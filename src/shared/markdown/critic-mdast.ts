@@ -1,8 +1,7 @@
 import type { Parent, PhrasingContent, Root } from 'mdast'
 import type { Node } from 'unist'
 import type { Sentinels } from '../critic/mask'
-// Container prefixes embedded in raw multi-line slices must NOT live in atom
-// content: serializers re-add prefixes per line (double-prefix otherwise).
+// Container prefixes belong to the enclosing Markdown node, not displayed atom content.
 import { stripLinePrefixes } from '../critic/scanner'
 import type { CriticSpan } from '../critic/types'
 
@@ -139,79 +138,6 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
     position: synthPosition(span),
   } as CriticCommentNode
   return node as unknown as PhrasingContent
-}
-
-/**
- * Milkdown's SerializerState closes marks after EVERY inline node and moves
- * boundary spaces outside mark nodes, so one `{++has **bold**++}` span leaves
- * the serializer as several criticInsert nodes separated by space-only text.
- * This pass (run on the serializer's mdast just before stringify) re-merges
- * adjacent wrap nodes that share a `spanIndex`, absorbing the exiled spaces.
- */
-/**
- * Milkdown's bullet-list/list-item toMarkdown runners leak `spread` as the
- * STRING "false"/"true" (ordered list converts it; these don't). A truthy
- * "false" makes remark-stringify emit loose lists, flipping tight lists on
- * every round-trip. Normalize to booleans before stringify.
- */
-export function fixSerializedSpread(tree: Node): void {
-  const walk = (node: Record<string, unknown>): void => {
-    if (typeof node.spread === 'string') node.spread = node.spread === 'true'
-    const children = node.children as Array<Record<string, unknown>> | undefined
-    if (children) for (const child of children) walk(child)
-  }
-  walk(tree as unknown as Record<string, unknown>)
-}
-
-export function mergeCriticSiblings(tree: Node): void {
-  const WRAP_TYPES = new Set<string>(['criticInsert', 'criticDelete', 'criticHighlight'])
-  const walk = (parent: Parent): void => {
-    for (const child of parent.children) {
-      if ((child as Parent).children) walk(child as Parent)
-    }
-    const children = parent.children as unknown as Array<Record<string, unknown>>
-    const out: Array<Record<string, unknown>> = []
-    let i = 0
-    while (i < children.length) {
-      const node = children[i]!
-      const type = node.type as string
-      const span = node.spanIndex as number | undefined
-      if (!WRAP_TYPES.has(type) || span === undefined || span < 0) {
-        out.push(node)
-        i++
-        continue
-      }
-      const absorbed = [...((node.children as unknown[]) ?? [])]
-      let j = i + 1
-      while (j < children.length) {
-        const next = children[j]!
-        const after = children[j + 1]
-        if (next.type === type && next.spanIndex === span) {
-          absorbed.push(...((next.children as unknown[]) ?? []))
-          j += 1
-          continue
-        }
-        if (
-          next.type === 'text' &&
-          typeof next.value === 'string' &&
-          /^ +$/.test(next.value) &&
-          after !== undefined &&
-          after.type === type &&
-          after.spanIndex === span
-        ) {
-          absorbed.push(next)
-          absorbed.push(...((after.children as unknown[]) ?? []))
-          j += 2
-          continue
-        }
-        break
-      }
-      out.push({ ...node, children: absorbed })
-      i = j
-    }
-    parent.children = out as unknown as Parent['children']
-  }
-  walk(tree as Parent)
 }
 
 /**

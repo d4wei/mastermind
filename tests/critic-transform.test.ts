@@ -101,7 +101,7 @@ describe('criticTransform via analyzeMarkdown', () => {
     expect(collect(tree, 'blockquote')).toHaveLength(1)
     const comments = collect(tree, 'criticComment') as CriticCommentNode[]
     expect(comments).toHaveLength(1)
-    // container prefixes are stripped from atom content (serializers re-add them)
+    // The enclosing blockquote owns its container prefixes.
     expect(comments[0]!.data.content).toBe('note line one\nnote line two')
     const quoteText = textOf(collect(tree, 'blockquote')[0]!)
     expect(quoteText).toContain('before')
@@ -112,6 +112,26 @@ describe('criticTransform via analyzeMarkdown', () => {
     const { tree } = analyzeMarkdown('前言 {++插入的文字++} 后记')
     const ins = collect(tree, 'criticInsert')[0] as CriticWrapNode
     expect(textOf(ins as Node)).toBe('插入的文字')
+  })
+
+  it('retains exact original positions and raw atom bytes with CRLF input', () => {
+    const source = '> {++**新增**++} {~~旧~>新~~} {>>line one\r\n> line two<<} tail'
+    const { tree } = analyzeMarkdown(source)
+    for (const type of ['criticInsert', 'criticSub', 'criticComment']) {
+      const node = collect(tree, type)[0]!
+      const start = node.position!.start.offset!
+      const end = node.position!.end.offset!
+      const slice = source.slice(start, end)
+      if (type === 'criticInsert') {
+        expect(slice).toBe('{++**新增**++}')
+        expect(collect(node, 'strong')).toHaveLength(1)
+      } else {
+        expect((node as CriticSubNode | CriticCommentNode).data.raw).toBe(slice)
+      }
+    }
+    const comment = collect(tree, 'criticComment')[0] as CriticCommentNode
+    expect(comment.data.raw).toBe('{>>line one\r\n> line two<<}')
+    expect(comment.data.content).toBe('line one\r\nline two')
   })
 
   it('plain documents pass through untouched', () => {
