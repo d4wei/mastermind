@@ -26,16 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-10 — Mine upstream's design rationale before any heavy change
-
-**Deferral.** The fork keeps most of what upstream built, and the author's reasons live in
-[`docs/product.md`](docs/product.md), [`themes/README.md`](themes/README.md), and the shipped plan
-[`docs/upstream-behaviors-plan.md`](docs/upstream-behaviors-plan.md). Heavy changes wait until that
-residual value is distilled into what the squad keeps and why.
-
-**Exit:** the distillation lands in [`docs/squad-fork.md`](docs/squad-fork.md) and the historical
-plan is deleted.
-
 ## 2026-10-10 — Agents answering in the file versus upstream's one-direction marks
 
 **Open question.** Upstream's invariant is that marks flow user → agent only: the shipped skills
