@@ -1,4 +1,5 @@
-import type { CriticSpan } from '../../../shared/critic/types'
+import type { CriticSpan, Range as SourceRange } from '../../../shared/critic/types'
+import { codeRanges } from '../../../shared/markdown/exclusions'
 import type { TextEdit } from '../../../shared/types'
 
 export interface SelRange {
@@ -9,7 +10,6 @@ export interface SelRange {
 
 export type SelError = 'empty' | 'cross-block' | 'unmapped' | 'overlaps-mark'
 export type SelResult = SelRange | { error: SelError }
-/** Multi-block result: one SelRange per spanned block, in document order. */
 export type MultiSelResult = { ranges: SelRange[] } | { error: SelError }
 
 const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote,pre'
@@ -19,7 +19,6 @@ function closestBlock(node: Node): HTMLElement | null {
   return el?.closest(BLOCK_SELECTOR) ?? null
 }
 
-/** Descend an element boundary point to the text leaf it borders. */
 function normalizePoint(node: Node, offset: number): { node: Node; offset: number } {
   let current = node
   let off = offset
@@ -38,11 +37,7 @@ function normalizePoint(node: Node, offset: number): { node: Node; offset: numbe
   return { node: current, offset: off }
 }
 
-/**
- * Map one selection endpoint to a source offset via the renderer's
- * data-ps/data-pe spans. Returns null when the span's rendered text length
- * differs from its source length (escapes/entities) — caller falls back.
- */
+/** Escapes and entities can make rendered offsets differ from source offsets. */
 function pointToOffset(rawNode: Node, rawOffset: number): number | null {
   const { node, offset } = normalizePoint(rawNode, rawOffset)
   if (node.nodeType !== Node.TEXT_NODE) return null
@@ -54,8 +49,7 @@ function pointToOffset(rawNode: Node, rawOffset: number): number | null {
   const pe = Number(span.dataset.pe)
   if (!Number.isFinite(ps) || !Number.isFinite(pe)) return null
   const value = span.textContent ?? ''
-  if (pe - ps !== value.length) return null // source has escapes/entities here
-  // walk text siblings inside the span (it normally holds a single text node)
+  if (pe - ps !== value.length) return null
   let prefix = 0
   let walker: Node | null = span.firstChild
   while (walker && walker !== node) {
@@ -66,22 +60,52 @@ function pointToOffset(rawNode: Node, rawOffset: number): number | null {
   return ps + prefix + offset
 }
 
+/** Code is atomic for review: put delimiters outside its backticks, never inside them. */
+function selectedInlineCode(range: Range, block: HTMLElement, source: string): SelRange | null {
+  for (const code of block.querySelectorAll<HTMLElement>('code.md-inline-code')) {
+    const content = code.ownerDocument.createRange()
+    const start = normalizePoint(code, 0)
+    const end = normalizePoint(code, code.childNodes.length)
+    content.setStart(start.node, start.offset)
+    content.setEnd(end.node, end.offset)
+    if (range.toString() !== code.textContent ||
+        range.compareBoundaryPoints(Range.START_TO_START, content) > 0 ||
+        range.compareBoundaryPoints(Range.END_TO_END, content) < 0) continue
+    const from = Number(code.dataset.ps)
+    const to = Number(code.dataset.pe)
+    if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
+      return { from, to, text: source.slice(from, to) }
+    }
+  }
+  return null
+}
+
+/** A surrounding mark can contain code, but neither delimiter may land inside it. */
+function splitsOpaqueSyntax(from: number, to: number, opaque: readonly SourceRange[]): boolean {
+  return opaque.some((r) =>
+    (r.start < from && from < r.end) || (r.start < to && to < r.end))
+}
+
 /**
  * One block-bounded DOM range → source offsets. Fast path through data-ps with a
  * slice-equality invariant; fallback to an unambiguous substring search within
  * the containing block; refusal otherwise. Never guesses on a mismatch. Assumes
  * the range stays inside `block` (callers split cross-block selections first).
  */
-function mapWithinBlock(range: Range, block: HTMLElement, source: string): SelResult {
+function mapWithinBlock(
+  range: Range, block: HTMLElement, source: string, opaque: readonly SourceRange[],
+): SelResult {
   const selectedText = range.toString()
   if (selectedText.length === 0) return { error: 'empty' }
+  if (block.tagName === 'PRE') return { error: 'unmapped' }
+  const code = selectedInlineCode(range, block, source)
+  if (code) return code
 
   let from = pointToOffset(range.startContainer, range.startOffset)
   let to = pointToOffset(range.endContainer, range.endOffset)
 
   const valid = from !== null && to !== null && to > from && source.slice(from, to) === selectedText
   if (!valid) {
-    // block-bounded substring search, only when unambiguous
     const bps = Number(block.dataset.ps)
     const bpe = Number(block.dataset.pe)
     if (!Number.isFinite(bps) || !Number.isFinite(bpe)) return { error: 'unmapped' }
@@ -92,6 +116,7 @@ function mapWithinBlock(range: Range, block: HTMLElement, source: string): SelRe
     to = from + selectedText.length
   }
 
+  if (splitsOpaqueSyntax(from!, to!, opaque)) return { error: 'unmapped' }
   return { from: from!, to: to!, text: selectedText }
 }
 
@@ -99,11 +124,6 @@ function overlapsMark(r: SelRange, spans: readonly CriticSpan[]): boolean {
   return spans.some((s) => r.from < s.end && r.to > s.start)
 }
 
-/**
- * DOM Range → single source range. Single-block only; cross-block returns an
- * error. Kept for callers that act on one contiguous span; the toolbar uses
- * {@link rangeToSourceRanges} so big selections can span blocks.
- */
 export function rangeToSource(range: Range, source: string, spans: readonly CriticSpan[]): SelResult {
   if (range.collapsed) return { error: 'empty' }
   if (range.toString().length === 0) return { error: 'empty' }
@@ -112,18 +132,13 @@ export function rangeToSource(range: Range, source: string, spans: readonly Crit
   const endBlock = closestBlock(range.endContainer)
   if (!startBlock || startBlock !== endBlock) return { error: 'cross-block' }
 
-  const r = mapWithinBlock(range, startBlock, source)
+  const r = mapWithinBlock(range, startBlock, source, codeRanges(source))
   if ('error' in r) return r
   if (overlapsMark(r, spans)) return { error: 'overlaps-mark' }
   return r
 }
 
-/**
- * The innermost blocks the range touches, in document order. A mark can't span a
- * block boundary in CriticMarkup, so a multi-block selection becomes one mark per
- * block; this enumerates those blocks. "Innermost" drops any ancestor block that
- * merely wraps another selected block (e.g. a blockquote around its paragraphs).
- */
+/** Ancestor containers must not duplicate the selected ranges of their nested blocks. */
 function blocksBetween(range: Range, startBlock: HTMLElement, endBlock: HTMLElement): HTMLElement[] {
   const ca = range.commonAncestorContainer
   const root = (ca.nodeType === Node.ELEMENT_NODE ? ca : ca.parentElement) as HTMLElement | null
@@ -142,14 +157,18 @@ function blocksBetween(range: Range, startBlock: HTMLElement, endBlock: HTMLElem
  * straddles a highlight/comment becomes the gaps on either side. Whitespace-only
  * gaps are dropped so we never emit an empty `{== ==}`.
  */
-function markFreeGaps(from: number, to: number, source: string, spans: readonly CriticSpan[]): SelRange[] {
+function markFreeGaps(
+  from: number, to: number, source: string, spans: readonly CriticSpan[], opaque: readonly SourceRange[],
+): SelRange[] {
   const blocking = spans
     .filter((s) => s.start < to && s.end > from)
     .sort((a, b) => a.start - b.start)
   const out: SelRange[] = []
   const push = (a: number, b: number): void => {
     const text = source.slice(a, b)
-    if (b > a && text.trim().length > 0) out.push({ from: a, to: b, text })
+    if (b > a && text.trim().length > 0 && !splitsOpaqueSyntax(a, b, opaque)) {
+      out.push({ from: a, to: b, text })
+    }
   }
   let cursor = from
   for (const m of blocking) {
@@ -161,31 +180,18 @@ function markFreeGaps(from: number, to: number, source: string, spans: readonly 
   return out
 }
 
-/** Block/list containers: an element whose nearest one of these is the target
- *  block belongs to that block directly (not to a nested list/paragraph). */
 const NESTED_CONTAINER = `${BLOCK_SELECTOR},ul,ol`
 
-/**
- * A whole leaf block's content source ranges — the markdown structural prefix
- * (`## `, `- `) excluded, inline markdown (`**`, links) included — split around
- * any existing marks. Unlike a DOM Range mapped through {@link rangeToSourceRanges}
- * (whose text must equal the source slice, which breaks on inline formatting), this
- * spans from the block's first inline `[data-ps]` offset to its last `[data-pe]`,
- * so it's robust for any block. Descendants that live inside a *nested* block or
- * list (a sub-list under a list item, a loose item's paragraph) are excluded, so
- * the range never crosses a block boundary or a blank line. Empty array if nothing
- * directly in the block can be marked.
- */
+/** Block actions retain inline syntax while excluding nested block content. */
 export function blockContentRanges(
   block: HTMLElement,
   source: string,
   spans: readonly CriticSpan[],
 ): SelRange[] {
+  if (block.tagName === 'PRE') return []
   let from = Infinity
   let to = -Infinity
   for (const el of block.querySelectorAll<HTMLElement>('[data-ps]')) {
-    // only inline content owned directly by `block` — skip nested blocks/lists
-    // (and their descendants), whose nearest container is something else.
     if (el.closest(NESTED_CONTAINER) !== block) continue
     const ps = Number(el.dataset.ps)
     const pe = Number(el.dataset.pe)
@@ -193,18 +199,10 @@ export function blockContentRanges(
     if (Number.isFinite(pe)) to = Math.max(to, pe)
   }
   if (from === Infinity || to <= from) return []
-  return markFreeGaps(from, to, source, spans)
+  return markFreeGaps(from, to, source, spans, codeRanges(source))
 }
 
-/**
- * DOM Range → the source ranges to wrap, one or more per spanned block. A mark
- * can't cross a block boundary or overlap an existing mark, so a big selection is
- * split at both: each spanned block contributes its selected slice, minus any
- * region already covered by a mark. Blocks whose slice can't be unambiguously
- * mapped (escapes/entities, code) are skipped, not fatal — the toolbar still acts
- * on everything that *can* be marked. Returns an error only when nothing in the
- * selection is markable (so the toolbar hides), never because one block was.
- */
+/** Unmappable blocks are skipped; markable blocks in the same selection remain available. */
 export function rangeToSourceRanges(range: Range, source: string, spans: readonly CriticSpan[]): MultiSelResult {
   if (range.collapsed) return { error: 'empty' }
   if (range.toString().length === 0) return { error: 'empty' }
@@ -217,6 +215,7 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
   if (blocks.length === 0) return { error: 'unmapped' }
 
   const ranges: SelRange[] = []
+  const opaque = codeRanges(source)
   for (const block of blocks) {
     // The single-block case uses the selection as-is; spanning blocks each get a
     // fresh range clamped to the selection where it enters/leaves, block edges
@@ -228,10 +227,10 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
       if (block === startBlock) sub.setStart(range.startContainer, range.startOffset)
       if (block === endBlock) sub.setEnd(range.endContainer, range.endOffset)
     }
-    if (sub.collapsed || sub.toString().trim().length === 0) continue // partial/whitespace-only edge
-    const r = mapWithinBlock(sub, block, source)
-    if ('error' in r) continue // unmappable block — skip it, keep the rest
-    ranges.push(...markFreeGaps(r.from, r.to, source, spans))
+    if (sub.collapsed || sub.toString().trim().length === 0) continue
+    const r = mapWithinBlock(sub, block, source, opaque)
+    if ('error' in r) continue
+    ranges.push(...markFreeGaps(r.from, r.to, source, spans, opaque))
   }
 
   if (ranges.length === 0) return { error: 'unmapped' }
@@ -239,11 +238,6 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
   return { ranges }
 }
 
-/**
- * Build the splice edits that wrap each block's slice in CriticMarkup. `wrap`
- * receives the slice text, its index, and whether it's the last range, so a
- * comment can be attached to just one block while the rest stay bare highlights.
- */
 export function markEdits(
   ranges: readonly SelRange[],
   wrap: (text: string, index: number, isLast: boolean) => string,
