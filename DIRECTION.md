@@ -26,13 +26,19 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-10 — Architecture ablation and the wishlist need a reviewed plan
+
+**Gap.** The product directions are settled in `DECISIONS.md`; their implementation is not.
+[`docs/architecture-review.md`](docs/architecture-review.md) maps the current system, deletion
+candidates, file-safety risks, and remaining choices, including wrapper selection and onboarding.
+
+**Exit:** the user reviews the plan and rules on the choices needed by its first implementation arc.
+
 ## 2026-10-10 — Agents answering in the file versus upstream's one-direction marks
 
-**Open question.** Upstream's invariant is that marks flow user → agent only: the shipped skills
-tell an agent never to add CriticMarkup, and the agent's changes show through the revision diff. The
-squad's review convention has an agent answer a comment in place with a consecutive
-`{>>@<harness>: …<<}`, so a question can be answered without a document change. The two cannot both
-hold.
+**Open question.** Upstream's setup block forbids agent marks; another section permits replies.
+The squad convention uses consecutive harness-tagged replies. The conflicts and author-neutral
+renderer support are inventoried in [`docs/squad-fork.md`](docs/squad-fork.md).
 
 **Exit:** a `DECISIONS.md` ruling, with the shipped skills, `AGENT_SETUP.md`, and the renderer's
 treatment of agent-authored comments brought to match.
@@ -46,16 +52,6 @@ upstream's author.
 
 **Exit:** a ruling on the default — translation available on demand, open never blocked — and the
 per-user language pair set at first run.
-
-## 2026-10-10 — The browser is the container until the squad says otherwise
-
-**Bet.** A standalone shell (Tauri, Electron) is the expensive end of a ladder whose cheap rungs —
-Chromium `--app=` mode, Safari's Add to Dock, a web manifest for Chrome's install — give a
-chromeless window with a Dock entry for no build cost. The tool's form-factor problem may be fully
-solved there.
-
-**Exit:** a week of squad use on app mode; a named failure of the browser container sizes a shell,
-or the bet is deleted.
 
 ## 2026-10-10 — Package and CLI identity
 

@@ -15,9 +15,9 @@ upstream-shaped commits so they remain sendable.
 The squad keeps the following design commitments from
 [`product.md`](product.md) and [`../themes/README.md`](../themes/README.md):
 
-- **"The file on disk is the protocol."** A plan, its CriticMarkup feedback, and the hand-back
-  summary travel together. A teammate or coding agent can participate with a text editor; the
-  review does not depend on an account, a service, or a second store of discussion state.
+- **"The file on disk is the protocol."** A plan and its CriticMarkup feedback travel together.
+  Upstream also appends a hand-back summary. A teammate or agent can participate with a text editor;
+  the review does not depend on an account, a service, or a second store of discussion state.
 - **"Reviewer-grade reading experience" and "the document column is sacred."** Typography,
   reading measure, and the margin rail serve long sessions of thinking about a document. Keep
   the quiet reading surface, keyboard shortcuts, and restrained chrome; a three-person audience
@@ -27,12 +27,13 @@ The squad keeps the following design commitments from
   document. The optional code-color preference remains an explicit exception. User-selectable
   fonts and themes support different readers without changing the document's content.
 - **"Marks are the data."** Review actions hang off source spans, and accepting a mark is an exact
-  splice. Keep byte-preserving source edits and the revision diff: readers can inspect what changed
-  without a Markdown serializer rewriting unrelated text. Who may author a mark remains an open
-  heavy-track question below.
-- **"Local, fast, silent" and the hand-back loop as "the product's spine."** Keep one reviewed file
-  per session, a stable CLI signal, and a summary in the file. Agents consume the file and stdout,
-  not the UI. The same loop remains legible with three people taking turns.
+  splice. Keep byte-preserving source edits without a Markdown serializer rewriting unrelated text.
+  Upstream's setup prose also promises a revision diff, but the current code has removed rounds and
+  snapshots; that promise is not a shipped capability. Who may author a mark remains open below.
+- **"Local, fast, silent" and the hand-back loop as "the product's spine."** Upstream's per-file
+  session, summary, and stdout signal make completion explicit. Keep the underlying principle that
+  agents consume files without driving the UI. The squad's later ruling in `DECISIONS.md` replaces
+  explicit hand-back with continuous saving; the upstream mechanism no longer binds the fork.
 
 The historical behaviors plan at upstream `3687c91` adds integration rationale worth retaining:
 
@@ -69,17 +70,24 @@ The four fixes from the first day of use have landed in separate upstream-shaped
 - Settings labels resist accidental selection. Author and language-search inputs remain
   selectable and editable.
 
-## Heavy track — candidates, not yet ruled
+## Heavy track — rulings and remaining candidates
 
-Each becomes a `DECISIONS.md` ruling before it is built, or is dropped.
+[`DECISIONS.md`](../DECISIONS.md) records settled product directions. The
+[`architecture review`](architecture-review.md) owns the wishlist, proposed ablation sequence, and
+remaining implementation choices. The user reviews that plan before any refactoring begins.
+
+The following original questions still need rulings before implementation:
 
 - Translation available on demand, never a gate on `open`; language pair per user at first run.
 - Agent-authored comments in the file (the squad's convention) versus upstream's one-direction
   marks, including how the renderer shows an agent's reply.
-- App-mode launch (`--app=` / web manifest) as the default container.
 - Package, CLI, and config-directory rename.
 - Squad-level configuration: a shared default for the review convention and language pair, with
   per-user author tags.
+
+The browser-container bet has graduated to the desktop-wrapper ruling. GUI onboarding, continuous
+saving without explicit hand-back, agent discretion over review-file selection, and cross-platform
+viability are also settled there; their implementation remains ahead.
 
 ### Agent-authored comments: current assumptions and existing support
 
