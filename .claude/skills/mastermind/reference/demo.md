@@ -20,6 +20,10 @@ writes a plan here; you mark it up; it reads the same file back.
   deletion*. It stays visible but {--struck through--}, so you can see what's queued
   for the agent. Changed your mind? Click the struck-through text to undo it.
 
+Use **Resolve** when a discussion is finished: it moves into the file's hidden archive and remains
+available in **Resolved**. **Delete comment** removes just that comment without keeping a record.
+Use Undo to reverse either action.
+
 ## A small table and some code
 
 | Surface | Purpose      |

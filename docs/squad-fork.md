@@ -74,7 +74,7 @@ The four fixes from the first day of use have landed in separate upstream-shaped
 
 [`DECISIONS.md`](../DECISIONS.md) records settled product directions. The
 [`architecture review`](architecture-review.md) owns the wishlist, proposed ablation sequence, and
-remaining implementation choices. The user's review is incorporated; implementation has not begun.
+remaining implementation choices and execution status. Implementation follows the approved plan.
 
 The following original questions still need rulings before implementation:
 
@@ -167,6 +167,10 @@ out as it settles.
 The user supplied five screenshots and two further observations. These are intake findings, not
 implemented fixes. Screenshots 2–3 came from a document that has since been processed away; its
 source cannot be inspected. The code checks below describe the current checkout at `0d83478`.
+
+These observations describe the initial trial. Subsequent implementation is recorded in the
+[architecture review](architecture-review.md); retain the evidence below as the original diagnosis,
+not a current bug-status list.
 
 1. **Selection is invisible in the comment composer (screenshot 1).** The user reports selected
    text has no visible highlight. `app.css` supplies one global selection color, while the composer

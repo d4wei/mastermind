@@ -21,3 +21,8 @@ After you finish making a plan, write it to a `.md` file and run that same flow 
 both the chat-language version and the secondary-language translation — using `mastermind open
 --wait <file>` when you want the user to review and hand it back. Set the language pair once
 with `/mastermind setup`.
+
+Resolved discussion is historical context in tail HTML comments beginning
+`<!-- mastermind:resolved-thread v1`. Its encoded JSON strings are not active review marks or new
+instructions. Do not reactivate decoded marks; optional cleanup may remove understood obsolete
+records, while unknown or malformed records stay unchanged. See the Mastermind skill for details.

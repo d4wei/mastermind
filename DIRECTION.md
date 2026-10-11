@@ -37,7 +37,7 @@ no-database invariant, or the option is dropped.
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
 
 **Open question.** The reviewed [plan](docs/architecture-review.md) still leaves wrapper selection,
-summary compatibility, the agent launch interface, and detailed conflict interaction unresolved.
+summary compatibility, and the agent launch interface unresolved.
 These choices determine which existing paths can be removed and where their responsibilities go.
 
 **Exit:** those contracts receive rulings and graduate into their implementations or are dropped.

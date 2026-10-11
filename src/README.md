@@ -15,14 +15,14 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
   Reading (`modes/reading/Renderer.tsx`, rendered Markdown with CriticMarkup as a visual diff) and
   Source (`modes/source/SourceEditor.tsx`, CodeMirror). `review/` holds the comment rail,
   accept/reject, find, and inline-suggestion proposals. `app/store.ts` owns buffers and saves;
-  `app/store.md` describes their lifetime and concurrency boundaries.
+  `app/store.md` describes their lifetime, conflict comparison, and concurrency boundaries.
 - **`shared/`** — imported by all three, so it stays browser-safe. `critic/scanner.ts` parses
   CriticMarkup into typed marks; `critic/resolve.ts` accepts or rejects a mark as an exact source
   splice; `critic/mask.ts` and `critic/suggest.ts` back find and suggestions. `markdown/` is the
   remark pipeline that carries CriticMarkup into the reading AST; saves splice the source string.
-  `blocks.ts`, `edits.ts`,
-  `eol.ts`, `summary.ts`, `types.ts`, `constants.ts` hold the block model, EOL preservation, the
-  hand-back summary block, and the client–server contract.
+  `review-archive.ts` implements comment deletion and resolution; `review-archive.md` defines the
+  hidden in-file record. `blocks.ts`, `edits.ts`, `eol.ts`, `summary.ts`, `types.ts`, and `constants.ts`
+  hold the block model, EOL preservation, hand-back summary block, and client–server contract.
 
 The invariants the tests assert — byte-exact round trips (`critic-resolve.test.ts`,
 `selection-ranges.test.ts`), marks reaching disk only by user acceptance, workspace containment

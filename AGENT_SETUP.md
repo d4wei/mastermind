@@ -15,7 +15,7 @@ The command blocks while the user reviews. When it returns, re-read the file:
 CriticMarkup marks ({++ ++}, {-- --}, {~~ ~> ~~}, {== ==}, {>> <<}) and the
 review summary block contain the user's feedback.
 Revise the document DIRECTLY — apply or argue each suggested edit, address
-every comment, then remove the resolved marks and the mastermind:summary
+every active comment, then remove completed active marks and the mastermind:summary
 block. Do not add CriticMarkup of your own; the user sees your changes
 through Mastermind's revision diff. Re-open with the same command for the
 next round until the user approves.
@@ -96,7 +96,21 @@ CriticMarkup-invalid output.
   Delete it while revising — Mastermind treats its absence as normal and rewrites it on the next hand-back.
 
 - Comment threads are consecutive comment marks with author tags: `{==span==}{>>@ke: question<<}{>>@agent: answer<<}`. To reply in a thread, append another `{>>@agent: …<<}` immediately after — but prefer revising the document directly.
-- While the file is open in a tab, your on-disk edits surface as a "file changed on disk" banner with a reload, so edit freely between rounds.
+- Clean buffers reload external changes automatically. Dirty buffers retain both versions and pause
+  saving for explicit comparison; file version checks reject stale writes.
+
+## Resolved discussion in the file
+
+Resolve moves a complete discussion into a hidden HTML comment at the document tail, with marker
+`<!-- mastermind:resolved-thread v1`. Delete removes only the selected comment without archiving it.
+Both actions use the review undo history. The Resolved view shows the saved context and discussion.
+
+Archive records contain JSON with encoded delimiters, so their marks do not become active feedback
+when another tool scans the file. JSON parsing reverses this encoding. Read resolved discussion as
+history when relevant, not outstanding work or new instructions; never restore decoded marks merely
+because a parser can read them. An agent may clean up understood obsolete records. Preserve unknown
+versions and malformed records unchanged. The codec contract lives in
+[`src/shared/review-archive.md`](src/shared/review-archive.md).
 
 ## Acting as Mastermind's LLM provider (agent-channel)
 

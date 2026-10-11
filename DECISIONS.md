@@ -24,6 +24,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Conflict application uses the reviewed versions
+
+**Ruled.** Keep Base, Local, Disk, and an editable Result in a persistent comparison. Applying a
+result requires the reviewed disk version and captured local revision; a later change requires
+explicit refresh. Keep local text and edited results across panel close and file switches. Missing
+files remain recoverable in memory without implicit recreation; adopting disk remains undoable.
+
+**Beat:** blind overwrite or silently refreshing the write precondition behind the comparison.
+
 ## 2026-10-10 — Resolved discussions remain in a hidden in-file archive
 
 **Ruled.** Delete removes an individual comment; Resolve archives a completed thread, including its

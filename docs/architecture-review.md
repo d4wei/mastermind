@@ -47,8 +47,6 @@ boundaries; any retained root-scoped operation must still enforce its root.
 
 ### `translate-blocks <file>`
 
-
-
 Emits missing translation blocks as JSON; `--save` accepts translated JSON and writes the cache.
 The agent supplies the translation. A block is a source slice derived from a top-level Markdown
 node; lists split into individual items. Headings and paragraphs are separate blocks. Code, HTML,
@@ -103,20 +101,18 @@ state, not a dependency or a second store for review feedback in this iteration.
 The original source findings below now have controlled regressions and fixes for navigation, stale
 responses, slow saves, and competing writes. Document ownership lives in
 [`store.md`](../src/ui/app/store.md); filesystem guarantees and limits live in
-[`files.md`](../src/server/files.md). The detailed comparison/merge UI remains unbuilt.
+[`files.md`](../src/server/files.md). The explicit comparison panel now uses those same ownership
+and version checks.
 
 The implemented regression cases live in `tests/document-store.test.ts` and
 `tests/file-safety.test.ts`. Keep these cases when changing the host. Browser unload currently
 requests a prompt while retained buffers are dirty or saving; native close must wait for completion
 or present a recoverable failure. Keep a user-visible save state.
 
-For external changes, propose automatic reload only when the buffer is clean; otherwise retain base,
-local, and disk versions for an explicit comparison/merge. Content-based version checks are stronger
-than mtime alone. Atomic replacement can avoid partial file contents but does not make a preceding
-read/check atomic against unrelated writers. Do not claim lossless concurrent editing without a
-cooperative protocol. Symlinks, permissions, and platform replacement behavior need explicit tests.
-The reviewed direction is clean-buffer reload and explicit comparison/merge for a dirty buffer.
-The interaction details remain to be designed before implementation.
+Clean-buffer reload and explicit comparison for dirty buffers are implemented. The comparison
+contract lives with the store; the source snapshots, edited result, and guarded apply actions are
+covered by `tests/document-store.test.ts` and `tests/conflict-panel.test.tsx`. Native close must
+still wait for completion or offer recovery; the browser cannot supply that lifecycle guarantee.
 
 ## Proposed deletion and consolidation
 
@@ -147,7 +143,7 @@ requirement; packaging and native behavior still need testing on each platform.
 
 - **Electron** embeds Chromium and Node. The existing React UI and Node filesystem/watch/cache code
   fit that process model. Proposed shape: privileged document operations in the main process,
-  narrow preload IPC to the renderer, and no separate always-running HTTP daemon. This appears to
+  narrow preload IPC to the renderer, with no production HTTP server. This appears to
   require less backend adaptation for this repository; that is an inference, not a measured result.
   See [Electron's introduction](https://www.electronjs.org/docs/latest/) and
   [process model](https://www.electronjs.org/docs/latest/tutorial/process-model).
@@ -186,53 +182,16 @@ Include actual macOS automation and the browser preview in the wrapper compariso
 
 ### Comment lifecycle
 
-The trial raises a separate question from agent replies: deleting one comment versus resolving a
-whole thread, and whether resolution retains a record. Current behavior is inventoried in
-[the trial notes](squad-fork.md#trial-notes).
+Delete, Resolve, and the Resolved view are implemented. The versioned, hidden in-file record and
+its compatibility rules live in [`review-archive.md`](../src/shared/review-archive.md). The codec
+uses the existing Markdown parser and native JSON encoding; no new parser or HTML-rendering library
+is needed. Regression cases cover byte preservation, safe escaping, active mark discovery,
+translation exclusion, malformed records, stale actions, and undo. The external markup parser was
+also checked against the emitted archive: historical marks remain inactive.
 
-Approved direction: Delete removes an individual comment; Resolve moves a completed thread
-into an in-file archive at the document's tail. Both actions support undo. Resolution preserves the
-quoted context, authors, and discussion, while removing its active comment marks from the body.
-Resolving a discussion must not implicitly accept or reject an attached suggested edit. Retention
-in a hidden tail archive is approved; the record encoding below still needs implementation fixtures.
-
-Markdown can hide content with [HTML comments][commonmark-html]. The current renderer already hides
-comment nodes, the review scanner excludes HTML ranges, and translation skips HTML blocks. A
-read-only synthetic check with a Critic comment inside an HTML comment produced no active spans and
-an untranslatable HTML block. These existing behaviors make a hidden tail archive a small extension;
-they do not constitute an archive reader or a lifecycle implementation.
-
-Proposed shape: a versioned HTML-comment block with an explicit resolved-discussion marker and
-readable records. Keep quoted context and the original thread text, including author tags; avoid
-stale source offsets as the only context after the document changes. Finalize the minimal record
-syntax with fixtures before implementation. Arbitrary discussion can contain HTML-comment openers
-and terminators, so define reversible escaping and test it rather than inserting raw text blindly.
-Preserve unknown versions and malformed records verbatim; surface a diagnostic instead of discarding
-them. An unedited open/save must preserve archive bytes and line endings along with the document.
-
-The normal reading surface stays quiet. An explicit Resolved view can expose the archived threads;
-source readers and agents can always inspect the tail. Archived discussion is historical context,
-not outstanding feedback or new instructions. The receiving agent may clean it up when appropriate,
-as the user suggested; retaining it must not force a permanent audit log. Specify that discretion in
-the shipped review guidance. Do not automatically resurrect archived marks. Reopening a thread and
-relocating its anchor can wait for an actual need; undo covers immediate accidental resolution.
-
-A visible appendix is the simpler fallback if hidden records make source editing awkward.
-[GitHub also supports collapsed `<details>` sections][collapsed-sections], but Mastermind currently
-renders those tags literally. Collapsed content is also still part of the ordinary document, and
-Critic marks inside it need explicit exclusion from active review. Prefer HTML comments for this
-proposal rather than adding general HTML rendering just for an archive. Neither option makes the
-content private; it remains in the file and its Git history.
-
-Acceptance cases for the lifecycle arc: standalone and anchored threads, consecutive replies,
-Unicode and spaced author names, literal comment delimiters, CRLF/no-final-newline input, repeated
-resolution, undo, unknown archive versions, and external edits during resolution. Check counts,
-rendering, translation, and agent mark discovery against the same fixtures. The external markup
-skill's parser is a compatibility boundary to verify, not something this app's HTML exclusion checks
-establish. No SQLite-only or sidecar-only discussion store satisfies the file-only protocol.
-
-[commonmark-html]: https://spec.commonmark.org/0.31.2/#html-blocks
-[collapsed-sections]: https://docs.github.com/en/get-started/writing-on-github
+Receiving-agent guidance distinguishes active feedback from resolved history. Agent-authored
+replies remain a separate open ruling. Reopening archived threads and relocating their anchors can
+wait for an actual need; undo covers immediate accidental resolution.
 
 ## Rendering and frontmatter
 
@@ -337,6 +296,6 @@ close/reopen, and actual platform builds, not just a framework's support list.
 Execution is approved. The first batch delivered document-owned buffers and save scheduling,
 version-checked file writes, the initial ablation, and the three small comment-display fixes. Tests
 cover the previously failing schedules; a browser smoke check exercised source autosave, clean
-external reload, author labels, soft wraps, and selected input text. The conflict-comparison flow,
-archive implementation, cross-list mark handling, responsive chrome, wrapper selection, and other
-explicitly open contracts remain ahead.
+external reload, author labels, soft wraps, and selected input text. The next batch added guarded
+conflict comparison and hidden resolved discussions with per-comment deletion. Cross-list mark
+handling, responsive chrome, wrapper selection, and the explicitly open contracts remain ahead.
