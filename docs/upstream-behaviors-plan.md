@@ -1,3 +1,6 @@
+> Status: historical. Upstream's plan for the behaviors that shipped in v0.2.x, kept unedited as the
+> record of the author's rationale until it is distilled into `squad-fork.md`; then it is deleted.
+
 # Plan — Default "designed behaviors" for every Mastermind install
 
 **Goal.** When anyone installs Mastermind, they also get a set of agent behaviors:

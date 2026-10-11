@@ -122,6 +122,21 @@ Themes are just data — drop a `themes/<id>/{theme.json,tokens.css}` folder in 
 
 *Themes, typeface, code font, code-color scheme, and your two reading languages — all in Settings.*
 
+## Developing
+
+```sh
+npm run dev        # tsx-watched daemon on :5199 + Vite dev server on :5173 (proxies to daemon)
+npm test           # vitest run — full suite
+npm run test:watch # vitest watch
+npm run typecheck  # tsc against tsconfig.json (browser) and tsconfig.node.json (cli/server)
+npm run build      # vite build (UI) + tsup (cli + server) — required before the bin works
+```
+
+Run one test file or one test: `npx vitest run tests/critic-scanner.test.ts`,
+`npx vitest run -t "name of the test"`. From a clone that is not npm-linked, run the CLI as
+`node bin/mastermind.js <cmd>`. The layer map is in [`src/README.md`](src/README.md); the design-system
+token contract is in [`themes/README.md`](themes/README.md).
+
 ## Commands
 
 ```sh
