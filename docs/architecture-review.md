@@ -130,49 +130,172 @@ silently cleaned up on open. The public skill supports author-tagged replies and
 - **Retire the separate workspace UI and app-owned harness installer.** Replace their entry points
   with native file access and harness-owned installation guidance. Remove tree/badge/session code
   only after checking which pieces remain necessary for opening an agent-selected set of files.
+### Root Markdown cleanup in the ablation
+
+Inventory checked at `7ae2863`. Keep root entry points and canonical ledgers; do not relocate every
+file into a general documentation bucket. No scratch document below is consumed by the automated
+suite. Existing files under `tests/fixtures/` remain byte-exact.
+
+- **Keep:** `README.md`, `AGENTS.md`, `CLAUDE.md`, `DIRECTION.md`, and `DECISIONS.md`. Each is a
+  repository entry point or canonical operating ledger, rather than a loose topic document.
+- **Retire `dummy-plan.md`:** a disposable theme-toggle mock with fictional paths and an obsolete
+  generated summary. The bundled demo already supplies a maintained starting point.
+- **Retire `sample-doc.md`:** another disposable migration-plan example, with no tracked consumers.
+  Keep the shipped demo and tested corpus rather than another unsupervised copy.
+- **Move and tighten `feature-test.md` into `tests/manual/review-interactions.md`:** preserve the
+  deliberate cross-block and callout examples as a manual exercise, remove the false one-direction
+  claim, and use durable expected outcomes. It is not a byte-exact automated fixture. Update the
+  historical pointer in `docs/squad-fork.md` so the original trial remains understandable.
+- **Fold `AGENT_SETUP.md` into `assets/agent/README.md`:** keep installation/removal explanation
+  beside the packaged agent assets; link the actual skill and protocol instead of duplicating them.
+  Update the root README, plan-review instruction, CLI help pointer, and historical inventory.
+  The installer remains until its separately approved retirement has a replacement entry point.
+- **Retire `.impeccable.md`:** it is an upstream landing-page brief, including obsolete hand-back,
+  one-direction review, and npm-release claims. Its durable app design rationale already lives in
+  `themes/README.md`. Preserve only still-applicable site-specific rationale in `site/README.md`
+  beside the Astro site; do not transplant upstream personal preferences as squad requirements.
+
+Check incoming links and any tool discovery contract before each deletion or move. No installed
+plugin behavior is inferred merely from a dotfile name. Review the retained site prose with the
+site itself; this cleanup does not publish or redesign the landing page. Retiring a source reference
+requires fixing its callers in the same commit. Delete this inventory once those changes land;
+durable guidance belongs at the destination.
+
+
 ## Desktop wrapper choice
 
-Both candidates support macOS, Windows, and Linux. Cross-platform capability is a selection
-requirement; packaging and native behavior still need testing on each platform.
+Research checked on 2026-10-10 against the reduced implementation at `7ae2863`. No wrapper is
+selected. Recommendation: shortlist Electron and Tauri with native file services; favor Electron
+provisionally for this repository, then test whether Tauri earns its extra porting work.
 
-- **Electron** embeds Chromium and Node. The existing React UI and Node filesystem/watch code
-  fit that process model. Proposed shape: privileged document operations in the main process,
-  narrow preload IPC to the renderer, with no production HTTP server. This appears to
-  require less backend adaptation for this repository; that is an inference, not a measured result.
-  See [Electron's introduction](https://www.electronjs.org/docs/latest/) and
-  [process model](https://www.electronjs.org/docs/latest/tutorial/process-model).
-- **Tauri** uses a Rust core and platform webviews. Reusing the Node backend is possible through a
-  packaged sidecar; otherwise its filesystem services need porting. Compare the extra process
-  boundary against a Rust implementation before treating the wrapper as thin. See
-  [Tauri architecture](https://v2.tauri.app/concept/architecture/) and
-  [Node sidecars](https://v2.tauri.app/learn/sidecar-nodejs/).
+### The architecture both candidates should serve
 
-Recommendation for review: favor Electron if keeping the current backend minimizes total machinery.
-Keep Tauri in contention if a small packaged experiment shows a simpler result at acceptable porting
-cost. After approval, compare open/save/watch, multiple documents, app reopen, agent invocation,
-and shutdown on the supported platforms. Measure package size, startup, and idle memory rather
-than selecting on generic framework claims. No wrapper is selected by this document.
+The app needs a privileged local host for file access, watching, dialogs, opening paths from an
+agent, and save-aware shutdown. It does not need a production HTTP listener or detached daemon.
+The browser engine draws the React interface; the host performs privileged operations through a
+small bridge. IPC means messages between those app processes, not a remote backend.
 
-### Preserve the browser development loop
+Keep the Markdown parser, exact-splice review core, translation projection, and document buffers
+in TypeScript. Put version-checked file reads/writes and watching behind a narrow host interface.
+Move responsibilities, not the Hono routes, port scanning, health probes, or idle-daemon lifecycle.
+The current contracts in `src/server/files.md` and `src/ui/app/store.md` remain the acceptance bar.
+A native file plugin's plain read/write calls do not by themselves replace those contracts.
 
-A desktop wrapper adds native integration to test; it need not remove browser iteration on the React
-UI. Proposed constraint: keep the same UI runnable at a local development URL, with a narrow host
-interface for file access, dialogs, and lifecycle. Use a development adapter or fixtures for that
-interface; do not retain the production detached daemon solely to make previews work.
+The same React surface should run at a local development URL through a development adapter.
+That preserves browser iteration without making an HTTP server part of the shipped desktop app.
+Native open/save/quit behavior must also run against the real packaged host.
 
-Codex's [built-in browser](https://learn.chatgpt.com/docs/browser?surface=app) can inspect, interact
-with, and screenshot local web apps. Those checks cover typography, selection, comments, and layout.
-Native dialogs, application menus, keyboard focus, file associations, and quit/reopen behavior still
-need checks in the actual desktop app. Native accessibility/screenshot control is available in this
-session, but browser DOM access to every wrapped webview should not be assumed.
+### Electron: strongest fit with the current implementation
 
-[Playwright supports Electron automation](https://playwright.dev/docs/api/class-electron), currently
-marked experimental; native dialogs need separate handling. [Tauri's testing guide][tauri-tests]
-describes mock-runtime and end-to-end options, including a WebdriverIO route for macOS. Its mock
-runtime does not execute native webviews. Neither framework makes browser-only tests sufficient.
-Include actual macOS automation and the browser preview in the wrapper comparison before selection.
+[Electron][electron-process] bundles Chromium and Node. Its main process can run the existing Node
+file services; the renderer keeps React and CodeMirror. Expose specific document operations through
+an isolated preload bridge, following [Electron's IPC guidance][electron-ipc], rather than exposing
+arbitrary filesystem or IPC access to rendered document content.
 
-[tauri-tests]: https://v2.tauri.app/develop/tests/
+For this codebase, that means adapting the existing `files.ts`, `watch.ts`, config, and artifact
+services instead of rewriting them in another language. A consistent Chromium renderer reduces
+engine variation in selection, geometry, CodeMirror, and Chinese text input, although operating
+system differences still require testing. These are repository-specific advantages, not measured
+claims about our future desktop build.
+
+The cost is carrying a browser and Node runtime for a small document utility. Package size, total
+process memory, startup, and update burden matter; no size or memory estimate is established here.
+Electron itself does not require keeping our HTTP server. Its host owns the application lifetime.
+
+[Playwright's Electron support][electron-tests] drives the real application and is currently
+experimental. Browser tests remain useful, but native dialogs, menus, focus, and quit handling need
+separate checks. This is the shortest apparent route to reuse our existing implementation and tests.
+
+### Tauri with native file services: a credible smaller-runtime alternative
+
+[Tauri][tauri-architecture] uses a Rust host and system webviews. It avoids shipping Chromium by
+default. [Its process model][tauri-process] uses different webview implementations across platforms;
+that makes our actual selection and editing behavior a required comparison, not an assumed match.
+The React/TypeScript document core can remain intact; choosing Tauri does not mean rewriting the UI
+or CriticMarkup parser in Rust.
+
+Tauri's [filesystem plugin][tauri-fs] supplies reads, writes, watching, and path scopes. The missing
+work is our application-specific file contract: version tokens, competing writes, symlink and inode
+behavior, watcher echoes, and save completion before close. Implement that in a focused native
+service and port its behavioral tests. Avoid rebuilding the retired workspace or queue machinery.
+
+The strongest argument for Tauri is the final product: a small local document utility with a narrow
+native boundary. The strongest argument against it is that we have just stabilized precisely the
+file-safety code that would need porting. Rust is an additional implementation and build toolchain;
+its presence is neither a disqualifier nor a reason to rewrite more than this boundary needs.
+Do not overstate that port: the current file read/write and watcher modules together occupy only
+140 lines at the inspected revision. That is not an effort estimate, but it argues against choosing
+Electron merely because Node code already exists. The difficult part is preserving behavior.
+
+Current [Tauri WebDriver guidance][tauri-tests] supports macOS through WebdriverIO's embedded
+provider, alongside Windows and Linux. The older claim that desktop macOS automation is unavailable
+is too broad. Include that debug-only integration in the experiment; do not ship an automation
+server in release builds. Its reliability for our app remains unmeasured.
+
+### Other shapes considered
+
+- **Tauri with a Node sidecar:** [supported][tauri-sidecar], and it could reuse file services. It
+  adds the Rust host, a packaged Node process, and another lifecycle/communication boundary. It
+  need not use HTTP, but for our reduced app it weakens the reason to prefer Tauri. Keep it out of
+  the first comparison unless a native port reveals a concrete blocker.
+- **Electrobun:** worth knowing about, but not the initial baseline. Its current
+  [platform guide][electrobun] offers system webviews or bundled CEF and requires native
+  build/test runners; its published architecture matrix has caveats, including no macOS x64 core
+  artifact in the documented release workflow. We have not validated its runtime compatibility,
+  lifecycle, or automation against this app. It earns a trial if the two main candidates both fail
+  a requirement; a framework change alone is not a product benefit.
+- **Neutralinojs:** [its architecture][neutralino] uses HTTP for resources and WebSockets for native
+  calls. That is a weak match for the desired removal of the server-shaped runtime, even though the
+  server is local. No first-round experiment recommended.
+- **A custom macOS-only shell:** conflicts with the approved cross-platform direction. A native UI
+  rewrite would also discard the web rendering/selection layer we intend to keep.
+
+### What would decide the choice
+
+The crux is whether carrying Chromium costs more in daily use than porting and maintaining the
+native file boundary plus testing different webviews. Generic framework benchmarks cannot answer
+that for this app. Cross-platform support provides a path, not free release validation. Both
+[Electron][electron-distribution] and [Tauri][tauri-distribution] still require packaging,
+signing, and actual platform tests.
+
+Proposed bounded comparison, before a framework ruling:
+
+1. Run the same current React UI and corpus in one Electron host and one Tauri host. Pin the trial
+   dependencies. Start with one window and chosen files, not onboarding or a new navigation design.
+2. Exercise unchanged CRLF round trips, exact mark splices, translated quotes, external replacement,
+   conflicting writes, two open documents, slow saves, and a failed save during attempted quit.
+   Verify file permissions/symlinks and all affected document bytes, not just visible success.
+3. Open multiple paths from an agent with the app cold and already running. The launcher returns
+   after files are accepted for opening; it does not wait for review completion. Finder opening and
+   drag/drop are separate native entry points to the same operation.
+4. Test Chinese IME composition, selection across formatted text, comment popover placement,
+   keyboard shortcuts, file dialogs, and focus in the real macOS app. Demonstrate an automated
+   desktop smoke test and the ordinary browser preview for each candidate.
+5. Measure packaged size, cold open-to-readable time, aggregate idle memory across app processes,
+   and native code/adapter complexity using identical documents and repeated runs. Record hardware,
+   build mode, framework versions, and the measurement method with the results.
+6. Build and smoke-test Windows and Linux packages on native runners before claiming portability.
+   A missing runner is an explicit evidence gap. Choose after reviewing correctness and measured
+   tradeoffs; neither candidate wins merely by launching a blank window.
+
+Favor Electron if both pass and Tauri's smaller package does not produce a worthwhile daily-use
+improvement. Favor Tauri if its file service stays small, its native automation works reliably, and
+its measured footprint justifies the port without weakening file safety or review interactions.
+No numerical performance threshold is invented before seeing the baseline; agree a threshold if
+measurements expose a real tradeoff. The initial comparison remains a proposal for review.
+
+[electron-process]: https://www.electronjs.org/docs/latest/tutorial/process-model
+[electron-ipc]: https://www.electronjs.org/docs/latest/tutorial/ipc
+[electron-tests]: https://playwright.dev/docs/api/class-electron
+[electron-distribution]: https://www.electronjs.org/docs/latest/tutorial/distribution-overview
+[tauri-architecture]: https://v2.tauri.app/concept/architecture/
+[tauri-process]: https://v2.tauri.app/concept/process-model/
+[tauri-fs]: https://v2.tauri.app/plugin/file-system/
+[tauri-tests]: https://tauri.app/develop/tests/webdriver/
+[tauri-sidecar]: https://v2.tauri.app/learn/sidecar-nodejs/
+[tauri-distribution]: https://v2.tauri.app/distribute/
+[electrobun]: https://framework.blackboard.sh/electrobun/guides/cross-platform-development/
+[neutralino]: https://neutralino.js.org/docs/contributing/architecture/
 
 ### Comment lifecycle
 
@@ -234,9 +357,9 @@ presentation direction.
   Optional Git commits remain a separate proposal, with file scope and timing unresolved; autosave
   should not implicitly stage or commit unrelated repository changes.
 - **Translation and squad configuration:** support repo-language-only operation and an optional
-  comfort language, with translations supplied by the invoking agent. Decide nonblocking opening
-  when translation is enabled, live versus prepared translation, and how repo settings are stored
-  and discovered before changing those contracts. Comfort language remains a personal preference.
+  comfort language, with fresh translations supplied by the invoking agent. Nonblocking opening
+  and prepared delivery have shipped. Repository settings still need storage and discovery;
+  comfort language remains a personal preference.
 - **Package identity:** choose the name before distribution changes; package, executable, and config
   migration still need a ruling. A wrapper does not remove collisions with upstream automatically.
 - **Claude Code Mods:** retain as an aspiration. Anthropic's
