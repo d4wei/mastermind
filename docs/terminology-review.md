@@ -6,7 +6,7 @@ exit: naming choices are accepted or rejected and adopted terms live with their 
 # Terminology review
 
 These are naming proposals for the application at `e5c501d`, not adopted labels or schema changes.
-The exercise covers distinct concepts in the UI, agent instructions, configuration, file formats,
+The review covers distinct concepts in the UI, agent instructions, configuration, file formats,
 implementation contracts, and design documents. Related inflections and synonyms are grouped.
 Ordinary verbs and third-party names are included in the retain inventory rather than given new
 names. Internal variables that introduce no distinct concept are outside this vocabulary review.
@@ -24,15 +24,18 @@ technical names identify the precise operation or data being discussed.
 | UI language | Interface language | 界面语言 |
 | Repo language | Project language | 项目语言 |
 | Source, as an editor mode | Markdown | Markdown |
-| Author tag, in Settings | Comment name | 评论署名 |
+| Author tag, in Settings | Display name | 显示名称 |
 | Prepared translation, in notices | Translation | 译文 |
 | Edits, as a review search filter | Suggested edits | 修改建议 |
 | Original thread, in resolved history | Discussion | 讨论 |
-| Base / Local / Latest disk / Result | See the comparison exercise below | 见版本比较 |
+| Base, in conflict comparison | Base version | 基准版本 |
+| Local, in conflict comparison | Your edits | 你的编辑 |
+| Latest disk, in conflict comparison | File on disk | 磁盘文件 |
+| Result, in conflict comparison | Merge result | 合并结果 |
 | Session, in document errors | Open document | 已打开的文档 |
 | Typeface | Font preset | 字体预设 |
-| Code color | Syntax colors | 语法配色 |
-| Content width | Reading width | 阅读宽度 |
+| Code color | Code color scheme | 代码配色 |
+| Content width | Text width | 正文宽度 |
 | Smart open | Open selected files | 打开所选文件 |
 | Ablation | Removal and refactoring | 移除与重构 |
 | Wrapper, in product descriptions | Desktop app | 桌面应用 |
@@ -177,12 +180,15 @@ Do not promise a persistent block identity or character-by-character translation
 
 Evidence: [author defaults][preferences] and [public protocol][protocol].
 
-Candidates for the Settings field: **Comment name**, **Comment signature**, **Author tag**.
-Recommend **Comment name / 评论署名**. The reader supplies a name; the app writes an `@name:`
-signature. Author can be mistaken for the document's author, and tag sounds like a category.
-Comment signature is accurate but can suggest a full signature block.
+This Settings field supplies the name shown beside comments and written into their `@name:`
+signatures in Markdown. It does not name a comment or require an account.
 
-Try: “Comment name: Alex. Your comments will be signed @Alex.”
+Candidates for the Settings field: **Display name**, **Comment signature**, **Author tag**.
+Recommend **Display name / 显示名称**, with the helper “Shown beside your comments.” / “显示在评论旁。”
+Comment name can sound like a title for a comment. Author can be mistaken for the document's author,
+and tag sounds like a category. Comment signature can suggest a full signature block.
+
+Try: “Display name: Alex.” A comment is then attributed to Alex and stored with `@Alex:`.
 Keep **author tag** in protocol documentation and `authorTag` in code: there it names actual syntax.
 A signature records attribution, not an authenticated identity.
 
@@ -352,21 +358,30 @@ and recovery action without inventing a replacement background service.
 
 ## 12. Appearance and layout
 
-Evidence: [settings][settings], [font presets][fonts], [syntax colors][colors], and
+Evidence: [settings][settings], [font presets][fonts], [code color schemes][colors], and
 [themes][themes].
 
 Candidates for Typeface/type set: **Font preset**, **Font pairing**, **Typography preset**.
-Recommend **Font preset / 字体预设**: it selects heading/body families and associated styling, and
-some presets use the same family for both. Pairing overemphasizes two distinct fonts; typography
-preset is more technical. A later implementation can rename `typeSet` to `fontPreset` together with
-its registry if that improves the contract; this is not necessary for the label change.
+Recommend **Font preset / 字体预设**: it selects heading and body font families, heading weight, and
+heading letter spacing. For example, the Bricolage preset uses Bricolage Grotesque for headings and
+Inter for body text. Some presets use the same family for both. Pairing overemphasizes two distinct
+fonts; typography preset is more technical. If the feature later selects only a font, label it Font.
+A later implementation can rename `typeSet` to `fontPreset` together with its registry if that
+improves the contract; this is not necessary for the label change.
 
 Candidates for Code color: **Syntax colors**, **Syntax highlighting**, **Code color scheme**.
-Recommend **Syntax colors / 语法配色**. The choice is among color palettes or Off; highlighting alone
-can be confused with review highlights. Keep named palettes Soft, Vivid, Warm, with 柔和、鲜明、暖色.
+Recommend **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
+established feature name is [syntax highlighting][syntax-highlighting], but this control selects its
+palette. Naming code explicitly avoids assuming the reader knows what syntax refers to. Syntax
+colors is less recognizable, and highlighting alone can be confused with review highlights.
+Keep named palettes Soft, Vivid, Warm, with 柔和、鲜明、暖色.
 
 Candidates for Content width: **Reading width**, **Text width**, **Content width**.
-Recommend **Reading width / 阅读宽度** because the control sets the document column's measure.
+Recommend **Text width / 正文宽度**: the control sets the maximum width of the central document
+column. Editors use different labels: Obsidian calls its limit
+[Readable line length][obsidian-width], while Typora calls the column dimension
+[Width of Writing Area][typora-width]. Text width describes
+this app's setting directly; it does not imply paper dimensions or a hard line-wrap character count.
 Keep Font size, Line height, Theme, Appearance, Film grain, Texture, and System default.
 For grain textures use 细腻、柔和、粗糙; 粗粝 is unusually literary for a setting.
 
@@ -441,8 +456,8 @@ launch contract. Display styling alone does not solve installation collisions.
 
 ## Retain inventory and coverage check
 
-The exercises above cover the project-specific and overloaded concepts. The remaining terms below
-have direct, ordinary meanings in their current context and need no new names.
+The recommendations above cover the project-specific and overloaded concepts. The remaining terms
+below have direct, ordinary meanings in their current context and need no new names.
 
 | Family | Retain |
 | --- | --- |
@@ -468,7 +483,7 @@ must become part of the product's public vocabulary.
 
 ## Adoption sequence after review
 
-1. Decide the proposed public names and example wording, especially language roles, comment names,
+1. Decide the proposed public names and example wording, especially language roles, display names,
    comparison panes, and font presets. Keep accepted product semantics unchanged.
 2. Change labels, accessibility text, help, documentation, and examples together. Remove unused
    labels only after checking callers. Add focused behavior checks where meaning changes.
@@ -500,3 +515,6 @@ must become part of the product's public vocabulary.
 [fonts]: ../src/shared/fonts.ts
 [colors]: ../src/shared/codeThemes.ts
 [themes]: ../themes/README.md
+[syntax-highlighting]: https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide
+[obsidian-width]: https://obsidian.md/help/settings
+[typora-width]: https://support.typora.io/Width-of-Writing-Area/
