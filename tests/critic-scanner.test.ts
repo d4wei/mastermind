@@ -157,3 +157,30 @@ describe('author parsing', () => {
     expect(parseAuthor('email@example.com: not a tag').author).toBeNull()
   })
 })
+
+describe('spaced author tags', () => {
+  it.each(['Da Wei', '李 明', 'Élodie Martin', 'claude'])('recognizes %s without changing the source', (name) => {
+    const source = `{>>@${name}: first\r\nsecond<<}`
+    const items = group(scan(source), source)
+    const thread = items[0]!
+    expect(thread.type).toBe('thread')
+    if (thread.type !== 'thread') throw new Error('Expected comment thread')
+    expect(thread.comments[0]!.author).toBe(name)
+    expect(thread.comments[0]!.body).toBe('first\r\nsecond')
+    expect(source.slice(thread.start, thread.end)).toBe(source)
+  })
+
+  it('retains leading whitespace and post-colon newline compatibility', () => {
+    expect(parseAuthor('\r\n  @Da Wei:\nbody')).toEqual({ author: 'Da Wei', body: 'body' })
+  })
+
+  it('trims name edges while retaining body whitespace', () => {
+    expect(parseAuthor('@ Da Wei :  note')).toEqual({ author: 'Da Wei', body: ' note' })
+  })
+
+  it.each(['@: note', '@   : note', '@Da\nWei: note', '@Da\tWei: note', '@name@host: note',
+    '@{name}: note', '@name<reply>: note', '@name|reply: note', '@name=reply: note',
+    '@Da\u2028Wei: note', '@Da\u2029Wei: note', '@name', `@${'a'.repeat(65)}: note`, 'prefix @Da Wei: note'])('leaves malformed prefix %j in the body', (body) => {
+    expect(parseAuthor(body)).toEqual({ author: null, body })
+  })
+})

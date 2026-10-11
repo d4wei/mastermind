@@ -138,7 +138,7 @@ export function scan(text: string, exclude: readonly Range[] = []): CriticSpan[]
   return spans
 }
 
-const AUTHOR_RE = /^\s*@([^\s:@]{1,64}):\s?/
+const AUTHOR_RE = /^\s*@([^:@{}<>=|\x00-\x1f\u2028\u2029]{1,64}):\s?/
 
 /**
  * Drop container prefixes (`> `, continuation indent) from a raw multi-line
@@ -150,8 +150,9 @@ export function stripLinePrefixes(s: string): string {
 
 export function parseAuthor(content: string): { author: string | null; body: string } {
   const m = AUTHOR_RE.exec(content)
-  if (!m) return { author: null, body: content }
-  return { author: m[1]!, body: content.slice(m[0].length) }
+  const author = m?.[1]?.trim()
+  if (!m || !author) return { author: null, body: content }
+  return { author, body: content.slice(m[0].length) }
 }
 
 function toEntry(span: CriticSpan, text: string): CommentEntry {
