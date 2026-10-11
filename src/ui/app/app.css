@@ -8,9 +8,7 @@
 /* ---------- base ---------- */
 
 :root {
-  /* Floating bottom nav: --bar-h is the bar's measured height (written by
-     TopBar's ResizeObserver); --bar-gap is its inset from the viewport edges;
-     --bar-clear is the vertical room content/overlays must leave above it. */
+  /* TopBar measures its wrapped height; content and overlays reserve that space. */
   --bar-gap: calc(var(--space-unit) * 3);
   --bar-h: 57px;
   --bar-clear: calc(var(--bar-h) + var(--bar-gap) * 2);
@@ -20,7 +18,7 @@
   --z-sticky: 10; /* in-flow sticky badges (translation loading) */
   --z-rail: 15; /* mark gutter / minimap */
   --z-nav: 30; /* left navigator / file tree + its reveal button */
-  --z-topbar: 40; /* sticky top bar */
+  --z-topbar: 40; /* fixed document controls */
   --z-panel: 50; /* slide-overs: settings, find */
   --z-popover: 60; /* selection toolbar, hover actions, proposal card */
   --z-overlay: 65; /* off-canvas scrim for nav/rail at narrow widths */
@@ -78,9 +76,9 @@ body {
   padding: 0;
 }
 
-/* Keep anchored scrolls (heading nav, find) clear of the floating bottom bar. */
+/* Native anchor scrolling clears the fixed document controls. */
 html {
-  scroll-padding-bottom: var(--bar-clear);
+  scroll-padding-top: var(--bar-clear);
 }
 
 body {
@@ -135,31 +133,29 @@ body {
 
 /* ---------- top bar ---------- */
 
-/* A compact pill anchored to the BOTTOM of the viewport. It hugs its contents,
-   floats centered, and stays put — it does not react to scroll. */
+/* Leave room for the separate navigator control at the left edge. */
 .topbar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: var(--bar-gap);
-  top: auto;
-  /* Compact pill: the bar hugs its contents and floats centered (auto margins
-     against the full-width left/right:0 box), so there is no wide, mostly-empty
-     state. It grows only with the filename, capped to the viewport on tiny screens. */
-  width: max-content;
-  max-width: calc(100vw - var(--bar-gap) * 2);
+  left: calc(var(--bar-gap) + var(--space-unit) * 11);
+  right: var(--bar-gap);
+  top: var(--bar-gap);
+  width: fit-content;
+  max-width: calc(100% - var(--bar-gap) * 2 - var(--space-unit) * 11);
   margin-inline: auto;
   z-index: var(--z-topbar);
   display: flex;
-  flex-wrap: nowrap; /* a fixed inline set — never wraps */
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
-  /* 8 block / 16 inline: the inline inset clears the capsule's rounded ends. */
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
+  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.16 * var(--shadow-strength)));
+}
+.app-content:has(.topbar) {
+  padding-top: var(--bar-clear);
 }
 @media (prefers-reduced-motion: no-preference) {
   .topbar {
@@ -172,7 +168,8 @@ body {
   align-items: center;
   gap: calc(var(--space-unit) * 2.5);
   min-width: 0;
-  flex-shrink: 1; /* the filename truncates before the action cluster gives way */
+  flex: 1 1 auto;
+  max-width: 100%;
 }
 
 /* hairline between the icon-only view toggle and the filename */
@@ -208,7 +205,9 @@ body {
 .topbar-right {
   display: flex;
   align-items: center;
-  flex-shrink: 0; /* the action cluster keeps its size; the filename shrinks instead */
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
   /* No flex gap: spacing rides on each collapsible control's trailing margin so a
      collapsed control leaves no orphaned gap. See .topbar-collapsible. */
 }
@@ -289,34 +288,6 @@ body {
   color: var(--color-text);
 }
 .topbar-icon-btn.active {
-  color: var(--color-accent-dim);
-}
-
-/* Settings: a standalone floating button pinned to the bottom-right corner of
-   the page (outside the bottom bar). The settings slide-over rises above it. */
-.floating-settings {
-  position: fixed;
-  right: var(--bar-gap);
-  /* Vertically centered within the bottom bar's height band so it reads as part
-     of that row (the bar sits at --bar-gap and is --bar-h tall). */
-  bottom: calc(var(--bar-gap) + (var(--bar-h) - var(--space-unit) * 11) / 2);
-  z-index: var(--z-topbar);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--space-unit) * 11);
-  height: calc(var(--space-unit) * 11);
-  color: var(--color-text-muted);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.16 * var(--shadow-strength)));
-  transition: color var(--dur-fast) ease;
-}
-.floating-settings:hover:not(:disabled) {
-  color: var(--color-text);
-}
-.floating-settings.active {
   color: var(--color-accent-dim);
 }
 
@@ -453,8 +424,7 @@ button:disabled {
 .doc-column {
   width: 100%;
   max-width: var(--content-max-width);
-  /* bottom padding clears the floating bar so the last lines stay readable */
-  padding: calc(var(--space-unit) * 8) calc(var(--space-unit) * 4) calc(var(--bar-clear) + var(--space-unit) * 10);
+  padding: calc(var(--space-unit) * 8) calc(var(--space-unit) * 4) calc(var(--space-unit) * 10);
   min-width: 0;
 }
 
@@ -1129,7 +1099,7 @@ mark.critic-hl.critic-anchor:hover {
 
 .toast {
   position: fixed;
-  top: calc(var(--space-unit) * 6);
+  top: var(--bar-clear);
   right: calc(var(--space-unit) * 6);
   z-index: var(--z-toast);
   background: var(--color-invert-bg);
@@ -1157,17 +1127,14 @@ mark.critic-hl.critic-anchor:hover {
   color: var(--color-text);
 }
 
-/* ---------- shared slide-over (Settings / Rounds / Find adopt this) ---------- */
+/* ---------- shared slide-over ---------- */
 
 .slide-over {
   position: fixed;
-  /* Rises from just above the floating bottom bar (where its gear/find/comment
-     triggers live) — anchored to the bottom, growing up, never touching the top
-     or bottom viewport edge so all four corners stay rounded and visible. */
-  bottom: var(--bar-clear);
+  top: var(--bar-clear);
   right: var(--bar-gap);
   z-index: var(--z-panel);
-  width: 340px;
+  width: min(340px, calc(100% - var(--bar-gap) * 2));
   max-height: calc(100vh - var(--bar-clear) - var(--bar-gap));
   display: flex;
   flex-direction: column;
@@ -1176,14 +1143,14 @@ mark.critic-hl.critic-anchor:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg); /* uniform on all four corners — reads as a floating card, not a drawer */
   box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.14 * var(--shadow-strength)));
-  transform-origin: bottom right;
+  transform-origin: top right;
   animation: slide-over-in var(--dur-base) var(--ease-out);
 }
-/* Pops up from the bottom (rise + subtle scale) rather than sliding in from the right edge. */
+/* Panels unfold below their controls. */
 @keyframes slide-over-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.98);
+    transform: translateY(-14px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -1519,7 +1486,7 @@ input[type='checkbox'] {
 
 .trans-loading {
   position: sticky;
-  top: calc(var(--bar-gap) + 8px);
+  top: var(--bar-clear);
   z-index: var(--z-sticky);
   display: inline-block;
   background: var(--color-invert-bg);
@@ -1604,7 +1571,7 @@ input[type='checkbox'] {
 
 .mark-gutter {
   position: fixed;
-  top: var(--bar-gap);
+  top: var(--bar-clear);
   right: 0;
   width: 12px;
   height: calc(100vh - var(--bar-gap) - var(--bar-clear));
@@ -1715,11 +1682,13 @@ input[type='checkbox'] {
 
 .find-bar {
   position: fixed;
-  top: calc(var(--bar-gap) + 8px);
+  top: var(--bar-clear);
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-panel);
+  max-width: calc(100% - var(--bar-gap) * 2);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: calc(var(--space-unit) * 2);
   background: var(--color-bg-elevated);
@@ -1731,6 +1700,8 @@ input[type='checkbox'] {
 
 .find-input {
   width: 200px;
+  min-width: 0;
+  flex: 1 1 200px;
 }
 
 .find-filters {
@@ -1973,7 +1944,7 @@ input[type='checkbox'] {
 
 .navigator {
   position: fixed;
-  inset: var(--bar-gap) auto var(--bar-clear) 0; /* floats OVER the page, clearing the bottom bar */
+  inset: var(--bar-clear) auto var(--bar-gap) 0;
   width: var(--nav-w);
   display: flex;
   flex-direction: column;
@@ -2213,7 +2184,7 @@ input[type='checkbox'] {
   .nav-collapse,
   .topbar-icon-btn,
   .topbar-trans,
-  .floating-settings {
+  .topbar-settings {
     min-width: calc(var(--space-unit) * 11);
     min-height: calc(var(--space-unit) * 11);
   }
@@ -2239,6 +2210,10 @@ input[type='checkbox'] {
   .nav-scrim,
   .grain-overlay {
     display: none !important;
+  }
+
+  .app-content:has(.topbar) {
+    padding-top: 0;
   }
 
   /* the navigator is chrome — print the document edge-to-edge */
@@ -2369,4 +2344,16 @@ input[type='checkbox'] {
   padding-top: calc(var(--space-unit) * 4);
   margin-top: calc(var(--space-unit) * 4);
   border-top: 1px solid var(--color-border);
+}
+
+/* A narrow comment panel uses ordinary flow rather than document-aligned offsets. */
+.comments-panel .rail {
+  height: auto !important;
+  padding: 0;
+}
+.comments-panel .rail-card {
+  position: relative;
+  top: auto !important;
+  width: 100%;
+  margin-bottom: calc(var(--space-unit) * 2);
 }

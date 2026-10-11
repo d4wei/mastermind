@@ -13,8 +13,7 @@ interface Props {
 /**
  * The one transient-panel shell: a right-anchored slide-over with a titled
  * header, Escape-to-close, click-outside-to-dismiss (ignoring the invoking
- * control), and focus return on close. Settings / Rounds / Find adopt this so
- * every panel lives in the same place and behaves identically (Phase D).
+ * control), and focus return on close.
  */
 export function SlideOver({ title, onClose, ignoreSelector, children }: Props) {
   const t = useT()

@@ -1,6 +1,6 @@
 .conflict-notice {
   position: fixed;
-  top: var(--bar-gap);
+  top: var(--bar-clear);
   left: var(--bar-gap);
   right: var(--bar-gap);
   z-index: var(--z-toast);
@@ -19,8 +19,9 @@
 }
 .conflict-compare { flex-shrink: 0; }
 .conflict-host .slide-over {
+  top: calc(var(--bar-clear) + var(--space-unit) * 27);
   width: min(calc(100vw - var(--bar-gap) * 2), calc(var(--content-max-width) * 1.5));
-  max-height: calc(100vh - var(--bar-clear) - var(--bar-gap) - var(--space-unit) * 24);
+  max-height: calc(100vh - var(--bar-clear) - var(--bar-gap) - var(--space-unit) * 27);
 }
 .conflict-comparison {
   display: grid;

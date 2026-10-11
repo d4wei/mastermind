@@ -85,3 +85,14 @@ it.each([
   expect(badge.title).toBe(expected)
   expect(badge.textContent).toBe(String(counts.comments + counts.edits + counts.highlights))
 })
+
+it.each(['en', 'zh-CN'] as const)('keeps settings in the document toolbar in %s', (uiLang) => {
+  useConfig.setState({ config: { ...config, uiLang } })
+  const onToggle = vi.fn()
+  act(() => root.render(<TopBar settings={{ open: true, onToggle }} />))
+  const label = uiLang === 'en' ? 'Settings' : '设置'
+  const button = host.querySelector<HTMLButtonElement>(`header [aria-label="${label}"]`)!
+  expect(button.getAttribute('aria-pressed')).toBe('true')
+  act(() => button.click())
+  expect(onToggle).toHaveBeenCalledOnce()
+})

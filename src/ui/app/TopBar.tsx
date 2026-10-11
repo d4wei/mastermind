@@ -1,11 +1,12 @@
 import { useLayoutEffect, useRef, type ComponentType, type SVGProps } from 'react'
 import { ToggleGroup } from 'radix-ui'
 import { useT } from '../i18n'
-import { ChatIcon, CodeIcon, EyeIcon, LanguageIcon } from '../icons'
+import { ChatIcon, CodeIcon, EyeIcon, GearIcon, LanguageIcon } from '../icons'
 import { SlotLabel } from '../util/SlotLabel'
 import { useDoc, type ViewMode } from './store'
 
 interface TopBarProps {
+  settings?: { open: boolean; onToggle: () => void }
   resolved?: { count: number; open: boolean; onToggle: () => void }
   railOpen?: boolean
   onToggleRail?: () => void
@@ -21,7 +22,7 @@ interface TopBarProps {
   }
 }
 
-export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation, resolved }: TopBarProps) {
+export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation, resolved, settings }: TopBarProps) {
   const t = useT()
   const headerRef = useRef<HTMLElement | null>(null)
   const meta = useDoc((s) => s.meta)
@@ -37,8 +38,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
     { id: 'source', label: t('source'), Icon: CodeIcon },
   ]
 
-  // Publish the floating bar's measured height so overlays/content can reserve
-  // clearance above it (--bar-h drives --bar-clear in app.css).
+  // Wrapping and localization change the space needed below the fixed controls.
   useLayoutEffect(() => {
     const el = headerRef.current
     if (!el) return
@@ -46,7 +46,10 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
     apply()
     const ro = new ResizeObserver(apply)
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--bar-h')
+    }
   }, [])
 
   return (
@@ -93,7 +96,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
         {onToggleRail && (
           <button
             type="button"
-            className={`btn-ghost topbar-icon-btn topbar-collapsible${commentsVisible ? '' : ' is-collapsed'}${railOpen ? ' active' : ''}`}
+            className={`btn-ghost topbar-icon-btn topbar-comments topbar-collapsible${commentsVisible ? '' : ' is-collapsed'}${railOpen ? ' active' : ''}`}
             onClick={onToggleRail}
             inert={!commentsVisible}
             aria-label={railOpen ? t('hideComments') : t('showComments')}
@@ -107,6 +110,13 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
           <button type="button" className={`btn-ghost topbar-resolved${resolved.open ? ' active' : ''}`}
             aria-pressed={resolved.open} onClick={resolved.onToggle}>
             {t('resolved')} ({resolved.count})
+          </button>
+        )}
+        {settings && (
+          <button type="button" className={`btn-ghost topbar-icon-btn topbar-settings${settings.open ? ' active' : ''}`}
+            onClick={settings.onToggle} aria-label={t('settings')} aria-pressed={settings.open}
+            title={t('settings')}>
+            <GearIcon />
           </button>
         )}
       </div>

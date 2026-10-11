@@ -82,3 +82,24 @@ it('keeps resolved discussions and comparison mutually exclusive', () => {
   expect(useDoc.getState().conflictDraft!.open).toBe(false)
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 })
+
+it('opens narrow-screen comments in a dismissible panel without reserving a side column', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
+  render('{>>@Alex: a note<<}')
+  expect(host.querySelector('[data-testid="rail"]')).toBeNull()
+  const toggle = host.querySelector<HTMLButtonElement>('.topbar-comments')!
+  act(() => toggle.click())
+  expect(host.querySelector('.doc-shell')?.classList.contains('with-rail')).toBe(false)
+  const panel = host.querySelector('[role="dialog"]')!
+  expect(panel.getAttribute('aria-label')).toBe('Comments')
+  expect(panel.querySelector('[data-testid="rail"]')).not.toBeNull()
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  expect(host.querySelector('[role="dialog"]')).toBeNull()
+})
+
+it('opens the comment panel from a narrow-screen document marker', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
+  render('{>>@Alex: a note<<}')
+  act(() => host.querySelector<HTMLElement>('.critic-comment-marker')!.click())
+  expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Comments')
+})

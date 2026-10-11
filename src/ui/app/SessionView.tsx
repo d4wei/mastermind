@@ -13,7 +13,6 @@ import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../shared/critic/scanner'
 import { SlotLabel } from '../util/SlotLabel'
 import { useT } from '../i18n'
-import { GearIcon } from '../icons'
 import { useTranslation } from '../translate/translationStore'
 import { TranslatedSelection } from '../translate/TranslatedSelection'
 import { openEvents } from './api'
@@ -23,6 +22,8 @@ import { parseResolvedThreads } from '../../shared/review-archive'
 import { ResolvedThreads } from '../review/ResolvedThreads'
 import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
+import { SlideOver } from './SlideOver'
+import { useIsNarrow } from './Navigator'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -56,25 +57,35 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const articleRef = useRef<HTMLElement | null>(null)
   const translatedRef = useRef<HTMLElement | null>(null)
   const [activeSpan, setActiveSpan] = useState<number | null>(null)
-  const [railOpen, setRailOpen] = useState(true)
+  const narrow = useIsNarrow()
+  const [railOpen, setRailOpen] = useState(!narrow)
+  useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
+  const closeRail = useCallback(() => setRailOpen(false), [])
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
   const [resolvedOpen, setResolvedOpen] = useState(false)
+  useEffect(() => { if (narrow && findOpen) setRailOpen(false) }, [narrow, findOpen])
   const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
   // Transient panels share one overlay home; opening one closes the others.
   const toggleSettings = useCallback(() => {
     setSettingsOpen((v) => {
-      if (!v) { setFindOpen(false); setResolvedOpen(false); useDoc.getState().closeConflict() }
+      if (!v) {
+        setFindOpen(false)
+        setResolvedOpen(false)
+        if (narrow) setRailOpen(false)
+        useDoc.getState().closeConflict()
+      }
       return !v
     })
-  }, [])
+  }, [narrow])
   useEffect(() => {
     if (comparisonOpen) {
+      if (narrow) setRailOpen(false)
       setSettingsOpen(false)
       setFindOpen(false)
       setResolvedOpen(false)
     }
-  }, [comparisonOpen])
+  }, [comparisonOpen, narrow])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
   const translationLanguage = useConfig((s) => s.config?.translationLanguage) ?? null
@@ -242,7 +253,10 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       const target = (e.target as HTMLElement).closest('.critic-anchor, .critic-comment-marker')
       if (target) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
-        if (Number.isFinite(idx)) setActiveSpan((prev) => (prev === idx ? null : idx))
+        if (Number.isFinite(idx)) {
+          setActiveSpan((prev) => (prev === idx ? null : idx))
+          setRailOpen(true)
+        }
       }
     },
     [undoDeletion],
@@ -260,7 +274,10 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       if (target) {
         e.preventDefault()
         const idx = Number((target as HTMLElement).dataset.spanIndex)
-        if (Number.isFinite(idx)) setActiveSpan((prev) => (prev === idx ? null : idx))
+        if (Number.isFinite(idx)) {
+          setActiveSpan((prev) => (prev === idx ? null : idx))
+          setRailOpen(true)
+        }
       }
     },
     [undoDeletion],
@@ -305,19 +322,45 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const hasThreads = analysis?.items.some((i) => i.type === 'thread') ?? false
   const showRail = mode === 'reading' && railOpen && hasThreads
 
+  const commentRail = analysis && (
+    <CommentRail
+      items={analysis.items}
+      spans={analysis.spans}
+      source={source}
+      docRef={articleRef}
+      authorTag={authorTag}
+      activeSpan={activeCardSpan}
+      onActivate={setActiveSpan}
+      onEdit={(edits) => {
+        const current = useDoc.getState()
+        if (current.sessionId === sessionId && current.source === source) current.applyEdits(edits)
+      }}
+    />
+  )
+
   return (
     <>
       <TopBar
+        settings={{ open: settingsOpen, onToggle: toggleSettings }}
         resolved={{ count: resolvedCount, open: resolvedOpen, onToggle: () => {
           setResolvedOpen((value) => !value)
           setSettingsOpen(false)
+          if (narrow) setRailOpen(false)
           setFindOpen(false)
           useDoc.getState().closeConflict()
         } }}
         railOpen={railOpen}
         // Both controls stay mounted so the bar morphs between layouts; their
         // applicability (not their presence) is what changes per view.
-        onToggleRail={() => setRailOpen((v) => !v)}
+        onToggleRail={() => {
+          setRailOpen((v) => !v)
+          if (narrow) {
+            setSettingsOpen(false)
+            setResolvedOpen(false)
+            setFindOpen(false)
+            useDoc.getState().closeConflict()
+          }
+        }}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
         translation={translationLanguage ? {
           label: transActive ? t('original') : translationLanguage,
@@ -326,18 +369,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           onToggle: () => void useTranslation.getState().toggle(),
         } : undefined}
       />
-      {/* Settings lives on its own as a floating button in the bottom-right
-          corner — outside the bottom bar — anchoring the panel that rises above it. */}
-      <button
-        type="button"
-        className={`floating-settings${settingsOpen ? ' active' : ''}`}
-        onClick={toggleSettings}
-        aria-label={t('settings')}
-        aria-pressed={settingsOpen}
-        title={t('settings')}
-      >
-        <GearIcon width={16} height={16} />
-      </button>
       {settingsOpen && (
         <Suspense fallback={null}>
           <SettingsPanel onClose={closeSettings} />
@@ -358,7 +389,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       {translation.error && <div className="banner" role="status"><span className="banner-text">
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </span></div>}
-      <div className={`doc-shell${showRail ? ' with-rail' : ''}`}>
+      <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
         <div className="doc-column">
           {showTranslated && (
             <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
@@ -401,21 +432,13 @@ export function SessionView({ sessionId }: { sessionId: string }) {
             </Suspense>
           )}
         </div>
-        {showRail && analysis && (
-          <CommentRail
-            items={analysis.items}
-            spans={analysis.spans}
-            source={source}
-            docRef={articleRef}
-            authorTag={authorTag}
-            activeSpan={activeCardSpan}
-            onActivate={setActiveSpan}
-            onEdit={(edits) => {
-              const current = useDoc.getState()
-              if (current.sessionId === sessionId && current.source === source) current.applyEdits(edits)
-            }}
-          />
-        )}
+        {showRail && analysis && !showTranslated && (narrow ? (
+          <div className="comments-panel">
+            <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments">
+              {commentRail}
+            </SlideOver>
+          </div>
+        ) : commentRail)}
       </div>
       {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
         translation.targetLang === translationLanguage && (

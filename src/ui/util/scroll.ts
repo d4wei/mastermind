@@ -52,7 +52,10 @@ export function scrollToElement(el: Element | null): Element | null {
  * heading marked active.
  */
 export function scrollElementToTop(el: Element | null, offsetTop = 24): Element | null {
-  if (el) smoothScrollWindowTo(window.scrollY + el.getBoundingClientRect().top - offsetTop)
+  if (el) {
+    const controlsBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0
+    smoothScrollWindowTo(window.scrollY + el.getBoundingClientRect().top - offsetTop - controlsBottom)
+  }
   return el
 }
 

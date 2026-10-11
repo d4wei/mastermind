@@ -83,3 +83,19 @@ for (const book of books) {
 
 This ordinary heading does not match a callout title. It also leaves a prose block after the code
 example for selection checks that include the end of a literal block.
+
+## Responsive controls
+
+Use a disposable copy with a long filename. Check widths of 320, 768, and 1440 pixels with English
+and Chinese interface labels, a translation language configured, and light and dark themes.
+
+- Document controls remain at the top, with no overlap among active buttons or the navigator toggle.
+  Narrow controls wrap, the filename clips, and settings remains reachable.
+- The first heading starts below the controls. Scrolling and choosing an outline heading keep both
+  the target heading and the controls visible. Repeat in Markdown mode.
+- At narrow widths, comments start closed. The comments button or a document comment marker opens
+  the panel; Close and Escape dismiss it. The document does not reserve an off-screen rail.
+- Open settings, resolved history, comments, and Find. Panels fit the viewport and scroll inside;
+  Find wraps. In a disposable conflict test, the fixed notice and comparison clear the toolbar.
+- In the embedded browser, the host's bottom input does not cover document controls. Return any
+  viewport override to its normal size after checking.
