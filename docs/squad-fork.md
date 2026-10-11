@@ -78,12 +78,12 @@ remaining implementation choices. The user's review is incorporated; implementat
 
 The following original questions still need rulings before implementation:
 
-- Translation delivery and nonblocking `open` when enabled; repo/comfort configuration scope.
+- Translation delivery and nonblocking `open` when enabled; repository-settings mechanics.
 - Agent-authored comments in the file (the squad's convention) versus upstream's one-direction
   marks, including how the renderer shows an agent's reply.
 - Package, CLI, and config-directory rename.
-- Squad-level configuration: shared repo-language and review-convention defaults, with
-  per-user author tags.
+- Repository settings: storage, discovery, and precedence for repo language; whether the review
+  convention also needs a shared setting. Comfort language and author tags remain personal.
 
 The browser-container bet has graduated to the desktop-wrapper ruling. GUI onboarding, continuous
 saving without explicit hand-back, agent discretion over review-file selection, and cross-platform

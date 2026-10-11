@@ -24,6 +24,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Repo language is a repository setting
+
+**Ruled.** The language used for repository communication and bookkeeping is scoped to the repo;
+comfort language remains personal. Repo language establishes a concrete need for repo settings,
+without making every preference repo-configurable. Storage, discovery, and precedence remain open.
+
+**Beat:** storing repo language only as a global user preference shared by unrelated repositories.
+
 ## 2026-10-10 — Clean external changes reload; dirty buffers retain both versions
 
 **Ruled.** Reload external changes automatically only when the buffer is clean. When it is dirty,

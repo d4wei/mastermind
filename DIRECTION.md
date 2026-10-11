@@ -58,7 +58,8 @@ translation is enabled, cold-cache opening, live versus prepared translations, a
 translated view remain unresolved. See the [current behavior](docs/architecture-review.md).
 
 **Exit:** rulings on nonblocking opening, translation delivery, source anchoring for review, and
-repo-versus-user configuration scope.
+storage/discovery/precedence for repository settings. Repo language is repo-scoped; comfort language
+is personal, as ruled in `DECISIONS.md`.
 
 ## 2026-10-10 — Package and CLI identity
 

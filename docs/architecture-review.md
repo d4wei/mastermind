@@ -47,25 +47,7 @@ boundaries; any retained root-scoped operation must still enforce its root.
 
 ### `translate-blocks <file>`
 
-{>>@Da-Wei: Got it, this feels like the one legitimate place where the app needs input from a model.
-I'm going to assume that the invoking agent is the one providing it.
-That does remind me, at a semantic level - first of all, we should allow a uni-language model of
-operation. Some people don't need another language. Secondly, we should make it clear what the two
-languages are - language one is the language the repo communicates and bookkeeps in; the other is
-the user's comfort language.
-How are translation blocks applied when viewing files? What happens when comments are left in the
-user's comfortable language?<<}{>>@codex: Yes: the invoking agent prepares translations, or serves
-requests through the current assist channel. The viewer segments the original source, looks up
-cached translations by block hash and target language, and renders each hit in place of that block.
-A miss shows the source with an indicator; with no cached hits the toggle stays on the original.
-This only changes the display, never the document on disk. The translated view is read-only and
-hides the comment rail, so comments currently have to be made against the original view. A comment
-in your comfort language is saved verbatim in that language: there is no translation-on-save. Adding
-it changes that block's hash, so the old cached translation no longer matches. If the agent later
-translates the changed block, the comment text travels inside it; that still does not rewrite the
-original comment. I have added single-language operation and the repo-language/comfort-language
-semantics to the design. Reviewing directly in the comfort-language view would need source-anchor
-mapping that the current block replacement does not provide.<<}
+
 
 Emits missing translation blocks as JSON; `--save` accepts translated JSON and writes the cache.
 The agent supplies the translation. A block is a source slice derived from a top-level Markdown
@@ -78,11 +60,13 @@ blocks survive surrounding edits. The language pair and a CJK heuristic choose t
 this is original text plus cached target blocks, not two fully translated copies of every document.
 The translated view is read-only, with source fallback for misses.
 
-The new language model has a repo language for communication and bookkeeping, plus an optional
-personal comfort language. Single-language operation is a complete mode: no second language or
-translation preparation is required. The invoking agent supplies translations when needed. Replace
+The new language model has a repository-scoped language for communication and bookkeeping, plus an
+optional personal comfort language. Single-language operation requires no second language or
+translation preparation. The invoking agent supplies translations when needed. Replace
 preferred/secondary language semantics and the script-based direction guess with these explicit
-roles; preference scope, mixed-language documents, and review interactions need detailed design.
+roles. Repo settings have a place in the design, with repo language as the first concrete use case.
+Storage, repo discovery, defaults outside a repo, precedence, mixed-language documents, and review
+interactions need detailed design; this does not require making every preference repo-configurable.
 
 Today `open` refuses a cold cache unless `--no-translate` is supplied. There is also a live assist
 queue served by an attached agent. Preserve reusable segmentation/cache logic; decide separately
@@ -230,10 +214,10 @@ presentation direction.
 
 ## Wishlist mapped to product work
 
-- **One graphical onboarding flow:** combine setup, handle, repo language, optional comfort
-  language, and a localized demo. Prefill invocation values, then existing settings/Git defaults as
+- **One graphical onboarding flow:** combine setup, handle, repository-scoped language, optional
+  comfort language, and a localized demo. Prefill invocation values, then settings/Git defaults as
   appropriate. Keep harness installation in its skill/package guidance. Preference precedence,
-  first-run persistence, and repo-versus-user configuration scope remain open.
+  first-run persistence, and the repository-settings storage/discovery mechanism remain open.
 - **One review skill:** replace separate setup/demo entry points with the normal launch flow. Blend
   the existing file-review instructions with the squad's `z:markup` convention after ruling on
   agent-authored replies and thread resolution. Keep that protocol portable across harnesses.
@@ -245,8 +229,8 @@ presentation direction.
   should not implicitly stage or commit unrelated repository changes.
 - **Translation and squad configuration:** support repo-language-only operation and an optional
   comfort language, with translations supplied by the invoking agent. Decide nonblocking opening
-  when translation is enabled, live versus prepared translation, and configuration scope before
-  changing those contracts. Graphical onboarding owns the personal language choice.
+  when translation is enabled, live versus prepared translation, and how repo settings are stored
+  and discovered before changing those contracts. Comfort language remains a personal preference.
 - **Package identity:** choose the name before distribution changes; package, executable, and config
   migration still need a ruling. A wrapper does not remove collisions with upstream automatically.
 - **Claude Code Mods:** retain as an aspiration. Anthropic's
@@ -257,7 +241,15 @@ presentation direction.
 
 [mods]: https://github.com/anthropics/claude-code-playground/blob/main/claude-code/mods/README.md
 
-## Reviewed implementation sequence
+## {==Reviewed implementation sequence==}{>>@Da-Wei: There's also a list of UI/UX quirks that I've
+been accumulating as I use the product. What would be the ideal place to put them onto the
+table?<<}{>>@codex: Bring them in now, before the ablation and wrapper work. Paste the raw list in
+this chat, or add it under Trial notes in docs/squad-fork.md; that section is already the home for
+observations from actual use. Rough notes are enough. Where available, include what you were doing,
+what happened, and what you expected. We can then identify which problems disappear with planned
+deletions, which need fixes, and which should amend this architecture plan before implementation.
+Only unresolved design questions graduate to DIRECTION.md and settled constraints to DECISIONS.md;
+the raw quirk list belongs in the trial notes.<<}
 
 1. **Characterize and fix document/save ownership.** Reproduce the schedules listed above; choose
    the detailed conflict interaction; land isolated fixes with failing-before/passing-after tests.
