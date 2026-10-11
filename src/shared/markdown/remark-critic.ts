@@ -3,10 +3,9 @@ import type { Node } from 'unist'
 import type { Processor, Transformer } from 'unified'
 import type { VFile } from 'vfile'
 import { maskSource, type Sentinels } from '../critic/mask'
-import { scan } from '../critic/scanner'
 import type { CriticSpan } from '../critic/types'
 import { criticTransform } from './critic-mdast'
-import { codeRanges } from './exclusions'
+import { scanMarkdown } from './scan'
 
 interface CriticState {
   original: string
@@ -29,7 +28,7 @@ export function remarkCritic(this: Processor): Transformer<Root> {
   const inner = self.parser
   if (typeof inner === 'function') {
     self.parser = (doc: string, file: VFile): Node => {
-      const spans = scan(doc, codeRanges(doc))
+      const spans = scanMarkdown(doc)
       const state: CriticState = { original: doc, spans, sentinels: null }
       STATE.set(self, state)
       if (spans.length > 0) {

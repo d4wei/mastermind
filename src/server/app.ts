@@ -27,8 +27,8 @@ import { detectBrowsers } from './browsers'
 import { scanThemes } from './themes'
 import { readPreparedTranslation, validLanguageCode } from './translate/prepared'
 import { startWatcher, stopWatcher } from './watch'
-import { group, reviewCounts, scan } from '../shared/critic/scanner'
-import { codeRanges } from '../shared/markdown/exclusions'
+import { group, reviewCounts } from '../shared/critic/scanner'
+import { scanMarkdown } from '../shared/markdown/scan'
 import { log } from './log'
 import { themesDir, uiDir } from './paths'
 import { type Conn, SessionRegistry } from './sessions'
@@ -66,7 +66,7 @@ async function workspaceFileMeta(rel: string, real: string, mtimeMs: number): Pr
   if (real.toLowerCase().endsWith('.md')) {
     try {
       const body = await fs.readFile(real, 'utf8')
-      counts = reviewCounts(group(scan(body, codeRanges(body)), body))
+      counts = reviewCounts(group(scanMarkdown(body), body))
     } catch {
       counts = null
     }

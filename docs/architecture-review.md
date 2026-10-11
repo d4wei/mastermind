@@ -1,6 +1,6 @@
 ---
 status: living
-updated: 2026-10-10
+updated: 2026-10-11
 exit: approved changes ship with colocated contracts, or the remaining proposals are dropped
 ---
 # Architecture review and proposed ablation
@@ -390,4 +390,17 @@ external reload, author labels, soft wraps, and selected input text. The next ba
 conflict comparison and hidden resolved discussions with per-comment deletion. Fresh prepared
 translation, translated-view comments, public reply guidance, and removal of
 hand-back and the live service followed. Root document cleanup has also landed. Cross-list mark
-handling, responsive chrome, Tauri host validation, and the explicitly open contracts remain ahead.
+handling now excludes unsupported spans from review actions; the contract lives in
+[Markdown review boundaries](../src/shared/markdown/scan.md). Responsive chrome, Tauri host
+validation, and the explicitly open contracts remain ahead.
+
+## Review reliability implementation
+
+Use the existing remark block positions to keep actionable CriticMarkup within a paragraph,
+heading, or table cell. Marks crossing list items or other blocks stay literal and do not enter
+review actions. Verify valid multiline marks, CRLF preservation, and a valid mark following an
+unsupported mark. The lost trial file cannot establish the exact cause of the original screenshot.
+
+Move document controls to the top of the viewport, allow narrow layouts to wrap, and reserve their
+measured height for content, navigation, and panels. Keep settings reachable alongside the controls.
+Check English and Chinese controls across themes and viewport sizes, including the embedded browser.

@@ -20,7 +20,8 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
 - **`shared/`** — imported by all three, so it stays browser-safe. `critic/scanner.ts` parses
   CriticMarkup into typed marks; `critic/resolve.ts` accepts or rejects a mark as an exact source
   splice; `critic/mask.ts` and `critic/suggest.ts` back find and suggestions. `markdown/` is the
-  remark pipeline that carries CriticMarkup into the reading AST; saves splice the source string.
+  remark pipeline that carries CriticMarkup into the reading AST; its active-mark boundary lives in
+  `markdown/scan.md`. Saves splice the source string.
   `review-archive.ts` implements comment deletion and resolution; `review-archive.md` defines the
   hidden in-file record. `translation.ts` validates prepared snapshots and encodes translated-view
   comments; `translation.md` describes freshness and source mapping. `blocks.ts`, `edits.ts`,

@@ -3,8 +3,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorState, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
-import { scan } from '../../../shared/critic/scanner'
-import { codeRanges } from '../../../shared/markdown/exclusions'
+import { scanMarkdown } from '../../../shared/markdown/scan'
 import { useDoc } from '../../app/store'
 import { scrollElementToTop } from '../../util/scroll'
 
@@ -20,7 +19,7 @@ function computeDecorations(view: EditorView): DecorationSet {
   const text = view.state.doc.toString()
   const builder = new RangeSetBuilder<Decoration>()
   try {
-    for (const span of scan(text, codeRanges(text))) {
+    for (const span of scanMarkdown(text)) {
       builder.add(span.start, span.end, Decoration.mark({ class: CRITIC_CLASS[span.kind]! }))
     }
   } catch {

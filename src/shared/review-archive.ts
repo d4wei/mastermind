@@ -3,7 +3,7 @@ import { group, parseAuthor, scan, stripLinePrefixes } from './critic/scanner'
 import type { Range, ReviewItem } from './critic/types'
 import { detectEol } from './eol'
 import { applyTextEdits } from './edits'
-import { codeRanges } from './markdown/exclusions'
+import { scanMarkdown } from './markdown/scan'
 import { parseMarkdown } from './markdown/processor'
 import type { TextEdit } from './types'
 
@@ -64,7 +64,7 @@ export function parseResolvedThreads(source: string): { entries: ResolvedThread[
 }
 
 function currentThread(source: string, thread: ReviewThread): ReviewThread | null {
-  const current = group(scan(source, codeRanges(source)), source)
+  const current = group(scanMarkdown(source), source)
     .find((item): item is ReviewThread => item.type === 'thread' && item.start === thread.start && item.end === thread.end)
   // Revalidate offsets and parsed comment text before splicing a captured UI thread.
   return current && JSON.stringify(current) === JSON.stringify(thread) ? current : null

@@ -10,7 +10,10 @@ const EXCLUDED_TYPES = new Set(['code', 'inlineCode', 'html', 'yaml'])
  * supplies positions from the same syntax used by the renderer.
  */
 export function codeRanges(text: string): Range[] {
-  const tree = parseMarkdown(text)
+  return excludedRanges(parseMarkdown(text))
+}
+
+export function excludedRanges(tree: Node): Range[] {
   const out: Range[] = []
   const visit = (node: Node): void => {
     const start = node.position?.start?.offset

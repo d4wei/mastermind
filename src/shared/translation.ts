@@ -1,5 +1,6 @@
+import { scanMarkdown } from './markdown/scan'
 import { segmentBlocks } from './blocks'
-import { scan, parseAuthor } from './critic/scanner'
+import { parseAuthor } from './critic/scanner'
 import { applyTextEdits } from './edits'
 import { codeRanges } from './markdown/exclusions'
 import { parseResolvedThreads } from './review-archive'
@@ -31,7 +32,7 @@ function narrativeProjection(source: string): { text: string; starts: number[]; 
   const archive = parseResolvedThreads(source)
   const removals: Array<TextEdit & { archive?: boolean }> = [...archive.entries, ...archive.diagnostics]
     .map(({ range }) => ({ from: range.start, to: range.end, insert: '', archive: true }))
-  for (const span of scan(source, codeRanges(source))) {
+  for (const span of scanMarkdown(source)) {
     if (span.kind === 'comment') removals.push({ from: span.start, to: span.end, insert: '' })
     else if (span.kind === 'highlight') removals.push(
       { from: span.start, to: span.innerStart, insert: '' },
@@ -76,7 +77,7 @@ export async function prepareTranslation(source: string): Promise<TranslationPro
 
 function suggestionStructure(text: string): string[] | null {
   const excluded = codeRanges(text)
-  const spans = scan(text, excluded)
+  const spans = scanMarkdown(text)
   if (spans.some((span) => span.kind === 'comment' || span.kind === 'highlight')) return null
   const tokens = [...text.matchAll(/\{(?:\+\+|--|~~|==|>>)|(?:\+\+|--|~~|==|<<)\}/g)]
     .filter((token) => !excluded.some((range) => token.index! >= range.start && token.index! < range.end))
@@ -168,7 +169,7 @@ export async function translatedCommentEdit(source: string, request: TranslatedC
   const edit = { from: block.end, to: block.end, insert }
   // A point comment must remain a complete active mark at the original block boundary.
   const updated = applyTextEdits(source, [edit])
-  if (!scan(updated, codeRanges(updated)).some((span) => span.kind === 'comment' &&
+  if (!scanMarkdown(updated).some((span) => span.kind === 'comment' &&
     span.start === block.end && span.end === block.end + insert.length)) return null
   return edit
 }
