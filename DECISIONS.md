@@ -29,6 +29,24 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-11 — Opening files and assisting onboarding are separate operations
+
+**Ruled.** Opening adds explicit files, returns each path's result, and preserves existing buffers
+and conflict state. Individual file failures do not prevent valid files from opening. Opening does
+not carry name or language-setting flags; agents may separately suggest onboarding values for the
+person to confirm in the GUI. Whether incomplete onboarding blocks opening remains under review.
+
+**Beat:** using file opening to change identity or language settings as a side effect.
+
+## 2026-10-11 — Desktop migration has no legacy compatibility obligation
+
+**Ruled.** Existing commands and stored formats may be removed or replaced during desktop migration.
+Do not retain adapters, aliases, or migration machinery solely for backward compatibility; preserve
+the selected product capabilities and file-safety invariants instead. Validate native launch and
+packaging in a bounded proof of concept before migrating the editor host.
+
+**Beat:** preserving old command contracts before validating native launch.
+
 ## 2026-10-10 — Product vocabulary follows one canonical reference
 
 **Ruled.** [Product terminology](docs/terminology.md) defines the accepted English and Simplified
