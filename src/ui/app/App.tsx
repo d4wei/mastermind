@@ -6,6 +6,7 @@ import { useConfig } from './configStore'
 import { Navigator, useIsNarrow } from './Navigator'
 import { useNav } from './navStore'
 import { useRoute } from './route'
+import { registerDocumentLifecycle } from './documentLifecycle'
 import { SessionView } from './SessionView'
 import { WorkspaceView } from './WorkspaceView'
 
@@ -15,6 +16,8 @@ export function App() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => registerDocumentLifecycle(), [])
 
   return (
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>

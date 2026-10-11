@@ -39,11 +39,12 @@ export function getFile(sessionId: string): Promise<FileResponse> {
   return request<FileResponse>(`/api/sessions/${sessionId}/file`)
 }
 
-export function putFile(sessionId: string, content: string, baseMtimeMs?: number): Promise<{ mtimeMs: number }> {
-  return request<{ mtimeMs: number }>(`/api/sessions/${sessionId}/file`, jsonInit('PUT', { content, baseMtimeMs }))
+export function putFile(sessionId: string, content: string, baseVersion: string): Promise<{ mtimeMs: number; version: string }> {
+  return request<{ mtimeMs: number; version: string }>(`/api/sessions/${sessionId}/file`, jsonInit('PUT', { content, baseVersion }))
 }
 
 export interface HandbackResponse {
+  version: string
   mtimeMs: number
   counts: { comments: number; edits: number; highlights: number }
   summaryLine: string
@@ -52,17 +53,17 @@ export interface HandbackResponse {
 export function postHandback(
   sessionId: string,
   content: string,
-  baseMtimeMs: number,
+  baseVersion: string,
   note?: string,
 ): Promise<HandbackResponse> {
   return request<HandbackResponse>(
     `/api/sessions/${sessionId}/handback`,
-    jsonInit('POST', { content, baseMtimeMs, note }),
+    jsonInit('POST', { content, note, baseVersion }),
   )
 }
 
-export function postRename(sessionId: string, filename: string): Promise<{ path: string; displayName: string }> {
-  return request<{ path: string; displayName: string }>(
+export function postRename(sessionId: string, filename: string): Promise<{ path: string; displayName: string; version: string }> {
+  return request<{ path: string; displayName: string; version: string }>(
     `/api/sessions/${sessionId}/rename`,
     jsonInit('POST', { filename }),
   )

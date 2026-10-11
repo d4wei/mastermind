@@ -1,20 +1,19 @@
-import fs from 'node:fs/promises'
 import { group, reviewCounts, scan } from '../shared/critic/scanner'
 import { codeRanges } from '../shared/markdown/exclusions'
 import { stripSummary, summaryLine, upsertSummary } from '../shared/summary'
 import type { ReviewCounts } from '../shared/types'
-import { processFeedbackLanguage } from './feedback'
-import { sha256hex } from './files'
+import { writeSessionFile } from './files'
 import type { Session } from './sessions'
 
 export interface HandbackResult {
   ok: true
   mtimeMs: number
+  version: string
   counts: ReviewCounts
   summaryLine: string
 }
 
-export type HandbackOutcome = HandbackResult | { ok: false; currentMtimeMs: number }
+export type HandbackOutcome = HandbackResult | { ok: false; currentMtimeMs: number | null }
 
 /**
  * The hand-back contract: strip any stale summary, count marks with the same
@@ -25,24 +24,15 @@ export type HandbackOutcome = HandbackResult | { ok: false; currentMtimeMs: numb
 export async function performHandback(
   session: Session,
   rawContent: string,
-  baseMtimeMs: number | undefined,
+  baseVersion: string,
   note?: string,
 ): Promise<HandbackOutcome> {
-  if (baseMtimeMs !== undefined) {
-    const st = await fs.stat(session.path).catch(() => null)
-    if (st && Math.abs(st.mtimeMs - baseMtimeMs) > 0.001) {
-      return { ok: false, currentMtimeMs: st.mtimeMs }
-    }
-  }
-
-  const content = await processFeedbackLanguage(rawContent)
+  const content = rawContent
   const body = stripSummary(content)
   const counts = reviewCounts(group(scan(body, codeRanges(body)), body))
   const final = upsertSummary(content, counts, new Date(), note)
 
-  session.lastSelfWriteHash = sha256hex(final)
-  await fs.writeFile(session.path, final)
-  const st = await fs.stat(session.path)
-
-  return { ok: true, mtimeMs: st.mtimeMs, counts, summaryLine: summaryLine(counts) }
+  const result = await writeSessionFile(session, final, baseVersion)
+  if (!result.ok) return result
+  return { ...result, counts, summaryLine: summaryLine(counts) }
 }

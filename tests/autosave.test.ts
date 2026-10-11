@@ -35,6 +35,7 @@ function seed(over: Partial<ReturnType<typeof useDoc.getState>> = {}): void {
     savedSource: 'hello',
     eol: 'lf',
     mtimeMs: 100,
+    version: 'base',
     saving: false,
     savingKind: null,
     conflict: false,
@@ -51,7 +52,7 @@ function seed(over: Partial<ReturnType<typeof useDoc.getState>> = {}): void {
 describe('autosave', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.mocked(putFile).mockReset().mockResolvedValue({ mtimeMs: 200 })
+    vi.mocked(putFile).mockReset().mockResolvedValue({ mtimeMs: 200, version: 'saved' })
     vi.mocked(getFile).mockReset()
     vi.mocked(postHandback).mockReset()
     seed()
@@ -66,7 +67,7 @@ describe('autosave', () => {
 
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).toHaveBeenCalledTimes(1)
-    expect(putFile).toHaveBeenCalledWith('s1', 'hello world', 100)
+    expect(putFile).toHaveBeenCalledWith('s1', 'hello world', 'base')
     expect(useDoc.getState().savedSource).toBe('hello world')
   })
 
@@ -77,21 +78,22 @@ describe('autosave', () => {
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
 
     expect(putFile).toHaveBeenCalledTimes(1)
-    expect(putFile).toHaveBeenCalledWith('s1', 'abc', 100)
+    expect(putFile).toHaveBeenCalledWith('s1', 'abc', 'base')
   })
 
   it('restores the original EOL on the wire', async () => {
     seed({ eol: 'crlf', source: 'a\nb', savedSource: 'a\nb' })
     useDoc.getState().setSource('a\nb\nc')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(putFile).toHaveBeenCalledWith('s1', 'a\r\nb\r\nc', 100)
+    expect(putFile).toHaveBeenCalledWith('s1', 'a\r\nb\r\nc', 'base')
   })
 
   it('saves unedited YAML frontmatter byte-for-byte, including CRLF', async () => {
     const source = '---\ntitle: "Plan"\nitems: [one, two]\n---\n\n# Body\n'
     seed({ source, savedSource: source, eol: 'crlf' })
+    vi.mocked(getFile).mockResolvedValue({ content: source, mtimeMs: 100, version: 'disk' })
     await useDoc.getState().saveForce()
-    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), undefined)
+    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), 'disk')
   })
 
   it('an unnamed draft prompts for a filename instead of writing', async () => {
@@ -143,12 +145,12 @@ describe('autosave', () => {
     expect(useDoc.getState().notice).toBeNull()
   })
 
-  it('adopts server-rewritten bytes when the feedback-language rule changes them', async () => {
+  it('retains the exact accepted buffer after saving', async () => {
     vi.mocked(putFile).mockResolvedValue({ mtimeMs: 250, content: 'REWRITTEN\n' } as never)
     useDoc.getState().setSource('hello world')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
 
-    expect(useDoc.getState().source).toBe('REWRITTEN\n')
-    expect(useDoc.getState().savedSource).toBe('REWRITTEN\n')
+    expect(useDoc.getState().source).toBe('hello world')
+    expect(useDoc.getState().savedSource).toBe('hello world')
   })
 })

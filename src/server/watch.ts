@@ -1,6 +1,6 @@
 import { watch } from 'chokidar'
 import fs from 'node:fs/promises'
-import { sha256hex } from './files'
+import { readSessionFile, sha256hex } from './files'
 import { log } from './log'
 import type { Session, SessionRegistry } from './sessions'
 
@@ -17,9 +17,9 @@ export function startWatcher(session: Session, registry: SessionRegistry): void 
 
   const onContent = async (): Promise<void> => {
     try {
-      const [content, st] = await Promise.all([fs.readFile(session.path, 'utf8'), fs.stat(session.path)])
+      const { content, mtimeMs } = await readSessionFile(session.path)
       if (sha256hex(content) === session.lastSelfWriteHash) return // our own write
-      registry.broadcast(session.id, 'file-changed', { mtimeMs: st.mtimeMs })
+      registry.broadcast(session.id, 'file-changed', { mtimeMs })
     } catch {
       /* deleted between events — unlink handler covers it */
     }

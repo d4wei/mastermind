@@ -65,7 +65,9 @@ export function SourceEditor() {
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
-    const entry = useDoc.getState().source
+    const { source: entry, sessionId, externalVersion } = useDoc.getState()
+    const ownsBuffer = (): boolean => useDoc.getState().sessionId === sessionId &&
+      useDoc.getState().externalVersion === externalVersion
 
     const view = new EditorView({
       state: EditorState.create({
@@ -81,7 +83,7 @@ export function SourceEditor() {
             // Push every edit straight into the canonical buffer — the store
             // debounces the disk write (autosave). No remount: setSourceFromEditor
             // leaves externalVersion untouched, so the cursor is preserved.
-            if (u.docChanged) useDoc.getState().setSourceFromEditor(u.state.doc.toString())
+            if (u.docChanged && ownsBuffer()) useDoc.getState().setSourceFromEditor(u.state.doc.toString())
           }),
         ],
       }),
@@ -90,9 +92,10 @@ export function SourceEditor() {
 
     const flush = (): void => {
       const text = view.state.doc.toString()
-      if (text !== useDoc.getState().source) useDoc.getState().setSourceFromEditor(text)
+      if (ownsBuffer() && text !== useDoc.getState().source) useDoc.getState().setSourceFromEditor(text)
     }
     useDoc.getState().registerFlusher(flush)
+    const registeredFlusher = useDoc.getState().flushEditor
     // Outline navigation: scroll to the heading's source line, landed near the
     // top of the page (the window is the scroll container — the CM scroller is
     // sized to its content).
@@ -104,13 +107,14 @@ export function SourceEditor() {
       scrollElementToTop(line)
     })
 
+    const registeredScroller = useDoc.getState().scroller
     return () => {
       // Deliberately NOT flushing on unmount: every edit was already pushed live,
       // so the store is current. A remount is triggered by an external buffer
       // swap (disk reload, handback adopting the new summary block) — flushing the
       // outgoing editor's now-stale text would overwrite that adopted content.
-      useDoc.getState().registerFlusher(null)
-      useDoc.getState().registerScroller(null)
+      if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
+      if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       view.destroy()
     }
   }, [])

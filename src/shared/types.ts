@@ -50,6 +50,7 @@ export interface SessionMeta {
 export interface FileResponse {
   content: string
   mtimeMs: number
+  version: string
 }
 
 /* ---- workspace (file tree) ---- */

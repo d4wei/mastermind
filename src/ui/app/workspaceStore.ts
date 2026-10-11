@@ -63,6 +63,7 @@ interface WorkspaceState {
 
 // Badge fetch scheduler — purely internal, no UI binding, so it lives at module
 // scope (one workspace is open at a time; init() resets it).
+let openRequest = 0
 let badgeActive = 0
 const badgeQueue: string[] = []
 const badgePending = new Set<string>()
@@ -207,7 +208,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   async openFile(rel) {
     const { workspaceId, root } = get()
     if (!workspaceId) return
-    // never drop unsaved WYSIWYG edits when navigating away
+    const request = ++openRequest
     useDoc.getState().flushEditor?.()
     try {
       const r = await fetch('/api/sessions', {
@@ -217,6 +218,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       })
       if (!r.ok) return
       const sess = (await r.json()) as { sessionId: string }
+      if (request !== openRequest || get().workspaceId !== workspaceId) return
       const recent = [rel, ...get().recent.filter((x) => x !== rel)].slice(0, RECENT_CAP)
       saveRecent(root, recent)
       set({ recent })

@@ -95,20 +95,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translationReady, status, sessionId])
 
-  // Autosave debounces by ~600ms; flush immediately when the tab is hidden or
-  // the window loses focus so closing it can't drop the last few keystrokes.
-  useEffect(() => {
-    const flushNow = () => void useDoc.getState().autosave()
-    const onVisibility = () => {
-      if (document.hidden) flushNow()
-    }
-    window.addEventListener('blur', flushNow)
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      window.removeEventListener('blur', flushNow)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [])
 
   useEffect(() => {
     setAgentWaiting(meta?.agentWaiting ?? false)
@@ -133,15 +119,15 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     const es = openEvents(sessionId)
     es.addEventListener('file-changed', (e) => {
       const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
-      useDoc.getState().notifyDiskChange(mtimeMs)
+      if (useDoc.getState().sessionId === sessionId) useDoc.getState().notifyDiskChange(mtimeMs)
     })
     es.addEventListener('file-deleted', () => {
-      useDoc.getState().notifyDiskChange(0, true)
+      if (useDoc.getState().sessionId === sessionId) useDoc.getState().notifyDiskChange(0, true)
     })
     es.addEventListener('handback', (e) => {
       const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
       const s = useDoc.getState()
-      if (!s.saving && Math.abs(s.mtimeMs - mtimeMs) > 0.001) s.notifyDiskChange(mtimeMs)
+      if (s.sessionId === sessionId) s.notifyDiskChange(mtimeMs)
     })
     es.addEventListener('config-changed', () => {
       void useConfig.getState().load()

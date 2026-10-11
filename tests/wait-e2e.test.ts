@@ -116,11 +116,11 @@ describe.skipIf(!hasDist)('mastermind open --wait (e2e)', () => {
 
     await sleep(300) // let the cli SSE attach
     const content = fs.readFileSync(file, 'utf8')
-    const { mtimeMs } = fs.statSync(file)
+    const disk = await fetch(`http://127.0.0.1:5311/api/sessions/${sessionId}/file`).then((response) => response.json()) as { version: string }
     const res = await fetch(`http://127.0.0.1:5311/api/sessions/${sessionId}/handback`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content, baseMtimeMs: mtimeMs }),
+      body: JSON.stringify({ content, baseVersion: disk.version }),
     })
     expect(res.status).toBe(200)
 
