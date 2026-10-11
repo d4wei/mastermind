@@ -66,3 +66,18 @@ describe('default review author', () => {
     expect(readConfig()).toMatchObject({ authorTag: 'my-tag', theme: 'nacht' })
   })
 })
+
+
+it('defaults to original-only reading and persists an explicit optional comfort language', () => {
+  expect(readConfig().comfortLang).toBeNull()
+  expect(updateConfig({ comfortLang: 'zh-CN' }).comfortLang).toBe('zh-CN')
+  expect(readConfig().comfortLang).toBe('zh-CN')
+  expect(updateConfig({ comfortLang: null }).comfortLang).toBeNull()
+  expect(() => updateConfig({ comfortLang: '../outside' })).toThrow('language code')
+})
+
+it('does not expose the retired language pair from existing preference JSON', () => {
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ authorTag: 'Alex', langPair: { a: 'en', b: 'zh' } }))
+  expect(readConfig()).not.toHaveProperty('langPair')
+  expect(readConfig().comfortLang).toBeNull()
+})

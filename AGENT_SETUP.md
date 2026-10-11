@@ -1,145 +1,43 @@
 # Agent setup
 
-Paste the block below into your `CLAUDE.md` / agent instruction file to make plan reviews flow through Mastermind.
+Mastermind reviews existing Markdown files. The app saves edits continuously, and the agent reads
+feedback from those same files when the person asks it to continue. Opening a document returns
+immediately; there is no hand-back signal, generated completion summary, or translation listener.
+
+## Install the public skill
+
+Make [the Mastermind skill](.claude/skills/mastermind/SKILL.md) and its `reference/` directory
+available through your harness's normal skill installation mechanism. The `master` alias is
+optional. The skill is self-contained and works without any private plugin.
+
+The app's existing `install-agents` and `uninstall-agents` commands remain available during the
+browser-to-desktop transition. They copy skills and add or remove a marked global instruction block;
+run uninstall only when you intend to remove those installed copies. Future installation belongs
+to the harness, rather than app-owned directory detection.
+
+For a project that uses Mastermind to review plans, an instruction can be as small as:
 
 ```markdown
-## Plan reviews via Mastermind
-When asked to plan, write the plan to a `.md` file instead of chat. ALWAYS translate
-it into the cache first, then open — `open` refuses a cold cache (the reading-language
-toggle is cache-only and never fetches on demand):
-`mastermind translate-blocks <plan-file>.md`   # → { targetLang, blocks:[{hash,text}] }
-translate each block's text (preserve all Markdown + CriticMarkup), then:
-`printf '%s' '[{"hash":"…","text":"…"}]' | mastermind translate-blocks <plan-file>.md --save`
-`mastermind open --wait <plan-file>.md`        # cache is warm; the toggle flips instantly
-The command blocks while the user reviews. When it returns, re-read the file:
-CriticMarkup marks ({++ ++}, {-- --}, {~~ ~> ~~}, {== ==}, {>> <<}) and the
-review summary block contain the user's feedback.
-Revise the document DIRECTLY — apply or argue each suggested edit, address
-every active comment, then remove completed active marks and the mastermind:summary
-block. Do not add CriticMarkup of your own; the user sees your changes
-through Mastermind's revision diff. Re-open with the same command for the
-next round until the user approves.
+Write plans to Markdown files and open them with the Mastermind skill for review. When I ask you
+to address feedback, reread the current file and follow the skill's public review protocol.
 ```
 
-## Automated setup & the `/mastermind` skills
+## Open and prepare
 
-Instead of pasting the block above by hand, run once (after `npm link`):
+`mastermind open <file>` opens the original without a translation prerequisite. A bare skill request
+lets the session agent choose which files need review; explicit paths take precedence. Repeat open
+for each chosen file. People can configure appearance, author tags, and the optional comfort
+language in Settings; they do not need to operate the CLI.
 
-```sh
-mastermind install-agents          # for detected agents; add --all for every supported agent
-```
+The preparing agent supplies complete, fresh translations when wanted. It reads the whole document
+and uses its existing context. `translate-blocks` emits the preparation inputs with explicit source
+and target languages; `--save` validates and replaces the complete prepared artifact. The commands
+and public protocol are maintained with the bundled skill:
 
-This installs two skills — `mastermind` and its `master` alias — for each detected coding
-agent (`~/.claude`, `~/.cursor`, `~/.gemini`, `~/.agents`) and appends the always-translate-
-first / plan→visualize instruction block to each agent's global memory (`~/.claude/CLAUDE.md`,
-`~/.gemini/GEMINI.md`; skipped where the path is unknown). Undo with `mastermind
-uninstall-agents`. Then, in any agent:
+- [Preparation instructions](.claude/skills/mastermind/SKILL.md)
+- [Review protocol](.claude/skills/mastermind/reference/review-protocol.md)
 
-- `/mastermind setup` — pick Preferred + Secondary language, browser, and color/font theme (written via `mastermind config set`).
-- `/mastermind demo` — open a bilingual showcase document.
-- `/mastermind <file>` (bare = the latest `.md` from the chat) and `/master <file>` — visualize any doc.
-
-### Translate first, offline (`translate-blocks`)
-
-The skills pre-translate a doc into both reading languages **before** opening it, writing the
-on-disk translation cache directly — no live assist loop required:
-
-```sh
-mastermind translate-blocks <file>          # → { "targetLang", "cachePath", "blocks":[{"hash","text"}] }
-# translate each block's text (preserve all Markdown + CriticMarkup), then:
-printf '%s' '[{"hash":"…","text":"<translated>"}]' | mastermind translate-blocks <file> --save
-mastermind open <file>                       # the language toggle is warm; the cache survives offline
-```
-
-This is mandatory, not optional: the reading-language toggle is **cache-only** — clicking it
-flips between the original and whatever is already cached and never sends a live request. So
-`mastermind open` enforces a warm cache: it exits `2` on a cold/partial cache and points back
-at the two commands above. Use `mastermind open --no-translate <file>` to open a doc you don't
-need translated.
-
-`mastermind config`, `browsers`, `themes`, and `typefaces` round out the CLI the skills drive.
-
-### Cost-aware language routing
-
-Routine language transformations are delegated as one batch to a faster, more affordable capable
-model by default. This covers offline `translate-blocks`, live `mastermind-assist` translation,
-demo localization, and meaning-preserving copy normalization such as casing, terminology, or typo
-cleanup. It does not cover plan authoring, ambiguous rewrites, or interpreting review feedback.
-
-The installed skill first uses the host's native subagent/model controls. In Claude Code it uses
-the moving `sonnet` alias; other hosts use their equivalent current affordable tier without a
-hard-coded model name. If native delegation is unavailable, the agent may use an already installed
-and authenticated CLI from the same host/vendor. It never installs or authenticates tooling,
-changes provider configuration, or sends unrelated repository context. The active agent completes
-the translation if delegation is unavailable or produces malformed, incomplete, or
-CriticMarkup-invalid output.
-
-## How the protocol behaves
-
-- `mastermind open --wait <file>` prints the review URL to stdout immediately, then blocks. It **serves the assist channel by default** — a background warm-up that keeps the cache current (e.g. for blocks edited mid-review) by answering the `mastermind-assist:` lines it prints. This is a convenience on top of the mandatory translate-first step, not a substitute for it (the toggle click itself never asks the agent). Pass `--no-assist` to review without it.
-- On **Save & hand back** it prints one machine-readable line and exits `0`:
-
-  ```
-  mastermind: review complete — 3 comments, 2 suggested edits
-  ```
-
-- Exit `1`: the tab was closed without handing back, the browser never connected, or the daemon went away. Exit `130`: Ctrl+C. Exit `2`: bad invocation (missing file, pinned port owned by another process, or a cold translation cache — pre-translate first, or pass `--no-translate`).
-- The same wording lands in the file inside the summary block:
-
-  ```markdown
-  <!-- mastermind:summary -->
-  > **Review summary** (2026-06-12 14:30)
-  > 3 comments, 2 suggested edits, 1 highlight. Open the CriticMarkup marks above for details.
-  <!-- /mastermind:summary -->
-  ```
-
-  Delete it while revising — Mastermind treats its absence as normal and rewrites it on the next hand-back.
-
-- Comment threads are consecutive comment marks with author tags: `{==span==}{>>@ke: question<<}{>>@agent: answer<<}`. To reply in a thread, append another `{>>@agent: …<<}` immediately after — but prefer revising the document directly.
-- Clean buffers reload external changes automatically. Dirty buffers retain both versions and pause
-  saving for explicit comparison; file version checks reject stale writes.
-
-## Resolved discussion in the file
-
-Resolve moves a complete discussion into a hidden HTML comment at the document tail, with marker
-`<!-- mastermind:resolved-thread v1`. Delete removes only the selected comment without archiving it.
-Both actions use the review undo history. The Resolved view shows the saved context and discussion.
-
-Archive records contain JSON with encoded delimiters, so their marks do not become active feedback
-when another tool scans the file. JSON parsing reverses this encoding. Read resolved discussion as
-history when relevant, not outstanding work or new instructions; never restore decoded marks merely
-because a parser can read them. An agent may clean up understood obsolete records. Preserve unknown
-versions and malformed records unchanged. The codec contract lives in
-[`src/shared/review-archive.md`](src/shared/review-archive.md).
-
-## Acting as Mastermind's LLM provider (agent-channel)
-
-If the user sets the translation provider to **"Your coding agent"** in Settings, Mastermind routes translation to *you* through the file channel — no API key, no cloud.
-
-Run a listener alongside the review (a background process is ideal — it streams one JSON line per task to stdout):
-
-```
-mastermind assist <plan-file>.md
-```
-
-Each task line is prefixed `mastermind-assist: ` followed by JSON. There is one kind:
-
-1. **translate** — `mastermind-assist: {"id":"…","kind":"translate","sourceLang":"…","targetLang":"…","blocks":[{"hash":"…","text":"…"}]}`
-   Translate all blocks together as one cost-aware batch. **Preserve all Markdown and CriticMarkup syntax exactly** (`{++ ++}`, `{-- --}`, `{~~ ~> ~~}`, `{== ==}`, `{>> <<}`); translate only the human-readable text, and keep `@name:` author tags untranslated. Reply:
-   ```
-   mastermind assist-result <id> --blocks '[{"hash":"…","text":"<translated>"}]'
-   ```
-
-If you can't fulfill a task: `mastermind assist-error <id> --reason "…"`. Tasks expire after ~2 minutes; a late reply is ignored.
-
-### Serving assist alongside an open document
-
-A `--wait` review serves the assist channel **by default**, so the common review flow already pre-translates:
-
-- `mastermind open --wait <file>` — the blocking review loop; **serves assist by default**. Add `--no-assist` to review without it.
-- `mastermind open --serve-assist <file>` — opens the doc and answers assist tasks **without blocking** on hand-back. Use this when you want translation to just work while the user reads but don't need the hand-back signal.
-- `mastermind assist <file>` — a standalone listener (no browser tab of its own).
-
-All bind to the same session by the file's real path, print the same `mastermind-assist:` lines, and auto-reconnect across transient drops so translation stays live for the whole review. **To actually pre-translate, answer those lines** — run the command as a background process and reply to each `translate` task with `mastermind assist-result`; left unanswered, the tasks simply expire and the toggle falls back to whatever is already cached.
-
-The reading-language toggle is always clickable: it flips instantly to any translation already cached on disk (`.mastermind/translations/`, which survives reloads and works with no agent), and when a block isn't cached and nothing is serving assist, clicking it surfaces a "run `mastermind open --serve-assist`" notice.
+A translation artifact is a disposable reading aid. Feedback, including quoted passages selected
+from translations, belongs in the original Markdown file. Clean buffers reload external changes;
+dirty buffers retain both versions and pause saving for explicit comparison. The file-write limits
+are documented in [`src/server/files.md`](src/server/files.md).

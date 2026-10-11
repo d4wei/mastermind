@@ -18,12 +18,11 @@ vi.mock('../src/ui/app/api', () => {
     putFile: vi.fn(),
     getFile: vi.fn(),
     getSession: vi.fn(),
-    postHandback: vi.fn(),
     postRename: vi.fn(),
   }
 })
 
-import { ApiError, getFile, postHandback, putFile } from '../src/ui/app/api'
+import { ApiError, getFile, putFile } from '../src/ui/app/api'
 import { useDoc } from '../src/ui/app/store'
 
 const AUTOSAVE_MS = 600
@@ -54,7 +53,6 @@ describe('autosave', () => {
     vi.useFakeTimers()
     vi.mocked(putFile).mockReset().mockResolvedValue({ mtimeMs: 200, version: 'saved' })
     vi.mocked(getFile).mockReset()
-    vi.mocked(postHandback).mockReset()
     seed()
   })
   afterEach(() => {
@@ -110,22 +108,6 @@ describe('autosave', () => {
     useDoc.getState().setSource('edit during conflict')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).not.toHaveBeenCalled()
-  })
-
-  it('hand back cancels a pending autosave so no stale PUT clobbers the summary', async () => {
-    vi.mocked(postHandback).mockResolvedValue({
-      mtimeMs: 300,
-      counts: { comments: 0, edits: 0, highlights: 0 },
-      summaryLine: 'mastermind: review complete — no marks',
-    } as never)
-    vi.mocked(getFile).mockResolvedValue({ content: 'hello world\n', mtimeMs: 300 } as never)
-
-    useDoc.getState().setSource('hello world') // queues an autosave
-    await useDoc.getState().handback() // must clear that timer
-    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-
-    expect(putFile).not.toHaveBeenCalled()
-    expect(postHandback).toHaveBeenCalledTimes(1)
   })
 
   it('a failed write is never silent — it raises the saveFailed notice', async () => {

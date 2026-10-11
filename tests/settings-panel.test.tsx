@@ -9,7 +9,7 @@ import { SettingsPanel } from '../src/ui/settings/SettingsPanel'
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
   authorTag: 'alex', typeSet: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', langPair: { a: 'English', b: 'Simplified Chinese' }, browser: '', grain: {},
+  uiLang: 'en', comfortLang: null, browser: '', grain: {},
 }
 
 let host: HTMLDivElement
@@ -48,4 +48,22 @@ describe('settings browser preference', () => {
       expect(update).toHaveBeenCalledWith({ browser: 'Safari' })
     },
   )
+})
+
+it('uses one optional comfort-language field and turns translation off explicitly', () => {
+  useConfig.setState({ config: { ...config, comfortLang: 'zh-CN' } })
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  expect(host.querySelectorAll('.lang-select')).toHaveLength(1)
+  const off = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Off')!
+  act(() => off.click())
+  expect(update).toHaveBeenCalledWith({ comfortLang: null })
+  expect(host.textContent).not.toContain('Preferred language')
+})
+
+it('stores the explicit language code selected from the comfort picker', () => {
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  act(() => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
+  const option = Array.from(host.querySelectorAll<HTMLElement>('[role="option"]')).find((item) => item.textContent?.includes('Simplified Chinese'))!
+  act(() => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
+  expect(update).toHaveBeenCalledWith({ comfortLang: 'zh-CN' })
 })

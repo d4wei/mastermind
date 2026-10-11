@@ -24,6 +24,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Translation is freshly prepared without a live service
+
+**Ruled.** The document's preparing agent supplies a complete fresh translation on each preparation
+pass. Do not automatically reuse translations across passes. A local prepared snapshot supports
+reading and reopening; prose or proposed-edit changes invalidate it, while comments, highlights,
+and resolved history alone do not. Discussion stays in its authored language. Open the original
+without waiting for translation, and remove the live queue, separate translator, and hand-back loop.
+
+**Beat:** per-block reuse without context validation, Git HEAD as a freshness key, and dependency
+tracking before there is evidence that its complexity is needed.
+
 ## 2026-10-10 — Translated review comments anchor to the original block
 
 **Ruled.** A reader may comment from the comfort-language view. Store the comment in the original

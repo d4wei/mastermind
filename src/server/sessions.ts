@@ -7,12 +7,10 @@ import {
 import type { SessionCloseReason, SseEventName } from '../shared/types'
 import { log } from './log'
 
-export type ConnRole = 'ui' | 'cli'
+export type ConnRole = 'ui'
 
 export interface Conn {
   readonly role: ConnRole
-  /** cli conns that opted into agent-channel work (SSE `assist=1`); answers translate requests. */
-  readonly assistCapable?: boolean
   /** Push one SSE event to this connection. */
   readonly send: (event: SseEventName, data: unknown) => Promise<void>
   /** Force the underlying stream closed. */
@@ -29,10 +27,7 @@ export interface Session {
   lastSelfWriteHash: string | null
   /** chokidar handle, owned by server/watch.ts */
   watcher: { close(): Promise<void> } | null
-  /** in-flight agent-channel request ids, cancelled on close (owned by assist registry) */
-  readonly pendingAssist: Set<string>
   readonly uiConns: Set<Conn>
-  readonly cliConns: Set<Conn>
   /* liveness bookkeeping */
   everConnected: boolean
   graceTimer: NodeJS.Timeout | null
@@ -64,8 +59,6 @@ export class SessionRegistry {
   onSessionOpened: ((session: Session) => void) | null = null
   /** Hook for cleanup when a session closes (stop file watcher). */
   onSessionClosed: ((session: Session, reason: SessionCloseReason) => void) | null = null
-  /** Hook when a session's tree-visible state changes (agent attach/detach) — lets workspaces refresh badges. */
-  onSessionActivity: ((session: Session) => void) | null = null
 
   open(realPath: string, opts: { isDraft?: boolean } = {}): { session: Session; created: boolean } {
     const existing = this.byPath.get(realPath)
@@ -79,9 +72,7 @@ export class SessionRegistry {
       createdAt: Date.now(),
       lastSelfWriteHash: null,
       watcher: null,
-      pendingAssist: new Set(),
       uiConns: new Set(),
-      cliConns: new Set(),
       everConnected: false,
       graceTimer: null,
       graceArmedAt: 0,
@@ -131,56 +122,29 @@ export class SessionRegistry {
   attach(sessionId: string, conn: Conn): boolean {
     const session = this.byId.get(sessionId)
     if (!session || session.closed) return false
-    if (conn.role === 'ui') {
-      session.uiConns.add(conn)
-      session.everConnected = true
-      if (session.neverOpenedTimer) {
-        clearTimeout(session.neverOpenedTimer)
-        session.neverOpenedTimer = null
-      }
-      this.disarmGrace(session)
-    } else {
-      session.cliConns.add(conn)
-      this.broadcast(sessionId, 'waiters-changed', { count: session.cliConns.size }, ['ui'])
-      if (conn.assistCapable) {
-        this.broadcast(sessionId, 'assist-availability', { available: true }, ['ui'])
-      }
-      this.onSessionActivity?.(session)
+    session.uiConns.add(conn)
+    session.everConnected = true
+    if (session.neverOpenedTimer) {
+      clearTimeout(session.neverOpenedTimer)
+      session.neverOpenedTimer = null
     }
+    this.disarmGrace(session)
     return true
-  }
-
-  /** Any assist-capable cli conn currently listening on this session. */
-  hasAssistListener(session: Session): boolean {
-    for (const c of session.cliConns) if (c.assistCapable) return true
-    return false
   }
 
   detach(sessionId: string, conn: Conn): void {
     const session = this.byId.get(sessionId)
     if (!session) return
-    const hadCli = session.cliConns.has(conn)
     session.uiConns.delete(conn)
-    session.cliConns.delete(conn)
-    if (hadCli && !session.closed) {
-      this.broadcast(sessionId, 'waiters-changed', { count: session.cliConns.size }, ['ui'])
-      if (conn.assistCapable) {
-        this.broadcast(sessionId, 'assist-availability', { available: this.hasAssistListener(session) }, ['ui'])
-      }
-      this.onSessionActivity?.(session)
-    }
     if (conn.role === 'ui' && session.uiConns.size === 0 && session.everConnected && !session.closed) {
       this.armGrace(session)
     }
   }
 
-  broadcast(sessionId: string, event: SseEventName, data: unknown, roles: ConnRole[] = ['ui', 'cli']): void {
+  broadcast(sessionId: string, event: SseEventName, data: unknown): void {
     const session = this.byId.get(sessionId)
     if (!session) return
-    const targets: Conn[] = []
-    if (roles.includes('ui')) targets.push(...session.uiConns)
-    if (roles.includes('cli')) targets.push(...session.cliConns)
-    for (const conn of targets) {
+    for (const conn of session.uiConns) {
       conn.send(event, data).catch(() => {
         // dead pipe — drop it; liveness timers handle the rest
         this.detach(sessionId, conn)
@@ -195,12 +159,11 @@ export class SessionRegistry {
     if (session.graceTimer) clearTimeout(session.graceTimer)
     if (session.neverOpenedTimer) clearTimeout(session.neverOpenedTimer)
     this.broadcast(sessionId, 'session-closed', { reason })
-    for (const conn of [...session.uiConns, ...session.cliConns]) {
+    for (const conn of [...session.uiConns]) {
       // give the event a beat to flush before tearing the stream down
       setTimeout(() => conn.close(), 50)
     }
     session.uiConns.clear()
-    session.cliConns.clear()
     this.byPath.delete(session.path)
     this.byId.delete(sessionId)
     log(`session ${sessionId} closed (${reason})`)

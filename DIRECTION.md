@@ -42,17 +42,14 @@ These choices determine which existing paths can be removed and where their resp
 
 **Exit:** those contracts receive rulings and graduate into their implementations or are dropped.
 
-## 2026-10-10 — Translation opening and interaction (updated 2026-10-10)
+## 2026-10-10 — Repository language settings (updated 2026-10-10)
 
-**Open question.** Single-language operation and repo/comfort language roles are settled. When
-translation is enabled, nonblocking opening, freshness, and artifact storage need a contract.
-Block-anchored comments from the comfort-language view are ruled. The proposed long-term path is
-fresh preparation by the document agent, with no live queue or separate translator. See the
-[design discussion](docs/architecture-review.md#translation-without-a-live-service).
+**Open question.** Repo language and personal comfort language have settled roles, but repository
+settings still need storage, discovery, precedence, and defaults outside a repo. Translation now
+uses explicit preparation languages and an optional personal comfort preference; that does not
+choose a repo-settings mechanism.
 
-**Exit:** rulings on nonblocking opening, translation delivery and freshness, artifact storage, and
-storage/discovery/precedence for repository settings. Repo language is repo-scoped; comfort language
-is personal, as ruled in `DECISIONS.md`.
+**Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 
 ## 2026-10-10 — Package and CLI identity
 

@@ -29,7 +29,8 @@ The squad keeps the following design commitments from
 - **"Marks are the data."** Review actions hang off source spans, and accepting a mark is an exact
   splice. Keep byte-preserving source edits without a Markdown serializer rewriting unrelated text.
   Upstream's setup prose also promises a revision diff, but the current code has removed rounds and
-  snapshots; that promise is not a shipped capability. Who may author a mark remains open below.
+  snapshots; that promise is not a shipped capability. The squad now permits author-tagged replies
+  from people and agents.
 - **"Local, fast, silent" and the hand-back loop as "the product's spine."** Upstream's per-file
   session, summary, and stdout signal make completion explicit. Keep the underlying principle that
   agents consume files without driving the UI. The squad's later ruling in `DECISIONS.md` replaces
@@ -43,8 +44,8 @@ The historical behaviors plan at upstream `3687c91` adds integration rationale w
 - **"The agent is the translator."** Offline cache preparation avoids asking one process to drive
   a review and answer its own live translation requests. Hash-keyed blocks reuse unchanged work;
   shared segmentation and target-language selection keep CLI-written entries compatible with the
-  browser. Retain that useful preparation path and the bilingual toggle. Whether preparation may
-  gate opening is a separate, unresolved squad decision.
+  browser. Retain agent preparation and optional translated reading. The later squad ruling replaces
+  cached-block reuse with fresh snapshots and makes opening independent of translation.
 - **One preferred/secondary language pair.** Setup and the reading toggle share `langPair`, avoiding
   competing preferences. Retain consistent language configuration and optional translated reading;
   the later squad ruling replaces the pair's semantics with repo and optional comfort languages.
@@ -78,20 +79,22 @@ remaining implementation choices and execution status. Implementation follows th
 
 The following original questions still need rulings before implementation:
 
-- Translation delivery and nonblocking `open` when enabled; repository-settings mechanics.
 - Package, CLI, and config-directory rename.
 - Repository settings: storage, discovery, and precedence for repo language; whether the review
   convention also needs a shared setting. Comfort language and author tags remain personal.
 
 The browser-container bet has graduated to the desktop-wrapper ruling. GUI onboarding, continuous
 saving without explicit hand-back, agent discretion over review-file selection, and cross-platform
-viability are also settled there; their implementation remains ahead.
+viability are also settled there. See the architecture review for execution status.
 
 ### Agent-authored comments: current assumptions and existing support
 
 Inspection on 2026-10-10, after the light fixes. The subsequent ruling in `DECISIONS.md` permits
-author-tagged agent replies. This dated inventory guides the remaining public-protocol work; the
-shipped instructions still conflict, while the renderer does not enforce a human-only author role.
+author-tagged agent replies. This dated inventory records the original conflicts, not current
+behavior. The [public protocol][protocol] replaces the conflicting instructions. The renderer has
+never enforced a human-only author role.
+
+[protocol]: ../.claude/skills/mastermind/reference/review-protocol.md
 
 **Instruction surfaces**
 
@@ -146,11 +149,10 @@ shipped instructions still conflict, while the renderer does not enforce a human
 
 Outside the requested shipped surfaces, [`README.md`](../README.md)'s review workflow and
 [`feature-test.md`](../feature-test.md)'s demonstration also describe one-direction feedback.
-They would need reconciliation if the squad rules otherwise.
+The public guidance now follows the squad ruling.
 
-The ruling still needed is whether an answered comment stays beside an agent's harness-tagged reply,
-when a thread is removed, and whether answers need any distinct display or summary treatment. The
-squad's convention supplies a candidate policy; this inventory does not adopt it.
+The later ruling and public protocol govern answered threads and their retention. This inventory
+remains evidence of the original design, not an additional policy source.
 
 ## Trial notes
 

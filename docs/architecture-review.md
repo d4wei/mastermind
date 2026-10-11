@@ -47,69 +47,30 @@ boundaries; any retained root-scoped operation must still enforce its root.
 
 ### `translate-blocks <file>`
 
-Emits missing translation blocks as JSON; `--save` accepts translated JSON and writes the cache.
-The agent supplies the translation. A block is a source slice derived from a top-level Markdown
-node; lists split into individual items. Headings and paragraphs are separate blocks. Code, HTML,
-frontmatter, thematic breaks, and definitions are not translated.
+Translation preparation and delivery are implemented. The command emits every block for a fresh
+preparation; `--save` publishes one complete, validated reading artifact. Opening always shows the
+original immediately. There is no live queue, separate translator, waiting loop, or old-cache
+reader.
 
-[`blocks.ts`](../src/shared/blocks.ts) keys each block by its kind and exact source text. The cache
-under `.mastermind/translations/` maps hashes to translated text for a target language, so unchanged
-blocks survive surrounding edits. The language pair and a CJK heuristic choose the other language;
-this is original text plus cached target blocks, not two fully translated copies of every document.
-The translated view is read-only, with source fallback for misses.
-
-The new language model has a repository-scoped language for communication and bookkeeping, plus an
-optional personal comfort language. Single-language operation requires no second language or
-translation preparation. The invoking agent supplies translations when needed. Replace
-preferred/secondary language semantics and the script-based direction guess with these explicit
-roles. Repo settings have a place in the design, with repo language as the first concrete use case.
-Storage, repo discovery, defaults outside a repo, precedence, mixed-language documents, and review
-interactions need detailed design; this does not require making every preference repo-configurable.
-
-Today `open` refuses a cold cache unless `--no-translate` is supplied. There is also a live assist
-queue served by an attached agent. Preserve reusable segmentation/cache logic; decide separately
-whether both provisioning paths justify their machinery. The earlier proposal that translation
-must never gate opening still needs its own ruling.
+A block is a source slice derived from a top-level Markdown node; lists split into individual items.
+The durable projection, freshness, and quoted-comment contracts live in
+[`translation.md`](../src/shared/translation.md). Artifact storage, publishing, and the CLI/API
+contract live in [`prepared.md`](../src/server/translate/prepared.md). The public preparation flow
+lives in [the shipped skill](../.claude/skills/mastermind/SKILL.md).
 
 ### Translation without a live service
 
-The user proposes preparation and refresh by the same agent that prepares the document, using its
-existing context. There is no need to preserve upstream translation caches. The app would read
-prepared artifacts; no translator agent, request queue, or waiting session is necessary. This is a
-long-term proposal, not a compatibility mode. Translation still requires generation time in the
-preparing agent's turn; opening the original need not wait for it.
+The preparing agent supplies a complete fresh translation using its existing context. The app
+checks the current narrative snapshot, not the repository's Git HEAD or an inferred dependency
+list. Comments and resolved history remain in their authored language; source prose and proposed
+edits invalidate the prepared translation. Block-anchored comments preserve the exact translated
+selection and its language in the original file. These contracts have graduated to the sidecars
+above and the rulings in `DECISIONS.md`.
 
-The remaining contract should cover:
-
-- **Freshness proposal:** generate a fresh full-document translation on each explicit preparation
-  pass, with no automatic reuse across passes. Retain a local artifact for the current prepared
-  snapshot so reopening it needs no live translator. The preparation pass is an agent operation,
-  not a waiting app session. Actual source prose or proposed-edit changes invalidate that snapshot;
-  comments, highlights, and resolved history alone should not. This distinction requires a tested
-  projection and source mapping; it must not rewrite the document on disk. Keep review discussion
-  in its authored language rather than making each new comment demand translation.
-- **Context boundary:** the app can check whether a translation corresponds to its source snapshot;
-  it cannot establish that the preparing agent considered every relevant contextual dependency.
-  Preparing anew avoids cross-pass reuse assumptions but does not make semantic drift impossible.
-  The agent owns context selection. A changed Git HEAD misses uncommitted changes and also reacts
-  to unrelated commits; it should not be the translation-validity key. A declared dependency list
-  is a possible later optimization only if repeat use warrants the added discovery and validation
-  machinery; it cannot represent undisclosed conversation context.
-- **Missing preparation:** show the current original with a clear unavailable/stale indication until
-  the preparing agent supplies current output. Do not display stale translations as current or make
-  the app create a request that needs another agent to wait on it.
-- **Feedback anchoring, approved:** accept comments against the corresponding original block, in
-  the reviewer's language. Preserve the precise selected translated passage and its language in
-  the comment as historical context, even after translation refresh. Exact selected-text edits
-  still use the original. Check the current source mapping before applying the comment; quote
-  serialization must preserve CriticMarkup boundaries, including delimiter-like selected text.
-- **Storage and languages:** choose a simple derived artifact and explicit source/target metadata.
-  Repo language, personal comfort language, file discovery, and freshness validation must agree;
-  there is no requirement to preserve the old cache format or language-pair heuristic.
-
-Feedback in a comfort language remains in the original Markdown file. Translation artifacts contain
-no exclusive review state. The block-anchored comment direction is ruled; freshness and artifact
-storage remain proposals for review.
+The app cannot establish that the agent considered every relevant contextual dependency. Context
+selection remains the agent's responsibility; preparing again does not eliminate semantic drift.
+Repository language settings still need storage, discovery, and precedence. The current command
+requires explicit source and target languages; comfort language is an optional personal preference.
 
 ### `install-agents` / `uninstall-agents`
 
@@ -126,13 +87,13 @@ path when retiring the commands, not a background cleanup that edits harness fil
 ### `status` / `stop`
 
 Today these commands inspect or terminate the detached localhost server. It serves the UI, performs
-file I/O and watching, maintains sessions, and brokers assist tasks. Removing hand-back alone does
+file I/O and watching, and maintains sessions. Removing hand-back alone does
 not eliminate those responsibilities; the desktop host takes them over.
 
 The target is an editor-style app whose wrapper owns its runtime and review-session state. Remove
 the detached daemon and its status/stop workflow once those responsibilities run under the app's
 lifetime. Review-session state is in memory and ends when the app quits; saved Markdown remains on
-disk. Existing preferences and translation-cache files are separate from session restoration, and
+disk. Existing preferences and prepared translation files are separate from session restoration, and
 this ruling does not require deleting them. SQLite is a possible later choice for restoring app
 state, not a dependency or a second store for review feedback in this iteration.
 
@@ -160,28 +121,21 @@ Completed in the first execution batch: serializer removal, feedback pass-throug
 legacy history-pruning removal. A deterministic regression identified pruning as the cause of the
 intermittent translation-cache failure. The remaining deletions below retain their prerequisites.
 
-- **Delete the explicit hand-back path after safe saving lands.** Remove the button, pulse/toast,
-  summary generation, endpoint, and waiting-loop completion event together with their callers.
-  Preserve ordinary file watching and review counts. No legacy summary compatibility is required;
-  remove summary-specific behavior without silently rewriting arbitrary document content on open.
-- **Untangle assist lifetime from hand-back.** `open --wait` currently also enables translation
-  service. Removing its wait loop must not silently remove translation. Either retain an independent
-  agent adapter or choose cache preparation as the supported path before deleting queue machinery.
+Hand-back, generated summaries, waiting-loop events, assist dispatch, and live translation have now
+been removed together. Ordinary watching and autosaving remain. Existing document bytes are not
+silently cleaned up on open. The public skill supports author-tagged replies and fresh preparation.
+
 - **Retire `new` and draft-only machinery.** Trace rename and session rekey callers first; keep any
   operation that still supports an independently chosen file-management capability.
 - **Retire the separate workspace UI and app-owned harness installer.** Replace their entry points
   with native file access and harness-owned installation guidance. Remove tree/badge/session code
   only after checking which pieces remain necessary for opening an agent-selected set of files.
-- **Repair remaining protocol guidance with skill consolidation.** `AGENT_SETUP.md` still promises
-  an absent revision diff. The architecture map was updated with the initial ablation; keep it
-  aligned as later responsibilities move. Do not sweep unrelated comments.
-
 ## Desktop wrapper choice
 
 Both candidates support macOS, Windows, and Linux. Cross-platform capability is a selection
 requirement; packaging and native behavior still need testing on each platform.
 
-- **Electron** embeds Chromium and Node. The existing React UI and Node filesystem/watch/cache code
+- **Electron** embeds Chromium and Node. The existing React UI and Node filesystem/watch code
   fit that process model. Proposed shape: privileged document operations in the main process,
   narrow preload IPC to the renderer, with no production HTTP server. This appears to
   require less backend adaptation for this repository; that is an inference, not a measured result.
@@ -230,10 +184,12 @@ translation exclusion, malformed records, stale actions, and undo. The external 
 also checked against the emitted archive: historical marks remain inactive.
 
 Receiving-agent guidance distinguishes active feedback from resolved history. Author-tagged agent
-replies are now approved; the public convention must be self-contained and use neutral examples.
-Port only the required protocol, confirming ambiguous private material before inclusion. Reopening
+replies use the self-contained [public protocol][public-protocol]. The shipped instructions use
+neutral examples and require no private skill or helper. Reopening
 archived threads and relocating their anchors can wait for an actual need; undo covers immediate
 accidental resolution.
+
+[public-protocol]: ../.claude/skills/mastermind/reference/review-protocol.md
 
 ## Rendering and frontmatter
 
@@ -274,7 +230,7 @@ presentation direction.
 - **Smart open:** the session agent has full discretion over the files needing review now. Provide
   a deterministic operation to open its chosen paths; do not encode a Git-only or session-only
   eligibility rule. Git is useful context and is optional. Multi-file UI details remain open.
-- **Continuous saving:** use the file-safety work above as the prerequisite to deleting hand-back.
+- **Continuous saving:** autosave has replaced explicit hand-back.
   Optional Git commits remain a separate proposal, with file scope and timing unresolved; autosave
   should not implicitly stage or commit unrelated repository changes.
 - **Translation and squad configuration:** support repo-language-only operation and an optional
@@ -315,15 +271,15 @@ the scope small enough to validate before beginning the wrapper or broader produ
    regressions plus visual checks across themes and representative viewport sizes.
 4. **Settle and implement the file protocol.** Review the archive proposal above alongside
    translation opening/lifetime and the minimal agent launch interface. Agent replies and dropping
-   legacy compatibility are ruled. Delete/Resolve have shipped; align the remaining skill guidance
-   with the public reply convention. Exit: app and receiving agent agree on active versus historical
+   legacy compatibility are ruled. Delete/Resolve, public replies, and fresh translation
+   preparation have shipped. Exit: app and receiving agent agree on active versus historical
    feedback; translation does not accidentally depend on a removed completion loop.
 5. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
    experiment, including browser preview and native macOS automation. Record the choice with a
    credible Windows/Linux packaging path. Retire daemon and browser-choice machinery only when their
    responsibilities have a tested owner. Exit: measured comparison and a wrapper ruling.
 6. **Build the chosen review flow.** Implement native file access, multi-file review, graphical
-   onboarding, skill consolidation, and hand-back removal against settled contracts. App session
+   onboarding, and the graphical setup/demo flow against settled contracts. App session
    state ends on quit; restoration is deferred. Evaluate frontmatter rows and renderer replacement
    independently. Choose package identity before distribution. Optional Git commits and Claude Mods
    remain deferred. Exit: a teammate can open, review, save, and revisit chosen files without
@@ -338,5 +294,7 @@ Execution is approved. The first batch delivered document-owned buffers and save
 version-checked file writes, the initial ablation, and the three small comment-display fixes. Tests
 cover the previously failing schedules; a browser smoke check exercised source autosave, clean
 external reload, author labels, soft wraps, and selected input text. The next batch added guarded
-conflict comparison and hidden resolved discussions with per-comment deletion. Cross-list mark
-handling, responsive chrome, wrapper selection, and the explicitly open contracts remain ahead.
+conflict comparison and hidden resolved discussions with per-comment deletion. Fresh prepared
+translation, translated-view comments, public reply guidance, and removal of
+hand-back and the live service followed. Cross-list mark handling, responsive chrome, wrapper
+selection, and the explicitly open contracts remain ahead.

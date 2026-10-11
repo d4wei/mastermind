@@ -43,25 +43,6 @@ export function putFile(sessionId: string, content: string, baseVersion: string)
   return request<{ mtimeMs: number; version: string }>(`/api/sessions/${sessionId}/file`, jsonInit('PUT', { content, baseVersion }))
 }
 
-export interface HandbackResponse {
-  version: string
-  mtimeMs: number
-  counts: { comments: number; edits: number; highlights: number }
-  summaryLine: string
-}
-
-export function postHandback(
-  sessionId: string,
-  content: string,
-  baseVersion: string,
-  note?: string,
-): Promise<HandbackResponse> {
-  return request<HandbackResponse>(
-    `/api/sessions/${sessionId}/handback`,
-    jsonInit('POST', { content, note, baseVersion }),
-  )
-}
-
 export function postRename(sessionId: string, filename: string): Promise<{ path: string; displayName: string; version: string }> {
   return request<{ path: string; displayName: string; version: string }>(
     `/api/sessions/${sessionId}/rename`,
@@ -71,4 +52,8 @@ export function postRename(sessionId: string, filename: string): Promise<{ path:
 
 export function openEvents(sessionId: string): EventSource {
   return new EventSource(`/api/sessions/${sessionId}/events?role=ui`)
+}
+
+export function getPreparedTranslation(sessionId: string, targetLang: string): Promise<unknown> {
+  return request<unknown>(`/api/sessions/${sessionId}/translation?targetLang=${encodeURIComponent(targetLang)}`)
 }

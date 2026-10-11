@@ -225,8 +225,7 @@ function FileRow({
       <FileIcon className="ws-icon" />
       <span className="ws-name">{name}</span>
       <span className="ws-marks">
-        {sess?.agentWaiting && <span className="ws-dot ws-dot-agent" title="agent waiting" />}
-        {sess && !sess.agentWaiting && <span className="ws-dot ws-dot-open" title="open" />}
+        {sess && <span className="ws-dot ws-dot-open" title="open" />}
         {active && dirtyOpen && <span className="ws-dot ws-dot-dirty" title="unsaved changes" />}
         {total > 0 && (
           <span className="ws-count" title={countsTitle(counts!)}>

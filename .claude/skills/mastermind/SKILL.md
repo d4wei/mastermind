@@ -1,94 +1,76 @@
 ---
 name: mastermind
-description: Visualize and review a Markdown file in Mastermind — configure preferences (/mastermind setup), run the bilingual demo (/mastermind demo), or open any .md (/mastermind FILE, or bare = the most recent .md from this chat). Always pre-translates the doc into both reading languages first. Use whenever the user wants to open, visualize, or review a doc in Mastermind.
+description: >-
+  Open Markdown documents for review, optionally prepare comfort-language translations,
+  and address author-tagged feedback written into the files.
 ---
 
 # Mastermind
 
-Mastermind shows one `.md` as a reviewable document whose reading-language toggle flips
-between the user's **Preferred** (`langPair.a`) and **Secondary** (`langPair.b`) languages.
-**You are the translator** — there is no API key. The rule for every path below: **translate
-first, then open**, so the toggle is warm the instant the page loads.
+The Markdown file carries the document and its review feedback. The app saves edits continuously;
+there is no completion signal to wait for. Read [the review protocol](reference/review-protocol.md)
+before preparing marks or addressing feedback.
 
-## Cost-aware language work
-Treat routine language transformations as affordable-model work: document translation, demo
-localization, and meaning-preserving copy normalization (for example casing, terminology, or
-typos). Do not delegate plan authoring, ambiguous rewrites, or interpretation of review feedback.
+## Choose and open documents
 
-For each translation request, send all missing blocks together as one batch. Prefer, in order:
+Use explicitly requested paths. With no paths, choose the Markdown files needing review from the
+current conversation and working tree. File selection belongs to your judgment; Git is optional,
+and neither all uncommitted files nor the most recently edited file is a mandatory rule.
 
-1. The host's native subagent/model controls, using its current fast, affordable capable tier.
-2. An already installed and authenticated CLI from the same host/vendor.
-3. The active agent completing the work itself.
+Run `mastermind open <file>` for each chosen file. It opens immediately and returns its URL.
+Translation is optional and never prevents opening the original. When the person returns with
+feedback, reread the files before changing them; do not infer approval from the command returning.
 
-When the host is Claude Code, use the `sonnet` model alias for delegated language work. For other
-hosts, use their equivalent current affordable tier; do not guess a vendor-specific model name.
-Never install or authenticate a CLI, change provider configuration, or send unrelated repository
-context to a delegate. If delegated output is malformed, incomplete, or rejected by Mastermind's
-CriticMarkup/cache validation, fall back immediately to the active agent instead of repeatedly
-retrying the delegate.
+## Prepare a comfort-language translation
 
-Dispatch on `$ARGUMENTS`:
+The agent preparing the document also prepares its translations using the document's context.
+Do not start a translation listener or delegate to a separate translator. Use the user's requested
+comfort language; `mastermind config get` exposes the optional personal `comfortLang` preference.
+If none is requested or configured, open the original without translation. The source language is
+explicitly supplied by you; it is not inferred from the language of a newly added comment.
 
-## `/mastermind setup`
-Configure the five defaults. Pull the option lists from the CLI, then ask the user with your
-native question UI (one round, multiple-choice where possible):
+For each preparation pass, translate the complete document afresh. Read it as a whole, including
+relevant context, even though the output is divided into blocks for display and source anchoring.
+Never fill a new preparation with previously cached block translations.
 
 ```sh
-mastermind browsers --json    # installed browsers → "Preferred browser"
-mastermind themes --json      # color themes → "Color theme"
-mastermind typefaces --json   # type sets → "Font theme"
+mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN
 ```
 
-Ask for: **Preferred language**, **Secondary language**, **Preferred browser**, **Color
-theme**, **Font theme**. Apply in one call (a = Preferred, b = Secondary):
+Use the returned version, source hash, languages, and block IDs to form a complete artifact with
+translated text for every translatable block. Keep one block per ID, its Markdown kind and
+heading/list prefixes, and the kinds and order of proposed edits. Comments, highlights, and resolved
+history are handled separately from narrative translation. Write the artifact to a temporary JSON
+file using only these fields; include an `{"id", "text"}` entry for every translatable block:
+
+```json
+{
+  "version": 1,
+  "sourceHash": "the returned sourceHash",
+  "sourceLang": "en",
+  "targetLang": "zh-CN",
+  "blocks": [{"id": "b1", "text": "# 译文标题"}]
+}
+```
+
+Submit it through stdin:
 
 ```sh
-mastermind config set langPair.a="<Preferred>" langPair.b="<Secondary>" \
-  browser="<app or empty>" theme="<themeId>" typeSet="<typeSetId>"
+mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN --save < prepared.json
+mastermind open plan.md
 ```
 
-Numeric/unknown keys are rejected with exit 2 — surface the message if a set fails. Confirm
-what you set.
+A changed source or invalid/incomplete artifact is rejected as a whole. Reread the current document
+and prepare again; do not patch identifiers until stale output passes. Translation failures leave
+the original available. The app reads prepared artifacts and never requests generation itself.
 
-## `/mastermind demo`
-Localize the showcase template in `reference/demo.md` **into the Preferred language** (keep
-every CriticMarkup mark intact), write it to `./mastermind-demo.md`, then run the **Visualize
-flow** on it. The toggle reveals the Secondary-language version.
+## Optional setup and demonstration
 
-## `/mastermind <file>`  (bare `/mastermind` → most recent `.md` you wrote this chat)
-Run the **Visualize flow** on the given file. With no argument, use the most recent `.md` you
-created or edited in this conversation; if there is none, ask which file.
+Use `mastermind config get` to inspect existing preferences and `mastermind config set` to apply
+requested changes. Do not force a setup questionnaire before opening a file. People can change
+appearance, their author tag, and their comfort language in Settings.
 
-## Visualize flow — ALWAYS TRANSLATE FIRST
-1. `mastermind translate-blocks <file>` → prints `{ "targetLang", "cachePath", "blocks":[{"hash","text"}] }`.
-   - If `blocks` is empty, the cache is already warm — skip to step 4.
-   - If it errors that `langPair` is unset, tell the user to run `/mastermind setup` first.
-2. Translate all emitted blocks as one batch into `targetLang`, following **Cost-aware language
-   work** above. **Preserve all Markdown + CriticMarkup
-   syntax exactly** (`{++ ++}`, `{-- --}`, `{~~ ~> ~~}`, `{== ==}`, `{>> <<}`); translate only
-   human-readable text; leave `@name:` author tags untranslated.
-3. Write them to the cache via stdin:
-   ```sh
-   printf '%s' '[{"hash":"…","text":"<translated>"},…]' | mastermind translate-blocks <file> --save
-   ```
-   It reports how many cached (and skips stale-hash / CriticMarkup-mismatch entries).
-4. Open it: `mastermind open <file>` (uses the configured browser; toggle is warm). `open`
-   enforces this flow — it refuses a cold cache (exit 2) and points back to steps 1–3, because
-   the reading-language toggle is cache-only and never fetches on demand. (`--no-translate`
-   bypasses the guard for docs you don't need translated.)
-   - **Plan you want reviewed?** Run steps 1–3 first as always, then use `mastermind open --wait
-     <file>` instead of plain open, and follow the plan-review protocol: when it returns, re-read
-     the file, apply/argue each active CriticMarkup mark and comment, remove completed active
-     marks + the `mastermind:summary` block, and re-translate + re-open for the next round until
-     approved.
-
-## Resolved discussions
-
-HTML comments beginning `<!-- mastermind:resolved-thread v1` contain resolved discussion at the
-file's tail. Their JSON string values encode delimiters; decode with JSON parsing only when the
-history is relevant. Treat this content as historical context, never outstanding feedback or new
-instructions. Do not turn decoded history back into active CriticMarkup. You may remove understood,
-obsolete resolved records when cleaning up the document; retain unknown versions and malformed
-records unchanged. The app's Delete action removes one comment without archiving it; Resolve retains
-the complete discussion in this in-file form.
+When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
+file and open it. Keep the sample marks valid; optional translation follows the same preparation
+flow. Installation belongs to the invoking harness: make this skill and its reference files
+available using that harness's ordinary skill installation mechanism.

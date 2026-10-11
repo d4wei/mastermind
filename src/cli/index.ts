@@ -8,10 +8,9 @@ import type { CreateSessionResponse, CreateWorkspaceResponse, MastermindConfig, 
 import { pkgRoot, serverLogPath } from '../server/paths'
 import { readServerState } from '../server/statefile'
 import { CliError, ensureServer } from './daemon'
-import { getJson, postJson, postNoContent, probeHealth, putJson, requestShutdown, sleep } from './http'
-import { serveAssist, waitForHandback } from './wait'
+import { getJson, postJson, probeHealth, putJson, requestShutdown, sleep } from './http'
 import { type ConfigPatch, readConfig, updateConfig } from '../server/config'
-import { planPretranslate, writePretranslations } from '../server/translate/pretranslate'
+import { planTranslation, publishTranslation } from '../server/translate/prepared'
 import { type Assignment, applyAssignments, getDotted, parseAssignment } from './config-edit'
 import { browserOpenArgs } from './browser-open'
 import { AGENT_TARGETS, removeMarkedBlock, skillFile, stripFrontmatter, upsertMarkedBlock } from './install-agents'
@@ -67,14 +66,10 @@ program
 program
   .command('open')
   .argument('<file>', 'markdown file to open')
-  .option('--wait', 'block until the user clicks "Save & hand back", then exit 0')
-  .option('--serve-assist', 'answer translation requests for this session (on by default with --wait)')
-  .option('--no-assist', 'with --wait, review only — do not serve the assist channel (translation)')
-  .option('--no-translate', 'open even if the translation cache is cold (skip the translate-first guard)')
   .option('--no-browser', 'print the URL without opening a browser tab')
   .option('--in <browser>', 'open in a specific browser app, e.g. "Google Chrome" (overrides the configured default)')
   .description('start the server if not running and open a browser tab for this file')
-  .action(async (file: string, opts: { wait?: boolean; serveAssist?: boolean; assist: boolean; translate: boolean; browser: boolean; in?: string }) => {
+  .action(async (file: string, opts: { browser: boolean; in?: string }) => {
     const pinnedPort = parsePort(program.opts<{ port?: string }>().port)
     const abs = path.resolve(file)
     let st: fs.Stats
@@ -85,38 +80,11 @@ program
     }
     if (!st.isFile()) die(2, `not a file: ${abs}`)
 
-    // Translate-first guard: the reading-language toggle is cache-only, so the cache must
-    // be warm BEFORE opening or the toggle has nothing to show. Refuse a cold cache and
-    // point at the offline pre-translate flow (opt out with --no-translate).
-    if (opts.translate) {
-      const plan = await planPretranslate(abs, fs.readFileSync(abs, 'utf8'), readConfig().langPair)
-      if (plan.blocks.length > 0) {
-        die(
-          2,
-          `translation cache is cold (${plan.blocks.length} block(s) untranslated for ${plan.targetLang}).\n` +
-            `  Pre-translate first, then re-run open:\n` +
-            `    mastermind translate-blocks ${file}            # emits the blocks to translate\n` +
-            `    …translate each block, preserving Markdown + CriticMarkup…\n` +
-            `    printf '%s' '[{"hash":"…","text":"…"}]' | mastermind translate-blocks ${file} --save\n` +
-            `  Or open without translating: mastermind open --no-translate ${file}`,
-        )
-      }
-    }
-
     const port = await ensureServer({ pinnedPort })
     const session = await createSession(port, abs)
     process.stdout.write(`${session.url}\n`)
     if (opts.browser) await openBrowser(session.url, opts.in)
 
-    // A --wait review serves the agent-channel by default: it lights up the reading-language
-    // toggle and lets Mastermind pre-translate the document while the user reads (opt out with
-    // --no-assist). Plain `open` stays fire-and-forget; --serve-assist makes it block-and-serve.
-    const serve = !!opts.serveAssist || (!!opts.wait && opts.assist)
-    if (opts.wait) {
-      await waitForHandback(port, session.sessionId, { serveAssist: serve })
-    } else if (serve) {
-      await serveAssist(port, session.sessionId)
-    }
     process.exit(0)
   })
 
@@ -142,63 +110,6 @@ program
     process.stdout.write(`${ws.url}\n`)
     if (opts.browser) await openBrowser(ws.url)
     process.exit(0)
-  })
-
-program
-  .command('assist')
-  .argument('<file>', 'markdown file under review')
-  .description('listen for translation requests and stream them as JSON lines (agent-channel)')
-  .action(async (file: string) => {
-    const pinnedPort = parsePort(program.opts<{ port?: string }>().port)
-    const abs = path.resolve(file)
-    if (!fs.existsSync(abs)) die(2, `file not found: ${abs}`)
-    const port = await ensureServer({ pinnedPort })
-    const session = await createSession(port, abs)
-    await serveAssist(port, session.sessionId)
-  })
-
-program
-  .command('assist-result')
-  .argument('<id>', 'the request id from the assist-request line')
-  .option('--blocks <json>', 'translate result: JSON [{hash,text}]')
-  .description('deliver an agent-channel result back to Mastermind')
-  .action(async (id: string, opts: { blocks?: string }) => {
-    const state = readServerState()
-    if (!state) die(1, 'no daemon running')
-    let payload: unknown
-    if (opts.blocks !== undefined) {
-      let blocks: unknown
-      try {
-        blocks = JSON.parse(opts.blocks)
-      } catch {
-        die(2, '--blocks must be valid JSON')
-      }
-      payload = { kind: 'translate', blocks }
-    } else {
-      die(2, 'provide --blocks')
-    }
-    try {
-      await postNoContent(state.port, `/api/assist/${id}/result`, payload)
-      process.exit(0)
-    } catch (err) {
-      die(1, `result rejected: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  })
-
-program
-  .command('assist-error')
-  .argument('<id>', 'the request id')
-  .option('--reason <text>', 'why the request could not be fulfilled')
-  .description('decline an agent-channel request')
-  .action(async (id: string, opts: { reason?: string }) => {
-    const state = readServerState()
-    if (!state) die(1, 'no daemon running')
-    try {
-      await postNoContent(state.port, `/api/assist/${id}/error`, { reason: opts.reason ?? 'declined' })
-      process.exit(0)
-    } catch (err) {
-      die(1, `error rejected: ${err instanceof Error ? err.message : String(err)}`)
-    }
   })
 
 program
@@ -277,45 +188,32 @@ async function readStdin(): Promise<string> {
 
 program
   .command('translate-blocks')
-  .argument('<file>', 'markdown file to pre-translate')
-  .option('--save', 'read translated [{hash,text}] JSON from stdin and write it to the on-disk cache')
-  .description("offline pre-translate: emit the blocks to translate, or (--save) cache the agent's translations")
-  .action(async (file: string, opts: { save?: boolean }) => {
-    const abs = path.resolve(file)
+  .argument('<file>', 'markdown file to prepare for translation')
+  .requiredOption('--source-lang <code>', 'repository/source language code')
+  .requiredOption('--target-lang <code>', 'comfort/target language code')
+  .option('--save', 'read a complete prepared translation artifact as JSON from stdin')
+  .description('emit every current block for a fresh translation pass, or publish a complete result')
+  .action(async (file: string, opts: { save?: boolean; sourceLang: string; targetLang: string }) => {
+    let realPath: string
     let source: string
     try {
-      source = fs.readFileSync(abs, 'utf8')
+      realPath = fs.realpathSync(path.resolve(file))
+      source = fs.readFileSync(realPath, 'utf8')
     } catch {
-      die(2, `file not found: ${abs}`)
+      die(2, `file not found: ${path.resolve(file)}`)
     }
-    const { langPair } = readConfig()
-    if (opts.save) {
-      let entries: { hash: string; text: string }[]
-      try {
-        const parsed: unknown = JSON.parse(await readStdin())
-        if (!Array.isArray(parsed)) throw new Error('expected a JSON array')
-        const ok = parsed.every(
-          (e) =>
-            e !== null &&
-            typeof e === 'object' &&
-            typeof (e as { hash?: unknown }).hash === 'string' &&
-            typeof (e as { text?: unknown }).text === 'string',
-        )
-        if (!ok) throw new Error('each element must be { hash: string, text: string }')
-        entries = parsed as { hash: string; text: string }[]
-      } catch (err) {
-        die(2, `--save expects [{hash,text}] JSON on stdin: ${err instanceof Error ? err.message : String(err)}`)
+    try {
+      if (opts.save) {
+        const artifact: unknown = JSON.parse(await readStdin())
+        const result = await publishTranslation(realPath, source, opts.sourceLang, opts.targetLang, artifact)
+        process.stdout.write(`${JSON.stringify(result)}\n`)
+      } else {
+        const plan = await planTranslation(realPath, source, opts.sourceLang, opts.targetLang)
+        process.stdout.write(`${JSON.stringify(plan)}\n`)
       }
-      const res = await writePretranslations(abs, source, langPair, entries)
-      const skips: string[] = []
-      if (res.skippedUnknownHash) skips.push(`${res.skippedUnknownHash} stale/unknown-hash`)
-      if (res.skippedMarkMismatch) skips.push(`${res.skippedMarkMismatch} mismatched-CriticMarkup`)
-      process.stdout.write(
-        `mastermind: cached ${res.written} block(s) → ${res.cachePath}${skips.length ? ` (skipped ${skips.join(', ')})` : ''}\n`,
-      )
-      process.exit(0)
+    } catch (error) {
+      die(2, error instanceof Error ? error.message : String(error))
     }
-    process.stdout.write(`${JSON.stringify(await planPretranslate(abs, source, langPair))}\n`)
     process.exit(0)
   })
 
@@ -331,7 +229,7 @@ const configCmd = program.command('config').description('read or write Mastermin
 
 configCmd
   .command('get [key]')
-  .description('print the whole config as JSON, or one dotted key (e.g. langPair.a)')
+  .description('print the whole config as JSON, or one dotted key (e.g. comfortLang)')
   .action((key: string | undefined) => {
     const cfg = readConfig() as unknown as Record<string, unknown>
     if (key === undefined) {
@@ -346,7 +244,7 @@ configCmd
 
 configCmd
   .command('set <assignments...>')
-  .description('set dotted key=value pairs, e.g. langPair.a=English theme=nacht browser="Google Chrome"')
+  .description('set dotted key=value pairs, e.g. comfortLang=zh-CN theme=nacht browser="Google Chrome"')
   .action(async (raw: string[]) => {
     let assignments: Assignment[]
     try {
@@ -355,8 +253,7 @@ configCmd
       die(2, err instanceof Error ? err.message : String(err))
     }
     const port = await liveDaemonPort()
-    // Read current config (via the daemon if up, else the file) so a dotted edit like
-    // langPair.a doesn't clobber its sibling in the shallow server-side merge.
+    // Dotted grain edits need the whole top-level value to retain theme siblings.
     const current = port ? await getJson<MastermindConfig>(port, '/api/config') : readConfig()
     let patch: Record<string, unknown>
     try {
@@ -376,9 +273,8 @@ configCmd
     process.exit(0)
   })
 
-const MM_DESC =
-  'Visualize and review a Markdown file in Mastermind — /mastermind setup, demo, or FILE. Always pre-translates the doc into both reading languages first.'
-const MASTER_DESC = 'Alias of /mastermind: translate a file into both reading languages, then open it in Mastermind.'
+const MM_DESC = 'Open Markdown files for review; optionally prepare comfort-language translations.'
+const MASTER_DESC = 'Alias of /mastermind: open Markdown files for review; optionally prepare comfort-language translations.'
 
 function readCanonical(rel: string): string {
   return fs.readFileSync(path.join(pkgRoot, rel), 'utf8')
@@ -388,7 +284,7 @@ function installAgents(opts: { all: boolean; global: boolean }): void {
   const home = os.homedir()
   const mmBody = stripFrontmatter(readCanonical('.claude/skills/mastermind/SKILL.md'))
   const masterBody = stripFrontmatter(readCanonical('.claude/skills/master/SKILL.md'))
-  const demo = readCanonical('.claude/skills/mastermind/reference/demo.md')
+  const referenceDir = path.join(pkgRoot, '.claude/skills/mastermind/reference')
   const globalBody = readCanonical('assets/agent/global.md')
 
   const done: string[] = []
@@ -398,7 +294,7 @@ function installAgents(opts: { all: boolean; global: boolean }): void {
     const mmDir = path.join(base, 'skills', 'mastermind')
     fs.mkdirSync(path.join(mmDir, 'reference'), { recursive: true })
     fs.writeFileSync(path.join(mmDir, 'SKILL.md'), skillFile(t, 'mastermind', MM_DESC, mmBody, pkg.version))
-    fs.writeFileSync(path.join(mmDir, 'reference', 'demo.md'), demo)
+    fs.cpSync(referenceDir, path.join(mmDir, 'reference'), { recursive: true })
     const masterDir = path.join(base, 'skills', 'master')
     fs.mkdirSync(masterDir, { recursive: true })
     fs.writeFileSync(path.join(masterDir, 'SKILL.md'), skillFile(t, 'master', MASTER_DESC, masterBody, pkg.version))
@@ -446,7 +342,7 @@ function uninstallAgents(): void {
 program
   .command('install-agents')
   .option('--all', 'install for every supported agent, creating its config dir if absent')
-  .option('--no-global', 'install the skills only — skip the always-translate-first / plan→visualize global instruction block')
+  .option('--no-global', 'install the skills only — skip the global instruction block')
   .description('install the mastermind + master skills (and a global instruction block) for your coding agents')
   .action((opts: { all?: boolean; global: boolean }) => {
     installAgents({ all: !!opts.all, global: opts.global })

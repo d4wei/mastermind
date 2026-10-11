@@ -7,7 +7,7 @@ based an edit on. HTTP writes reject a missing version rather than permitting an
 
 `writeSessionFile` queues this process's writes by canonical path. Each write validates its base
 after preceding writes finish, so competing changes from one base cannot both apply. Deleted paths
-are conflicts and are not recreated. Hand-back uses the same writer. Unedited saves leave the
+are conflicts and are not recreated. Unedited saves leave the
 original bytes intact, including bytes that cannot round-trip through UTF-8 decoding.
 
 Changed content is written through the existing inode to preserve symlinks and permissions. This

@@ -3,13 +3,14 @@
 CLI, server, and UI layers over one shared core; two tsconfigs check browser and Node code.
 
 - **`cli/`** — the `mastermind` command (commander). A thin client: `daemon.ts` ensures one shared
-  background daemon is running, then everything goes over HTTP (`http.ts`) and SSE (`sse.ts`).
-  `wait.ts` implements the `--wait` and `--serve-assist` blocking loops.
+  background daemon is running; file operations use HTTP (`http.ts`). Opening returns immediately.
+  Translation preparation publishes complete artifacts without a live agent service.
 - **`server/`** — a Hono app (`app.ts`) plus daemon lifecycle (`index.ts`: port scan from 5173, idle
   self-exit, statefile under `~/.config/mastermind`). Registries: `sessions.ts` (open files by real
-  path), `workspaces.ts` (file-tree roots), `assist/` (agent-as-provider task queue), `translate/`
-  (providers and the on-disk cache). `files.ts` owns versioned reads and writes; its contract lives
-  in `server/files.md`. `handback.ts` implements Save & hand back. `contain.ts` keeps workspace
+  path) and `workspaces.ts` (file-tree roots). `translate/prepared.ts` validates and publishes
+  prepared reading artifacts; its contract lives in `translate/prepared.md`. `files.ts` owns
+  versioned reads and writes; its contract lives
+  in `server/files.md`. `contain.ts` keeps workspace
   trees inside their root; `watch.ts` (chokidar) reports external file changes.
 - **`ui/`** — React 19 + Vite, Zustand stores. Two views over one buffer, toggled with `Cmd+E`:
   Reading (`modes/reading/Renderer.tsx`, rendered Markdown with CriticMarkup as a visual diff) and
@@ -21,8 +22,10 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
   splice; `critic/mask.ts` and `critic/suggest.ts` back find and suggestions. `markdown/` is the
   remark pipeline that carries CriticMarkup into the reading AST; saves splice the source string.
   `review-archive.ts` implements comment deletion and resolution; `review-archive.md` defines the
-  hidden in-file record. `blocks.ts`, `edits.ts`, `eol.ts`, `summary.ts`, `types.ts`, and `constants.ts`
-  hold the block model, EOL preservation, hand-back summary block, and client–server contract.
+  hidden in-file record. `translation.ts` validates prepared snapshots and encodes translated-view
+  comments; `translation.md` describes freshness and source mapping. `blocks.ts`, `edits.ts`,
+  `eol.ts`, `types.ts`, and `constants.ts` hold segmentation, source edits, EOL preservation, and
+  client–server contract.
 
 The invariants the tests assert — byte-exact round trips (`critic-resolve.test.ts`,
 `selection-ranges.test.ts`), marks reaching disk only by user acceptance, workspace containment

@@ -16,7 +16,6 @@ import {
   CounterClockwiseClockIcon,
   MagnifyingGlassIcon,
   CodeIcon as RCodeIcon,
-  PaperPlaneIcon as RPaperPlaneIcon,
   GlobeIcon as RGlobeIcon,
 } from '@radix-ui/react-icons'
 
@@ -64,16 +63,13 @@ export const ChevronUpIcon = radix(RChevronUpIcon, 13)
 export const ChevronDownIcon = radix(RChevronDownIcon, 13)
 export const FileIcon = radix(RFileIcon, 14)
 
-/* ---- new review/chrome verbs ---- */
+/* ---- review/chrome verbs ---- */
 export const CrossIcon = radix(Cross2Icon, 14)
 export const StrikethroughIcon = radix(RStrikethroughIcon, 14)
 export const EyeIcon = radix(EyeOpenIcon, 14)
 export const HistoryIcon = radix(CounterClockwiseClockIcon, 14)
 export const SearchIcon = radix(MagnifyingGlassIcon, 14)
-/** Source view (code) and the hand-back send glyph. */
 export const CodeIcon = radix(RCodeIcon, 14)
-export const SendIcon = radix(RPaperPlaneIcon, 14)
-/** Reading-language toggle (translate) — a globe reads as "language" universally. */
 export const LanguageIcon = radix(RGlobeIcon, 14)
 
 /* ---- hand-drawn glyphs Radix lacks ---- */
@@ -86,7 +82,6 @@ export function FolderIcon(props: IconProps) {
   )
 }
 
-/** Table-of-contents / document outline — a small bulleted list of headings. */
 export function OutlineIcon(props: IconProps) {
   return (
     <svg {...base(props, 14)}>
@@ -98,16 +93,6 @@ export function OutlineIcon(props: IconProps) {
   )
 }
 
-/** Language-swap (⇄) — Radix has no clean horizontal double-arrow. */
-export function SwapIcon(props: IconProps) {
-  return (
-    <svg {...base(props, 13)}>
-      <path d="M2.5 5.5h9.5m0 0L9.5 3m2.5 2.5L9.5 8M13.5 10.5H4m0 0L6.5 8M4 10.5 6.5 13" />
-    </svg>
-  )
-}
-
-/** The inline comment marker (a small filled diamond). */
 export function DiamondIcon(props: IconProps) {
   return (
     <svg {...base(props, 9)}>

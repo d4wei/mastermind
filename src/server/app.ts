@@ -23,26 +23,21 @@ import type {
 import { readConfig, redactConfig, updateConfig, type ConfigPatch } from './config'
 import { relWithin, resolveWithin } from './contain'
 import { readSessionFile, writeSessionFile } from './files'
-import { performHandback } from './handback'
 import { detectBrowsers } from './browsers'
 import { scanThemes } from './themes'
-import { translateBlocks, type TranslateRequestBlock } from './translate/index'
+import { readPreparedTranslation, validLanguageCode } from './translate/prepared'
 import { startWatcher, stopWatcher } from './watch'
-import { AssistError, type AssistRegistry } from './assist/index'
 import { group, reviewCounts, scan } from '../shared/critic/scanner'
 import { codeRanges } from '../shared/markdown/exclusions'
-import { stripSummary } from '../shared/summary'
 import { log } from './log'
 import { themesDir, uiDir } from './paths'
-import { type Conn, type ConnRole, SessionRegistry } from './sessions'
+import { type Conn, SessionRegistry } from './sessions'
 import { serveFile } from './static'
 import type { WorkspaceRegistry } from './workspaces'
-import type { AssistResultPayload } from '../shared/types'
 
 export interface AppDeps {
   registry: SessionRegistry
   workspaces: WorkspaceRegistry
-  assist: AssistRegistry
   version: string
   startedAt: number
   requestShutdown: (reason: string) => void
@@ -60,8 +55,7 @@ function isHiddenEntry(name: string): boolean {
 
 /**
  * Lazy per-file review badge, cached by (realpath, mtimeMs) so a static tree
- * doesn't re-scan on every viewport pass. Uses the exact handback count
- * pipeline so a badge matches what the reader and summary report.
+ * doesn't re-scan on every viewport pass. Counts come from active review marks.
  */
 const fileMetaCache = new Map<string, FileMeta>()
 async function workspaceFileMeta(rel: string, real: string, mtimeMs: number): Promise<FileMeta> {
@@ -71,7 +65,7 @@ async function workspaceFileMeta(rel: string, real: string, mtimeMs: number): Pr
   let counts: ReviewCounts | null = null
   if (real.toLowerCase().endsWith('.md')) {
     try {
-      const body = stripSummary(await fs.readFile(real, 'utf8'))
+      const body = await fs.readFile(real, 'utf8')
       counts = reviewCounts(group(scan(body, codeRanges(body)), body))
     } catch {
       counts = null
@@ -83,7 +77,7 @@ async function workspaceFileMeta(rel: string, real: string, mtimeMs: number): Pr
 }
 
 export function createApp(deps: AppDeps): Hono {
-  const { registry, workspaces, assist } = deps
+  const { registry, workspaces } = deps
   const app = new Hono()
 
   // Guards: localhost-only Host (DNS rebinding) and same-machine Origin for writes (CSRF).
@@ -122,7 +116,10 @@ export function createApp(deps: AppDeps): Hono {
     } catch {
       return c.json({ error: 'invalid JSON body' }, 400)
     }
-    const next = updateConfig(patch)
+    let next
+    try { next = updateConfig(patch) } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : 'invalid configuration' }, 400)
+    }
     for (const session of registry.all()) {
       registry.broadcast(session.id, 'config-changed', {})
     }
@@ -133,39 +130,19 @@ export function createApp(deps: AppDeps): Hono {
 
   app.get('/api/browsers', (c) => c.json(detectBrowsers()))
 
-  app.post('/api/translate', async (c) => {
-    let body: {
-      sessionId?: string
-      sourceLang?: string
-      targetLang?: string
-      blocks?: TranslateRequestBlock[]
-      cacheOnly?: boolean
-    }
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json({ error: 'invalid JSON body' }, 400)
-    }
-    if (!body.sessionId || !body.targetLang || !Array.isArray(body.blocks)) {
-      return c.json({ error: 'sessionId, targetLang, blocks required' }, 400)
-    }
-    const session = registry.get(body.sessionId)
+  app.get('/api/sessions/:id/translation', async (c) => {
+    const session = registry.get(c.req.param('id'))
     if (!session) return c.json({ error: 'session not found' }, 404)
+    const targetLang = c.req.query('targetLang') ?? ''
+    if (!validLanguageCode(targetLang)) return c.json({ error: 'invalid targetLang' }, 400)
     try {
-      const { results, error } = await translateBlocks(
-        session,
-        body.blocks.slice(0, 50),
-        body.sourceLang ?? 'auto-detected source language',
-        body.targetLang,
-        assist,
-        { cacheOnly: body.cacheOnly === true },
-      )
-      // 200 even when `error` is set: cached blocks come back regardless, and the
-      // agent leg (no-agent/timeout) only fails the misses — never the whole batch.
-      return c.json({ results, error })
-    } catch (err) {
-      const code = err instanceof AssistError ? err.code : 'provider'
-      return c.json({ error: code }, 502)
+      const { content } = await readSessionFile(session.path)
+      const prepared = await readPreparedTranslation(session.path, content, targetLang)
+      if (prepared.status === 'missing') return c.json({ error: 'missing' }, 404)
+      if (prepared.status === 'stale') return c.json({ error: 'stale' }, 409)
+      return c.json(prepared.artifact)
+    } catch {
+      return c.json({ error: 'file unreadable' }, 410)
     }
   })
 
@@ -232,8 +209,6 @@ export function createApp(deps: AppDeps): Hono {
       displayName: session.displayName,
       isDraft: session.isDraft,
       mtimeMs,
-      agentWaiting: session.cliConns.size > 0,
-      assistAvailable: registry.hasAssistListener(session),
     }
     return c.json(meta)
   })
@@ -296,38 +271,6 @@ export function createApp(deps: AppDeps): Hono {
     startWatcher(session, registry)
     log(`session ${session.id}: renamed to ${real}`)
     return c.json({ path: real, displayName: session.displayName, ...(await readSessionFile(real)) })
-  })
-
-  app.post('/api/sessions/:id/handback', async (c) => {
-    const session = registry.get(c.req.param('id'))
-    if (!session) return c.json({ error: 'session not found' }, 404)
-    let body: { content?: string; baseVersion?: string; note?: string }
-    try {
-      body = await c.req.json()
-    } catch {
-      return c.json({ error: 'invalid JSON body' }, 400)
-    }
-    if (typeof body.content !== 'string') return c.json({ error: 'content is required' }, 400)
-    if (typeof body.baseVersion !== 'string') return c.json({ error: 'baseVersion is required' }, 400)
-    const note = typeof body.note === 'string' ? body.note : undefined
-    const result = await performHandback(session, body.content, body.baseVersion, note)
-    if (!result.ok) {
-      return c.json({ error: 'file changed on disk', currentMtimeMs: result.currentMtimeMs }, 409)
-    }
-    log(`session ${session.id}: hand back — ${result.summaryLine}`)
-    registry.broadcast(session.id, 'handback', {
-      summaryLine: result.summaryLine,
-      counts: result.counts,
-      mtimeMs: result.mtimeMs,
-    })
-    // counts just changed on disk — refresh any workspace tree showing this file
-    workspaces.notifyForPath(session.path, 'file-badge-changed')
-    return c.json({
-      mtimeMs: result.mtimeMs,
-      counts: result.counts,
-      version: result.version,
-      summaryLine: result.summaryLine,
-    })
   })
 
   // --- workspaces (file tree) ---
@@ -420,8 +363,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(await workspaceFileMeta(rel, real, st.mtimeMs))
   })
 
-  // open sessions whose file lives under this root — drives the tree's
-  // open / agent-waiting dots (a file open in a *different* tab still shows here)
+  // Include sessions from other tabs whose files belong to this workspace.
   app.get('/api/workspaces/:wid/sessions', (c) => {
     const ws = workspaces.get(c.req.param('wid'))
     if (!ws) return c.json({ error: 'workspace not found' }, 404)
@@ -432,8 +374,6 @@ export function createApp(deps: AppDeps): Hono {
       out.push({
         rel,
         sessionId: s.id,
-        agentWaiting: s.cliConns.size > 0,
-        assistAvailable: registry.hasAssistListener(s),
         isDraft: s.isDraft,
       })
     }
@@ -477,48 +417,14 @@ export function createApp(deps: AppDeps): Hono {
     })
   })
 
-  // --- agent-channel (assist) ---
-
-  app.get('/api/assist/pending', (c) => {
-    const sessionId = c.req.query('sessionId')
-    const session = sessionId ? registry.get(sessionId) : undefined
-    if (!session) return c.json({ error: 'session not found' }, 404)
-    return c.json({ requests: assist.pendingFor(session.id) })
-  })
-
-  app.post('/api/assist/:id/result', async (c) => {
-    let payload: AssistResultPayload
-    try {
-      payload = await c.req.json<AssistResultPayload>()
-    } catch {
-      return c.json({ error: 'invalid JSON body' }, 400)
-    }
-    return assist.resolve(c.req.param('id'), payload) ? c.body(null, 204) : c.json({ error: 'unknown or expired' }, 404)
-  })
-
-  app.post('/api/assist/:id/error', async (c) => {
-    let body: { reason?: string }
-    try {
-      body = await c.req.json()
-    } catch {
-      body = {}
-    }
-    return assist.fail(c.req.param('id'), body.reason ?? 'declined')
-      ? c.body(null, 204)
-      : c.json({ error: 'unknown or expired' }, 404)
-  })
-
   app.get('/api/sessions/:id/events', (c) => {
     const sessionId = c.req.param('id')
-    const role: ConnRole = c.req.query('role') === 'cli' ? 'cli' : 'ui'
-    const assistCapable = role === 'cli' && c.req.query('assist') === '1'
     if (!registry.get(sessionId)) return c.json({ error: 'session not found' }, 404)
 
     return streamSSE(c, async (stream) => {
       let open = true
       const conn: Conn = {
-        role,
-        assistCapable,
+        role: 'ui',
         send: async (event: SseEventName, data: unknown) => {
           await stream.writeSSE({ event, data: JSON.stringify(data) })
         },
@@ -535,7 +441,7 @@ export function createApp(deps: AppDeps): Hono {
         open = false
         return
       }
-      log(`sse ${role} connected to session ${sessionId}`)
+      log(`sse ui connected to session ${sessionId}`)
       while (open) {
         await stream.sleep(SSE_PING_INTERVAL_MS)
         if (!open) break

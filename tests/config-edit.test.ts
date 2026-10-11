@@ -6,8 +6,8 @@ const asRec = (o: unknown) => o as Record<string, unknown>
 
 describe('config-edit', () => {
   it('preserves siblings on a dotted set (the shallow-merge workaround)', () => {
-    const { patch } = applyAssignments(DEFAULT_CONFIG, [{ key: 'langPair.a', value: 'Spanish' }])
-    expect(patch.langPair).toEqual({ a: 'Spanish', b: 'Simplified Chinese' })
+    const { patch } = applyAssignments(DEFAULT_CONFIG, [{ key: 'grain.grid.intensity', value: 'low' }])
+    expect(patch.grain).toEqual({ grid: { intensity: 'low' } })
   })
 
   it('coerces numeric keys to finite positive numbers, rejecting junk/empty/zero', () => {
@@ -22,7 +22,7 @@ describe('config-edit', () => {
 
   it('leaves non-numeric keys as strings', () => {
     expect(coerceConfigValue('theme', 'nacht')).toBe('nacht')
-    expect(coerceConfigValue('langPair.a', 'English')).toBe('English')
+    expect(coerceConfigValue('comfortLang', 'en')).toBe('en')
   })
 
   it('rejects unknown top-level keys (typo guard)', () => {
@@ -34,7 +34,7 @@ describe('config-edit', () => {
   })
 
   it('parseAssignment splits on the first =', () => {
-    expect(parseAssignment('langPair.a=English')).toEqual({ key: 'langPair.a', value: 'English' })
+    expect(parseAssignment('comfortLang=en')).toEqual({ key: 'comfortLang', value: 'en' })
     expect(parseAssignment('x=a=b')).toEqual({ key: 'x', value: 'a=b' })
     expect(() => parseAssignment('noequals')).toThrow()
   })
@@ -50,7 +50,15 @@ describe('config-edit', () => {
   })
 
   it('getDotted resolves nested keys and misses safely', () => {
-    expect(getDotted(asRec(DEFAULT_CONFIG), 'langPair.b')).toBe('Simplified Chinese')
+    expect(getDotted(asRec(DEFAULT_CONFIG), 'comfortLang')).toBeNull()
     expect(getDotted(asRec(DEFAULT_CONFIG), 'nope.nope')).toBeUndefined()
   })
+})
+
+
+it('coerces an optional comfort language and rejects path-shaped codes', () => {
+  expect(coerceConfigValue('comfortLang', 'zh-CN')).toBe('zh-CN')
+  expect(coerceConfigValue('comfortLang', 'null')).toBeNull()
+  expect(coerceConfigValue('comfortLang', '')).toBeNull()
+  expect(() => coerceConfigValue('comfortLang', '../outside')).toThrow()
 })

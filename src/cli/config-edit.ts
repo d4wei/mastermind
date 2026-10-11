@@ -1,13 +1,4 @@
-/**
- * Pure helpers for `mastermind config set/get` — extracted so they can be unit-tested
- * without spawning the CLI (the entrypoint runs `program.parseAsync()` at import).
- *
- * The server merges config patches SHALLOWLY at the top level (`{ ...readConfig(), ...patch }`),
- * so a dotted edit like `langPair.a=…` must be applied onto a copy of the *current* config and
- * the WHOLE top-level key sent back — otherwise `langPair.b` (or a `grain.<theme>` sibling) is
- * silently dropped. These helpers also validate input so a malformed value can never persist
- * `NaN`/`null` or pollute the config with unknown keys.
- */
+/** Dotted updates send the complete top-level value so the server's shallow merge retains siblings. */
 
 import type { MastermindConfig } from '../shared/types'
 
@@ -22,7 +13,7 @@ const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'monoFont',
   'codeTheme',
   'uiLang',
-  'langPair',
+  'comfortLang',
   'browser',
   'grain',
 ])
@@ -43,6 +34,11 @@ export function parseAssignment(arg: string): Assignment {
 
 /** Coerce a string value for a key: numeric keys → a finite number (throws on NaN), else the string. */
 export function coerceConfigValue(key: string, value: string): unknown {
+  if (key === 'comfortLang') {
+    if (value === 'null' || value === '') return null
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) throw new Error('comfortLang must be a language code or null')
+    return value
+  }
   if (!NUMERIC_KEYS.has(key.split('.')[0]!)) return value
   const n = Number(value)
   if (value.trim() === '' || !Number.isFinite(n) || n <= 0) {

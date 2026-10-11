@@ -11,6 +11,3 @@ export const DAEMON_IDLE_EXIT_MS = 30 * 60_000
 
 /** Neutral fallback when no configured signature or Git name is available. */
 export const DEFAULT_AUTHOR_TAG = 'reviewer'
-
-/** How long an agent-channel request waits for the agent to answer. */
-export const ASSIST_TIMEOUT_MS = 120_000

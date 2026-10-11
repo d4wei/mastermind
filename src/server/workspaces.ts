@@ -20,8 +20,7 @@ export interface Workspace {
  * session: it owns no file, no watcher, no liveness timers. It exists only to
  * (a) anchor the containment root and (b) hold a thin SSE channel so an open
  * tree keeps the daemon alive and can be told to refresh. Opening a file from
- * the tree mints an ordinary session through the existing SessionRegistry — the
- * session layer, `--wait`, handback, and idle-exit are all untouched.
+ * the tree uses an ordinary document session.
  */
 export class WorkspaceRegistry {
   private byRoot = new Map<string, Workspace>()

@@ -109,7 +109,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     await get().loadDir('')
     void get().refreshSessions()
 
-    // live channel: a save/handback/agent-attach refreshes the affected row;
+    // live channel: a save refreshes the affected row;
     // returning focus to the tab re-pulls the open levels + sessions
     const es = new EventSource(`/api/workspaces/${workspaceId}/events`)
     es.addEventListener('file-badge-changed', (e) => {

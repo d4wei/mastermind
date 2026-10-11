@@ -46,8 +46,8 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 - `npm run build` before running `bin/mastermind.js` from a clone; the bin refuses without `dist/`.
 - Touch `src/shared/critic/` only with the corpus tests green; it is the most test-covered code.
 - Plan in a `.md` file and review it through Mastermind itself (`node bin/mastermind.js open
-  --no-translate <plan>.md`, or warm the translation cache first — see `AGENT_SETUP.md`), re-read
-  the file after hand-back, and revise it directly.
+  <plan>.md`; optional translation preparation is in `AGENT_SETUP.md`). Reread the file when the
+  user returns with feedback, and revise it directly.
 
 ## Code quality
 

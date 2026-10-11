@@ -1,10 +1,9 @@
 ---
 name: master
-description: Alias of /mastermind for opening a file in Mastermind. `/master <file>` is equivalent to `/mastermind <file>` — translate the file into both reading languages, then open it.
+description: Alias of the mastermind skill for opening Markdown files and addressing in-file review.
 ---
 
-# master — alias of /mastermind
+# Mastermind alias
 
-Treat `/master $ARGUMENTS` exactly as `/mastermind $ARGUMENTS`: run the Mastermind **Visualize
-flow** (translate the file into both reading languages first via `mastermind translate-blocks`,
-then `mastermind open`). See the `mastermind` skill for the full protocol.
+Treat `/master` arguments as `/mastermind` arguments. Follow the sibling `mastermind` skill and its
+bundled review protocol. File selection and optional translation use that same flow.

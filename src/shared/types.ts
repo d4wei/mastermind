@@ -41,10 +41,6 @@ export interface SessionMeta {
   displayName: string
   isDraft: boolean
   mtimeMs: number
-  /** A `mastermind open --wait` is currently blocked on this session. */
-  agentWaiting: boolean
-  /** An assist-capable agent (`mastermind assist`) is listening on this session. */
-  assistAvailable: boolean
 }
 
 export interface FileResponse {
@@ -100,8 +96,6 @@ export interface FileMeta {
 export interface WorkspaceSessionInfo {
   rel: string
   sessionId: string
-  agentWaiting: boolean
-  assistAvailable: boolean
   isDraft: boolean
 }
 
@@ -136,8 +130,8 @@ export interface MastermindConfig {
   /** id of the chosen code-color scheme; `none` = uncolored (see src/shared/codeThemes.ts) */
   codeTheme: string
   uiLang: 'en' | 'zh-CN'
-  /** the reading-language toggle pair (a = Preferred, b = Secondary; routes to the user's agent) */
-  langPair: { a: string; b: string }
+  /** Optional personal language code for prepared reading translations. */
+  comfortLang: string | null
   /** app name / bundle id to open Mastermind in; '' = the system default browser */
   browser: string
   /** per-theme grain overrides; `enabled` is the legacy on/off, superseded by `intensity` */
@@ -173,34 +167,11 @@ export type SseEvent =
   | { event: 'ping'; data: Record<string, never> }
   | { event: 'file-changed'; data: { mtimeMs: number } }
   | { event: 'file-deleted'; data: Record<string, never> }
-  | { event: 'handback'; data: { summaryLine: string; counts: ReviewCounts } }
   | { event: 'session-closed'; data: { reason: SessionCloseReason } }
   | { event: 'config-changed'; data: Record<string, never> }
-  | { event: 'waiters-changed'; data: { count: number } }
-  /** an assist-capable agent (mastermind assist) is/ isn't listening on this session */
-  | { event: 'assist-availability'; data: { available: boolean } }
-  /** server → agent: please do this LLM task and POST the result back */
-  | { event: 'assist-request'; data: AssistRequestEvent }
   /** workspace → tree: a directory's listing changed (add/remove/rename) */
   | { event: 'file-list-changed'; data: { dir: string } }
   /** workspace → tree: one file's review badge changed (re-fetch its file-meta) */
   | { event: 'file-badge-changed'; data: { rel: string } }
 
 export type SseEventName = SseEvent['event']
-
-/* ---- agent-channel (assist) ---- */
-
-export interface AssistBlock {
-  hash: string
-  text: string
-}
-
-export type AssistRequestEvent = {
-  id: string
-  kind: 'translate'
-  sourceLang: string
-  targetLang: string
-  blocks: AssistBlock[]
-}
-
-export type AssistResultPayload = { kind: 'translate'; blocks: AssistBlock[] }

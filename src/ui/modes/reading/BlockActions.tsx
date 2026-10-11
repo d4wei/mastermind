@@ -127,7 +127,7 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
     if (active?.mode === 'menu') menuRef.current?.querySelector('button')?.focus()
   }, [active?.mode])
 
-  // the captured block can detach across a re-render (handback / disk reload swaps
+  // the captured block can detach across a re-render (a disk reload swaps
   // the DOM); don't position against a stale node — the next hover re-anchors.
   if (!active || !active.block.isConnected) return null
 

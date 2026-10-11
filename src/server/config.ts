@@ -16,7 +16,7 @@ export const DEFAULT_CONFIG: MastermindConfig = {
   monoFont: 'geist',
   codeTheme: 'none',
   uiLang: 'en',
-  langPair: { a: 'English', b: 'Simplified Chinese' },
+  comfortLang: null,
   browser: '',
   grain: {},
 }
@@ -44,7 +44,12 @@ export function readConfig(): MastermindConfig {
     // Missing or unreadable preferences use the same defaults as a new install.
   }
   const authorTag = parsed?.authorTag ?? gitAuthorTag()
-  return { ...DEFAULT_CONFIG, ...parsed, authorTag, version: 1 }
+  const known = Object.fromEntries(Object.keys(DEFAULT_CONFIG)
+    .filter((key) => Object.hasOwn(parsed ?? {}, key))
+    .map((key) => [key, parsed[key as keyof MastermindConfig]]))
+  const comfortLang = typeof parsed?.comfortLang === 'string' && /^[A-Za-z][A-Za-z0-9_-]*$/.test(parsed.comfortLang)
+    ? parsed.comfortLang : null
+  return { ...DEFAULT_CONFIG, ...known, authorTag, comfortLang, version: 1 }
 }
 
 function persist(config: MastermindConfig): void {
@@ -57,6 +62,10 @@ function persist(config: MastermindConfig): void {
 export type ConfigPatch = Partial<Omit<MastermindConfig, 'version'>>
 
 export function updateConfig(patch: ConfigPatch): MastermindConfig {
+  if (patch.comfortLang !== undefined && patch.comfortLang !== null &&
+    (typeof patch.comfortLang !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(patch.comfortLang))) {
+    throw new Error('comfortLang must be null or a language code')
+  }
   const next: MastermindConfig = { ...readConfig(), ...patch, version: 1 }
   persist(next)
   return next

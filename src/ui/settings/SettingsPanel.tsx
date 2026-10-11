@@ -1,7 +1,6 @@
 import { useConfig, type ConfigPatch } from '../app/configStore'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
-import { SwapIcon } from '../icons'
 import { LangSelect } from './LangSelect'
 import { useT, type MsgKey } from '../i18n'
 import { TYPE_SETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
@@ -388,26 +387,12 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="settings-row">
-            <span>{t('readingPair')}</span>
-            <div className="settings-langpair">
-              <LangSelect
-                label={t('preferredLanguage')}
-                value={config.langPair.a}
-                onChange={(a) => patch({ langPair: { ...config.langPair, a } })}
-              />
-              <button
-                type="button"
-                className="btn-ghost settings-langswap"
-                aria-label={t('swapLangs')}
-                onClick={() => patch({ langPair: { a: config.langPair.b, b: config.langPair.a } })}
-              >
-                <SwapIcon />
-              </button>
-              <LangSelect
-                label={t('secondaryLanguage')}
-                value={config.langPair.b}
-                onChange={(b) => patch({ langPair: { ...config.langPair, b } })}
-              />
+            <span>{t('comfortLanguage')}</span>
+            <div className="settings-comfort-language">
+              <button type="button" className="btn-ghost" aria-pressed={config.comfortLang === null}
+                onClick={() => patch({ comfortLang: null })}>{t('translationOff')}</button>
+              <LangSelect label={t('comfortLanguage')} value={config.comfortLang ?? ''} emptyLabel={t('translationOff')}
+                onChange={(comfortLang) => patch({ comfortLang })} />
             </div>
           </div>
         </section>

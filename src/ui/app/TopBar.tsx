@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef, type ComponentType, type SVGProps } from 'reac
 import { ToggleGroup } from 'radix-ui'
 import { useT } from '../i18n'
 import { ChatIcon, CodeIcon, EyeIcon, LanguageIcon } from '../icons'
-import { HandBackButton } from './HandBackButton'
 import { SlotLabel } from '../util/SlotLabel'
 import { useDoc, type ViewMode } from './store'
 
@@ -110,7 +109,6 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
             {t('resolved')} ({resolved.count})
           </button>
         )}
-        <HandBackButton />
       </div>
     </header>
   )

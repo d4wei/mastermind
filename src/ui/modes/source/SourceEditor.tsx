@@ -111,8 +111,8 @@ export function SourceEditor() {
     return () => {
       // Deliberately NOT flushing on unmount: every edit was already pushed live,
       // so the store is current. A remount is triggered by an external buffer
-      // swap (disk reload, handback adopting the new summary block) — flushing the
-      // outgoing editor's now-stale text would overwrite that adopted content.
+      // swap after a disk reload. Flushing the outgoing editor's stale text would
+      // overwrite the adopted content.
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       view.destroy()

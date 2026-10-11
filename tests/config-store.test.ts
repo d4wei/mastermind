@@ -21,7 +21,7 @@ describe('configStore.load resilience', () => {
     vi.stubGlobal(
       'fetch',
       mockFetch({
-        '/api/config': { version: 1, theme: 'grid', langPair: { a: 'English', b: 'Simplified Chinese' }, browser: '' },
+        '/api/config': { version: 1, theme: 'grid', comfortLang: null, browser: '' },
         '/api/themes': [{ id: 'grid', name: 'Grid' }],
         // '/api/browsers' intentionally absent → 404
       }),
@@ -38,7 +38,7 @@ describe('configStore.load resilience', () => {
     vi.stubGlobal(
       'fetch',
       mockFetch({
-        '/api/config': { version: 1, theme: 'grid', langPair: { a: 'English', b: 'Simplified Chinese' }, browser: '' },
+        '/api/config': { version: 1, theme: 'grid', comfortLang: null, browser: '' },
         '/api/themes': [],
         '/api/browsers': [{ id: 'Safari', name: 'Safari' }],
       }),

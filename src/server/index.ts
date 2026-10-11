@@ -5,7 +5,6 @@ import type { Server } from 'node:http'
 import pkg from '../../package.json'
 import { DAEMON_IDLE_EXIT_MS, DEFAULT_PORT, PORT_SCAN_LIMIT } from '../shared/constants'
 import { createApp } from './app'
-import { AssistRegistry } from './assist/index'
 import { log } from './log'
 import { SessionRegistry } from './sessions'
 import { WorkspaceRegistry } from './workspaces'
@@ -55,20 +54,15 @@ async function main(): Promise<void> {
     graceMs: Number(process.env.MASTERMIND_GRACE_MS || '') || undefined,
     neverOpenedMs: Number(process.env.MASTERMIND_NEVER_OPENED_MS || '') || undefined,
   })
-  const assist = new AssistRegistry(registry)
   const workspaces = new WorkspaceRegistry()
   registry.onChange = () => {
     lastActivity = Date.now()
   }
-  // tree dots: a session opening/closing or an agent attaching changes the
-  // open/agent state of a file that a workspace tree may be showing
-  registry.onSessionActivity = (session) => workspaces.notifyForPath(session.path, 'file-badge-changed')
   registry.onSessionOpened = (session) => {
     startWatcher(session, registry)
     workspaces.notifyForPath(session.path, 'file-badge-changed')
   }
   registry.onSessionClosed = (session) => {
-    assist.cancelForSession(session.id)
     void stopWatcher(session)
     workspaces.notifyForPath(session.path, 'file-badge-changed')
     if (session.isDraft) {
@@ -96,7 +90,6 @@ async function main(): Promise<void> {
   const app = createApp({
     registry,
     workspaces,
-    assist,
     version: pkg.version,
     startedAt,
     requestShutdown: shutdown,

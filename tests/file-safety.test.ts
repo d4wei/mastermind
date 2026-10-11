@@ -3,10 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readSessionFile, writeSessionFile } from '../src/server/files'
-import { performHandback } from '../src/server/handback'
 import { SessionRegistry, type Session } from '../src/server/sessions'
 import { createApp } from '../src/server/app'
-import { AssistRegistry } from '../src/server/assist/index'
 import { WorkspaceRegistry } from '../src/server/workspaces'
 
 let dir: string
@@ -46,10 +44,10 @@ describe('guarded file writes', () => {
     expect(await fs.readFile(file, 'utf8')).toBe(results[0]!.ok ? 'canonical' : 'alias')
   })
 
-  it('requires a version on both HTTP write routes and returns guarded versions', async () => {
+  it('requires a version on HTTP saves and retires the hand-back route', async () => {
     const registry = new SessionRegistry()
     const opened = registry.open(await fs.realpath(file)).session
-    const app = createApp({ registry, workspaces: new WorkspaceRegistry(), assist: new AssistRegistry(registry), version: 'test', startedAt: 0, requestShutdown() {}, touch() {} })
+    const app = createApp({ registry, workspaces: new WorkspaceRegistry(), version: 'test', startedAt: 0, requestShutdown() {}, touch() {} })
     const url = `http://localhost/api/sessions/${opened.id}`
     const request = (route: string, content: object) => app.request(`${url}/${route}`, {
       method: route === 'file' ? 'PUT' : 'POST',
@@ -57,7 +55,7 @@ describe('guarded file writes', () => {
     })
     try {
       expect((await request('file', { content: 'unsafe' })).status).toBe(400)
-      expect((await request('handback', { content: 'unsafe' })).status).toBe(400)
+      expect((await request('handback', { content: 'unsafe' })).status).toBe(404)
       const base = await (await app.request(`${url}/file`, { headers: { host: 'localhost' } })).json() as { version: string }
       const saved = await request('file', { content: 'saved', baseVersion: base.version })
       expect(saved.status).toBe(200)
@@ -131,24 +129,21 @@ describe('guarded file writes', () => {
     expect(await fs.readFile(file)).toEqual(Buffer.from(content))
   })
 
+  it('preserves existing summary blocks as ordinary source content', async () => {
+    const source = '# Review\r\n\r\n<!-- mastermind:summary -->\r\n> Earlier review summary\r\n<!-- /mastermind:summary -->\r\n'
+    await fs.writeFile(file, source)
+    const opened = await readSessionFile(file)
+    expect(opened.content).toBe(source)
+    expect((await writeSessionFile(session, opened.content, opened.version)).ok).toBe(true)
+    expect(await fs.readFile(file, 'utf8')).toBe(source)
+  })
+
   it('leaves unedited bytes and version intact', async () => {
     const bytes = Buffer.from([0xef, 0xbb, 0xbf, 0x61, 0x0d, 0x0a, 0xff])
     await fs.writeFile(file, bytes)
     const base = await readSessionFile(file)
     expect(await writeSessionFile(session, base.content, base.version)).toEqual({ ok: true, mtimeMs: base.mtimeMs, version: base.version })
     expect(await fs.readFile(file)).toEqual(bytes)
-  })
-
-  it('shares the save guard with hand-back', async () => {
-    const base = await readSessionFile(file)
-    const results = await Promise.all([
-      writeSessionFile(session, 'saved', base.version),
-      performHandback(session, 'reviewed', base.version),
-    ])
-    expect(results.filter((result) => result.ok)).toHaveLength(1)
-    const content = await fs.readFile(file, 'utf8')
-    if (results[0]!.ok) expect(content).toBe('saved')
-    else expect(content).toContain('reviewed')
   })
 
   it('rejects a read whose descriptor changes while reading', async () => {

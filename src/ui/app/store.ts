@@ -1,12 +1,11 @@
 import { create } from 'zustand'
 import { applyTextEdits } from '../../shared/edits'
 import { detectEol, normalizeToLf, restoreEol, type Eol } from '../../shared/eol'
-import type { ReviewCounts, SessionMeta, TextEdit } from '../../shared/types'
+import type { SessionMeta, TextEdit } from '../../shared/types'
 import {
   ApiError,
   getFile,
   getSession,
-  postHandback,
   postRename,
   putFile,
 } from './api'
@@ -51,7 +50,7 @@ export interface DocStore {
   conflict: boolean
   saving: boolean
   /** Which write is in flight — drives button labels. */
-  savingKind: 'save' | 'handback' | null
+  savingKind: 'save' | null
   /** Transient toast: i18n key + optional count; kind picks the style. */
   notice: { kind: 'error' | 'ok'; msg: string; count?: number } | null
   /**
@@ -68,10 +67,6 @@ export interface DocStore {
   history: string[]
   /** The file changed on disk under us (banner state). */
   diskChange: { mtimeMs: number; deleted: boolean; content?: string; version?: string } | null
-  /** Toast after a successful hand-back (counts, localized at render). */
-  handedBack: ReviewCounts | null
-  /** One-shot flag: pulse the agent chip right after a local hand-back. */
-  handbackPulse: boolean
 
   flushAll(): Promise<void>
   hasPendingWrites(): boolean
@@ -88,9 +83,6 @@ export interface DocStore {
   setConflictResult(result: string): void
   saveConflictResult(): Promise<boolean>
   useConflictDisk(): Promise<boolean>
-  /** Hand the document back to the waiting agent; an optional note is woven into the summary block. */
-  handback(note?: string): Promise<boolean>
-  clearHandedBack(): void
   setNotice(notice: DocStore['notice']): void
   /** Draft naming: first save prompts for a filename. */
   renamePrompt: boolean
@@ -114,8 +106,8 @@ export interface DocStore {
 
 type DocumentState = Pick<DocStore,
   'meta' | 'source' | 'savedSource' | 'eol' | 'mtimeMs' | 'version' | 'revision' | 'conflictDraft' | 'mode' | 'conflict' |
-  'saving' | 'savingKind' | 'notice' | 'history' | 'diskChange' | 'handedBack' |
-  'handbackPulse' | 'renamePrompt' | 'renameError'>
+  'saving' | 'savingKind' | 'notice' | 'history' | 'diskChange' |
+  'renamePrompt' | 'renameError'>
 
 export function createDocStore() {
   const documents = new Map<string, DocumentState>()
@@ -267,8 +259,6 @@ export function createDocStore() {
     scroller: null,
     history: [],
     diskChange: null,
-    handedBack: null,
-    handbackPulse: false,
     renamePrompt: false,
     renameError: null,
 
@@ -303,7 +293,7 @@ export function createDocStore() {
           eol: detectEol(file.content), mtimeMs: file.mtimeMs, version: file.version, status: 'ready',
           revision: 0, conflictDraft: null,
           conflict: false, saving: false, savingKind: null, notice: null, history: [],
-          diskChange: null, handedBack: null, handbackPulse: false,
+          diskChange: null,
           renamePrompt: false, renameError: null, flushEditor: null, scroller: null,
           externalVersion: s.externalVersion + 1,
           mode: meta.isDraft ? 'source' : s.mode,
@@ -528,53 +518,6 @@ export function createDocStore() {
       }
     },
 
-    async handback(note?: string) {
-      // Cancel any pending autosave so its stale PUT can't land after handback and
-      // clobber the summary block the server is about to write.
-      clearAutosave()
-      get().flushEditor?.()
-      const { sessionId, source, eol, version, saving, meta } = get()
-      if (!sessionId || saving) return false
-      if (meta?.isDraft) {
-        set({ renamePrompt: true })
-        return false
-      }
-      diskRequests.set(sessionId, (diskRequests.get(sessionId) ?? 0) + 1)
-      set({ saving: true, savingKind: 'handback', notice: null })
-      try {
-        const res = await postHandback(sessionId, restoreEol(source, eol), version, note)
-        // the server appended/refreshed the summary block — adopt its content
-        const file = await getFile(sessionId)
-        const latest = documents.get(sessionId)!
-        const normalized = normalizeToLf(file.content)
-        updateDocument(sessionId, {
-          savedSource: normalized, mtimeMs: file.mtimeMs, version: file.version,
-          ...(latest.source === source ? { source: normalized, eol: detectEol(file.content) }
-            : { conflict: true }),
-          handedBack: res.counts, handbackPulse: true,
-        })
-        if (get().sessionId === sessionId) set((s) => ({ externalVersion: s.externalVersion + 1 }))
-        return true
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 409) {
-          updateDocument(sessionId, { conflict: true })
-          return false
-        }
-        updateDocument(sessionId, { notice: { kind: 'error', msg: 'handbackFailed' } })
-        return false
-      } finally {
-        diskRequests.set(sessionId, (diskRequests.get(sessionId) ?? 0) + 1)
-        updateDocument(sessionId, { saving: false, savingKind: null })
-        const pending = pendingDiskChanges.get(sessionId)
-        pendingDiskChanges.delete(sessionId)
-        if (pending) void readDiskChange(sessionId, pending.mtimeMs, pending.deleted)
-      }
-    },
-
-    clearHandedBack() {
-      set({ handedBack: null, handbackPulse: false })
-    },
-
     cancelRename() {
       set({ renamePrompt: false, renameError: null })
     },
@@ -609,9 +552,9 @@ export function createDocStore() {
       return
     }
     const { meta, source, savedSource, eol, mtimeMs, version, revision, conflictDraft, mode, conflict, saving, savingKind,
-      notice, history, diskChange, handedBack, handbackPulse, renamePrompt, renameError } = s
+      notice, history, diskChange, renamePrompt, renameError } = s
     documents.set(s.sessionId, { meta, source, savedSource, eol, mtimeMs, version, revision, conflictDraft, mode, conflict,
-      saving, savingKind, notice, history, diskChange, handedBack, handbackPulse,
+      saving, savingKind, notice, history, diskChange,
       renamePrompt, renameError })
   })
   return store

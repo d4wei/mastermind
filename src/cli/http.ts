@@ -49,26 +49,6 @@ export async function postJson<T>(port: number, pathName: string, body: unknown)
   return (await res.json()) as T
 }
 
-/** POST that tolerates a 204/empty body (used by assist-result / assist-error). */
-export async function postNoContent(port: number, pathName: string, body: unknown): Promise<void> {
-  const res = await fetch(`http://127.0.0.1:${port}${pathName}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(5000),
-  })
-  if (!res.ok) {
-    let detail = `${res.status}`
-    try {
-      const j = (await res.json()) as { error?: string }
-      if (j.error) detail = j.error
-    } catch {
-      /* not json */
-    }
-    throw new Error(detail)
-  }
-}
-
 export async function getJson<T>(port: number, pathName: string): Promise<T> {
   const res = await fetch(`http://127.0.0.1:${port}${pathName}`, { signal: AbortSignal.timeout(5000) })
   if (!res.ok) throw new Error(`${res.status}`)

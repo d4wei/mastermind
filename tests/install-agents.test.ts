@@ -1,4 +1,7 @@
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import {
   AGENT_TARGETS,
@@ -42,25 +45,35 @@ describe('install-agents helpers', () => {
     expect(skillFile(claude, 'm', 'line one\nline two', 'B', '1')).toContain('description: line one line two')
   })
 
-  it('installs cost-aware language routing for every supported agent', () => {
+  it('carries the fresh preparation and original-file feedback protocol for every host', () => {
     for (const target of AGENT_TARGETS) {
       const rendered = skillFile(target, 'mastermind', 'desc', canonicalBody, '0.2.0')
-      expect(rendered).toContain('send all missing blocks together as one batch')
-      expect(rendered).toContain("native subagent/model controls")
-      expect(rendered).toContain('already installed and authenticated CLI from the same host/vendor')
-      expect(rendered).toContain('active agent completing the work itself')
+      expect(rendered).toContain('reference/review-protocol.md')
+      expect(rendered).toContain('translate the complete document afresh')
+      expect(rendered).toContain('Do not start a translation listener or delegate to a separate translator')
+      expect(rendered).toContain('--source-lang en --target-lang zh-CN --save')
     }
   })
 
-  it('keeps the Claude model example conditional and other hosts vendor-neutral', () => {
-    expect(canonicalBody).toContain('When the host is Claude Code, use the `sonnet` model alias')
-    expect(canonicalBody).toMatch(/For other\s+hosts, use their equivalent current affordable tier/)
-    expect(canonicalBody).toContain('do not guess a vendor-specific model name')
-  })
-
-  it('falls back immediately when delegated translations fail validation', () => {
-    expect(canonicalBody).toMatch(/rejected by Mastermind's\s+CriticMarkup\/cache validation/)
-    expect(canonicalBody).toContain('fall back immediately to the active agent')
+  it('installs all public references alongside the skill in an isolated home', () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-install-'))
+    try {
+      const run = spawnSync(process.execPath,
+        ['--import', 'tsx', path.resolve('src/cli/index.ts'), 'install-agents', '--all'],
+        { env: { ...process.env, HOME: home }, encoding: 'utf8' })
+      expect(run.status, run.stderr).toBe(0)
+      const references = path.resolve('.claude/skills/mastermind/reference')
+      for (const target of AGENT_TARGETS) {
+        const installed = path.join(home, target.dir, 'skills/mastermind')
+        expect(fs.readFileSync(path.join(installed, 'SKILL.md'), 'utf8')).toContain('reference/review-protocol.md')
+        for (const name of fs.readdirSync(references)) {
+          expect(fs.readFileSync(path.join(installed, 'reference', name), 'utf8'))
+            .toBe(fs.readFileSync(path.join(references, name), 'utf8'))
+        }
+      }
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true })
+    }
   })
 
   it('upsertMarkedBlock appends once and is idempotent (replaces, never duplicates)', () => {

@@ -2,7 +2,7 @@
 
 A scratch document for exercising the recent work: the **callout band** treatment,
 **cross-block selection**, and the **top-right toast**. Select freely, comment,
-highlight, and hand back.
+highlight, and save comments.
 
 ## How to test
 
@@ -10,7 +10,7 @@ highlight, and hand back.
    inverted ink band with its own icon (`?`, check, checklist, triangle).
 2. **Cross-block selection** — drag a highlight from this paragraph down into the
    next one. The toolbar should appear and a mark should land in *each* block.
-3. **Toast** — accept or reject a mark, or hand back; the toast appears top-right.
+3. **Toast** — accept or reject a mark; the toast appears top-right.
 
 > "The file on disk is the single source of truth." Everything round-trips through
 > this `.md` — marks flow one direction, user to agent.

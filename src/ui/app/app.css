@@ -198,7 +198,6 @@ body {
    surrounding chrome text rather than the lib's default bottom alignment. */
 .seg-btn .slot-text,
 .btn-cta .slot-text,
-.agent-chip .slot-text,
 .toast .slot-text {
   vertical-align: middle;
 }
@@ -354,128 +353,6 @@ button:disabled {
 
 .btn-cta:active:not(:disabled) {
   background: color-mix(in srgb, var(--color-cta-bg) 72%, var(--color-cta-text) 28%);
-}
-
-/* ---- hand-back split button (wide face + note-popover arrow) ---- */
-.cta-split {
-  display: inline-flex;
-  align-items: stretch;
-  transition: transform var(--dur-fast) var(--ease-standard);
-}
-.cta-split-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  /* tighter inner edge so the seam sits midway between the label and the
-     chevron, instead of leaving the chevron stranded against the pill end */
-  padding-right: calc(var(--space-unit) * 2);
-}
-.cta-split-arrow {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  /* outer (right) gap matches the chevron's optical top/bottom inset so it sits
-     evenly inside the rounded cap; inner (left) edge stays tight to the seam */
-  padding-left: calc(var(--space-unit) * 2);
-  padding-right: calc(var(--space-unit) * 2.5);
-  /* hairline seam so the two faces read as one pill, not a gap */
-  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-cta-text) 22%, transparent);
-}
-/* Press the whole pill as one unit — scaling a single half would split the seam. */
-.cta-split:active:not(:has(:disabled)) {
-  transform: scale(0.96);
-}
-.cta-split .btn-cta:active:not(:disabled) {
-  transform: none;
-}
-.cta-split-arrow[data-state='open'] {
-  background: color-mix(in srgb, var(--color-cta-bg) 72%, var(--color-cta-text) 28%);
-}
-
-/* One unified composer: the card is the field (textarea is borderless), with a
-   hairline-divided action tray underneath. Streamlined — no nested borders. */
-.handback-note {
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-  max-width: calc(100vw - var(--space-unit) * 6);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.16 * var(--shadow-strength)));
-  z-index: var(--z-popover);
-  overflow: hidden; /* clip the footer tray to the card's rounded corners */
-}
-.handback-note:focus-within {
-  /* quiet focus: a subtle neutral border darkening, not a loud accent ring */
-  border-color: var(--color-border-hover);
-}
-
-/* The note popover unfolds upward out of the bar — a clip-path reveal (no text
-   distortion) with a short fade. Radix keeps the Content mounted through close,
-   flipping data-state open↔closed, so the exit runs its own faster keyframe. */
-@media (prefers-reduced-motion: no-preference) {
-  .handback-note[data-state='open'] {
-    animation: hb-unfold-in calc(var(--dur-base) + 40ms) var(--ease-out);
-  }
-  .handback-note[data-state='closed'] {
-    animation: hb-unfold-out var(--dur-fast) var(--ease-standard);
-  }
-}
-@keyframes hb-unfold-in {
-  from {
-    opacity: 0;
-    clip-path: inset(100% 0 0 0 round var(--radius-lg));
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    clip-path: inset(0 0 0 0 round var(--radius-lg));
-    transform: none;
-  }
-}
-@keyframes hb-unfold-out {
-  from {
-    opacity: 1;
-    clip-path: inset(0 0 0 0 round var(--radius-lg));
-  }
-  to {
-    opacity: 0;
-    clip-path: inset(40% 0 0 0 round var(--radius-lg));
-  }
-}
-.handback-note-input {
-  font-family: var(--font-body);
-  font-size: var(--font-size-sm);
-  line-height: var(--lh-snug);
-  background: transparent;
-  border: none;
-  padding: calc(var(--space-unit) * 3);
-  color: var(--color-text);
-  resize: none;
-  min-height: 76px;
-}
-.handback-note-input:focus-visible {
-  outline: none;
-}
-.handback-note-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: calc(var(--space-unit) * 2);
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2) calc(var(--space-unit) * 2)
-    calc(var(--space-unit) * 3);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-.handback-note-hint {
-  font-size: var(--font-size-micro);
-  line-height: var(--lh-snug);
-  color: var(--color-text-muted);
-}
-/* icon-only capsule — the popover context already says "hand back with a note",
-   so the button just needs the send glyph */
-.handback-note-send {
-  flex: none;
-  padding: calc(var(--space-unit) * 2);
 }
 
 .btn-ghost {
@@ -793,7 +670,7 @@ button:disabled {
   background: var(--color-bg-elevated);
 }
 
-/* light elevated dropdown — mirrors .lang-menu / .handback-note, not the dark toolbar */
+/* Elevated menus retain the page surface beneath the inverted selection toolbar. */
 .block-menu,
 .block-compose {
   position: absolute;
@@ -1491,33 +1368,11 @@ mark.critic-hl.critic-anchor:hover {
   width: 100%;
 }
 
-/* ---- reading-pair language pickers (searchable, replaces the two code inputs) ---- */
-.settings-langpair {
+.settings-comfort-language {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space-unit) * 1.5);
 }
-.settings-langswap {
-  align-self: center;
-  position: relative; /* hosts the expanded hit area below */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: calc(var(--space-unit) * 0.5);
-  color: var(--color-text-muted);
-  transform: rotate(90deg); /* SwapIcon is horizontal; the pair stacks vertically */
-}
-/* Keep the glyph compact between the two pickers, but give it a comfortable
-   ~28px hit area (it sits in the 6px gaps without overlapping the triggers). */
-.settings-langswap::before {
-  content: '';
-  position: absolute;
-  inset: calc(var(--space-unit) * -1.5);
-}
-.settings-langswap:hover {
-  color: var(--color-text);
-}
-
 .lang-select {
   position: relative;
 }
@@ -1741,80 +1596,6 @@ input[type='checkbox'] {
   color: var(--review-delete-text);
   font-size: var(--font-size-sm);
   margin: calc(var(--space-unit) * 2) 0 0;
-}
-
-/* ---------- agent presence ---------- */
-
-.agent-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space-unit) * 1.5);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--color-accent-dim);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 2px calc(var(--space-unit) * 2.5);
-  white-space: nowrap;
-}
-
-/* floated at the top-right of the UI, outside the bar — its own surface + shadow
-   so it reads legibly over the document instead of the bar's background */
-.agent-chip-floating {
-  position: fixed;
-  top: var(--bar-gap);
-  right: var(--bar-gap);
-  z-index: var(--z-topbar);
-  background: var(--color-bg-elevated);
-  box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.16 * var(--shadow-strength)));
-}
-
-.agent-chip-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background: var(--color-accent-dim);
-  animation: agent-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes agent-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-/* one-shot "released to the agent" beat after a local hand-back */
-.agent-chip.released {
-  animation: agent-released 900ms ease-out;
-}
-
-@keyframes agent-released {
-  0% {
-    transform: scale(1);
-    background: var(--color-accent-surface);
-    border-color: var(--color-accent-dim);
-  }
-  35% {
-    transform: scale(1.06);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-chip-dot {
-    animation: none;
-  }
-  .agent-chip.released {
-    animation: none;
-  }
 }
 
 /* The document outline now lives in the left Navigator (see .nav-outline). */
@@ -2160,13 +1941,11 @@ input[type='checkbox'] {
   }
   .seg-btn,
   .btn-cta,
-  .cta-split,
   .block-menu > button,
   .sel-toolbar > button {
     transition: none;
   }
   .btn-cta:active:not(:disabled),
-  .cta-split:active,
   .block-menu > button:active,
   .sel-toolbar > button:active {
     transform: none;
@@ -2455,7 +2234,6 @@ input[type='checkbox'] {
   .slide-over,
   .sel-toolbar,
   .block-actions,
-  .agent-chip,
   .navigator,
   .nav-reveal,
   .nav-scrim,
@@ -2575,8 +2353,20 @@ input[type='checkbox'] {
 .slide-over-title,
 .tooltip,
 .modal h4,
-.agent-chip,
 .find-filter {
   text-transform: none;
   letter-spacing: var(--ls-normal);
+}
+
+.translated-comment-quote {
+  margin: 0 0 calc(var(--space-unit) * 2);
+  padding-left: calc(var(--space-unit) * 2);
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+.translated-discussions {
+  padding-top: calc(var(--space-unit) * 4);
+  margin-top: calc(var(--space-unit) * 4);
+  border-top: 1px solid var(--color-border);
 }

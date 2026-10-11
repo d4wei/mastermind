@@ -1,155 +1,95 @@
-```
-█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄
-█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀
-```
+# Mastermind
 
-**Review markdown with your coding agent — local-first, the file is the only channel.**
+Review Markdown with your coding agent. Read a document, add author-tagged CriticMarkup comments
+and proposed edits, and let the agent reread the same file. Edits save continuously. Discussions,
+including agent replies and resolved history, stay in the Markdown file.
 
-An agent writes a plan or doc as `.md`; you read and mark it up in the browser with
-[CriticMarkup](https://github.com/CriticMarkup/CriticMarkup-toolkit); you hand it back; the agent
-re-reads the same file. No database, no accounts, no cloud — just localhost and the file on disk.
-Mastermind also renders any doc **bilingually**: your agent translates it into your two reading
-languages, toggled live.
+This is the squad fork of [Jingquank/Mastermind](https://github.com/Jingquank/Mastermind), based on
+v0.2.1 at `3687c91`, under the MIT license. It currently runs in a desktop browser with local file
+services; the planned desktop host will replace that runtime. The package and executable still use
+upstream's names, so install this fork from source while its distribution identity is being chosen.
 
-![Mastermind Reading view](https://raw.githubusercontent.com/Jingquank/Mastermind/main/assets/screenshots/reading.png)
+## Run from source
 
-*The Reading view — rendered Markdown with the heading outline on the left.*
-
-## Requirements
-
-- Node 20+ and a desktop browser (macOS is the tested platform).
-- A coding agent (Claude Code, Cursor, Gemini, …) — it drives the review loop and does translation.
-
-## Install
+Node 20+ and a desktop browser are required. macOS is the current development platform.
 
 ```sh
-npm i -g mastermind-md && mastermind install-agents
-```
-
-The first half installs the `mastermind` command; `install-agents` adds the `/mastermind` +
-`/master` skills to every coding agent it finds.
-
-<details>
-<summary>Install from source</summary>
-
-```sh
-git clone https://github.com/Jingquank/Mastermind.git
-cd Mastermind
+git clone https://github.com/d4wei/mastermind.git
+cd mastermind
 npm install
 npm run build
-npm link                      # puts `mastermind` on your PATH
-mastermind install-agents
+node bin/mastermind.js open plan.md
 ```
-</details>
 
-`install-agents` writes the skills for every coding agent it finds (`~/.claude`, `~/.cursor`,
-`~/.gemini`) and, where it can, a one-line rule so finished plans open in Mastermind automatically.
-Undo any time with `mastermind uninstall-agents`.
+Use `npm link` if you want the `mastermind` command on your PATH. Agents can use the
+[bundled skill](.claude/skills/mastermind/SKILL.md); [AGENT_SETUP.md](AGENT_SETUP.md) describes
+installation and the file-based review flow. No account, database, or remote service is required.
 
-## How it works
+## Review
 
-- **The file is the protocol.** Open a `.md` and Mastermind serves it at `127.0.0.1:5173`. Your
-  edits, comments, and accept/reject decisions round-trip through that one file as CriticMarkup —
-  nothing else, nowhere else.
-- **The review loop.** An agent writes a plan → you review and mark it up → **Save & hand back** →
-  the agent re-reads the file and revises. Repeat until you approve. Suggestions flow one direction
-  only (the agent proposes, you accept); nothing reaches disk until you do.
-- **Bilingual, no API key.** Your coding agent *is* the translator. Mastermind shows the doc in your
-  Preferred and Secondary languages (default English ⇄ 简体中文), toggled live, cached on disk
-  (`.mastermind/translations/`) so the toggle is instant and keeps working offline once warmed.
+`Cmd+E` switches between Reading and Source. Reading shows Markdown with insertions, deletions,
+substitutions, highlights, and author-tagged discussions. Source edits the original Markdown.
+Accepting or rejecting a mark splices the source rather than serializing a rendered document.
 
-![The same document toggled to Simplified Chinese](https://raw.githubusercontent.com/Jingquank/Mastermind/main/assets/screenshots/bilingual.png)
+Select original text to comment, highlight it, or suggest deletion. Agents may answer questions by
+appending a signed comment to the same thread. Delete removes one comment; Resolve archives the
+complete discussion at the file tail, visible through Resolved. `Cmd+Z` undoes review actions.
 
-*One click flips the whole doc to your second language; code and inline literals stay put.*
+A clean buffer reloads external changes automatically. A dirty buffer keeps local edits and the
+disk version, pauses saving, and offers an explicit comparison with an editable result. The
+[file service contract](src/server/files.md) describes the concurrency and filesystem limits.
 
-## The `/mastermind` skills
+## Optional comfort-language reading
 
-After `install-agents`, type these in your agent:
+Choose a comfort language in Settings when you want translated reading. The same agent preparing
+the document supplies a fresh complete translation for each preparation pass, using its existing
+context. The app reads that local artifact; it does not run a translation service or wait for an
+agent. Opening the original always works without a translation.
 
-| Command | What it does |
-| --- | --- |
-| `/mastermind setup` | Pick your two reading languages, preferred browser, and color / font theme. |
-| `/mastermind demo` | Open a bilingual demo doc — see the marks and the language toggle in action. |
-| `/mastermind <file>` | Translate any `.md` into both languages and open it. Bare `/mastermind` uses the most recent `.md` from the chat. |
-| `/master <file>` | Shorthand for `/mastermind <file>`. |
+Comments, highlights, and resolved history do not invalidate the narrative translation. Changes to
+prose or proposed edits do. A stale or missing translation falls back to the original. Select a
+translated passage to comment against its original block; the comment preserves the selected
+translation and its language. Exact text edits remain on the original document.
 
-Every open **translates first**, so the language toggle is warm the instant the page loads. With the
-global rule installed, finished plans (in plan mode) open in Mastermind automatically, in both
-languages. Routine translation and localization are sent as one batch to the coding agent's
-current fast, affordable model tier when available (`sonnet` in Claude Code); an existing
-same-vendor CLI and then the active agent provide non-blocking fallbacks. Planning and review
-interpretation stay with the primary agent.
+Discussion stays in its authored language. All feedback lives in the original Markdown file; the
+translation artifact contains no exclusive review state. See the
+[public review protocol](.claude/skills/mastermind/reference/review-protocol.md).
 
-## Reviewing
+## Settings
 
-Three views over the same file (`Cmd+E` cycles, `Cmd+S` saves):
-
-- **Reading** — rendered markdown with CriticMarkup as a visual diff: green insertions, struck
-  deletions, paired substitutions, gold highlights, and comment threads in a margin rail. Select
-  text → Comment / Suggest deletion / Highlight. Hover a suggestion → Accept / Reject (`Cmd+Z`
-  undoes review actions). Task-list checkboxes are live.
-- **Editing** — WYSIWYG; opening a file and saving it unchanged produces a byte-identical file.
-- **Source** — raw markdown with CriticMarkup highlighting.
-
-All five marks work inline anywhere: `{++ins++}`, `{--del--}`, `{~~old~>new~~}`, `{==highlight==}`,
-`{>>comment<<}`. A highlight directly followed by a comment anchors it to that span; consecutive
-comments form a thread; comments carry `@author:` tags.
-
-![CriticMarkup review marks](https://raw.githubusercontent.com/Jingquank/Mastermind/main/assets/screenshots/review-marks.png)
-
-*An insertion, a substitution, a struck deletion, a highlight, and a margin comment — all CriticMarkup.*
-
-The **language toggle** (top bar) flips the whole document between your two languages, block by
-block. `Cmd+F` is a mark-aware find (filter by comments / edits / highlights); `Cmd+P` prints
-ink-on-white with comments as numbered footnotes. Reviews are **multi-round**: when the agent
-rewrites the open file, a banner offers a reload so you pick up the new version in place.
-
-## Settings & themes
-
-Open Settings (the gear, bottom-right) to choose your **color theme** (seven ship — **Grid**, the
-Swiss-red default, plus Mint, Sepia, Carbon, Slate, Cobalt, Rose), **typeface** and **code font**, an
-optional **code-color scheme**, your **reading languages** (Preferred + Secondary), and the
-**browser** Mastermind opens in. Everything persists to `~/.config/mastermind/config.json` and is
-scriptable:
+Settings controls appearance, author tags, and the optional personal comfort language. Theme tokens
+keep the document surface quiet and reserve review colors for marks. Preferences remain in
+`~/.config/mastermind/config.json` during the desktop transition.
 
 ```sh
-mastermind config set langPair.a=English langPair.b=Japanese theme=sepia browser="Google Chrome"
+mastermind config get
+mastermind config set comfortLang=zh-CN theme=sepia
 ```
 
-Themes are just data — drop a `themes/<id>/{theme.json,tokens.css}` folder in and it shows up in Settings.
-
-![Settings panel](https://raw.githubusercontent.com/Jingquank/Mastermind/main/assets/screenshots/settings.png)
-
-*Themes, typeface, code font, code-color scheme, and your two reading languages — all in Settings.*
-
-## Developing
+## Agent commands
 
 ```sh
-npm run dev        # tsx-watched daemon on :5199 + Vite dev server on :5173 (proxies to daemon)
-npm test           # vitest run — full suite
-npm run test:watch # vitest watch
-npm run typecheck  # tsc against tsconfig.json (browser) and tsconfig.node.json (cli/server)
-npm run build      # vite build (UI) + tsup (cli + server) — required before the bin works
+mastermind open plan.md
+mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN
+mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN --save < prepared.json
 ```
 
-Run one test file or one test: `npx vitest run tests/critic-scanner.test.ts`,
-`npx vitest run -t "name of the test"`. From a clone that is not npm-linked, run the CLI as
-`node bin/mastermind.js <cmd>`. The layer map is in [`src/README.md`](src/README.md); the design-system
-token contract is in [`themes/README.md`](themes/README.md).
+Open returns immediately. Preparation emits the complete translation inputs; save validates and
+replaces a complete artifact, never merges old block translations. Language codes are explicit.
+People can use the app through their agent without operating these commands themselves.
 
-## Commands
+The existing `new`, `workspace`, `install-agents` / `uninstall-agents`, and `status` / `stop`
+commands remain during the transition. Their planned replacement or removal is described in the
+[architecture review](docs/architecture-review.md); they are not prerequisites for ordinary review.
+
+## Develop
 
 ```sh
-mastermind open <file>             # open a file for review
-mastermind open --wait <file>      # block until "Save & hand back" (the agent loop)
-mastermind new                     # start a blank draft
-mastermind workspace .             # browse a directory as a file tree (alias: ws)
-mastermind config get | set …      # read / write preferences
-mastermind translate-blocks <file> # pre-translate a doc into both languages (the skills use this)
-mastermind install-agents          # install the skills + global rule (undo: uninstall-agents)
-mastermind status | stop           # daemon status / shutdown
+npm run dev        # local file service and Vite development UI
+npm test           # full suite
+npm run typecheck  # browser and Node configurations
+npm run build      # required before invoking the bin from a clone
 ```
 
----
-
-More: **[AGENT_SETUP.md](AGENT_SETUP.md)** — the agent protocol, assist channel, and exit-code contract.
+Run one test file with `npx vitest run tests/critic-scanner.test.ts`. The implementation map is in
+[src/README.md](src/README.md), and the theme contract is in [themes/README.md](themes/README.md).

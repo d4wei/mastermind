@@ -5,8 +5,9 @@ import { langLabel, searchLanguages, type Language } from '../../shared/language
 
 interface Props {
   value: string
+  emptyLabel?: string
   onChange: (next: string) => void
-  /** Accessible name for the field (e.g. "First reading language"). */
+  /** Accessible name for the field. */
   label: string
 }
 
@@ -27,23 +28,8 @@ interface MenuPos {
   bottom?: number
 }
 
-/**
- * A searchable language picker: a trigger showing the current language, and a
- * dropdown (search box + filtered list) that opens against it. Any typed text
- * that doesn't match the curated list commits as a custom language — the agent
- * translates anything, so the list is a shortcut, not a fence.
- *
- * The menu is `position: fixed` so it escapes the settings SlideOver's
- * `overflow: auto` clipping. It flies out as a ribbon to the *left* of the
- * SlideOver panel rather than stacking on the trigger — that way the list
- * never overlays the panel's own fields and always has the full viewport
- * height to grow into (the old below-the-trigger menu got clipped near the
- * panel's bottom edge). On viewports too narrow to fit the ribbon beside the
- * panel it falls back to the classic flip-above/below placement. It stays a
- * DOM child of the field — not portaled — so the SlideOver's outside-click /
- * Escape containment checks keep treating menu interactions as "inside".
- */
-export function LangSelect({ value, onChange, label }: Props) {
+/** The fixed menu escapes panel overflow; retaining its DOM parent preserves outside-click handling. */
+export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
   const t = useT()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -54,13 +40,13 @@ export function LangSelect({ value, onChange, label }: Props) {
   const [pos, setPos] = useState<MenuPos | null>(null)
   const listId = useId()
 
-  const current = langLabel(value)
+  const current = value ? langLabel(value) : { name: emptyLabel ?? value, custom: false }
   const matches = searchLanguages(query)
   const typed = query.trim()
   const hasExact = matches.some(
     (l) => norm(l.name) === norm(typed) || norm(l.native) === norm(typed) || norm(l.code) === norm(typed),
   )
-  const showCustom = typed !== '' && !hasExact
+  const showCustom = /^[A-Za-z][A-Za-z0-9_-]*$/.test(typed) && typed !== '' && !hasExact
   // The flat option set the keyboard cursor walks: list rows, then the custom row.
   const optionCount = matches.length + (showCustom ? 1 : 0)
 
@@ -131,7 +117,7 @@ export function LangSelect({ value, onChange, label }: Props) {
 
   function commit(next: string): void {
     const v = next.trim()
-    if (v) onChange(v)
+    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(v)) onChange(v)
     setOpen(false)
     setQuery('')
   }
@@ -157,7 +143,7 @@ export function LangSelect({ value, onChange, label }: Props) {
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const pick = matches[active]
-      if (pick) commit(pick.name)
+      if (pick) commit(pick.code)
       else if (showCustom) commit(typed)
     }
   }
@@ -223,7 +209,7 @@ export function LangSelect({ value, onChange, label }: Props) {
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => {
                   e.preventDefault() // keep focus on the search input
-                  commit(l.name)
+                  commit(l.code)
                 }}
               >
                 <span className="lang-native">{l.native}</span>

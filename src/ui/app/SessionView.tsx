@@ -12,9 +12,10 @@ import { MarkGutter, type MarkTick } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../shared/critic/scanner'
 import { SlotLabel } from '../util/SlotLabel'
-import { formatCounts, useLang, useT } from '../i18n'
-import { CheckIcon, GearIcon } from '../icons'
-import { previewTargetLang, useTranslation } from '../translate/translationStore'
+import { useT } from '../i18n'
+import { GearIcon } from '../icons'
+import { useTranslation } from '../translate/translationStore'
+import { TranslatedSelection } from '../translate/TranslatedSelection'
 import { openEvents } from './api'
 import { useConfig } from './configStore'
 import { useDoc, type ViewMode } from './store'
@@ -44,9 +45,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
-  const handedBack = useDoc((s) => s.handedBack)
   const notice = useDoc((s) => s.notice)
-  const handbackPulse = useDoc((s) => s.handbackPulse)
   const renamePrompt = useDoc((s) => s.renamePrompt)
   const meta = useDoc((s) => s.meta)
   const mode = useDoc((s) => s.mode)
@@ -56,8 +55,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const applyEdits = useDoc((s) => s.applyEdits)
 
   const t = useT()
-  const lang = useLang()
   const articleRef = useRef<HTMLElement | null>(null)
+  const translatedRef = useRef<HTMLElement | null>(null)
   const [activeSpan, setActiveSpan] = useState<number | null>(null)
   const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -79,14 +78,20 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     }
   }, [comparisonOpen])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
-  const [agentWaiting, setAgentWaiting] = useState(false)
-  const [assistAvailable, setAssistAvailable] = useState(false)
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
-  const langPair = useConfig((s) => s.config?.langPair) ?? { a: 'en', b: 'zh-CN' }
+  const comfortLang = useConfig((s) => s.config?.comfortLang) ?? null
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
-  // translation routes to the user's agent, so it's ready iff a `mastermind assist` listener is live
-  const translationReady = assistAvailable
-  const transActive = useTranslation((s) => s.active)
+  const translation = useTranslation()
+  const retainedTranslation = useRef<{ sessionId: string; targetLang: string; artifact: NonNullable<typeof translation.artifact> } | null>(null)
+  if (translation.artifact && translation.sessionId === sessionId && translation.targetLang === comfortLang) {
+    retainedTranslation.current = { sessionId, targetLang: translation.artifact.targetLang, artifact: translation.artifact }
+  }
+  const captured = retainedTranslation.current
+  const composerArtifact = translation.artifact ?? (translation.error === 'stale' &&
+    captured?.sessionId === sessionId && captured.targetLang === comfortLang ? captured.artifact : null)
+  const transActive = translation.active && translation.sessionId === sessionId &&
+    translation.source === source && translation.targetLang === comfortLang
+  useEffect(() => { void useTranslation.getState().synchronize() }, [sessionId, source, comfortLang])
   const transLoading = useTranslation((s) => s.loading)
 
   useEffect(() => {
@@ -94,28 +99,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     useTranslation.getState().reset()
   }, [sessionId, load])
 
-  // #2 eager pre-translate: while an agent is serving assist, warm the whole
-  // document's translation into the on-disk cache + map so the toggle is instant.
-  // Intentionally keyed on agent-presence + load, not `source`, so it primes on
-  // open / agent-connect without re-firing on every keystroke.
-  useEffect(() => {
-    if (status !== 'ready' || !translationReady || !source) return
-    void useTranslation.getState().prefetch(sessionId, source, langPair)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [translationReady, status, sessionId])
-
-
-  useEffect(() => {
-    setAgentWaiting(meta?.agentWaiting ?? false)
-    setAssistAvailable(meta?.assistAvailable ?? false)
-  }, [meta])
-
-  // toasts auto-clear
-  useEffect(() => {
-    if (!handedBack) return
-    const timer = setTimeout(() => useDoc.getState().clearHandedBack(), 5000)
-    return () => clearTimeout(timer)
-  }, [handedBack])
   useEffect(() => {
     if (!notice) return
     const timer = setTimeout(() => useDoc.getState().setNotice(null), notice.kind === 'error' ? 8000 : 5000)
@@ -123,8 +106,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   }, [notice])
 
   useEffect(() => {
-    // role=ui SSE connection: its liveness keeps the session (and a blocked
-    // `mastermind open --wait`) alive while this tab is open.
+    // UI liveness keeps the review session open while its window remains attached.
     const es = openEvents(sessionId)
     es.addEventListener('file-changed', (e) => {
       const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
@@ -133,21 +115,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     es.addEventListener('file-deleted', () => {
       if (useDoc.getState().sessionId === sessionId) useDoc.getState().notifyDiskChange(0, true)
     })
-    es.addEventListener('handback', (e) => {
-      const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
-      const s = useDoc.getState()
-      if (s.sessionId === sessionId) s.notifyDiskChange(mtimeMs)
-    })
     es.addEventListener('config-changed', () => {
       void useConfig.getState().load()
-    })
-    es.addEventListener('waiters-changed', (e) => {
-      const { count } = JSON.parse((e as MessageEvent).data) as { count: number }
-      setAgentWaiting(count > 0)
-    })
-    es.addEventListener('assist-availability', (e) => {
-      const { available } = JSON.parse((e as MessageEvent).data) as { available: boolean }
-      setAssistAvailable(available)
     })
     return () => es.close()
   }, [sessionId])
@@ -352,28 +321,13 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         // applicability (not their presence) is what changes per view.
         onToggleRail={() => setRailOpen((v) => !v)}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
-        translation={{
-          label: transActive
-            ? t('original')
-            : (() => {
-                const target = previewTargetLang(source, langPair)
-                return /^(zh|中文)/i.test(target) ? '中文' : target
-              })(),
+        translation={comfortLang ? {
+          label: transActive ? t('original') : comfortLang,
           active: transActive,
           loading: transLoading,
-          // pure toggle: cache + in-memory only, it never enqueues the agent. It flips
-          // instantly from the on-disk cache; uncached blocks fall back to the original
-          // and surface a notice (the agent pre-translates and prefetch warms the cache).
-          onToggle: () => void useTranslation.getState().toggle(sessionId, source, langPair),
-        }}
+          onToggle: () => void useTranslation.getState().toggle(),
+        } : undefined}
       />
-      {/* "Agent waiting" status floats at the top-right of the UI, outside the bar. */}
-      {agentWaiting && (
-        <span className={`agent-chip agent-chip-floating${handbackPulse ? ' released' : ''}`} title={t('handBackTitle')}>
-          <span className="agent-chip-dot" />
-          <SlotLabel text={t('agentWaiting')} revealOnMount />
-        </span>
-      )}
       {/* Settings lives on its own as a floating button in the bottom-right
           corner — outside the bottom bar — anchoring the panel that rises above it. */}
       <button
@@ -403,11 +357,14 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       )}
       {resolvedOpen && <ResolvedThreads source={source} onClose={() => setResolvedOpen(false)} />}
       <ConflictPanel />
+      {translation.error && <div className="banner" role="status"><span className="banner-text">
+        {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
+      </span></div>}
       <div className={`doc-shell${showRail ? ' with-rail' : ''}`}>
         <div className="doc-column">
           {showTranslated && (
             <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-              <TranslatedView sessionId={sessionId} source={source} />
+              {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedRef} />}
             </Suspense>
           )}
           {mode === 'reading' && !showTranslated && analysis && (
@@ -462,6 +419,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           />
         )}
       </div>
+      {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
+        translation.targetLang === comfortLang && (
+        <TranslatedSelection key={`${sessionId}:${composerArtifact.sourceHash}:${comfortLang}`}
+          containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
+          stale={translation.error === 'stale'} />
+      )}
       {mode === 'reading' && !showTranslated && analysis && (
         <>
           <SelectionToolbar
@@ -483,13 +446,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           )}
         </>
       )}
-      {handedBack && (
-        <div className="toast" role="status">
-          <CheckIcon width={13} height={13} />{' '}
-          <SlotLabel revealOnMount text={`${t('handedBackToast')}${formatCounts(handedBack, lang)}`} />
-        </div>
-      )}
-      {!handedBack && notice && (
+      {notice && (
         <div className={`toast${notice.kind === 'error' ? ' toast-error' : ''}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
           <SlotLabel
             revealOnMount

@@ -4,7 +4,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { resolveWithin } from '../src/server/contain'
 import { createApp } from '../src/server/app'
-import { AssistRegistry } from '../src/server/assist/index'
 import { SessionRegistry } from '../src/server/sessions'
 import { WorkspaceRegistry } from '../src/server/workspaces'
 import type { CreateWorkspaceResponse, FileMeta, TreeResponse } from '../src/shared/types'
@@ -113,7 +112,6 @@ describe('workspace routes (containment wired end-to-end)', () => {
     app = createApp({
       registry: sessions,
       workspaces: new WorkspaceRegistry(),
-      assist: new AssistRegistry(sessions, 1000),
       version: 'test',
       startedAt: 0,
       requestShutdown: () => {},

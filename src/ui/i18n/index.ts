@@ -1,17 +1,15 @@
 import { useConfig } from '../app/configStore'
-import type { ReviewCounts } from '../../shared/types'
 
 const en = {
   reading: 'Read',
+  comfortLanguage: 'Comfort language',
+  translationOff: 'Off',
+  preparedMissing: 'No prepared translation for this language. Showing the original.',
+  preparedStale: 'The prepared translation does not match this document. Showing the original.',
+  preparedUnavailable: 'Could not read the prepared translation. Showing the original.',
+  translatedCommentStale: 'The document changed. Select the translated passage again.',
   source: 'Source',
   save: 'Save',
-  handBack: 'Hand back',
-  handingBack: 'Handing back…',
-  handBackTitle: 'Hand the document back to the waiting agent, with a review summary',
-  handBackMore: 'Hand back with a note',
-  handBackWithNote: 'Hand back with a note',
-  handBackNotePlaceholder: 'Note to your agent…',
-  handBackNoteHint: 'Added to the review summary the agent re-reads.',
   hideComments: 'Hide comments',
   showComments: 'Show comments',
   comment: 'Comment',
@@ -65,13 +63,10 @@ const en = {
   close: 'Close',
   nameDraft: 'Name this draft',
   draftFilename: 'Filename',
-  translating: 'Translating…',
+  translating: 'Loading translation…',
   original: 'Original',
   toggleRail: 'Toggle comment rail',
   toggleLang: 'Toggle reading language',
-  translateNoAgent: 'No agent is serving translations — run `mastermind open --serve-assist <file>`.',
-  translatePartialNoAgent: 'Showing cached translation — run `mastermind open --serve-assist <file>` to translate the rest.',
-  translateFailed: 'Translation failed: the provider returned an error.',
   newDraft: '+ New draft',
   newDraftFailed: 'Could not create a draft. Is the daemon running?',
   openHint: 'Open a document with',
@@ -83,13 +78,8 @@ const en = {
   showFiles: 'Show files',
   moreActions: 'More',
   outline: 'Outline',
-  untranslated: 'Not translated',
-  translationFailedBlock: 'Translation failed; showing the original',
-  agentWaiting: 'agent waiting',
-  handedBackToast: 'Handed back: ',
   saveFailed: 'Autosave failed — the daemon may be unreachable. Your next edit will retry.',
   configSaveFailed: 'Could not save settings; reverted to the stored values.',
-  handbackFailed: 'Hand back failed. The daemon may be unreachable; try again.',
   undoHint: 'Undo with ⌘Z',
   loadingDocument: 'Loading…',
   sessionNotFound: 'Session not found. It may have expired; run `mastermind open <file>` again.',
@@ -117,14 +107,10 @@ const en = {
   authorTag: 'Author tag',
   authorTagHint: 'Signs your review comments — e.g. @ke',
   uiLanguage: 'UI language',
-  readingPair: 'Reading pair',
   langSearchPlaceholder: 'Search languages…',
   langNoMatch: 'No matching language',
   langUseCustom: 'Use',
   langCustomTag: 'custom',
-  swapLangs: 'Swap languages',
-  preferredLanguage: 'Preferred language',
-  secondaryLanguage: 'Secondary language',
   browser: 'Browser',
   browserSystemDefault: 'System default',
   viewMode: 'View mode',
@@ -134,15 +120,14 @@ export type MsgKey = keyof typeof en
 
 const zhCN: Record<MsgKey, string> = {
   reading: '阅读',
+  comfortLanguage: '舒适语言',
+  translationOff: '关闭',
+  preparedMissing: '此语言没有预备翻译，显示原文。',
+  preparedStale: '预备翻译与当前文档不匹配，显示原文。',
+  preparedUnavailable: '无法读取预备翻译，显示原文。',
+  translatedCommentStale: '文档已变更，请重新选择译文片段。',
   source: '源码',
   save: '保存',
-  handBack: '交还',
-  handingBack: '交还中…',
-  handBackTitle: '将文档交还给等待中的 agent，并附上评审摘要',
-  handBackMore: '交还并附言',
-  handBackWithNote: '交还并附言',
-  handBackNotePlaceholder: '给 agent 的留言…',
-  handBackNoteHint: '将写入 agent 会重新读取的评审摘要中。',
   hideComments: '隐藏评论',
   showComments: '显示评论',
   comment: '评论',
@@ -196,13 +181,10 @@ const zhCN: Record<MsgKey, string> = {
   close: '关闭',
   nameDraft: '为草稿命名',
   draftFilename: '文件名',
-  translating: '翻译中…',
+  translating: '正在读取翻译…',
   original: '原文',
   toggleRail: '切换评论栏',
   toggleLang: '切换阅读语言',
-  translateNoAgent: '没有 agent 在提供翻译 — 运行 `mastermind open --serve-assist <文件>`。',
-  translatePartialNoAgent: '显示已缓存的翻译 — 运行 `mastermind open --serve-assist <文件>` 翻译其余部分。',
-  translateFailed: '翻译失败：翻译服务返回错误。',
   newDraft: '+ 新建草稿',
   newDraftFailed: '无法创建草稿。daemon 是否在运行？',
   openHint: '打开文档：',
@@ -214,13 +196,8 @@ const zhCN: Record<MsgKey, string> = {
   showFiles: '显示文件',
   moreActions: '更多',
   outline: '大纲',
-  untranslated: '未翻译',
-  translationFailedBlock: '翻译失败，显示原文',
-  agentWaiting: 'agent 等待中',
-  handedBackToast: '已交还：',
   saveFailed: '自动保存失败 — daemon 可能不可达。下次编辑时会自动重试。',
   configSaveFailed: '设置保存失败，已恢复为已存储的值。',
-  handbackFailed: '交还失败。daemon 可能不可达，请重试。',
   undoHint: '按 ⌘Z 撤销',
   loadingDocument: '加载中…',
   sessionNotFound: '会话不存在，可能已过期；请重新运行 `mastermind open <file>`。',
@@ -248,14 +225,10 @@ const zhCN: Record<MsgKey, string> = {
   authorTag: '作者标签',
   authorTagHint: '署名你的评审评论 — 例如 @ke',
   uiLanguage: '界面语言',
-  readingPair: '阅读语言对',
   langSearchPlaceholder: '搜索语言…',
   langNoMatch: '没有匹配的语言',
   langUseCustom: '使用',
   langCustomTag: '自定义',
-  swapLangs: '交换语言',
-  preferredLanguage: '首选语言',
-  secondaryLanguage: '次选语言',
   browser: '打开浏览器',
   browserSystemDefault: '系统默认',
   viewMode: '视图模式',
@@ -267,22 +240,4 @@ export function useT(): (key: MsgKey) => string {
   const lang = useConfig((s) => s.config?.uiLang) ?? 'en'
   const dict = DICTIONARIES[lang] ?? en
   return (key) => dict[key] ?? en[key]
-}
-
-export function useLang(): 'en' | 'zh-CN' {
-  return useConfig((s) => s.config?.uiLang) ?? 'en'
-}
-
-export function formatCounts(counts: ReviewCounts, lang: 'en' | 'zh-CN'): string {
-  const parts: string[] = []
-  if (lang === 'zh-CN') {
-    if (counts.comments > 0) parts.push(`${counts.comments} 条评论`)
-    if (counts.edits > 0) parts.push(`${counts.edits} 处修改建议`)
-    if (counts.highlights > 0) parts.push(`${counts.highlights} 处高亮`)
-    return parts.join('，') || '无标记'
-  }
-  if (counts.comments > 0) parts.push(`${counts.comments} comment${counts.comments === 1 ? '' : 's'}`)
-  if (counts.edits > 0) parts.push(`${counts.edits} suggested edit${counts.edits === 1 ? '' : 's'}`)
-  if (counts.highlights > 0) parts.push(`${counts.highlights} highlight${counts.highlights === 1 ? '' : 's'}`)
-  return parts.join(', ') || 'no marks'
 }
