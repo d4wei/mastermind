@@ -1,6 +1,7 @@
 # mastermind — agentic rules
 
 - Style this application as `mastermind`; use `Mastermind` for the original project.
+- Use [the canonical terminology](docs/terminology.md) for labels, onboarding, and feature names.
 - Record settled rulings in [`DECISIONS.md`](DECISIONS.md).
 - Record open questions and deferrals in [`DIRECTION.md`](DIRECTION.md).
 - Put forward designs under [`docs/`](docs/).

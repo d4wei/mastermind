@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Product vocabulary follows one canonical reference
+
+**Ruled.** [Product terminology](docs/terminology.md) defines the accepted English and Simplified
+Chinese names for labels, onboarding, documentation, and implementation. Apply its naming rules
+without changing feature semantics; config and serialized-format migrations require coordinated
+changes. This supersedes earlier terminology in this ledger, while preserving those rulings'
+meaning.
+
+**Beat:** carrying session vocabulary into the product or reopening accepted names in each feature.
+
 ## 2026-10-10 — The application name is styled as lowercase mastermind
 
 **Ruled.** Use `mastermind` in product copy, documentation, and application titles. Retain

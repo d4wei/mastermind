@@ -1,30 +1,22 @@
----
-status: living
-updated: 2026-10-10
-exit: naming choices are accepted or rejected and adopted terms live with their owning features
----
-# Terminology review
+# Product terminology
 
-These are naming proposals for the application at `e5c501d`, not adopted labels or schema changes.
-The review covers distinct concepts in the UI, agent instructions, configuration, file formats,
-implementation contracts, and design documents. Related inflections and synonyms are grouped.
-Ordinary verbs and third-party names are included in the retain inventory rather than given new
-names. Internal variables that introduce no distinct concept are outside this vocabulary review.
+This is the authoritative English and Simplified Chinese vocabulary for mastermind, adopted
+2026-10-10. Use it in product copy, onboarding, documentation, and new or revised implementation.
+It defines names and their meanings; feature contracts remain with their owning modules.
+Implementation may still contain earlier labels and identifiers until adoption is complete.
 
-For each family, test the name in context: can a new reader predict what changes, distinguish it
-from neighboring concepts, and understand it in English or Simplified Chinese? A permanent name
-should describe behavior, not the conversation that produced it. Public labels can be short while
-technical names identify the precise operation or data being discussed.
+Public labels describe what a reader sees or does. Technical names distinguish the precise operation
+or data being discussed. Names must stand on their own without the development conversation.
 
-## Recommended changes at a glance
+## Public labels
 
-| Current wording | Proposed public wording | 简体中文 |
+| Earlier wording | Canonical public wording | 简体中文 |
 | --- | --- | --- |
 | Comfort language | Translation language | 译文语言 |
 | UI language | Interface language | 界面语言 |
 | Repo language | Project language | 项目语言 |
 | Source, as an editor mode | Markdown | Markdown |
-| Author tag, in Settings | Display name | 显示名称 |
+| Author tag, in Settings | Name | 名字 |
 | Prepared translation, in notices | Translation | 译文 |
 | Edits, as a review search filter | Suggested edits | 修改建议 |
 | Original thread, in resolved history | Discussion | 讨论 |
@@ -40,8 +32,8 @@ technical names identify the precise operation or data being discussed.
 | Ablation | Removal and refactoring | 移除与重构 |
 | Wrapper, in product descriptions | Desktop app | 桌面应用 |
 
-The recommendations below explain alternatives and preserve distinctions that a bulk replacement
-would lose. In particular, project language is a policy; it is not a document's detected language.
+The definitions below preserve distinctions across features. Project language is a communication
+policy; it is not a document's detected language.
 
 ## 1. Language roles
 
@@ -53,21 +45,19 @@ Evidence: [preferences][preferences], [settings][settings], [translation format]
 `comfortLang` selects the language of an available translation; `null` means original-only reading.
 It does not generate a translation or change labels and menus.
 
-Candidates: **Translation language**, **Preferred reading language**, **Reading language**.
-Recommend **Translation language / 译文语言**. It identifies the affected feature. Reading language
-could mean the original document's language, while comfort is a personal motivation rather than a
-setting's effect. Preferred adds length without resolving a distinct ambiguity.
+Use **Translation language / 译文语言** for the personal preference that selects an available
+translation. Keep it distinct from the original document's language and the interface language.
 
-Try: “Translation language: 简体中文.” Helper: “Use available translations in this language.”
+Example: “Translation language: 简体中文.” Helper: “Use available translations in this language.”
 Use **Original only / 仅原文** for the null option instead of a contextless Off.
-Proposed personal config key: `translationLanguage`; retain `null` as the original-only value.
+The canonical personal config name is `translationLanguage`; retain `null` for original-only
+reading. Apply the identifier change through the coordinated adoption rules below.
 
 ### Interface language
 
 `uiLang` controls labels and notices independently of document content.
-Candidates: **Interface language**, **App language**, **UI language**.
-Recommend **Interface language / 界面语言**; it names the affected surface without an acronym.
-Try: “Interface language: English. Translation language: 简体中文.”
+Use **Interface language / 界面语言** for labels and menus.
+Example: “Interface language: English. Translation language: 简体中文.”
 The technical phrase UI language and existing `uiLang` key remain understandable; no key rename is
 needed merely to spell out its UI label.
 
@@ -75,35 +65,29 @@ needed merely to spell out its UI label.
 
 `sourceLang` and `targetLang` are explicit codes for one translation. They are not inferred from the
 last comment, interface setting, or repository identity.
-Candidates for prose: **Original language**, **Document language**, **Source language**.
-Recommend **Original language / 原文语言** in explanations and retain **source language / 源语言**
-and **target language / 目标语言** in translation APIs and CLI flags.
-Document language can overstate the uniformity of a mixed-language file.
+Use **Original language / 原文语言** in explanations and retain **source language / 源语言** and
+**target language / 目标语言** in translation APIs and CLI flags. These identify the languages of a
+translation operation; they do not assert that every passage in a file uses one language.
 
-Try: “Translate this document from English to 简体中文.” A translation's target language can differ
+Example: “Translate this document from English to 简体中文.” A translation's target language can differ
 from another reader's personal preference. `targetLang` therefore remains distinct from the
-proposed personal `translationLanguage` setting.
+personal `translationLanguage` setting.
 
 ### Repository communication policy
 
 The settled role concerns communication and bookkeeping across a repository; storage and discovery
 are not implemented. It does not declare every file to be written in that language.
-Candidates: **Project language**, **Repository language**, **Working language**.
-Recommend **Project language / 项目语言** for a future public setting, qualified in its explanation:
-“Language for project communication and records.” Use **repository language policy** in technical
-contracts so its scope remains explicit. Working language could mean a person's preference.
-
-This label does not authorize expanding the setting beyond a repository. If that scope distinction
-is considered essential in the label itself, **Repository language / 仓库语言** is the alternative.
-Do not call it Default document language unless a later ruling gives it that behavior.
+Use **Project language / 项目语言** with the explanation “Language for project communication and
+records.” Use **repository language policy** in technical contracts so its scope remains explicit.
+The scope remains one repository. Storage, discovery, and defaults remain governed by
+[DIRECTION.md][direction]; adopting this label does not implement the setting.
 
 ## 2. Views and language switching
 
 Read/Source currently switches rendered text and the Markdown editor. Original/translated reading
 is a different choice. See [the toolbar][toolbar].
 
-Candidates for the editor: **Source**, **Markdown source**, **Markdown**.
-Recommend **Read / 阅读** and **Markdown / Markdown** as the short mode labels. Use **Markdown
+Use **Read / 阅读** and **Markdown / Markdown** as the short mode labels. Use **Markdown
 source / Markdown 源文本** in explanatory prose. This avoids using source for both an editor and
 one side of translation; 源码 also suggests program code.
 
@@ -111,18 +95,16 @@ Keep **Original / 原文** and **Translation / 译文** for document language vi
 when the available translation is known. Reading language remains a useful description of this
 view choice, not another name for the persistent translation preference.
 
-Try: “Open Markdown to edit the original text.” / “切换到 Markdown 编辑原文。”
-Try: “Show original.” / “显示原文。”
+Example: “Open Markdown to edit the original text.” / “切换到 Markdown 编辑原文。”
+Example: “Show original.” / “显示原文。”
 
 ## 3. Translations and their lifecycle
 
 Evidence: [translation format][translation], [local storage][prepared], and
 [reading behavior][view].
 
-Candidates for the reader-facing object: **Translation**, **Prepared translation**, **Saved
-translation**. Recommend **Translation / 译文** in the UI. Agent instructions can say **prepare a
-translation / 准备译文** because they describe the work. Saved translation can imply a separate
-reviewable document; the current file is a derived reading aid.
+Use **Translation / 译文** in the UI and **prepare a translation / 准备译文** in agent instructions.
+The translation is a derived reading aid; review feedback stays in the original Markdown file.
 
 Replace 预备翻译, which sounds unfinished, with 译文. “No translation is available in this language.
 Showing the original.” / “暂无此语言的译文，显示原文。”
@@ -144,16 +126,15 @@ Distinguish these states instead of overloading fresh:
 Matching does not establish translation quality or that the agent considered every dependency.
 Do not label it Verified translation, Up to date with the project, or Approved translation.
 
-Candidates for `publishTranslation`: **publish**, **save**, **write**.
-Recommend **save translation / 保存译文** in instructions and **savePreparedTranslation** if the
-internal function is renamed. The operation validates and replaces a local file; publish suggests
-a remote audience. The existing CLI `--save` already uses the clearer verb.
+Use **save translation / 保存译文** in instructions and **savePreparedTranslation** as the canonical
+name for the operation currently called `publishTranslation`. It validates and replaces a local
+file. Keep the existing CLI `--save` flag.
 
 ## 4. Translation structure and freshness checks
 
 These names belong in implementation and agent documentation, not ordinary reading controls.
 
-| Current terms | Proposed canonical term | Meaning |
+| Earlier terms | Canonical technical term | Meaning |
 | --- | --- | --- |
 | Block | Translation block | A segmented source unit; lists split into items |
 | Literal/context block | Context block | Included as context, not offered for translation |
@@ -163,16 +144,14 @@ These names belong in implementation and agent documentation, not ordinary readi
 | Translation snapshot | Prepared translation | Complete data from one preparation |
 | Translated selection | Quoted translated passage | Exact selected text retained in feedback |
 
-Candidates for narrative: **translation input**, **translation projection**, **document content**.
-Recommend translation input in prose and **translation projection** for the transformation itself.
-Narrative sounds prose-only, but code and metadata also affect the fingerprint.
+Use **translation input** for the content and **translation projection** for the transformation
+that produces it. Code and metadata also affect the fingerprint; input is not limited to prose.
 
-Candidates for source hash: **document hash**, **translation fingerprint**, **content version**.
-Recommend translation fingerprint: comments, resolved history, and line-ending differences can leave
-it unchanged. A document hash would imply hashing all source bytes. Proposed serialized field:
-`translationFingerprint`, subject to the format-change checkpoint below.
+Use **translation fingerprint** for the hash: comments, resolved history, and line-ending
+differences can leave it unchanged. It does not hash all source bytes. The canonical field name is
+`translationFingerprint`; changing the serialized field requires the format-change checkpoint below.
 
-Try: “Prepare every translation block again; block IDs belong to this translation input.”
+Example: “Prepare every translation block again; block IDs belong to this translation input.”
 Keep **Markdown block** for parser structure and **selected passage** for text the reader selects.
 Do not promise a persistent block identity or character-by-character translation alignment.
 
@@ -183,24 +162,21 @@ Evidence: [author defaults][preferences] and [public protocol][protocol].
 This Settings field supplies the name shown beside comments and written into their `@name:`
 signatures in Markdown. It does not name a comment or require an account.
 
-Candidates for the Settings field: **Display name**, **Comment signature**, **Author tag**.
-Recommend **Display name / 显示名称**, with the helper “Shown beside your comments.” / “显示在评论旁。”
-Comment name can sound like a title for a comment. Author can be mistaken for the document's author,
-and tag sounds like a category. Comment signature can suggest a full signature block.
+Use **Name / 名字** in Settings. During onboarding ask **What should we call you? / 怎么称呼你？**
+Use the helper **This name appears beside your comments. / 这个名字会显示在你的评论旁。**
+A person may enter a name or nickname; the wording does not request a legal name or unique username.
 
-Try: “Display name: Alex.” A comment is then attributed to Alex and stored with `@Alex:`.
+Example: “Name: Alex.” A comment is attributed to Alex and stored with `@Alex:`.
 Keep **author tag** in protocol documentation and `authorTag` in code: there it names actual syntax.
 A signature records attribution, not an authenticated identity.
 
-The prose currently alternates among preparing agent, prep agent, session agent, invoking agent,
-and receiving agent. Do not turn these into permanent jobs or assume they are all the same process.
-Candidates: **your agent**, **invoking agent**, **agent preparing the document**.
-Recommend **your agent / 你的智能体** in product copy. Use **invoking agent** for the tool caller,
+Use **your agent / 你的智能体** in product copy. Use **invoking agent** for the tool caller,
 **agent preparing the document** for translation preparation, and **agent reading the feedback**
-for later review. A different agent can read the same file.
+for later review. These describe responsibilities, not permanent jobs or a requirement to use the
+same process. A different agent can read the same file.
 
-Try: “The agent preparing the document also prepares its translation.”
-Try: “When an agent reads feedback, it treats resolved discussions as history.”
+Example: “The agent preparing the document also prepares its translation.”
+Example: “When an agent reads feedback, it treats resolved discussions as history.”
 Use **coding-agent tool / 编程智能体工具** publicly and **agent harness** technically for the
 software that hosts the agent and installs skills. It is distinct from mastermind's native host.
 
@@ -213,11 +189,10 @@ construct. Its kinds remain insertion, deletion, substitution, highlight, and co
 Use **suggested edit / 修改建议** for an unaccepted insertion, deletion, or replacement; in the
 protocol, proposed edit is an equivalent description rather than a different object.
 
-Candidates for the search filter currently called Edits: **Edits**, **Suggestions**, **Suggested
-edits**. Recommend Suggested edits; edits alone could include changes already applied to the file.
+Use **Suggested edits / 修改建议** for the search filter over unaccepted edits.
 Keep **Accept / 接受**, **Reject / 拒绝**, and **Suggest deletion / 建议删除** as actions.
 
-Try: “Find in suggested edits.” / “在修改建议中查找。”
+Example: “Find in suggested edits.” / “在修改建议中查找。”
 Technical `suggestion` and `CriticKind` need no rename. A UI-only edit proposal and a CriticMarkup
 mark already stored in the file have different persistence states; the term suggestion does not
 establish whether either has been accepted.
@@ -228,18 +203,16 @@ highlight anchor from a translated comment's source-block association.
 
 ## 7. Comments, discussions, and resolution
 
-Candidates for a comment plus replies: **Discussion**, **Thread**, **Conversation**.
-Recommend **discussion / 讨论** in product copy, **comment thread / 评论串** in parser and storage
-contracts. Conversation risks confusion with the agent chat. Keep Comment and Reply for individual
-messages and the action of adding one.
+Use **discussion / 讨论** for a comment plus its replies in product copy, and **comment thread /
+评论串** in parser and storage contracts. Keep Comment and Reply for individual messages and the
+action of adding one.
 
-Candidates for completing a discussion: **Resolve**, **Mark resolved**, **Archive**.
-Recommend **Resolve / 标为已解决** as the action and **Resolved discussions / 已解决的讨论** as the
-panel title. Archive describes storage, not whether the discussion is finished. Resolution does
-not accept a proposed edit. Keep **Delete comment / 删除评论** for removing one comment.
+Use **Resolve / 标为已解决** as the action and **Resolved discussions / 已解决的讨论** as the panel
+title. Archive describes storage; resolution means the discussion is finished. Resolution does not
+accept a proposed edit. Use **Delete comment / 删除评论** for removing one comment.
 
-Try: “Resolve moves this discussion to the document's resolved history.”
-Try: “Delete comment removes this comment; undo restores it.”
+Example: “Resolve moves this discussion to the document's resolved history.”
+Example: “Delete comment removes this comment; undo restores it.”
 The existing Resolved shorthand can remain where space is limited.
 
 Use **discussion** instead of Original thread in the history panel; **quoted passage / 引用片段**
@@ -263,29 +236,25 @@ Keep the stored `mastermind:resolved-thread v1` and `translated-selection v1` ma
 Evidence: [comparison state][store] and [file writes][files]. Both the app buffer and disk are
 local, so Local does little to distinguish them. Latest disk can become false after another edit.
 
-| Current heading | Proposed heading | 简体中文 |
+| Earlier heading | Canonical heading | 简体中文 |
 | --- | --- | --- |
 | Base | Base version | 基准版本 |
 | Local | Your edits | 你的编辑 |
 | Latest disk | File on disk | 磁盘文件 |
 | Result | Merge result | 合并结果 |
 
-Candidates for Base: **Base version**, **Last saved version**, **Before edits**.
-Recommend Base version with “The version loaded or saved before these conflicting changes.”
-Last saved version can imply the latest disk contents or that the app itself saved it. The base
-may have come from opening or reloading a file.
+Explain **Base version** as “The version loaded or saved before these conflicting changes.” The
+base may have come from opening or reloading a file; the app need not have saved it.
 
-Candidates for Result: **Merge result**, **Merged version**, **Result**.
-Recommend Merge result with “Edit this text to combine the changes.” It starts as a copy of Your
-edits; no automatic merge has happened. Do not call it Suggested merge or imply a merged result
-was computed by the app.
+Explain **Merge result** as “Edit this text to combine the changes.” It starts as a copy of Your
+edits; no automatic merge has happened. The label must not imply a computed merge.
 
 Use **Compare versions / 比较版本**, **Refresh versions / 刷新版本**, **Use disk version / 采用磁盘版本**,
 and **Save merge result / 保存合并结果**. The first three comparison panes are captured versions;
 “Your edits” does not promise a live view while editing the merge result.
 
-Try: “Saving paused. Compare your edits with the file on disk.”
-Try: “The versions changed. Refresh them before saving the merge result.”
+Example: “Saving paused. Compare your edits with the file on disk.”
+Example: “The versions changed. Refresh them before saving the merge result.”
 Keep **autosave / 自动保存** and **saving paused / 保存已暂停**. In notices use unsaved changes rather
 than dirty buffer; technical clean/dirty buffer terminology remains useful.
 
@@ -293,20 +262,18 @@ than dirty buffer; technical clean/dirty buffer terminology remains useful.
 
 Evidence: [document sessions][sessions], [state ownership][store], and [lifetime ruling][decisions].
 
-Candidates for the public object: **Document**, **Review session**, **Open document**.
-Recommend **open document / 已打开的文档** when lifecycle matters, otherwise document. A current
+Use **open document / 已打开的文档** when lifecycle matters, otherwise document. A current
 server session is a per-file registry object; the intended app session is the app's whole lifetime.
 Use **document session** only for that existing server object and **app session** for app lifetime.
 Use **document buffer** for unsaved in-memory text, and **review state** for the broader state.
 
-Try: “This document is no longer open. Open the file again.”
-For the deferred feature, candidates are Session restoration, Resume review, and Restore open
-files. Recommend **Restore open files / 恢复已打开的文件** for the narrow public capability, with
-**review-state restoration** as the technical scope under discussion. That wording does not decide
-which buffers, positions, or panels will persist; restoration remains deferred.
+Example: “This document is no longer open. Open the file again.”
+Use **Restore open files / 恢复已打开的文件** for the deferred public capability, and **review-state
+restoration** for its technical scope. Naming does not decide which buffers, positions, or panels
+persist; restoration remains deferred in [DIRECTION.md][direction].
 
 Untitled draft means the temporary file created by `new`; conflict draft means a retained editable
-comparison. Recommend **untitled document / 未命名文档** if describing the first and **merge result**
+comparison. Use **untitled document / 未命名文档** for the first and **merge result**
 for the second. Do not rename draft-only code ahead of its approved removal.
 
 ## 10. Version, revision, snapshot, and source
@@ -326,9 +293,8 @@ Keep the ordinary engineering vocabulary, but qualify it where several kinds mee
 | Range/span | Source range / mark span | UTF-16 positions, including defined delimiters |
 | Splice | Source splice | Replace an exact range without re-rendering Markdown |
 
-Candidates for snapshot: keep it qualified, replace every occurrence with version, or invent a
-new product object. Recommend qualification. Version does not necessarily contain the captured text,
-and a new noun would add vocabulary without a new capability.
+Qualify snapshot where several kinds meet. A version does not necessarily contain captured text;
+a comparison snapshot does.
 
 Do not automatically rename `version` inside a clearly typed response or every `source` parameter.
 Rename misleading boundary fields deliberately; preserve byte-preserving round trip as an invariant,
@@ -336,18 +302,16 @@ not a feature brand. Fingerprint and disk version token are different checks.
 
 ## 11. File opening, navigation, and the desktop runtime
 
-Smart open currently means the agent chooses files using its judgment; there is no separate smart
-selection algorithm in the app. Candidates: Smart open, Review selected files, Open selected files.
-Recommend **Open selected files / 打开所选文件** for the operation and **agent-selected files** when
-explaining selection responsibility. Keep `open` as the concise typed command.
+Use **Open selected files / 打开所选文件** for the operation and **agent-selected files** when
+explaining selection responsibility. The agent chooses files using its judgment; the app has no
+separate smart selection algorithm. Keep `open` as the concise typed command.
 
 Keep **Files / 文件**, **Recent / 最近**, **Outline / 大纲**, **file tree / 文件树**, and **Filename /
 文件名**. Use **workspace / 工作区** only for the existing rooted tree feature; **repository / 仓库**
 means a version-controlled project and is not a synonym for any folder. The workspace is scheduled
 for removal, so new product copy should describe opening files, not a renamed workspace product.
 
-Candidates for the container: **Desktop app**, **Desktop wrapper**, **App-mode container**.
-Recommend **desktop app / 桌面应用** publicly and **Tauri host / Tauri 宿主** in architecture docs.
+Use **desktop app / 桌面应用** publicly and **Tauri host / Tauri 宿主** in architecture docs.
 Keep **native host**, **host bridge**, and **IPC** as technical terms, defined on first use. The
 bridge carries specific document operations between the web interface and privileged local code.
 
@@ -361,23 +325,18 @@ and recovery action without inventing a replacement background service.
 Evidence: [settings][settings], [font presets][fonts], [code color schemes][colors], and
 [themes][themes].
 
-Candidates for Typeface/type set: **Font preset**, **Font pairing**, **Typography preset**.
-Recommend **Font preset / 字体预设**: it selects heading and body font families, heading weight, and
+Use **Font preset / 字体预设**: it selects heading and body font families, heading weight, and
 heading letter spacing. For example, the Bricolage preset uses Bricolage Grotesque for headings and
-Inter for body text. Some presets use the same family for both. Pairing overemphasizes two distinct
-fonts; typography preset is more technical. If the feature later selects only a font, label it Font.
-A later implementation can rename `typeSet` to `fontPreset` together with its registry if that
-improves the contract; this is not necessary for the label change.
+Inter for body text. Some presets use the same family for both. If the feature later selects only a
+font, label it Font. The canonical implementation term is `fontPreset`; coordinate a rename of
+`typeSet` with its registry and persisted settings rather than treating it as a label-only change.
 
-Candidates for Code color: **Syntax colors**, **Syntax highlighting**, **Code color scheme**.
-Recommend **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
+Use **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
 established feature name is [syntax highlighting][syntax-highlighting], but this control selects its
-palette. Naming code explicitly avoids assuming the reader knows what syntax refers to. Syntax
-colors is less recognizable, and highlighting alone can be confused with review highlights.
+palette. Name code explicitly to distinguish its colors from review highlights.
 Keep named palettes Soft, Vivid, Warm, with 柔和、鲜明、暖色.
 
-Candidates for Content width: **Reading width**, **Text width**, **Content width**.
-Recommend **Text width / 正文宽度**: the control sets the maximum width of the central document
+Use **Text width / 正文宽度**: the control sets the maximum width of the central document
 column. Editors use different labels: Obsidian calls its limit
 [Readable line length][obsidian-width], while Typora calls the column dimension
 [Width of Writing Area][typora-width]. Text width describes
@@ -386,7 +345,7 @@ Keep Font size, Line height, Theme, Appearance, Film grain, Texture, and System 
 For grain textures use 细腻、柔和、粗糙; 粗粝 is unusually literary for a setting.
 
 Keep theme names **Grid**, **Nacht**, and **Sepia** and actual font-family names as proper names.
-The font preset also called Grid can become **Schibsted**, matching its family and avoiding a false
+Label the font preset also called Grid **Schibsted**, matching its family and avoiding a false
 association between choosing that font and changing the Grid theme. Keep its stored ID unless a
 coordinated registry change is approved. No new creative preset names are needed.
 
@@ -398,13 +357,12 @@ frontmatter Properties as if a typed property editor already exists.
 
 Use **Block actions / 内容块操作**, not 段落操作, for an action menu that can apply to nonparagraph
 blocks. Review badges should spell out localized categories rather than `3c 2e 1h`.
-Try: “3 comments, 2 suggested edits, 1 highlight.” / “3 条评论、2 条修改建议、1 处高亮。”
+Example: “3 comments, 2 suggested edits, 1 highlight.” / “3 条评论、2 条修改建议、1 处高亮。”
 
 ## 13. Workflow and design-document vocabulary
 
-Candidates for ablation: **Removal plan**, **Removal and refactoring**, **Simplification**.
-Recommend **removal and refactoring / 移除与重构**: it says which work happens, whereas ablation can
-mean an experiment that removes one variable to measure its effect. Simplification describes a hope.
+Use **removal and refactoring / 移除与重构** for work that removes features and restructures code.
+Reserve ablation for an experiment that removes a variable to measure its effect.
 
 Keep **review workflow** for the sequence of actions and **review protocol** for file syntax and
 agent behavior. “The file is the protocol” remains a concise explanation when followed by the actual
@@ -444,20 +402,14 @@ The product name **mastermind** is settled. **Mastermind** names Kevin Ding's or
 Keep third-party names such as Markdown, CriticMarkup, Tauri, Electron, CodeMirror, React, and Git.
 The actual package, command aliases, and config path currently retain inherited identifiers.
 
-For eventual npm distribution, candidates include a scoped package such as `@d4wei/mastermind`
-and a descriptive unscoped package such as `mastermind-review`. A scoped package preserves the
-chosen display name and identifies its publisher; an unscoped name is shorter to type but adds a
-second public identity. These are unverified candidates, not availability or account-ownership
-claims. Desktop distribution may not require an npm package at all.
+Use **mastermind** as the product name and **open** as the launch operation. Package, executable,
+application ID, and configuration-directory collisions remain a separate decision tracked in
+[DIRECTION.md][direction]. This vocabulary does not select distribution identifiers or assert
+package availability.
 
-Recommend keeping **mastermind** as the display name and **open** as the launch operation; settle
-package, executable, application ID, and config-directory collisions together with the desktop
-launch contract. Display styling alone does not solve installation collisions.
+## Other established terms
 
-## Retain inventory and coverage check
-
-The recommendations above cover the project-specific and overloaded concepts. The remaining terms
-below have direct, ordinary meanings in their current context and need no new names.
+The remaining terms below retain their ordinary meanings in context.
 
 | Family | Retain |
 | --- | --- |
@@ -476,26 +428,23 @@ below have direct, ordinary meanings in their current context and need no new na
 | Design | Theme token, Font family, Palette, Icon, Focus ring, Selection toolbar |
 | Agent integration | Skill, Alias, Agent harness, CLI command, Flag, Standard input/output |
 
-Sources inspected include every English/Chinese entry in [the UI dictionary][labels], the settings
-and review controls, CLI commands, public skills, shared types, technical sidecars, project docs,
-and inherited site terminology. This is a concept inventory, not a claim that every code identifier
-must become part of the product's public vocabulary.
+## Applying the vocabulary
 
-## Adoption sequence after review
+Apply labels, accessibility text, help, documentation, and examples together. Preserve accepted
+product semantics. Remove unused message keys only after checking callers, and add behavior checks
+where meaning changes. Apply the vocabulary to desktop features as they are implemented.
 
-1. Decide the proposed public names and example wording, especially language roles, display names,
-   comparison panes, and font presets. Keep accepted product semantics unchanged.
-2. Change labels, accessibility text, help, documentation, and examples together. Remove unused
-   labels only after checking callers. Add focused behavior checks where meaning changes.
-3. Rename `comfortLang` and misleading translation boundary names only as coordinated contract
-   changes: config validation/persistence, CLI, producer/consumer code, skills, and tests. A saved
-   personal preference is not the same thing as an obsolete translation cache; make its treatment
-   explicit instead of silently losing it.
-4. Changing serialized translation keys requires an explicit format/version choice because readers
-   reject unknown fields. Keep existing in-document review markers stable. If a format rename is
-   not worth that cost, keep its wire name and document the canonical concept beside it.
-5. Apply the new vocabulary to the desktop design as its contracts are implemented. Retire this
-   review document when its choices have been resolved; retain definitions beside their features.
+Coordinate identifier changes across config validation and persistence, CLI, producer/consumer code,
+skills, and tests. Preserve saved personal preferences through an explicit migration or
+compatibility choice; approval of vocabulary does not authorize silently losing settings.
+
+Serialized translation keys require an explicit format/version choice because readers reject unknown
+fields. Until that choice is made, retain the existing wire names and document their canonical
+meanings beside the format. Keep existing in-document review markers stable. Public terminology does
+not require renaming every `version`, `source`, or other identifier whose local meaning is clear.
+
+This reference governs naming across features. Keep feature behavior and storage contracts beside
+the implementation, and keep unresolved product choices in [DIRECTION.md][direction].
 
 [preferences]: ../src/server/config.md
 [settings]: ../src/ui/settings/SettingsPanel.tsx

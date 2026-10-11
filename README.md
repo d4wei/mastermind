@@ -94,5 +94,6 @@ npm run build      # required before invoking the bin from a clone
 
 Run one test file with `npx vitest run tests/critic-scanner.test.ts`. The implementation map is in
 [src/README.md](src/README.md), and the theme contract is in [themes/README.md](themes/README.md).
+The accepted English and Chinese names are defined in [Product terminology](docs/terminology.md).
 Use a disposable copy of [the manual review exercise](tests/manual/review-interactions.md) to check
 callouts and selections across blocks in the browser.

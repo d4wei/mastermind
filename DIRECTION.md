@@ -26,14 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-10 — Product terminology is under review
-
-**Open question.** Language preferences, document sessions, and several review concepts still use
-overloaded or development-era names. The [terminology exercises](docs/terminology-review.md) propose
-public labels and precise technical terms without changing their behavior or file formats.
-
-**Exit:** the naming choices are accepted or rejected and adopted names live with their features.
-
 ## 2026-10-10 — Restoring app sessions is deferred
 
 **Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible
@@ -52,10 +44,10 @@ agent passes files and optional setup values into the running app.
 
 ## 2026-10-10 — Repository language settings (updated 2026-10-10)
 
-**Open question.** Repo language and personal comfort language have settled roles, but repository
-settings still need storage, discovery, precedence, and defaults outside a repo. Translation now
-uses explicit preparation languages and an optional personal comfort preference; that does not
-choose a repo-settings mechanism.
+**Open question.** Project language and personal translation language have settled roles, but
+repository settings still need storage, discovery, precedence, and defaults outside a repo.
+Translation uses explicit preparation languages and an optional personal translation preference;
+that does not choose a repo-settings mechanism.
 
 **Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 
