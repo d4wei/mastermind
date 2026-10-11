@@ -28,8 +28,8 @@ installation and the file-based review flow. No account, database, or remote ser
 
 ## Review
 
-`Cmd+E` switches between Reading and Source. Reading shows Markdown with insertions, deletions,
-substitutions, highlights, and author-tagged discussions. Source edits the original Markdown.
+`Cmd+E` switches between Read and Markdown. Read shows the document with insertions, deletions,
+substitutions, highlights, and author-tagged discussions. Markdown edits the original text.
 Accepting or rejecting a mark splices the source rather than serializing a rendered document.
 
 Select original text to comment, highlight it, or suggest deletion. Agents may answer questions by
@@ -40,14 +40,14 @@ A clean buffer reloads external changes automatically. A dirty buffer keeps loca
 disk version, pauses saving, and offers an explicit comparison with an editable result. The
 [file service contract](src/server/files.md) describes the concurrency and filesystem limits.
 
-## Optional comfort-language reading
+## Optional translated reading
 
-Choose a comfort language in Settings when you want translated reading. The same agent preparing
+Choose a translation language in Settings when you want translated reading. The same agent preparing
 the document supplies a fresh complete translation for each preparation pass, using its existing
 context. The app reads that local artifact; it does not run a translation service or wait for an
 agent. Opening the original always works without a translation.
 
-Comments, highlights, and resolved history do not invalidate the narrative translation. Changes to
+Comments, highlights, and resolved history do not invalidate the translation. Changes to
 prose or proposed edits do. A stale or missing translation falls back to the original. Select a
 translated passage to comment against its original block; the comment preserves the selected
 translation and its language. Exact text edits remain on the original document.
@@ -58,7 +58,7 @@ translation artifact contains no exclusive review state. See the
 
 ## Settings
 
-Settings controls appearance, author tags, and the optional personal comfort language. Theme tokens
+Settings controls appearance, your name, and the optional translation language. Theme tokens
 keep the document surface quiet and reserve review colors for marks. Preferences remain in
 `~/.config/mastermind/config.json` during the desktop transition.
 

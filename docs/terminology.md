@@ -84,7 +84,7 @@ The scope remains one repository. Storage, discovery, and defaults remain govern
 
 ## 2. Views and language switching
 
-Read/Source currently switches rendered text and the Markdown editor. Original/translated reading
+Read/Markdown switches rendered text and the Markdown editor. Original/translated reading
 is a different choice. See [the toolbar][toolbar].
 
 Use **Read / 阅读** and **Markdown / Markdown** as the short mode labels. Use **Markdown
@@ -315,8 +315,7 @@ Use **desktop app / 桌面应用** publicly and **Tauri host / Tauri 宿主** in
 Keep **native host**, **host bridge**, and **IPC** as technical terms, defined on first use. The
 bridge carries specific document operations between the web interface and privileged local code.
 
-Current save errors mention a daemon, including untranslated English in Chinese notices. Use
-**local file service / 本地文件服务** in current recovery guidance; retain daemon for developer
+Use **local file service / 本地文件服务** in browser recovery guidance; retain daemon for developer
 commands describing the existing background process. Desktop wording should describe a save failure
 and recovery action without inventing a replacement background service.
 
@@ -344,8 +343,8 @@ this app's setting directly; it does not imply paper dimensions or a hard line-w
 Keep Font size, Line height, Theme, Appearance, Film grain, Texture, and System default.
 For grain textures use 细腻、柔和、粗糙; 粗粝 is unusually literary for a setting.
 
-Keep theme names **Grid**, **Nacht**, and **Sepia** and actual font-family names as proper names.
-Label the font preset also called Grid **Schibsted**, matching its family and avoiding a false
+Keep theme names and actual font-family names as proper names.
+Label the font preset with stored ID `grid` **Schibsted**, matching its family and avoiding a false
 association between choosing that font and changing the Grid theme. Keep its stored ID unless a
 coordinated registry change is approved. No new creative preset names are needed.
 
@@ -389,7 +388,7 @@ binding `DECISIONS.md` ledger.
 | Browser-choice preference, `--in`, app-mode container | Remove with the browser launch workflow |
 | `install-agents`, global injection | Remove with app-owned harness installation |
 | Daemon, status, stop, health probes | Retain technically until native ownership replaces them |
-| Keep mine, Reload (discard mine), Save anyway | Check callers; remove unused message keys |
+| Keep mine, Reload (discard mine), Save anyway | Retired controls; historical descriptions only |
 | Squad, light/heavy track | Historical provenance, not current product vocabulary |
 
 Do not turn an abandoned feature into a naming problem. The inherited marketing site describes the

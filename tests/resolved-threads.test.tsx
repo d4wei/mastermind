@@ -28,7 +28,7 @@ it('renders archived Unicode/spaced authors and literal original text safely', (
   if (thread.type !== 'thread') throw new Error('Expected thread')
   const archived = applyTextEdits(source, resolveThreadEdits(source, thread))
   act(() => root.render(<ResolvedThreads source={archived} onClose={() => {}} />))
-  expect(host.querySelector('[role="dialog"]')!.getAttribute('aria-label')).toBe('Resolved (1)')
+  expect(host.querySelector('[role="dialog"]')!.getAttribute('aria-label')).toBe('Resolved discussions (1)')
   expect(host.textContent).toContain('@Da Wei')
   expect(host.textContent).toContain('@李 明')
   expect(host.textContent).toContain('<img src=x onerror=alert(1)> question')

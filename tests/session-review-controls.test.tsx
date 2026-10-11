@@ -48,7 +48,7 @@ it.each(['plain body', '{>>live note<<}', '<!-- mastermind:resolved-thread v99\n
     expect(button.textContent).toBe('Resolved (0)')
     expect(button.disabled).toBe(false)
     act(() => button.click())
-    expect(host.querySelector('[role="dialog"]')!.getAttribute('aria-label')).toBe('Resolved (0)')
+    expect(host.querySelector('[role="dialog"]')!.getAttribute('aria-label')).toBe('Resolved discussions (0)')
   },
 )
 it.each(['resolve', 'delete'])('ignores stale double %s and callbacks captured before navigation', (action) => {

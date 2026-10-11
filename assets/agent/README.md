@@ -27,7 +27,7 @@ to address feedback, reread the current file and follow the skill's public revie
 
 `mastermind open <file>` opens the original without a translation prerequisite. A bare skill request
 lets the session agent choose which files need review; explicit paths take precedence. Repeat open
-for each chosen file. People can configure appearance, author tags, and the optional comfort
+for each chosen file. People can configure appearance, their name, and the optional translation
 language in Settings; they do not need to operate the CLI.
 
 The preparing agent supplies complete, fresh translations when wanted. It reads the whole document

@@ -1,7 +1,7 @@
 ---
 name: mastermind
 description: >-
-  Open Markdown documents for review, optionally prepare comfort-language translations,
+  Open Markdown documents for review, optionally prepare translations,
   and address author-tagged feedback written into the files.
 ---
 
@@ -21,13 +21,13 @@ Run `mastermind open <file>` for each chosen file. It opens immediately and retu
 Translation is optional and never prevents opening the original. When the person returns with
 feedback, reread the files before changing them; do not infer approval from the command returning.
 
-## Prepare a comfort-language translation
+## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.
 Do not start a translation listener or delegate to a separate translator. Use the user's requested
-comfort language; `mastermind config get` exposes the optional personal `comfortLang` preference.
-If none is requested or configured, open the original without translation. The source language is
-explicitly supplied by you; it is not inferred from the language of a newly added comment.
+translation language; `mastermind config get` exposes the optional personal `comfortLang`
+preference. If none is requested or configured, open the original without translation. Supply the
+source language explicitly; do not infer it from the language of a newly added comment.
 
 For each preparation pass, translate the complete document afresh. Read it as a whole, including
 relevant context, even though the output is divided into blocks for display and source anchoring.
@@ -37,11 +37,12 @@ Never fill a new preparation with previously cached block translations.
 mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN
 ```
 
-Use the returned version, source hash, languages, and block IDs to form a complete artifact with
-translated text for every translatable block. Keep one block per ID, its Markdown kind and
-heading/list prefixes, and the kinds and order of proposed edits. Comments, highlights, and resolved
-history are handled separately from narrative translation. Write the artifact to a temporary JSON
-file using only these fields; include an `{"id", "text"}` entry for every translatable block:
+Use the returned version, translation fingerprint (`sourceHash`), languages, and translation block
+IDs to form a complete artifact with translated text for every translatable block. Keep one block
+per ID, its Markdown kind and heading/list prefixes, and the kinds and order of proposed edits.
+Comments, highlights, and resolved history are handled separately from translation input. Write
+the artifact to a temporary JSON file using only these fields; include an `{"id", "text"}` entry
+for every translatable block:
 
 ```json
 {
@@ -68,7 +69,7 @@ the original available. The app reads prepared artifacts and never requests gene
 
 Use `mastermind config get` to inspect existing preferences and `mastermind config set` to apply
 requested changes. Do not force a setup questionnaire before opening a file. People can change
-appearance, their author tag, and their comfort language in Settings.
+appearance, their name, and their translation language in Settings.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; optional translation follows the same preparation

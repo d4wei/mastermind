@@ -9,11 +9,13 @@ If Git is unavailable, times out, or supplies no usable name, the tag is `review
 The global Git scope matches the shared per-user preferences: launching a daemon from one
 repository must not give all its other workspaces that repository's author identity. Reading
 preferences does not create a config file. Any normal preference update persists the merged
-configuration, and the author tag can be changed in Settings or with `mastermind config set`.
+configuration. The Name field in Settings edits `authorTag`; it is also available through
+`mastermind config set`.
 
 `tests/config-author.test.ts` checks default signatures, normalization, fallback, and overrides.
 
-`comfortLang` is an optional personal language code, defaulting to `null` for original-only reading.
+The Translation language field stores an optional personal language code in `comfortLang`,
+defaulting to `null` for original-only reading.
 It chooses which complete prepared artifact the browser can read; the invoking agent supplies the
 source and target codes explicitly for each preparation pass. The retired language-pair preference
 is not read or migrated. CLI preferences accept `comfortLang=CODE` or `comfortLang=null`.

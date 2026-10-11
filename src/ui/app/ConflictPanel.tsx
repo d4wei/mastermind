@@ -28,13 +28,13 @@ export function ConflictPanel({ store = useDoc }: Props) {
         <SlideOver title={t('conflictTitle')} onClose={state.closeConflict} ignoreSelector=".conflict-compare">
           <div className="conflict-comparison">
             <div className="conflict-versions">
-              <section><h3>{t('conflictBase')}</h3><pre>{draft.base}</pre></section>
+              <section><h3 title={t('conflictBaseHint')}>{t('conflictBase')}</h3><pre>{draft.base}</pre></section>
               <section><h3>{t('conflictLocal')}</h3><pre>{draft.local}</pre></section>
               <section><h3>{t('conflictDisk')}</h3><pre>{missing ? t('conflictMissing') : disk ?? t('conflictReadFailed')}</pre></section>
             </div>
             <label className="conflict-result">
               <span>{t('conflictResult')}</span>
-              <textarea value={draft.result} disabled={state.saving}
+              <textarea title={t('conflictResultHint')} value={draft.result} disabled={state.saving}
                 onChange={(event) => state.setConflictResult(event.target.value)} />
             </label>
             {missing && <p role="alert">{t('conflictMissing')}</p>}

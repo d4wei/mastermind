@@ -1,14 +1,4 @@
-/**
- * App-level font registry DATA — the single source of truth for typeface selection.
- *
- * Isomorphic / browser-safe (pure data + lookups, no DOM, no asset imports) so the
- * CLI can list type sets for the setup picker. The DOM/asset side — the `@font-face`
- * URL table (`FONT_FACES`) and the CSS font-family stack builders — lives in
- * src/ui/theme/fonts.ts and re-exports these.
- *
- * Font choice is a cross-theme USER preference (like font size); it overrides the
- * --font-* tokens at runtime rather than living in any one theme.json.
- */
+/** Font presets are shared by CLI and browser; asset URLs and CSS stacks live in ui/theme/fonts.ts. */
 
 export interface FontFace {
   family: string
@@ -21,9 +11,7 @@ export interface TypeSet {
   id: string
   name: string
   displayFamily: string
-  /** display weight → --weight-bold (Fraunces wants less than Schibsted's 800) */
   displayWeight: number
-  /** display letter-spacing → --ls-heading */
   displayTracking: string
   bodyFamily: string
 }
@@ -36,7 +24,7 @@ export interface MonoFont {
 
 /** Curated display+body pairings. `grid` is the default and matches the base tokens. */
 export const TYPE_SETS: TypeSet[] = [
-  { id: 'grid', name: 'Grid', displayFamily: 'Schibsted Grotesk', displayWeight: 800, displayTracking: '-0.02em', bodyFamily: 'Schibsted Grotesk' },
+  { id: 'grid', name: 'Schibsted', displayFamily: 'Schibsted Grotesk', displayWeight: 800, displayTracking: '-0.02em', bodyFamily: 'Schibsted Grotesk' },
   { id: 'geist', name: 'Geist', displayFamily: 'Geist', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Geist' },
   { id: 'bricolage', name: 'Bricolage', displayFamily: 'Bricolage Grotesque', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Inter' },
   { id: 'lora', name: 'Lora', displayFamily: 'Lora', displayWeight: 600, displayTracking: '-0.01em', bodyFamily: 'Lora' },

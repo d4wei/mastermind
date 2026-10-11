@@ -8,6 +8,10 @@ import { CODE_THEMES, type CodeTheme } from '../theme/codeThemes'
 import { GrainOffGlyph, GrainSwatch, INTENSITY_STEPS, TEXTURE_STEPS, resolveGrain } from '../theme/grain'
 import type { GrainIntensity, GrainTexture } from '../../shared/types'
 
+const CODE_COLOR_LABEL: Record<string, MsgKey> = {
+  none: 'codeColorNone', soft: 'codeColorSoft', vivid: 'codeColorVivid', warm: 'codeColorWarm',
+}
+
 /** Cosmetic opacity for the intensity swatches — louder than the live overlay so the icon reads. */
 const INTENSITY_PREVIEW: Record<Exclude<GrainIntensity, 'off'>, number> = { low: 0.4, medium: 0.7, high: 1 }
 const INTENSITY_LABEL: Record<GrainIntensity, MsgKey> = {
@@ -22,7 +26,6 @@ const TEXTURE_LABEL: Record<GrainTexture, MsgKey> = {
   coarse: 'textureCoarse',
 }
 
-/** Reading presets — discrete, self-illustrating (the glyph previews its effect). */
 const FONT_OPTS = [
   { v: 14, a: 10 },
   { v: 16, a: 12.5 },
@@ -44,7 +47,6 @@ function nearest(value: number, opts: number[]): number {
   return opts.reduce((a, b) => (Math.abs(b - value) < Math.abs(a - value) ? b : a))
 }
 
-/** Stacked rules whose vertical gap previews the line height. */
 function LineGapGlyph({ gap }: { gap: number }) {
   return (
     <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden focusable={false}>
@@ -55,7 +57,6 @@ function LineGapGlyph({ gap }: { gap: number }) {
   )
 }
 
-/** Three code-token bars previewing a color scheme on the active appearance. */
 function CodeSwatch({ theme, appearance }: { theme: CodeTheme; appearance: 'light' | 'dark' }) {
   const pal = theme.palettes?.[appearance]
   const cols = pal
@@ -71,7 +72,6 @@ function CodeSwatch({ theme, appearance }: { theme: CodeTheme; appearance: 'ligh
   )
 }
 
-/** A tiny page-tile previewing a theme: its bg, two ink lines, an accent dot. */
 function ThemeSwatch({ s }: { s: { bg: string; ink: string; accent: string } | null }) {
   if (!s) return null
   return (
@@ -84,7 +84,6 @@ function ThemeSwatch({ s }: { s: { bg: string; ink: string; accent: string } | n
   )
 }
 
-/** Centered rules whose width previews the content measure. */
 function WidthGlyph({ w }: { w: number }) {
   const x = (16 - w) / 2
   return (
@@ -112,7 +111,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   return (
     <SlideOver title={t('settings')} onClose={onClose} ignoreSelector=".floating-settings">
       <div className="settings-body">
-        {/* ---------- Appearance ---------- */}
         <section>
           <h4>{t('appearanceSection')}</h4>
           <div className="settings-row">
@@ -236,7 +234,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           )}
         </section>
 
-        {/* ---------- Reading ---------- */}
         <section>
           <h4>{t('readingSection')}</h4>
           <div className="settings-row">
@@ -285,7 +282,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => patch({ codeTheme: c.id })}
                 >
                   <CodeSwatch theme={c} appearance={activeTheme?.appearance ?? 'light'} />
-                  {c.id === 'none' ? t('codeColorNone') : c.name}
+                  {CODE_COLOR_LABEL[c.id] ? t(CODE_COLOR_LABEL[c.id]!) : c.name}
                 </button>
               ))}
             </div>
@@ -348,7 +345,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           </div>
         </section>
 
-        {/* ---------- Review & language ---------- */}
         <section>
           <h4>{t('reviewLangSection')}</h4>
           <label className="settings-row">
@@ -370,8 +366,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           </label>
           <div className="settings-row">
             <span>{t('uiLanguage')}</span>
-            {/* A small fixed option set → the same chip vocabulary as Theme/Typeface
-                above; the open-ended Reading pair below stays a searchable picker. */}
+            {/* Interface languages are bundled; translation targets accept arbitrary language codes. */}
             <div className="settings-theme-row">
               {(['en', 'zh-CN'] as const).map((code) => (
                 <button
@@ -387,7 +382,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="settings-row">
-            <span>{t('comfortLanguage')}</span>
+            <span title={t('translationLanguageHint')}>{t('comfortLanguage')}</span>
             <div className="settings-comfort-language">
               <button type="button" className="btn-ghost" aria-pressed={config.comfortLang === null}
                 onClick={() => patch({ comfortLang: null })}>{t('translationOff')}</button>

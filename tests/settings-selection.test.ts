@@ -13,7 +13,7 @@ it('keeps settings chrome nonselectable while preserving editable and document t
     <div class="slide-over" id="settings">
       <div class="slide-over-title">Settings</div>
       <div class="settings-body">
-        <span>Author tag</span><input type="text" value="alex">
+        <span>Name</span><input type="text" value="alex">
         <input type="search" value="English"><textarea>Editable text</textarea>
       </div>
     </div>

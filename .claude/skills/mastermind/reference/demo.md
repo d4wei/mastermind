@@ -1,7 +1,7 @@
 # Welcome to mastermind
 
 This is a demo document. mastermind renders Markdown **and** your review marks,
-and can show a prepared translation in your optional comfort language.
+and can show a prepared translation in your optional translation language.
 
 ## What you're looking at
 
@@ -27,10 +27,10 @@ Use Undo to reverse either action.
 
 ## A small table and some code
 
-| Surface | Purpose      |
-| ------- | ------------ |
-| Reading | review marks |
-| Source  | raw markdown |
+| Surface  | Purpose      |
+| -------- | ------------ |
+| Read     | review marks |
+| Markdown | source text  |
 
 ```ts
 function greet(name: string): string {
@@ -38,5 +38,5 @@ function greet(name: string): string {
 }
 ```
 
-If a translation has been prepared, toggle to your comfort language. Select a translated passage
+If a translation has been prepared, toggle to your translation language. Select a translated passage
 to comment on its original block; the comment keeps the selected translation as context.

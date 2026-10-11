@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReviewCounts, WorkspaceSessionInfo } from '../../shared/types'
 import { ChevronIcon, FileIcon, FolderIcon } from '../icons'
-import { useT } from '../i18n'
+import { useT, type MsgKey } from '../i18n'
 import { useDoc } from './store'
 import { useWorkspace } from './workspaceStore'
 
 interface Props {
-  /** session id of the file currently open in this workspace (for active highlight) */
   openSessionId: string | null
 }
 
-/** A shared IntersectionObserver registrar passed down to file rows. */
 type Observe = (el: Element | null, rel: string) => void
 
 /** The file-tree body (Recent + lazy tree). Chrome (header/collapse/sections) lives in Navigator. */
@@ -18,7 +16,6 @@ export function FilesList({ openSessionId }: Props) {
   const t = useT()
   const recent = useWorkspace((s) => s.recent)
   const sessions = useWorkspace((s) => s.sessions)
-  // one subscription for the open file's dirty state (only the active row uses it)
   const dirtyOpen = useDoc((s) => s.source !== s.savedSource)
 
   const openRel = useMemo(
@@ -26,9 +23,7 @@ export function FilesList({ openSessionId }: Props) {
     [sessions, openSessionId],
   )
 
-  // One observer for the whole tree; rows register their element + rel. Built
-  // eagerly (not in an effect) because child row effects fire BEFORE the
-  // parent's — an effect-built observer would still be null when rows mount.
+  // Create the observer before effects: child rows register before the parent effect runs.
   const elRel = useRef(new Map<Element, string>())
   const [observer] = useState(() =>
     typeof IntersectionObserver === 'undefined'
@@ -198,6 +193,7 @@ function FileRow({
   unobserve,
   flat,
 }: FileRowProps) {
+  const t = useT()
   const counts = useWorkspace((s) => s.badges[rel])
   const openFile = useWorkspace((s) => s.openFile)
   const ref = useRef<HTMLButtonElement>(null)
@@ -225,10 +221,10 @@ function FileRow({
       <FileIcon className="ws-icon" />
       <span className="ws-name">{name}</span>
       <span className="ws-marks">
-        {sess && <span className="ws-dot ws-dot-open" title="open" />}
-        {active && dirtyOpen && <span className="ws-dot ws-dot-dirty" title="unsaved changes" />}
+        {sess && <span className="ws-dot ws-dot-open" title={t('openDocument')} />}
+        {active && dirtyOpen && <span className="ws-dot ws-dot-dirty" title={t('unsavedChanges')} />}
         {total > 0 && (
-          <span className="ws-count" title={countsTitle(counts!)}>
+          <span className="ws-count" title={countsTitle(counts!, t)}>
             {total}
           </span>
         )}
@@ -237,8 +233,13 @@ function FileRow({
   )
 }
 
-function countsTitle(c: ReviewCounts): string {
-  return [c.comments && `${c.comments}c`, c.edits && `${c.edits}e`, c.highlights && `${c.highlights}h`]
-    .filter(Boolean)
-    .join(' ')
+function countsTitle(counts: ReviewCounts, t: (key: MsgKey) => string): string {
+  const categories: [number, MsgKey, MsgKey][] = [
+    [counts.comments, 'countComment', 'countComments'],
+    [counts.edits, 'countEdit', 'countEdits'],
+    [counts.highlights, 'countHighlight', 'countHighlights'],
+  ]
+  return categories.filter(([count]) => count > 0)
+    .map(([count, singular, plural]) => t(count === 1 ? singular : plural).replace('{count}', String(count)))
+    .join(t('countSeparator'))
 }
