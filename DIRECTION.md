@@ -26,6 +26,15 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-10 — Comment deletion, resolution, and retained history
+
+**Open question.** Resolve currently removes an entire thread; there is no individual Delete action
+or durable archive. The [architecture discussion](docs/architecture-review.md#comment-lifecycle)
+separates action scope from retention, which must respect the file-only protocol.
+
+**Exit:** a ruling on per-comment deletion, thread resolution, undo, and whether resolved discussion
+is retained in an explicit in-file form.
+
 ## 2026-10-10 — Restoring app sessions is deferred
 
 **Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible

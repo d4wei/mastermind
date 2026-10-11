@@ -161,3 +161,54 @@ out as it settles.
 
 - 2026-10-10 — `npx mastermind-md open --no-translate <file>` is the working invocation; a bare path
   is parsed as an unknown command. The reading surface itself reads well.
+
+### 2026-10-10 — UI observations from document review
+
+The user supplied five screenshots and two further observations. These are intake findings, not
+implemented fixes. Screenshots 2–3 came from a document that has since been processed away; its
+source cannot be inspected. The code checks below describe the current checkout at `0d83478`.
+
+1. **Selection is invisible in the comment composer (screenshot 1).** The user reports selected
+   text has no visible highlight. `app.css` supplies one global selection color, while the composer
+   uses inverted surface/text tokens. In the light themes, that selection color derives from dark
+   text and is a plausible poor match for the dark composer. Reproduce in the affected theme before
+   calling this the confirmed cause; check focused and unfocused selection across themes. This
+   concerns comment inputs, not the intentional suppression of settings-label selection.
+2. **Author formatting differs (screenshot 2).** `@Da Wei:` appears in the body; `@claude` gets the
+   author label. `scanner.ts`'s `parseAuthor` rejects whitespace in an author token. A direct check
+   returns no author for `@Da Wei: A note` and `claude` for `@claude: A note`. `CommentRail.tsx`
+   only emits the label when an author was parsed. This explains the pictured distinction regardless
+   of the selected anchor "In". Decide whether names with spaces are supported or normalized; align
+   configuration, external markup, and rendering without silently changing existing signatures.
+3. **Insertion delimiters appear literally (screenshot 3).** The pictured insertion appears to span
+   two list items. A synthetic source with an opener at the end of one item and a closer in the next
+   produces one scanner insertion span but zero `criticInsert` AST nodes; both delimiters become
+   text. `critic-mdast.ts` pairs wrappers within each parent and restores unmatched wrappers as
+   literals. The original source is unavailable, so this is a related reproduction, not an exact
+   diagnosis of the screenshot. The review convention forbids marks spanning blocks; decide how
+   imported invalid placements are explained, and check same-block valid marks separately.
+4. **Soft wrapping becomes visible line breaks (screenshot 4).** `.rail-body` uses
+   `white-space: pre-wrap`, so source newlines survive in the card. This accounts for a hard-wrapped
+   comment breaking after "derived". Proposed display behavior: treat ordinary source newlines as
+   prose spacing while preserving stored bytes. Explicitly multiline content needs a defined rule;
+   do not repair this by rewriting the comment on disk.
+5. **The app toolbar overlaps Codex's composer (screenshot 5).** Both occupy the bottom region.
+   The app toolbar is fixed near the viewport bottom. A standalone desktop window removes this
+   particular host overlay, but the browser development view still needs usable controls. Compare
+   an ordinary browser and the embedded view; prefer a layout that avoids the collision over a
+   hardcoded Codex-specific offset. The screenshot does not identify the host's inset contract.
+6. **There is no per-comment Delete action.** Current `resolveThread` removes every comment in the
+   thread and unwraps its highlight, preserving the anchored prose. Autosave writes that removal;
+   there is no durable resolved-thread archive. Buffer undo and any existing Git history are not
+   such an archive. The Delete/Resolve distinction and retention policy need a product ruling; see
+   [the architecture discussion](architecture-review.md#comment-lifecycle).
+7. **External-change notices are easy to miss when scrolled.** The banner appears before the
+   document and `.banner` has no sticky/fixed positioning. The requested outcome is a persistent,
+   viewport-visible notice with actions while attention is required. Design it with the dirty-buffer
+   conflict flow, without covering the selection, comment composer, or app toolbar. Clean-buffer
+   automatic reload may remove some notices, but conflicts and deletion still require visibility.
+
+The parser/rendering mismatch belongs in the renderer comparison's regression cases. Selection,
+author labels, and comment wrapping survive a shell change and need their own checks. The host
+overlay collision is partly container-specific. Thread lifecycle and external-change notices feed
+the architecture plan before implementation; they are not merely styling tasks.

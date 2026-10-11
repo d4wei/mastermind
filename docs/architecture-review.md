@@ -189,6 +189,43 @@ cost. After approval, compare open/save/watch, multiple documents, app reopen, a
 and shutdown on the supported platforms. Measure package size, startup, and idle memory rather
 than selecting on generic framework claims. No wrapper is selected by this document.
 
+### Preserve the browser development loop
+
+A desktop wrapper adds native integration to test; it need not remove browser iteration on the React
+UI. Proposed constraint: keep the same UI runnable at a local development URL, with a narrow host
+interface for file access, dialogs, and lifecycle. Use a development adapter or fixtures for that
+interface; do not retain the production detached daemon solely to make previews work.
+
+Codex's [built-in browser](https://learn.chatgpt.com/docs/browser?surface=app) can inspect, interact
+with, and screenshot local web apps. Those checks cover typography, selection, comments, and layout.
+Native dialogs, application menus, keyboard focus, file associations, and quit/reopen behavior still
+need checks in the actual desktop app. Native accessibility/screenshot control is available in this
+session, but browser DOM access to every wrapped webview should not be assumed.
+
+[Playwright supports Electron automation](https://playwright.dev/docs/api/class-electron), currently
+marked experimental; native dialogs need separate handling. [Tauri's testing guide][tauri-tests]
+describes mock-runtime and end-to-end options, including a WebdriverIO route for macOS. Its mock
+runtime does not execute native webviews. Neither framework makes browser-only tests sufficient.
+Include actual macOS automation and the browser preview in the wrapper comparison before selection.
+
+[tauri-tests]: https://v2.tauri.app/develop/tests/
+
+### Comment lifecycle
+
+The trial raises a separate question from agent replies: deleting one comment versus resolving a
+whole thread, and whether resolution retains a record. Current behavior is inventoried in
+[the trial notes](squad-fork.md#trial-notes).
+
+Recommendation for review: provide Delete for an individual comment and Resolve for a completed
+thread, with undo. For the first iteration, keep the convention's removal of completed threads and
+make that effect clear; do not introduce an archive merely because the action is called Resolve.
+This is a proposal, not a ruling that resolution must remain destructive.
+
+If retaining resolved discussion is required, define an explicit in-file representation and how an
+agent ignores it as outstanding feedback. An archive elsewhere, including SQLite, cannot be the
+only copy of review state under the file-only protocol. Decide retention before implementing the
+action labels; the current format has no resolved-state field to toggle.
+
 ## Rendering and frontmatter
 
 [`Renderer.tsx`](../src/ui/modes/reading/Renderer.tsx) renders the remark AST, Critic nodes,
@@ -203,6 +240,10 @@ and selection offsets across inline formatting. Adopt only if the remaining adap
 surface are simpler. Keep source splices authoritative; never save serialized rendered output.
 CodeMirror already provides the mature source-editing engine. A rich-text editor replacement is a
 separate product expansion and is not proposed here.
+
+Include the trial's cross-list insertion reproduction, author tags containing spaces, and comment
+soft-line wrapping in that comparison. Preserve screenshot-only observations as such; the original
+document is unavailable. See [trial notes](squad-fork.md#trial-notes) for evidence.
 
 For frontmatter, [Obsidian Properties](https://obsidian.md/help/properties) is a useful prior: named
 rows with values at the top, typed simple properties, and raw YAML/source mode for structures its
@@ -257,8 +298,9 @@ the raw quirk list belongs in the trial notes.<<}
 2. **Ablate obsolete machinery.** Remove serialization remnants, pass-through feedback handling,
    and recurring legacy-history deletion in separate coherent commits. Reconcile module maps.
 3. **Resolve the remaining contracts.** Settle summary compatibility, translation lifetime/open
-   policy, agent replies, and the minimal agent launch interface before deleting their existing
-   paths. Record rulings where they constrain future work. Blank-draft removal is settled.
+   policy, agent replies, comment deletion/resolution, and the minimal agent launch interface before
+   deleting their existing paths. Record rulings where they constrain future work. Blank-draft
+   removal is settled.
 4. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
    experiment, then record the choice. Retire detached-daemon and browser-choice machinery only when
    their remaining responsibilities have a tested owner.
