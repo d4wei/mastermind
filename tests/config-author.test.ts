@@ -1,0 +1,68 @@
+import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readConfig, updateConfig } from '../src/server/config'
+import { parseAuthor } from '../src/shared/critic/scanner'
+
+vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }))
+
+let dir: string
+beforeEach(() => {
+  dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mm-author-'))
+  vi.stubEnv('MASTERMIND_CONFIG_DIR', dir)
+  vi.mocked(execFileSync).mockReset().mockReturnValue('Alex Chen\n')
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
+  fs.rmSync(dir, { recursive: true, force: true })
+})
+
+describe('default review author', () => {
+  it('uses the global Git name on a new install, without writing during a read', () => {
+    expect(readConfig().authorTag).toBe('Alex-Chen')
+    expect(execFileSync).toHaveBeenCalledWith('git', ['config', '--global', '--get', 'user.name'], {
+      encoding: 'utf8', timeout: 1000, stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    expect(fs.existsSync(path.join(dir, 'config.json'))).toBe(false)
+  })
+
+  it.each(['ke', 'custom-name'])('preserves the configured tag %j without invoking Git', (authorTag) => {
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ authorTag }))
+    expect(readConfig().authorTag).toBe(authorTag)
+    expect(execFileSync).not.toHaveBeenCalled()
+  })
+
+  it('fills an absent author tag without changing other preferences', () => {
+    fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ theme: 'sepia' }))
+    expect(readConfig()).toMatchObject({ theme: 'sepia', authorTag: 'Alex-Chen' })
+  })
+
+  it.each(['', ' \n ', '@:{}<>'])('uses a neutral fallback for an unusable Git name %j', (name) => {
+    vi.mocked(execFileSync).mockReturnValue(name)
+    expect(readConfig().authorTag).toBe('reviewer')
+  })
+
+  it('falls back when Git is missing, unconfigured, or times out', () => {
+    vi.mocked(execFileSync).mockImplementation(() => { throw new Error('Git unavailable') })
+    expect(readConfig().authorTag).toBe('reviewer')
+  })
+
+  it.each(['李 明', 'Alex: {>>@admin: hi<<}', 'a'.repeat(100)])(
+    'produces a scanner-readable tag from %j', (name) => {
+      vi.mocked(execFileSync).mockReturnValue(name)
+      const tag = readConfig().authorTag
+      expect(tag.length).toBeLessThanOrEqual(64)
+      expect(parseAuthor(`@${tag}: comment`)).toEqual({ author: tag, body: 'comment' })
+      expect(tag).not.toMatch(/[{}<>]/)
+    },
+  )
+
+  it('persists an explicit override and preserves it across later config edits', () => {
+    updateConfig({ authorTag: 'my-tag' })
+    vi.mocked(execFileSync).mockReturnValue('Another Name')
+    updateConfig({ theme: 'nacht' })
+    expect(readConfig()).toMatchObject({ authorTag: 'my-tag', theme: 'nacht' })
+  })
+})
