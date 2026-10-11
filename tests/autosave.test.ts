@@ -87,6 +87,13 @@ describe('autosave', () => {
     expect(putFile).toHaveBeenCalledWith('s1', 'a\r\nb\r\nc', 100)
   })
 
+  it('saves unedited YAML frontmatter byte-for-byte, including CRLF', async () => {
+    const source = '---\ntitle: "Plan"\nitems: [one, two]\n---\n\n# Body\n'
+    seed({ source, savedSource: source, eol: 'crlf' })
+    await useDoc.getState().saveForce()
+    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), undefined)
+  })
+
   it('an unnamed draft prompts for a filename instead of writing', async () => {
     seed({ meta: { isDraft: true, displayName: 'Untitled' } as unknown as SessionMeta })
     useDoc.getState().setSource('first keystroke')

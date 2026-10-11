@@ -1,5 +1,6 @@
 import type { Root } from 'mdast'
 import remarkGfm from 'remark-gfm'
+import remarkFrontmatter from 'remark-frontmatter'
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
 import { group, scan } from '../critic/scanner'
@@ -7,7 +8,7 @@ import type { CriticSpan, ReviewItem } from '../critic/types'
 import { codeRanges } from './exclusions'
 import { remarkCritic } from './remark-critic'
 
-const criticProcessor = unified().use(remarkParse).use(remarkGfm).use(remarkCritic).freeze()
+const criticProcessor = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter).use(remarkCritic).freeze()
 
 export interface Analysis {
   tree: Root

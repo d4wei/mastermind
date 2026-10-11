@@ -291,6 +291,12 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
       )
     case 'list':
       return renderList(node, key, ctx)
+    case 'yaml':
+      return (
+        <pre key={key} className="md-code md-frontmatter">
+          <code>{node.value}</code>
+        </pre>
+      )
     case 'code':
       return (
         <pre key={key} className="md-code" data-lang={node.lang ?? undefined} {...posAttrs(node)}>
@@ -334,9 +340,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
     case 'thematicBreak':
       return <hr key={key} />
     case 'html':
-      // Comments stay invisible (the mastermind:summary fence renders as its
-      // inner blockquote alone); other raw HTML shows as source — v0.1 doesn't
-      // execute embedded HTML.
+      // Summary fences stay invisible; raw HTML renders literally rather than executing.
       return node.value.trimStart().startsWith('<!--') ? null : (
         <pre key={key} className="md-code md-html" {...posAttrs(node)}>
           <code>{node.value}</code>
