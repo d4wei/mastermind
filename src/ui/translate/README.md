@@ -1,7 +1,7 @@
 # Prepared reading translations
 
 The browser reads a complete prepared artifact through `getPreparedTranslation`; it does not ask
-for generation. The Translation language preference (`comfortLang`) chooses the target,
+for generation. The Translation language preference (`translationLanguage`) chooses the target,
 with `null` selecting original-only reading. The artifact supplies its source language. Repository
 language discovery remains separate.
 

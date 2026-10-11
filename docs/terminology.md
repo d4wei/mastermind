@@ -42,7 +42,7 @@ Evidence: [preferences][preferences], [settings][settings], [translation format]
 
 ### Personal translation preference
 
-`comfortLang` selects the language of an available translation; `null` means original-only reading.
+`translationLanguage` selects an available translation; `null` means original-only reading.
 It does not generate a translation or change labels and menus.
 
 Use **Translation language / 译文语言** for the personal preference that selects an available
@@ -50,8 +50,7 @@ translation. Keep it distinct from the original document's language and the inte
 
 Example: “Translation language: 简体中文.” Helper: “Use available translations in this language.”
 Use **Original only / 仅原文** for the null option instead of a contextless Off.
-The canonical personal config name is `translationLanguage`; retain `null` for original-only
-reading. Apply the identifier change through the coordinated adoption rules below.
+The preference migration is defined in [the configuration contract][preferences].
 
 ### Interface language
 
@@ -127,8 +126,8 @@ Matching does not establish translation quality or that the agent considered eve
 Do not label it Verified translation, Up to date with the project, or Approved translation.
 
 Use **save translation / 保存译文** in instructions and **savePreparedTranslation** as the canonical
-name for the operation currently called `publishTranslation`. It validates and replaces a local
-file. Keep the existing CLI `--save` flag.
+name for the operation that validates and replaces a local file. Keep the existing CLI `--save`
+flag.
 
 ## 4. Translation structure and freshness checks
 
@@ -327,8 +326,9 @@ Evidence: [settings][settings], [font presets][fonts], [code color schemes][colo
 Use **Font preset / 字体预设**: it selects heading and body font families, heading weight, and
 heading letter spacing. For example, the Bricolage preset uses Bricolage Grotesque for headings and
 Inter for body text. Some presets use the same family for both. If the feature later selects only a
-font, label it Font. The canonical implementation term is `fontPreset`; coordinate a rename of
-`typeSet` with its registry and persisted settings rather than treating it as a label-only change.
+font, label it Font. Use `fontPreset` for the preference, `FontPreset` for its type, and
+`FONT_PRESETS` for the registry. The preference migration is defined in
+[the configuration contract][preferences].
 
 Use **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
 established feature name is [syntax highlighting][syntax-highlighting], but this control selects its

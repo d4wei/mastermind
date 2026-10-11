@@ -123,15 +123,15 @@ export interface MastermindConfig {
   /** px */
   contentWidth: number
   authorTag: string
-  /** id of the chosen curated type set (display + body); see src/shared/fonts.ts */
-  typeSet: string
+  /** ID from the font preset registry in src/shared/fonts.ts */
+  fontPreset: string
   /** id of the chosen monospace face (code, filenames, CriticMarkup source) */
   monoFont: string
   /** id of the chosen code-color scheme; `none` = uncolored (see src/shared/codeThemes.ts) */
   codeTheme: string
   uiLang: 'en' | 'zh-CN'
   /** Optional personal language code for prepared reading translations. */
-  comfortLang: string | null
+  translationLanguage: string | null
   /** app name / bundle id to open review URLs in; '' = the system default browser */
   browser: string
   /** per-theme grain overrides; `enabled` is the legacy on/off, superseded by `intensity` */

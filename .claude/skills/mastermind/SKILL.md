@@ -25,7 +25,7 @@ feedback, reread the files before changing them; do not infer approval from the 
 
 The agent preparing the document also prepares its translations using the document's context.
 Do not start a translation listener or delegate to a separate translator. Use the user's requested
-translation language; `mastermind config get` exposes the optional personal `comfortLang`
+translation language; `mastermind config get` exposes the optional personal `translationLanguage`
 preference. If none is requested or configured, open the original without translation. Supply the
 source language explicitly; do not infer it from the language of a newly added comment.
 

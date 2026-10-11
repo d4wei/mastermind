@@ -64,7 +64,7 @@ keep the document surface quiet and reserve review colors for marks. Preferences
 
 ```sh
 mastermind config get
-mastermind config set comfortLang=zh-CN theme=sepia
+mastermind config set translationLanguage=zh-CN theme=sepia
 ```
 
 ## Agent commands

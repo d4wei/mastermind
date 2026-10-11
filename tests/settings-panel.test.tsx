@@ -8,8 +8,8 @@ import { SettingsPanel } from '../src/ui/settings/SettingsPanel'
 
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
-  authorTag: 'alex', typeSet: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', comfortLang: null, browser: '', grain: {},
+  authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
+  uiLang: 'en', translationLanguage: null, browser: '', grain: {},
 }
 
 let host: HTMLDivElement
@@ -51,12 +51,12 @@ describe('settings browser preference', () => {
 })
 
 it('uses one optional translation-language field and turns translation off explicitly', () => {
-  useConfig.setState({ config: { ...config, comfortLang: 'zh-CN' } })
+  useConfig.setState({ config: { ...config, translationLanguage: 'zh-CN' } })
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
   expect(host.querySelectorAll('.lang-select')).toHaveLength(1)
   const off = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Original only')!
   act(() => off.click())
-  expect(update).toHaveBeenCalledWith({ comfortLang: null })
+  expect(update).toHaveBeenCalledWith({ translationLanguage: null })
   expect(host.textContent).not.toContain('Preferred language')
 })
 
@@ -65,7 +65,7 @@ it('stores the explicit language code selected from the translation picker', () 
   act(() => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
   const option = Array.from(host.querySelectorAll<HTMLElement>('[role="option"]')).find((item) => item.textContent?.includes('Simplified Chinese'))!
   act(() => option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
-  expect(update).toHaveBeenCalledWith({ comfortLang: 'zh-CN' })
+  expect(update).toHaveBeenCalledWith({ translationLanguage: 'zh-CN' })
 })
 
 it.each([
@@ -91,7 +91,7 @@ it.each([
   const font = button('Schibsted')
   expect(font.closest('.settings-row')?.querySelector('span')?.textContent).toBe(labels.font)
   act(() => font.click())
-  expect(update).toHaveBeenLastCalledWith({ typeSet: 'grid' })
+  expect(update).toHaveBeenLastCalledWith({ fontPreset: 'grid' })
   const soft = button(labels.soft)
   expect(soft.closest('.settings-row')?.querySelector('span')?.textContent).toBe(labels.color)
   act(() => soft.click())

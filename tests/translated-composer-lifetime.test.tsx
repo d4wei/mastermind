@@ -23,7 +23,7 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.stubGlobal('crypto', webcrypto)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', source, savedSource: source, load: vi.fn().mockResolvedValue(undefined) })
-  useConfig.setState({ config: { ...config.config!, comfortLang: 'zh-CN' } })
+  useConfig.setState({ config: { ...config.config!, translationLanguage: 'zh-CN' } })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   await act(async () => root.render(<SessionView sessionId="A" />))
   const prepared = await prepareTranslation(source)

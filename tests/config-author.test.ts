@@ -68,16 +68,63 @@ describe('default review author', () => {
 })
 
 
-it('defaults to original-only reading and persists an explicit optional comfort language', () => {
-  expect(readConfig().comfortLang).toBeNull()
-  expect(updateConfig({ comfortLang: 'zh-CN' }).comfortLang).toBe('zh-CN')
-  expect(readConfig().comfortLang).toBe('zh-CN')
-  expect(updateConfig({ comfortLang: null }).comfortLang).toBeNull()
-  expect(() => updateConfig({ comfortLang: '../outside' })).toThrow('language code')
+it('defaults to original-only reading and persists an explicit optional translation language', () => {
+  expect(readConfig().translationLanguage).toBeNull()
+  expect(updateConfig({ translationLanguage: 'zh-CN' }).translationLanguage).toBe('zh-CN')
+  expect(readConfig().translationLanguage).toBe('zh-CN')
+  expect(updateConfig({ translationLanguage: null }).translationLanguage).toBeNull()
+  expect(() => updateConfig({ translationLanguage: '../outside' })).toThrow('language code')
 })
 
 it('does not expose the retired language pair from existing preference JSON', () => {
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ authorTag: 'Alex', langPair: { a: 'en', b: 'zh' } }))
   expect(readConfig()).not.toHaveProperty('langPair')
-  expect(readConfig().comfortLang).toBeNull()
+  expect(readConfig().translationLanguage).toBeNull()
+})
+
+it('reads earlier preference names without rewriting the file, then saves canonical keys', () => {
+  const file = path.join(dir, 'config.json')
+  const original = '{ "authorTag": "Alex", "comfortLang": "zh-CN", "typeSet": "lora", "fontSize": 18 }\r\n'
+  fs.writeFileSync(file, original)
+  expect(readConfig()).toMatchObject({ translationLanguage: 'zh-CN', fontPreset: 'lora', fontSize: 18 })
+  expect(readConfig()).not.toHaveProperty('comfortLang')
+  expect(readConfig()).not.toHaveProperty('typeSet')
+  expect(fs.readFileSync(file, 'utf8')).toBe(original)
+  updateConfig({ theme: 'sepia' })
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
+  expect(saved).toMatchObject({ translationLanguage: 'zh-CN', fontPreset: 'lora', fontSize: 18, theme: 'sepia' })
+  expect(saved).not.toHaveProperty('comfortLang')
+  expect(saved).not.toHaveProperty('typeSet')
+  expect(readConfig()).toEqual(saved)
+})
+
+it.each([null, 'ja'])('prefers canonical language %j and font keys over earlier names', (translationLanguage) => {
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
+    authorTag: 'Alex', translationLanguage, comfortLang: 'zh-CN', fontPreset: 'geist', typeSet: 'lora',
+  }))
+  expect(readConfig()).toMatchObject({ translationLanguage, fontPreset: 'geist' })
+})
+
+it.each([
+  { comfortLang: '../outside', typeSet: null },
+  { translationLanguage: '../outside', comfortLang: 'zh-CN', fontPreset: null, typeSet: 'lora' },
+])('normalizes unusable preference values without reviving shadowed names: %j', (preferences) => {
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ authorTag: 'Alex', ...preferences }))
+  expect(readConfig()).toMatchObject({ translationLanguage: null, fontPreset: 'grid' })
+})
+
+it.each([null, [], 'not preferences'])('uses defaults for non-object preference JSON: %j', (value) => {
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(value))
+  expect(readConfig()).toMatchObject({ translationLanguage: null, fontPreset: 'grid' })
+})
+
+it.each([
+  null, [], { comfortLang: 'ja' }, { typeSet: 'lora' }, { version: 2 },
+  { fontPreset: null }, { fontPreset: '' }, { translationLanguage: 42 },
+])('rejects invalid or retired update fields without touching saved preferences: %j', (patch) => {
+  const file = path.join(dir, 'config.json')
+  updateConfig({ translationLanguage: 'zh-CN', fontPreset: 'lora' })
+  const original = fs.readFileSync(file, 'utf8')
+  expect(() => updateConfig(patch as never)).toThrow()
+  expect(fs.readFileSync(file, 'utf8')).toBe(original)
 })

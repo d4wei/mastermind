@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useConfig } from '../app/configStore'
-import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, typeSetById } from './fonts'
+import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
 import { INTENSITY_SCALE, TEXTURES, resolveGrain } from './grain'
 
@@ -61,8 +61,7 @@ export function ThemeEffects() {
     if (veil) setTimeout(reveal, 220) // fallback if onload doesn't fire (cached sheet)
   }, [theme?.id, themeId])
 
-  // @font-face injection — app-level registry (font choice is cross-theme), once on mount.
-  // Browsers only fetch a family when text renders in it, so declaring all sets is cheap.
+  // Declare local font faces independently of the selected theme.
   useEffect(() => {
     let style = document.getElementById(FONTS_STYLE_ID) as HTMLStyleElement | null
     if (!style) {
@@ -76,7 +75,7 @@ export function ThemeEffects() {
     ).join('\n')
   }, [])
 
-  // user overrides ride on top of the theme's tokens
+  // Personal overrides remain independent of the selected theme.
   useEffect(() => {
     if (!config) return
     const root = document.documentElement.style
@@ -84,8 +83,7 @@ export function ThemeEffects() {
     root.setProperty('--lh-body', String(config.lineHeight))
     root.setProperty('--content-max-width', `${config.contentWidth / 16}rem`)
 
-    // typeface selection → display/body/mono tokens (+ per-set display weight & tracking)
-    const set = typeSetById(config.typeSet)
+    const set = fontPresetById(config.fontPreset)
     root.setProperty('--font-display', displayStack(set))
     root.setProperty('--font-body', bodyStack(set))
     root.setProperty('--weight-bold', String(set.displayWeight))

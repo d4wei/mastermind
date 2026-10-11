@@ -52,7 +52,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const current = useDoc.getState()
       const translated = useTranslation.getState()
       if (current.sessionId !== sessionId || !translated.active || translated.artifact !== artifact ||
-        translated.targetLang !== artifact.targetLang || useConfig.getState().config?.comfortLang !== artifact.targetLang ||
+        translated.targetLang !== artifact.targetLang || useConfig.getState().config?.translationLanguage !== artifact.targetLang ||
         !(await matchPreparedTranslation(current.source, artifact))) {
         setError(true); return
       }
@@ -61,7 +61,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const latest = useDoc.getState()
       if (!edit || latest.sessionId !== sessionId || latest.source !== current.source ||
         useTranslation.getState().artifact !== artifact || !useTranslation.getState().active ||
-        useConfig.getState().config?.comfortLang !== artifact.targetLang) { setError(true); return }
+        useConfig.getState().config?.translationLanguage !== artifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])
       window.getSelection()?.removeAllRanges()
       close()

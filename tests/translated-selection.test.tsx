@@ -29,7 +29,7 @@ beforeEach(async () => {
   const projection = await prepareTranslation(source)
   artifact = { version: 1, sourceHash: projection.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: projection.blocks.filter((block) => block.translatable).map((block, index) => ({ id: block.id, text: index ? 'Second translation' : quote })) }
-  useConfig.setState({ config: { ...initialConfig.config!, comfortLang: 'zh-CN' } })
+  useConfig.setState({ config: { ...initialConfig.config!, translationLanguage: 'zh-CN' } })
   useDoc.setState({ ...initial, sessionId: 'A', source, savedSource: source, queueAutosave: vi.fn() })
   useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', active: true, artifact, error: null })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
@@ -92,7 +92,7 @@ it.each(['navigation', 'narrative', 'target'])('rejects a composer captured befo
   act(() => {
     if (change === 'navigation') useDoc.setState({ sessionId: 'B' })
     if (change === 'narrative') useDoc.setState({ source: 'Changed prose.' })
-    if (change === 'target') useConfig.setState({ config: { ...useConfig.getState().config!, comfortLang: 'ja' } })
+    if (change === 'target') useConfig.setState({ config: { ...useConfig.getState().config!, translationLanguage: 'ja' } })
   })
   const before = useDoc.getState().source
   await act(async () => { submit.click(); await new Promise((resolve) => setTimeout(resolve, 30)) })

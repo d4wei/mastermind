@@ -1,4 +1,4 @@
-/** Curated comfort-language labels and searchable names; selected values use the explicit code. */
+/** Language labels and search names; selections store the language code. */
 export interface Language {
   code: string
   name: string

@@ -7,7 +7,7 @@ export interface FontFace {
   weight: string
 }
 
-export interface TypeSet {
+export interface FontPreset {
   id: string
   name: string
   displayFamily: string
@@ -23,7 +23,7 @@ export interface MonoFont {
 }
 
 /** Curated display+body pairings. `grid` is the default and matches the base tokens. */
-export const TYPE_SETS: TypeSet[] = [
+export const FONT_PRESETS: FontPreset[] = [
   { id: 'grid', name: 'Schibsted', displayFamily: 'Schibsted Grotesk', displayWeight: 800, displayTracking: '-0.02em', bodyFamily: 'Schibsted Grotesk' },
   { id: 'geist', name: 'Geist', displayFamily: 'Geist', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Geist' },
   { id: 'bricolage', name: 'Bricolage', displayFamily: 'Bricolage Grotesque', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Inter' },
@@ -40,11 +40,11 @@ export const MONO_FONTS: MonoFont[] = [
   { id: 'ubuntu', name: 'Ubuntu Sans Mono', family: 'Ubuntu Sans Mono' },
 ]
 
-export const DEFAULT_TYPE_SET = 'grid'
+export const DEFAULT_FONT_PRESET = 'grid'
 export const DEFAULT_MONO = 'geist'
 
-export function typeSetById(id: string | undefined): TypeSet {
-  return TYPE_SETS.find((s) => s.id === id) ?? TYPE_SETS[0]!
+export function fontPresetById(id: string | undefined): FontPreset {
+  return FONT_PRESETS.find((s) => s.id === id) ?? FONT_PRESETS[0]!
 }
 export function monoById(id: string | undefined): MonoFont {
   return MONO_FONTS.find((m) => m.id === id) ?? MONO_FONTS[0]!

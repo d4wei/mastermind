@@ -79,5 +79,5 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
 export const useTranslation = createTranslationStore(() => ({
   sessionId: useDoc.getState().sessionId,
   source: useDoc.getState().source,
-  targetLang: useConfig.getState().config?.comfortLang ?? null,
+  targetLang: useConfig.getState().config?.translationLanguage ?? null,
 }))

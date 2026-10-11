@@ -14,7 +14,11 @@
 
 ## Typography
 
-- Display + body come from a user-selectable **type set** — an app-level registry (`src/ui/theme/fonts.ts`) that overrides `--font-display`/`--font-body` (plus per-set display weight + tracking) at runtime; a cross-theme preference like font size, not a per-theme token. Ships four: **Grid** (Schibsted Grotesk throughout — the default/reference), **Editorial** (Fraunces display + Newsreader body), **Geist**, **Humanist** (Space Grotesk + Hanken Grotesk).
+- Heading and body fonts come from a user-selectable **font preset** in
+  [`src/shared/fonts.ts`](../src/shared/fonts.ts). Presets override `--font-display`, `--font-body`,
+  heading weight, and letter spacing across themes. The registry owns the available presets and
+  their families; [`src/ui/theme/fonts.ts`](../src/ui/theme/fonts.ts) supplies local assets and
+  fallback stacks.
 - Default display (Grid): weight 800, line-height ~1.08, sentence case (the Swiss voice is weight + tight tracking, not caps), h1–h3.
 - Body: 16px base (`--font-size-body`, user-adjustable), line-height 1.6 for long-form; don't go below 14px (`--font-size-sm`); micro = 11px for labels only.
 - Mono: also user-selectable (`--font-mono`) — **Geist Mono** (default), JetBrains Mono, Spline Sans Mono, Ubuntu Sans Mono — for filenames, code, CriticMarkup source.
@@ -40,4 +44,8 @@
 
 ## Themes
 
-Theme = `themes/<id>/theme.json` + `tokens.css`; the token names above are the contract. Ships: **grid** (light, Swiss red — the reference/default), **nacht** (dark, electric blue), **sepia** (warm paper, ochre). All flat (grain off by default). Bundled faces live in `themes/fonts/` (the shared set) and `themes/grid/fonts/` (Schibsted Grotesk + Geist Mono); the font registry (`src/ui/theme/fonts.ts`) declares `@font-face` for all of them at runtime, so a face is fetched only when something renders in it. Note the carve-out from the `var(--*)`-only rule: cross-theme **user preferences** — type set, mono font, code color — set their token values at runtime from a registry rather than any `tokens.css`.
+A theme is `themes/<id>/theme.json` plus `tokens.css`; the token names above are the contract.
+Each manifest declares its appearance and grain defaults. Bundled font faces live in `themes/fonts/`
+and `themes/grid/fonts/`; the [asset registry](../src/ui/theme/fonts.ts) declares their local URLs.
+Cross-theme preferences for font preset, code font, and code color scheme set token values at
+runtime from their registries rather than any one theme's `tokens.css`.

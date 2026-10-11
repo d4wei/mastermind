@@ -10,7 +10,7 @@ import { readServerState } from '../server/statefile'
 import { CliError, ensureServer } from './daemon'
 import { getJson, postJson, probeHealth, putJson, requestShutdown, sleep } from './http'
 import { type ConfigPatch, readConfig, updateConfig } from '../server/config'
-import { planTranslation, publishTranslation } from '../server/translate/prepared'
+import { planTranslation, savePreparedTranslation } from '../server/translate/prepared'
 import { type Assignment, applyAssignments, getDotted, parseAssignment } from './config-edit'
 import { browserOpenArgs } from './browser-open'
 import { AGENT_TARGETS, removeMarkedBlock, skillFile, stripFrontmatter, upsertMarkedBlock } from './install-agents'
@@ -189,9 +189,9 @@ program
   .command('translate-blocks')
   .argument('<file>', 'markdown file to prepare for translation')
   .requiredOption('--source-lang <code>', 'repository/source language code')
-  .requiredOption('--target-lang <code>', 'comfort/target language code')
+  .requiredOption('--target-lang <code>', 'target language code')
   .option('--save', 'read a complete prepared translation artifact as JSON from stdin')
-  .description('emit every current block for a fresh translation pass, or publish a complete result')
+  .description('emit every current block for a fresh translation pass, or save a complete result')
   .action(async (file: string, opts: { save?: boolean; sourceLang: string; targetLang: string }) => {
     let realPath: string
     let source: string
@@ -204,7 +204,7 @@ program
     try {
       if (opts.save) {
         const artifact: unknown = JSON.parse(await readStdin())
-        const result = await publishTranslation(realPath, source, opts.sourceLang, opts.targetLang, artifact)
+        const result = await savePreparedTranslation(realPath, source, opts.sourceLang, opts.targetLang, artifact)
         process.stdout.write(`${JSON.stringify(result)}\n`)
       } else {
         const plan = await planTranslation(realPath, source, opts.sourceLang, opts.targetLang)
@@ -227,7 +227,7 @@ const configCmd = program.command('config').description('read or write mastermin
 
 configCmd
   .command('get [key]')
-  .description('print the whole config as JSON, or one dotted key (e.g. comfortLang)')
+  .description('print the whole config as JSON, or one dotted key (e.g. translationLanguage)')
   .action((key: string | undefined) => {
     const cfg = readConfig() as unknown as Record<string, unknown>
     if (key === undefined) {
@@ -242,7 +242,7 @@ configCmd
 
 configCmd
   .command('set <assignments...>')
-  .description('set dotted key=value pairs, e.g. comfortLang=zh-CN theme=nacht browser="Google Chrome"')
+  .description('set dotted key=value pairs, e.g. translationLanguage=zh-CN theme=nacht browser="Google Chrome"')
   .action(async (raw: string[]) => {
     let assignments: Assignment[]
     try {
@@ -270,8 +270,8 @@ configCmd
     process.exit(0)
   })
 
-const MM_DESC = 'Open Markdown files for review; optionally prepare comfort-language translations.'
-const MASTER_DESC = 'Alias of /mastermind: open Markdown files for review; optionally prepare comfort-language translations.'
+const MM_DESC = 'Open Markdown files for review; optionally prepare translations.'
+const MASTER_DESC = 'Alias of /mastermind: open Markdown files for review; optionally prepare translations.'
 
 function readCanonical(rel: string): string {
   return fs.readFileSync(path.join(pkgRoot, rel), 'utf8')

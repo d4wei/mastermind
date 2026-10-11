@@ -2,18 +2,17 @@
 
 import type { MastermindConfig } from '../shared/types'
 
-/** Writable top-level config keys (everything in MastermindConfig except the fixed `version`). */
 const CONFIG_KEYS: ReadonlySet<string> = new Set([
   'theme',
   'fontSize',
   'lineHeight',
   'contentWidth',
   'authorTag',
-  'typeSet',
+  'fontPreset',
   'monoFont',
   'codeTheme',
   'uiLang',
-  'comfortLang',
+  'translationLanguage',
   'browser',
   'grain',
 ])
@@ -25,18 +24,16 @@ export interface Assignment {
   value: string
 }
 
-/** Split `key=value` on the first `=`. Throws on a missing/leading `=`. */
 export function parseAssignment(arg: string): Assignment {
   const eq = arg.indexOf('=')
   if (eq < 1) throw new Error(`expected key=value, got: ${arg}`)
   return { key: arg.slice(0, eq), value: arg.slice(eq + 1) }
 }
 
-/** Coerce a string value for a key: numeric keys → a finite number (throws on NaN), else the string. */
 export function coerceConfigValue(key: string, value: string): unknown {
-  if (key === 'comfortLang') {
+  if (key === 'translationLanguage') {
     if (value === 'null' || value === '') return null
-    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) throw new Error('comfortLang must be a language code or null')
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(value)) throw new Error('translationLanguage must be a language code or null')
     return value
   }
   if (!NUMERIC_KEYS.has(key.split('.')[0]!)) return value
@@ -68,11 +65,6 @@ export function getDotted(obj: Record<string, unknown>, dotted: string): unknown
     .reduce<unknown>((acc, k) => (acc == null ? undefined : (acc as Record<string, unknown>)[k]), obj)
 }
 
-/**
- * Apply `key=value` assignments onto a COPY of `current`, validating each, and return the
- * patch of touched TOP-LEVEL keys (full values, so the shallow server merge preserves siblings).
- * Throws on an unknown key, a non-finite numeric, or dotting into a scalar field.
- */
 export function applyAssignments(current: MastermindConfig, assignments: Assignment[]): { patch: Record<string, unknown> } {
   const next = structuredClone(current) as unknown as Record<string, unknown>
   for (const { key, value } of assignments) {

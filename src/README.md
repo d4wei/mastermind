@@ -4,10 +4,10 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
 
 - **`cli/`** — the `mastermind` command (commander). A thin client: `daemon.ts` ensures one shared
   background daemon is running; file operations use HTTP (`http.ts`). Opening returns immediately.
-  Translation preparation publishes complete artifacts without a live agent service.
+  Translation preparation saves complete artifacts without a live agent service.
 - **`server/`** — a Hono app (`app.ts`) plus daemon lifecycle (`index.ts`: port scan from 5173, idle
   self-exit, statefile under `~/.config/mastermind`). Registries: `sessions.ts` (open files by real
-  path) and `workspaces.ts` (file-tree roots). `translate/prepared.ts` validates and publishes
+  path) and `workspaces.ts` (file-tree roots). `translate/prepared.ts` validates and saves
   prepared reading artifacts; its contract lives in `translate/prepared.md`. `files.ts` owns
   versioned reads and writes; its contract lives
   in `server/files.md`. `contain.ts` keeps workspace

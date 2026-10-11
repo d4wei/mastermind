@@ -24,9 +24,7 @@ import { ResolvedThreads } from '../review/ResolvedThreads'
 import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
 
-// Code-split the heavy / conditionally-rendered views so the initial bundle stays
-// lean: CodeMirror (Source), the settings panel, find bar, rename dialog, and the
-// translated view each load on demand. (named exports → default shim for lazy())
+// Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
 const SettingsPanel = lazy(() => import('../settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
 const FindBar = lazy(() => import('../review/FindBar').then((m) => ({ default: m.FindBar })))
@@ -79,19 +77,19 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   }, [comparisonOpen])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
-  const comfortLang = useConfig((s) => s.config?.comfortLang) ?? null
+  const translationLanguage = useConfig((s) => s.config?.translationLanguage) ?? null
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const translation = useTranslation()
   const retainedTranslation = useRef<{ sessionId: string; targetLang: string; artifact: NonNullable<typeof translation.artifact> } | null>(null)
-  if (translation.artifact && translation.sessionId === sessionId && translation.targetLang === comfortLang) {
+  if (translation.artifact && translation.sessionId === sessionId && translation.targetLang === translationLanguage) {
     retainedTranslation.current = { sessionId, targetLang: translation.artifact.targetLang, artifact: translation.artifact }
   }
   const captured = retainedTranslation.current
   const composerArtifact = translation.artifact ?? (translation.error === 'stale' &&
-    captured?.sessionId === sessionId && captured.targetLang === comfortLang ? captured.artifact : null)
+    captured?.sessionId === sessionId && captured.targetLang === translationLanguage ? captured.artifact : null)
   const transActive = translation.active && translation.sessionId === sessionId &&
-    translation.source === source && translation.targetLang === comfortLang
-  useEffect(() => { void useTranslation.getState().synchronize() }, [sessionId, source, comfortLang])
+    translation.source === source && translation.targetLang === translationLanguage
+  useEffect(() => { void useTranslation.getState().synchronize() }, [sessionId, source, translationLanguage])
   const transLoading = useTranslation((s) => s.loading)
 
   useEffect(() => {
@@ -139,8 +137,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   }, [analysis])
 
   // The heading outline drives the left navigator in both modes (so its
-  // collapse/expand state persists across Reading/Source). Reading reuses its
-  // critic-aware tree; Source parses the source directly.
+  // collapse/expand state persists across Read/Markdown). Reading reuses its
+  // critic-aware tree; Markdown mode parses the source directly.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
     [analysis, status, source],
@@ -321,8 +319,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         // applicability (not their presence) is what changes per view.
         onToggleRail={() => setRailOpen((v) => !v)}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
-        translation={comfortLang ? {
-          label: transActive ? t('original') : comfortLang,
+        translation={translationLanguage ? {
+          label: transActive ? t('original') : translationLanguage,
           active: transActive,
           loading: transLoading,
           onToggle: () => void useTranslation.getState().toggle(),
@@ -420,8 +418,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         )}
       </div>
       {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
-        translation.targetLang === comfortLang && (
-        <TranslatedSelection key={`${sessionId}:${composerArtifact.sourceHash}:${comfortLang}`}
+        translation.targetLang === translationLanguage && (
+        <TranslatedSelection key={`${sessionId}:${composerArtifact.sourceHash}:${translationLanguage}`}
           containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
           stale={translation.error === 'stale'} />
       )}

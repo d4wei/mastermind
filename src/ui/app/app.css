@@ -1368,7 +1368,7 @@ mark.critic-hl.critic-anchor:hover {
   width: 100%;
 }
 
-.settings-comfort-language {
+.settings-translation-language {
   display: flex;
   flex-direction: column;
   gap: calc(var(--space-unit) * 1.5);

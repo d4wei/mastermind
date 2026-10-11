@@ -3,24 +3,19 @@ import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   FONT_FACES,
-  TYPE_SETS,
+  FONT_PRESETS,
   MONO_FONTS,
-  typeSetById,
+  fontPresetById,
   monoById,
-  DEFAULT_TYPE_SET,
+  DEFAULT_FONT_PRESET,
   DEFAULT_MONO,
 } from '../src/ui/theme/fonts'
 
-/**
- * The font registry is the contract behind the Settings typeface picker: every
- * family a type set or mono option names must be declared as an @font-face, and
- * every declared face must have its woff2 vendored on disk (no runtime CDN).
- */
 describe('font registry', () => {
   const families = new Set(FONT_FACES.map((f) => f.family))
 
-  it('every type set references declared display + body families', () => {
-    for (const s of TYPE_SETS) {
+  it('every font preset references declared display + body families', () => {
+    for (const s of FONT_PRESETS) {
       expect(families.has(s.displayFamily), `${s.id} display "${s.displayFamily}"`).toBe(true)
       expect(families.has(s.bodyFamily), `${s.id} body "${s.bodyFamily}"`).toBe(true)
     }
@@ -39,9 +34,9 @@ describe('font registry', () => {
   })
 
   it('defaults resolve, and unknown ids fall back to the first option', () => {
-    expect(typeSetById(DEFAULT_TYPE_SET).id).toBe(DEFAULT_TYPE_SET)
+    expect(fontPresetById(DEFAULT_FONT_PRESET).id).toBe(DEFAULT_FONT_PRESET)
     expect(monoById(DEFAULT_MONO).id).toBe(DEFAULT_MONO)
-    expect(typeSetById('nope').id).toBe(TYPE_SETS[0]!.id)
+    expect(fontPresetById('nope').id).toBe(FONT_PRESETS[0]!.id)
     expect(monoById('nope').id).toBe(MONO_FONTS[0]!.id)
   })
 })

@@ -79,7 +79,7 @@ it('rejects an artifact whose target or complete block set does not match', asyn
   expect(store.getState().active).toBe(false)
   expect(store.getState().error).toBe('stale')
 })
-it('does not issue requests when comfort language is off', async () => {
+it('does not issue requests when translation is disabled', async () => {
   snapshot.targetLang = null
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch)
   const store = createTranslationStore(() => snapshot)

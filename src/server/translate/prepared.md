@@ -1,15 +1,15 @@
 # Prepared translation artifacts
 
-`planTranslation` emits every current narrative and literal/context block, plus a source hash and
+`planTranslation` emits every translation and context block, plus a translation fingerprint and
 explicit source/target language codes. A new pass never filters blocks against an earlier artifact.
 The agent translates all translatable blocks and returns the complete versioned artifact described
 by `src/shared/translation.ts`.
 
-`publishTranslation` checks the whole source hash, language pair, complete IDs, and CriticMarkup
-structure before writing. It rereads the document before atomically replacing the artifact with a
-unique temporary-file rename. It does not merge previous entries, retain partial success, or swallow
-publication failures. An unrelated document writer can still change the source after that final
-check; this is not an atomic transaction across the document and artifact.
+`savePreparedTranslation` checks the translation fingerprint, language pair, complete IDs, and
+CriticMarkup structure before writing. It rereads the document before atomically replacing the
+artifact with a unique temporary-file rename. It does not merge previous entries, retain partial
+success, or swallow save failures. An unrelated document writer can still change the source after
+that final check; this is not an atomic transaction across the document and artifact.
 
 Artifacts live beside their documents at `.mastermind/translations/<basename>.<target-code>.json`.
 Language codes are validated before entering filenames. The source Markdown remains untouched;

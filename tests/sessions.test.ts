@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SessionRegistry } from '../src/server/sessions'
-import { planTranslation, publishTranslation, readPreparedTranslation } from '../src/server/translate/prepared'
+import { planTranslation, savePreparedTranslation, readPreparedTranslation } from '../src/server/translate/prepared'
 
 let root: string
 let sessions: SessionRegistry
@@ -70,6 +70,6 @@ it('opening a session cannot remove a directory being created for a translation 
   const plan = await planTranslation(file, 'Hello', 'en', 'zh-CN')
   const artifact = { version: 1, sourceHash: plan.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: plan.blocks.filter((b) => b.translatable).map((b) => ({ id: b.id, text: '译文' })) }
-  await publishTranslation(file, 'Hello', 'en', 'zh-CN', artifact)
+  await savePreparedTranslation(file, 'Hello', 'en', 'zh-CN', artifact)
   expect(await readPreparedTranslation(file, 'Hello', 'zh-CN')).toEqual({ status: 'ready', artifact })
 })

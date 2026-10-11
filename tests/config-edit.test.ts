@@ -22,7 +22,7 @@ describe('config-edit', () => {
 
   it('leaves non-numeric keys as strings', () => {
     expect(coerceConfigValue('theme', 'nacht')).toBe('nacht')
-    expect(coerceConfigValue('comfortLang', 'en')).toBe('en')
+    expect(coerceConfigValue('translationLanguage', 'en')).toBe('en')
   })
 
   it('rejects unknown top-level keys (typo guard)', () => {
@@ -34,7 +34,7 @@ describe('config-edit', () => {
   })
 
   it('parseAssignment splits on the first =', () => {
-    expect(parseAssignment('comfortLang=en')).toEqual({ key: 'comfortLang', value: 'en' })
+    expect(parseAssignment('translationLanguage=en')).toEqual({ key: 'translationLanguage', value: 'en' })
     expect(parseAssignment('x=a=b')).toEqual({ key: 'x', value: 'a=b' })
     expect(() => parseAssignment('noequals')).toThrow()
   })
@@ -50,15 +50,15 @@ describe('config-edit', () => {
   })
 
   it('getDotted resolves nested keys and misses safely', () => {
-    expect(getDotted(asRec(DEFAULT_CONFIG), 'comfortLang')).toBeNull()
+    expect(getDotted(asRec(DEFAULT_CONFIG), 'translationLanguage')).toBeNull()
     expect(getDotted(asRec(DEFAULT_CONFIG), 'nope.nope')).toBeUndefined()
   })
 })
 
 
-it('coerces an optional comfort language and rejects path-shaped codes', () => {
-  expect(coerceConfigValue('comfortLang', 'zh-CN')).toBe('zh-CN')
-  expect(coerceConfigValue('comfortLang', 'null')).toBeNull()
-  expect(coerceConfigValue('comfortLang', '')).toBeNull()
-  expect(() => coerceConfigValue('comfortLang', '../outside')).toThrow()
+it('coerces an optional translation language and rejects path-shaped codes', () => {
+  expect(coerceConfigValue('translationLanguage', 'zh-CN')).toBe('zh-CN')
+  expect(coerceConfigValue('translationLanguage', 'null')).toBeNull()
+  expect(coerceConfigValue('translationLanguage', '')).toBeNull()
+  expect(() => coerceConfigValue('translationLanguage', '../outside')).toThrow()
 })

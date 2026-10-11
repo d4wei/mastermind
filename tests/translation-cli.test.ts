@@ -32,7 +32,7 @@ function run(args: string[], input = ''): Promise<{ code: number | null; stdout:
   })
 }
 
-it('requires explicit language codes and publishes a complete fresh artifact', async () => {
+it('requires explicit language codes and saves a complete fresh artifact', async () => {
   expect((await run(['translate-blocks', file])).code).not.toBe(0)
   const args = ['translate-blocks', file, '--source-lang', 'en', '--target-lang', 'zh-CN']
   const prepared = await run(args)
@@ -70,3 +70,22 @@ it('opens a cold untranslated file and exits without an agent wait protocol', as
   expect(help.stdout).not.toMatch(/--wait|--serve-assist|--no-assist|--no-translate/)
   expect((await run(['assist', file])).code).not.toBe(0)
 }, 10_000)
+
+it('reads earlier settings and writes canonical preference names through the CLI', async () => {
+  const configPath = path.join(dir, 'config.json')
+  const original = JSON.stringify({ authorTag: 'Alex', comfortLang: 'zh-CN', typeSet: 'lora' })
+  await fs.writeFile(configPath, original)
+  const read = await run(['config', 'get'])
+  expect(read.code).toBe(0)
+  expect(JSON.parse(read.stdout)).toMatchObject({ translationLanguage: 'zh-CN', fontPreset: 'lora' })
+  expect(await fs.readFile(configPath, 'utf8')).toBe(original)
+  const edited = await run(['config', 'set', 'translationLanguage=null', 'fontPreset=geist'])
+  expect(edited.code).toBe(0)
+  const saved = JSON.parse(await fs.readFile(configPath, 'utf8'))
+  expect(saved).toMatchObject({ translationLanguage: null, fontPreset: 'geist' })
+  expect(saved).not.toHaveProperty('comfortLang')
+  expect(saved).not.toHaveProperty('typeSet')
+  const rejected = await run(['config', 'set', 'comfortLang=en'])
+  expect(rejected.code).not.toBe(0)
+  expect(rejected.stderr).toContain('unknown config key: comfortLang')
+})

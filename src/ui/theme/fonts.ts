@@ -1,15 +1,6 @@
-/**
- * DOM/asset side of the font registry — the `@font-face` URL table and the CSS
- * font-family stack builders. The cross-theme DATA (type sets, mono fonts, ids,
- * lookups) lives in src/shared/fonts.ts and is re-exported here so existing
- * `theme/fonts` importers keep working unchanged.
- *
- * Every face is a self-hosted `.woff2` under /themes/… — local-first, no CDN at
- * runtime (the binaries were vendored in at build time). `@font-face` only fetches
- * a family once text actually renders in it, so unselected sets cost nothing.
- */
+/** Font assets stay local; presets and lookups are shared with the CLI in shared/fonts.ts. */
 
-import type { FontFace, MonoFont, TypeSet } from '../../shared/fonts'
+import type { FontFace, MonoFont, FontPreset } from '../../shared/fonts'
 
 export * from '../../shared/fonts'
 
@@ -17,7 +8,6 @@ const SANS_FALLBACK = 'system-ui, -apple-system, sans-serif'
 const SERIF_FALLBACK = 'Georgia, Cambria, "Times New Roman", serif'
 const MONO_FALLBACK = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 
-/** Every bundled face. Schibsted Grotesk + Geist Mono ship with the grid theme; the rest live in /themes/fonts/. */
 export const FONT_FACES: FontFace[] = [
   { family: 'Schibsted Grotesk', url: '/themes/grid/fonts/SchibstedGrotesk-Variable.woff2', weight: '400 900' },
   { family: 'Geist Mono', url: '/themes/grid/fonts/GeistMono-Variable.woff2', weight: '100 900' },
@@ -39,10 +29,10 @@ function stack(family: string, fallback: string): string {
   return `'${family}', ${fallback}`
 }
 
-export function displayStack(set: TypeSet): string {
+export function displayStack(set: FontPreset): string {
   return stack(set.displayFamily, SERIF_FAMILIES.has(set.displayFamily) ? SERIF_FALLBACK : SANS_FALLBACK)
 }
-export function bodyStack(set: TypeSet): string {
+export function bodyStack(set: FontPreset): string {
   return stack(set.bodyFamily, SERIF_FAMILIES.has(set.bodyFamily) ? SERIF_FALLBACK : SANS_FALLBACK)
 }
 export function monoStack(m: MonoFont): string {

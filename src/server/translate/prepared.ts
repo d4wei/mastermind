@@ -18,7 +18,7 @@ export async function planTranslation(realPath: string, source: string, sourceLa
     artifactPath: translationFile(realPath, targetLang) }
 }
 
-export async function publishTranslation(realPath: string, source: string, sourceLang: string,
+export async function savePreparedTranslation(realPath: string, source: string, sourceLang: string,
   targetLang: string, input: unknown): Promise<{ artifactPath: string; written: number }> {
   if (!validLanguageCode(sourceLang) || !validLanguageCode(targetLang)) throw new Error('explicit language codes required')
   const artifact = await matchPreparedTranslation(source, input)
@@ -30,9 +30,9 @@ export async function publishTranslation(realPath: string, source: string, sourc
   const temporary = `${artifactPath}.${crypto.randomUUID()}.tmp`
   try {
     await fs.writeFile(temporary, JSON.stringify(artifact), { flag: 'wx', mode: 0o600 })
-    // Publishing must not install a plan whose source changed during preparation.
+    // Recheck freshness after preparation and before replacing the saved translation.
     const currentSource = await fs.readFile(realPath, 'utf8')
-    if (!(await matchPreparedTranslation(currentSource, artifact))) throw new Error('source changed before publication')
+    if (!(await matchPreparedTranslation(currentSource, artifact))) throw new Error('source changed before saving translation')
     await fs.rename(temporary, artifactPath)
   } finally {
     await fs.rm(temporary, { force: true })

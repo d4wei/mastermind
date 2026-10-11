@@ -12,11 +12,11 @@ export const DEFAULT_CONFIG: MastermindConfig = {
   lineHeight: 1.6,
   contentWidth: 736,
   authorTag: DEFAULT_AUTHOR_TAG,
-  typeSet: 'grid',
+  fontPreset: 'grid',
   monoFont: 'geist',
   codeTheme: 'none',
   uiLang: 'en',
-  comfortLang: null,
+  translationLanguage: null,
   browser: '',
   grain: {},
 }
@@ -37,19 +37,26 @@ function gitAuthorTag(): string {
 }
 
 export function readConfig(): MastermindConfig {
-  let parsed: Partial<MastermindConfig> = {}
+  let parsed: Record<string, unknown> = {}
   try {
-    parsed = JSON.parse(fs.readFileSync(configFilePath(), 'utf8')) as Partial<MastermindConfig>
+    const value: unknown = JSON.parse(fs.readFileSync(configFilePath(), 'utf8'))
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      parsed = value as Record<string, unknown>
+    }
   } catch {
     // Missing or unreadable preferences use the same defaults as a new install.
   }
-  const authorTag = parsed?.authorTag ?? gitAuthorTag()
+  const authorTag = typeof parsed.authorTag === 'string' ? parsed.authorTag : gitAuthorTag()
   const known = Object.fromEntries(Object.keys(DEFAULT_CONFIG)
-    .filter((key) => Object.hasOwn(parsed ?? {}, key))
-    .map((key) => [key, parsed[key as keyof MastermindConfig]]))
-  const comfortLang = typeof parsed?.comfortLang === 'string' && /^[A-Za-z][A-Za-z0-9_-]*$/.test(parsed.comfortLang)
-    ? parsed.comfortLang : null
-  return { ...DEFAULT_CONFIG, ...known, authorTag, comfortLang, version: 1 }
+    .filter((key) => Object.hasOwn(parsed, key))
+    .map((key) => [key, parsed[key]]))
+  // Presence matters: an explicit null means original-only reading, even beside an old value.
+  const language = Object.hasOwn(parsed, 'translationLanguage') ? parsed.translationLanguage : parsed.comfortLang
+  const preset = Object.hasOwn(parsed, 'fontPreset') ? parsed.fontPreset : parsed.typeSet
+  const translationLanguage = typeof language === 'string' && /^[A-Za-z][A-Za-z0-9_-]*$/.test(language)
+    ? language : null
+  const fontPreset = typeof preset === 'string' && preset !== '' ? preset : DEFAULT_CONFIG.fontPreset
+  return { ...DEFAULT_CONFIG, ...known, authorTag, translationLanguage, fontPreset, version: 1 }
 }
 
 function persist(config: MastermindConfig): void {
@@ -62,9 +69,16 @@ function persist(config: MastermindConfig): void {
 export type ConfigPatch = Partial<Omit<MastermindConfig, 'version'>>
 
 export function updateConfig(patch: ConfigPatch): MastermindConfig {
-  if (patch.comfortLang !== undefined && patch.comfortLang !== null &&
-    (typeof patch.comfortLang !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(patch.comfortLang))) {
-    throw new Error('comfortLang must be null or a language code')
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('expected a configuration object')
+  for (const key of Object.keys(patch)) {
+    if (key === 'version' || !Object.hasOwn(DEFAULT_CONFIG, key)) throw new Error(`unknown config key: ${key}`)
+  }
+  if (patch.translationLanguage !== undefined && patch.translationLanguage !== null &&
+    (typeof patch.translationLanguage !== 'string' || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(patch.translationLanguage))) {
+    throw new Error('translationLanguage must be null or a language code')
+  }
+  if (patch.fontPreset !== undefined && (typeof patch.fontPreset !== 'string' || patch.fontPreset === '')) {
+    throw new Error('fontPreset must be a nonempty preset ID')
   }
   const next: MastermindConfig = { ...readConfig(), ...patch, version: 1 }
   persist(next)

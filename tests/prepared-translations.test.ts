@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, publishTranslation, readPreparedTranslation, translationFile } from '../src/server/translate/prepared'
+import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../src/server/translate/prepared'
 import { createApp } from '../src/server/app'
 import { SessionRegistry } from '../src/server/sessions'
 import { WorkspaceRegistry } from '../src/server/workspaces'
@@ -26,7 +26,7 @@ async function artifactFor(text = source) {
 it('emits all current blocks on every preparation pass regardless of earlier artifacts', async () => {
   const first = await planTranslation(file, source, 'en', 'zh-CN')
   const artifact = await artifactFor()
-  await publishTranslation(file, source, 'en', 'zh-CN', artifact)
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
   const second = await planTranslation(file, source, 'en', 'zh-CN')
   expect(second.blocks).toEqual(first.blocks)
   expect(second.blocks.some((b) => !b.translatable)).toBe(true)
@@ -36,10 +36,10 @@ it('emits all current blocks on every preparation pass regardless of earlier art
 
 it('replaces an artifact atomically without carrying earlier translations into the result', async () => {
   const first = await artifactFor()
-  await publishTranslation(file, source, 'en', 'zh-CN', first)
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', first)
   const next = { ...first, blocks: first.blocks.map((b) => ({ ...b, text: b.text.startsWith('# ') ? '# 新标题' : '新段落。' })) }
   const rename = vi.spyOn(fs, 'rename')
-  await publishTranslation(file, source, 'en', 'zh-CN', next)
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', next)
   expect(rename).toHaveBeenCalledWith(expect.stringMatching(/\.tmp$/), translationFile(file, 'zh-CN'))
   expect(JSON.parse(await fs.readFile(translationFile(file, 'zh-CN'), 'utf8'))).toEqual(next)
   expect((await fs.readdir(path.dirname(translationFile(file, 'zh-CN')))).filter((name) => name.endsWith('.tmp'))).toEqual([])
@@ -47,26 +47,26 @@ it('replaces an artifact atomically without carrying earlier translations into t
 
 it('rejects partial, stale, wrong-language, and legacy artifacts without changing an existing one', async () => {
   const valid = await artifactFor()
-  await publishTranslation(file, source, 'en', 'zh-CN', valid)
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
   const invalid = [
     { ...valid, blocks: valid.blocks.slice(1) },
     { ...valid, sourceHash: 'stale' },
     { ...valid, targetLang: 'fr' },
     { h1: 'old cached map' },
   ]
-  for (const input of invalid) await expect(publishTranslation(file, source, 'en', 'zh-CN', input)).rejects.toThrow()
+  for (const input of invalid) await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', input)).rejects.toThrow()
   expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'ready', artifact: valid })
 })
 
-it('rejects a source change during publication and leaves the earlier artifact intact', async () => {
+it('rejects a source change while saving the translation and leaves the earlier artifact intact', async () => {
   const valid = await artifactFor()
-  await publishTranslation(file, source, 'en', 'zh-CN', valid)
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
   const originalWrite = fs.writeFile.bind(fs)
   vi.spyOn(fs, 'writeFile').mockImplementation(async (...args: Parameters<typeof fs.writeFile>) => {
     await originalWrite(...args)
     if (String(args[0]).endsWith('.tmp')) await originalWrite(file, 'Changed narrative')
   })
-  await expect(publishTranslation(file, source, 'en', 'zh-CN', valid)).rejects.toThrow('source changed')
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', valid)).rejects.toThrow('source changed')
   expect(JSON.parse(await fs.readFile(translationFile(file, 'zh-CN'), 'utf8'))).toEqual(valid)
 })
 
@@ -85,7 +85,7 @@ it('serves only a current prepared artifact and removes live generation and hand
   try {
     expect((await request('translation?targetLang=zh-CN')).status).toBe(404)
     const valid = await artifactFor()
-    await publishTranslation(file, source, 'en', 'zh-CN', valid)
+    await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
     expect(await (await request('translation?targetLang=zh-CN')).json()).toEqual(valid)
     expect((await request('translation?targetLang=../outside')).status).toBe(400)
     await fs.writeFile(file, 'Changed narrative')

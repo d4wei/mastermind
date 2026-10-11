@@ -3,7 +3,7 @@ import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
 import { LangSelect } from './LangSelect'
 import { useT, type MsgKey } from '../i18n'
-import { TYPE_SETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
+import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme } from '../theme/codeThemes'
 import { GrainOffGlyph, GrainSwatch, INTENSITY_STEPS, TEXTURE_STEPS, resolveGrain } from '../theme/grain'
 import type { GrainIntensity, GrainTexture } from '../../shared/types'
@@ -239,14 +239,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           <div className="settings-row">
             <span>{t('typeface')}</span>
             <div className="settings-theme-row">
-              {TYPE_SETS.map((s) => (
+              {FONT_PRESETS.map((s) => (
                 <button
                   key={s.id}
                   type="button"
-                  className={`theme-chip${config.typeSet === s.id ? ' active' : ''}`}
-                  aria-pressed={config.typeSet === s.id}
+                  className={`theme-chip${config.fontPreset === s.id ? ' active' : ''}`}
+                  aria-pressed={config.fontPreset === s.id}
                   style={{ fontFamily: displayStack(s) }}
-                  onClick={() => patch({ typeSet: s.id })}
+                  onClick={() => patch({ fontPreset: s.id })}
                 >
                   {s.name}
                 </button>
@@ -382,12 +382,12 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="settings-row">
-            <span title={t('translationLanguageHint')}>{t('comfortLanguage')}</span>
-            <div className="settings-comfort-language">
-              <button type="button" className="btn-ghost" aria-pressed={config.comfortLang === null}
-                onClick={() => patch({ comfortLang: null })}>{t('translationOff')}</button>
-              <LangSelect label={t('comfortLanguage')} value={config.comfortLang ?? ''} emptyLabel={t('translationOff')}
-                onChange={(comfortLang) => patch({ comfortLang })} />
+            <span title={t('translationLanguageHint')}>{t('translationLanguage')}</span>
+            <div className="settings-translation-language">
+              <button type="button" className="btn-ghost" aria-pressed={config.translationLanguage === null}
+                onClick={() => patch({ translationLanguage: null })}>{t('translationOff')}</button>
+              <LangSelect label={t('translationLanguage')} value={config.translationLanguage ?? ''} emptyLabel={t('translationOff')}
+                onChange={(translationLanguage) => patch({ translationLanguage })} />
             </div>
           </div>
         </section>
