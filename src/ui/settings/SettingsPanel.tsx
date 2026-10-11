@@ -200,7 +200,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             })()}
           {(browsers.length > 0 || (config.browser !== '' && !browsers.some((b) => b.id === config.browser))) && (
             <div className="settings-row">
-              <span>{t('openInBrowser')}</span>
+              <span>{t('browser')}</span>
               <div className="settings-theme-row">
                 <button
                   type="button"
