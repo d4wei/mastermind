@@ -132,7 +132,7 @@ export interface MastermindConfig {
   uiLang: 'en' | 'zh-CN'
   /** Optional personal language code for prepared reading translations. */
   comfortLang: string | null
-  /** app name / bundle id to open Mastermind in; '' = the system default browser */
+  /** app name / bundle id to open review URLs in; '' = the system default browser */
   browser: string
   /** per-theme grain overrides; `enabled` is the legacy on/off, superseded by `intensity` */
   grain: Record<string, { enabled?: boolean; intensity?: GrainIntensity; texture?: GrainTexture }>

@@ -1,6 +1,6 @@
-## Review Markdown with Mastermind
+## Review Markdown with mastermind
 
-When a Markdown document needs review, use the Mastermind skill to open the relevant files.
+When a Markdown document needs review, use the mastermind skill to open the relevant files.
 The preparing agent may supply a comfort-language translation using its existing context; opening
 and saving the original never depend on translation. Do not start a waiting review process or a
 translation listener.

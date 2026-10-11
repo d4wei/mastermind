@@ -223,7 +223,7 @@ async function liveDaemonPort(): Promise<number | null> {
   return typeof probe === 'object' ? state.port : null
 }
 
-const configCmd = program.command('config').description('read or write Mastermind preferences')
+const configCmd = program.command('config').description('read or write mastermind preferences')
 
 configCmd
   .command('get [key]')

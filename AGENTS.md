@@ -1,5 +1,6 @@
 # mastermind — agentic rules
 
+- Style this application as `mastermind`; use `Mastermind` for the original project.
 - Record settled rulings in [`DECISIONS.md`](DECISIONS.md).
 - Record open questions and deferrals in [`DIRECTION.md`](DIRECTION.md).
 - Put forward designs under [`docs/`](docs/).
@@ -42,7 +43,7 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 - `npm run typecheck` runs both tsconfigs; both must pass. `npm test` before every commit.
 - `npm run build` before running `bin/mastermind.js` from a clone; the bin refuses without `dist/`.
 - Touch `src/shared/critic/` only with the corpus tests green; it is the most test-covered code.
-- Plan in a `.md` file and review it through Mastermind itself (`node bin/mastermind.js open
+- Plan in a `.md` file and review it through mastermind itself (`node bin/mastermind.js open
   <plan>.md`; optional translation preparation is in `assets/agent/README.md`). Reread the file
   when the user returns with feedback, and revise it directly.
 

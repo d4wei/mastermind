@@ -3,7 +3,7 @@ dist/
 *.log
 .DS_Store
 
-# Mastermind's own per-directory workspace (history snapshots, translation cache)
+# Local review artifacts
 .mastermind/
 
 # brainstorming visual companion artifacts

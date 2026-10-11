@@ -5,7 +5,7 @@ description: >-
   and address author-tagged feedback written into the files.
 ---
 
-# Mastermind
+# mastermind
 
 The Markdown file carries the document and its review feedback. The app saves edits continuously;
 there is no completion signal to wait for. Read [the review protocol](reference/review-protocol.md)

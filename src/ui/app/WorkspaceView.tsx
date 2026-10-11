@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../shared/constants'
 import { useEffect } from 'react'
 import { useT } from '../i18n'
 import { SessionView } from './SessionView'
@@ -25,13 +26,13 @@ export function WorkspaceView({ workspaceId, sessionId }: Props) {
   }, [workspaceId, init])
 
   useEffect(() => {
-    if (status === 'ready' && !sessionId) document.title = `${displayName} — Mastermind`
+    if (status === 'ready' && !sessionId) document.title = `${displayName} — ${APP_NAME}`
   }, [status, displayName, sessionId])
 
   if (status === 'missing') {
     return (
       <div className="center-note">
-        <h1>MASTERMIND</h1>
+        <h1>{APP_NAME}</h1>
         <p>
           {t('workspaceNotFound')} <code>mastermind workspace .</code>
         </p>
@@ -43,7 +44,7 @@ export function WorkspaceView({ workspaceId, sessionId }: Props) {
 
   return (
     <div className="center-note">
-      <h1>{displayName || 'MASTERMIND'}</h1>
+      <h1>{displayName || APP_NAME}</h1>
       <p>{t('workspaceEmpty')}</p>
     </div>
   )

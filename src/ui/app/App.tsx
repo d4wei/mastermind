@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../shared/constants'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Tooltip } from 'radix-ui'
 import { useT } from '../i18n'
@@ -70,7 +71,7 @@ function HomeView() {
   const [draftError, setDraftError] = useState(false)
   return (
     <div className="center-note">
-      <h1>MASTERMIND</h1>
+      <h1>{APP_NAME}</h1>
       <p>
         {t('openHint')} <code>mastermind open &lt;file.md&gt;</code>
       </p>

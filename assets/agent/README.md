@@ -1,12 +1,12 @@
 # Agent setup
 
-Mastermind reviews existing Markdown files. The app saves edits continuously, and the agent reads
+mastermind reviews existing Markdown files. The app saves edits continuously, and the agent reads
 feedback from those same files when the person asks it to continue. Opening a document returns
 immediately; there is no hand-back signal, generated completion summary, or translation listener.
 
 ## Install the public skill
 
-Make [the Mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `reference/` directory
+Make [the mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `reference/` directory
 available through your harness's normal skill installation mechanism. The `master` alias is
 optional. The skill and its reference files contain the complete review instructions.
 
@@ -16,10 +16,10 @@ run `mastermind uninstall-agents` to remove those copies and marked blocks. It r
 `mastermind` and `master` skill directories, including local edits; retain any edits you need first.
 Future installation belongs to the harness, rather than app-owned directory detection.
 
-For a project that uses Mastermind to review plans, an instruction can be as small as:
+For a project that uses mastermind to review plans, an instruction can be as small as:
 
 ```markdown
-Write plans to Markdown files and open them with the Mastermind skill for review. When I ask you
+Write plans to Markdown files and open them with the mastermind skill for review. When I ask you
 to address feedback, reread the current file and follow the skill's public review protocol.
 ```
 

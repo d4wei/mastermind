@@ -1,6 +1,6 @@
-# Welcome to Mastermind
+# Welcome to mastermind
 
-This is a demo document. Mastermind renders Markdown **and** your review marks,
+This is a demo document. mastermind renders Markdown **and** your review marks,
 and can show a prepared translation in your optional comfort language.
 
 ## What you're looking at

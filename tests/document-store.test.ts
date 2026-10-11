@@ -51,6 +51,8 @@ it('saves the departing buffer and keeps undo isolated across documents', async 
 })
 
 it('ignores reversed load completion', async () => {
+  const tab = { title: '' }
+  vi.stubGlobal('document', tab)
   const store = createDocStore()
   const a = deferred<Response>()
   const b = deferred<Response>()
@@ -59,10 +61,12 @@ it('ignores reversed load completion', async () => {
   const second = store.getState().load('B')
   b.resolve(response({ content: 'B', mtimeMs: 1, version: 'B-1' }))
   await second
+  expect(tab.title).toBe('B — mastermind')
   a.resolve(response({ content: 'A', mtimeMs: 1, version: 'A-1' }))
   await first
   expect(store.getState().sessionId).toBe('B')
   expect(store.getState().source).toBe('B')
+  expect(tab.title).toBe('B — mastermind')
 })
 
 it('flushes an edit made during a slow save without another keystroke', async () => {

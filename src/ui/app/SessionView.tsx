@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_AUTHOR_TAG } from '../../shared/constants'
+import { APP_NAME, DEFAULT_AUTHOR_TAG } from '../../shared/constants'
 import { rejectEdit } from '../../shared/critic/resolve'
 import { analyzeMarkdown } from '../../shared/markdown/analyze'
 import { parseMarkdown } from '../../shared/markdown/processor'
@@ -295,7 +295,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   if (status === 'error') {
     return (
       <div className="center-note">
-        <h1>MASTERMIND</h1>
+        <h1>{APP_NAME}</h1>
         <p>{error === '__session-not-found__' ? t('sessionNotFound') : error}</p>
       </div>
     )

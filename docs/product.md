@@ -1,6 +1,6 @@
 # Product purpose
 
-Mastermind is a local Markdown reviewer for people working with coding agents. A reviewer reads a
+mastermind is a local Markdown reviewer for people working with coding agents. A reviewer reads a
 plan or other document, edits its source, and leaves comments or proposed changes as CriticMarkup.
 The agent reads and responds in that same file. Review does not require an account, remote service,
 or separate discussion store.

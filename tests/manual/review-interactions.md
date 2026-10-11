@@ -1,6 +1,6 @@
 # Review interactions
 
-This document is a manual exercise, not an automated fixture. Open a disposable copy in Mastermind
+This document is a manual exercise, not an automated fixture. Open a disposable copy in mastermind
 so comments and suggested edits can be saved without changing this guide. Use the original-language
 reading view for the selection checks.
 

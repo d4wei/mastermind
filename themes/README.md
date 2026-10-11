@@ -1,4 +1,4 @@
-# Mastermind design system
+# mastermind design system
 
 > Swiss International, in service of reading. The token NAMES are the schema every theme satisfies; components reference `var(--*)` only — no hardcoded values outside themes/*/tokens.css. **Grid** (light) is the reference theme.
 

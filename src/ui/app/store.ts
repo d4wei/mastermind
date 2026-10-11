@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../shared/constants'
 import { create } from 'zustand'
 import { applyTextEdits } from '../../shared/edits'
 import { detectEol, normalizeToLf, restoreEol, type Eol } from '../../shared/eol'
@@ -17,7 +18,7 @@ const AUTOSAVE_MS = 600
 /** Reflect the open document in the tab title — a no-op outside a browser (tests). */
 function setTabTitle(name: string): void {
   const g = globalThis as { document?: { title: string } }
-  if (g.document) g.document.title = `${name} — Mastermind`
+  if (g.document) g.document.title = `${name} — ${APP_NAME}`
 }
 
 export interface ConflictDraft {

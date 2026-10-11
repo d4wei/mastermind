@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — The application name is styled as lowercase mastermind
+
+**Ruled.** Use `mastermind` in product copy, documentation, and application titles. Retain
+`Mastermind` when referring to Kevin Ding's original project. This is a display-name convention;
+package, executable, and configuration-directory identity remain a separate decision.
+
+**Beat:** sharing the original project's capitalized display name.
+
 ## 2026-10-10 — Tauri hosts the desktop app with native file services
 
 **Ruled.** Use Tauri with a narrow Rust host and retain the React/TypeScript document core. The

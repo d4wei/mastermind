@@ -1,5 +1,5 @@
 /* ============================================================
-   Mastermind base styles — token-consuming rules ONLY.
+   mastermind base styles — token-consuming rules ONLY.
    Every color/face/size comes from var(--*) supplied by the
    active theme's tokens.css (themes/<id>/tokens.css). Fonts are
    injected from the theme.json manifest at runtime.
