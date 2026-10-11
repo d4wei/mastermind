@@ -303,11 +303,10 @@ the scope small enough to validate before beginning the wrapper or broader produ
    in the browser development view; a wrapper alone does not fix that preview. Exit: targeted
    regressions plus visual checks across themes and representative viewport sizes.
 4. **Settle and implement the file protocol.** Review the archive proposal above alongside
-   translation opening/lifetime and the minimal agent
-   launch interface. Agent replies and dropping legacy compatibility are ruled. Delete/Resolve
-   have shipped; align the remaining skill guidance with the public reply convention. Exit: app and receiving
-   agent agree on active versus historical feedback; translation does not accidentally depend on a
-   removed completion loop.
+   translation opening/lifetime and the minimal agent launch interface. Agent replies and dropping
+   legacy compatibility are ruled. Delete/Resolve have shipped; align the remaining skill guidance
+   with the public reply convention. Exit: app and receiving agent agree on active versus historical
+   feedback; translation does not accidentally depend on a removed completion loop.
 5. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
    experiment, including browser preview and native macOS automation. Record the choice with a
    credible Windows/Linux packaging path. Retire daemon and browser-choice machinery only when their
