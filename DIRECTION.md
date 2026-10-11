@@ -26,6 +26,14 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-10 — Product terminology is under review
+
+**Open question.** Language preferences, document sessions, and several review concepts still use
+overloaded or development-era names. The [terminology exercises](docs/terminology-review.md) propose
+public labels and precise technical terms without changing their behavior or file formats.
+
+**Exit:** the naming choices are accepted or rejected and adopted names live with their features.
+
 ## 2026-10-10 — Restoring app sessions is deferred
 
 **Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible
