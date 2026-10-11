@@ -18,8 +18,9 @@ Keep the source-preserving Markdown and CriticMarkup core and the reading surfac
 access in the desktop host instead of preserving the separate workspace experience. First make
 document ownership and saving reliable across file switches. Then remove obsolete
 serialization and feedback machinery before changing the host. Let the desktop shell own lifecycle,
-and retain a small agent-facing way to open chosen files. Avoid moving the whole detached daemon and
-its waiting-session protocol into a wrapper unchanged.
+and retain a small agent-facing way to open chosen files. The
+[agent launch proposal](agent-launch.md) defines that remaining contract for review. Avoid moving
+the whole detached daemon and its waiting-session protocol into a wrapper unchanged.
 
 The parser is already remark. The mature-library question belongs primarily to rendering, not a
 replacement of the entire Markdown stack. The editor already autosaves; removing hand-back means

@@ -34,11 +34,11 @@ SQLite implementation are later options; no database or alternate review-feedbac
 **Exit:** a concrete restoration need and a ruling on persisted state, storage, and the existing
 no-database invariant, or the option is dropped.
 
-## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
+## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-11)
 
-**Open question.** The [architecture plan](docs/architecture-review.md) leaves the agent launch
-interface unresolved. Tauri is selected in `DECISIONS.md`; the launch contract determines how an
-agent passes files and optional setup values into the running app.
+**Open question.** The [agent launch proposal](docs/agent-launch.md) defines multi-file admission,
+per-file acknowledgment, and transient onboarding prefills for review. Tauri is selected; the
+launch behavior and preference precedence need a ruling before implementation.
 
 **Exit:** the launch contract receives a ruling and graduates into its implementation or is dropped.
 
