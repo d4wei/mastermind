@@ -23,7 +23,7 @@ node bin/mastermind.js open plan.md
 ```
 
 Use `npm link` if you want the `mastermind` command on your PATH. Agents can use the
-[bundled skill](.claude/skills/mastermind/SKILL.md); [AGENT_SETUP.md](AGENT_SETUP.md) describes
+[bundled skill](.claude/skills/mastermind/SKILL.md); [agent setup](assets/agent/README.md) describes
 installation and the file-based review flow. No account, database, or remote service is required.
 
 ## Review
@@ -94,3 +94,5 @@ npm run build      # required before invoking the bin from a clone
 
 Run one test file with `npx vitest run tests/critic-scanner.test.ts`. The implementation map is in
 [src/README.md](src/README.md), and the theme contract is in [themes/README.md](themes/README.md).
+Use a disposable copy of [the manual review exercise](tests/manual/review-interactions.md) to check
+callouts and selections across blocks in the browser.

@@ -130,37 +130,6 @@ silently cleaned up on open. The public skill supports author-tagged replies and
 - **Retire the separate workspace UI and app-owned harness installer.** Replace their entry points
   with native file access and harness-owned installation guidance. Remove tree/badge/session code
   only after checking which pieces remain necessary for opening an agent-selected set of files.
-### Root Markdown cleanup in the ablation
-
-Inventory checked at `7ae2863`. Keep root entry points and canonical ledgers; do not relocate every
-file into a general documentation bucket. No scratch document below is consumed by the automated
-suite. Existing files under `tests/fixtures/` remain byte-exact.
-
-- **Keep:** `README.md`, `AGENTS.md`, `CLAUDE.md`, `DIRECTION.md`, and `DECISIONS.md`. Each is a
-  repository entry point or canonical operating ledger, rather than a loose topic document.
-- **Retire `dummy-plan.md`:** a disposable theme-toggle mock with fictional paths and an obsolete
-  generated summary. The bundled demo already supplies a maintained starting point.
-- **Retire `sample-doc.md`:** another disposable migration-plan example, with no tracked consumers.
-  Keep the shipped demo and tested corpus rather than another unsupervised copy.
-- **Move and tighten `feature-test.md` into `tests/manual/review-interactions.md`:** preserve the
-  deliberate cross-block and callout examples as a manual exercise, remove the false one-direction
-  claim, and use durable expected outcomes. It is not a byte-exact automated fixture. Update the
-  historical pointer in `docs/squad-fork.md` so the original trial remains understandable.
-- **Fold `AGENT_SETUP.md` into `assets/agent/README.md`:** keep installation/removal explanation
-  beside the packaged agent assets; link the actual skill and protocol instead of duplicating them.
-  Update the root README, plan-review instruction, CLI help pointer, and historical inventory.
-  The installer remains until its separately approved retirement has a replacement entry point.
-- **Retire `.impeccable.md`:** it is an upstream landing-page brief, including obsolete hand-back,
-  one-direction review, and npm-release claims. Its durable app design rationale already lives in
-  `themes/README.md`. Preserve only still-applicable site-specific rationale in `site/README.md`
-  beside the Astro site; do not transplant upstream personal preferences as squad requirements.
-
-Check incoming links and any tool discovery contract before each deletion or move. No installed
-plugin behavior is inferred merely from a dotfile name. Review the retained site prose with the
-site itself; this cleanup does not publish or redesign the landing page. Retiring a source reference
-requires fixing its callers in the same commit. Delete this inventory once those changes land;
-durable guidance belongs at the destination.
-
 
 ## Desktop wrapper choice
 
@@ -394,10 +363,11 @@ the scope small enough to validate before beginning the wrapper or broader produ
    legacy compatibility are ruled. Delete/Resolve, public replies, and fresh translation
    preparation have shipped. Exit: app and receiving agent agree on active versus historical
    feedback; translation does not accidentally depend on a removed completion loop.
-5. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
-   experiment, including browser preview and native macOS automation. Record the choice with a
-   credible Windows/Linux packaging path. Retire daemon and browser-choice machinery only when their
-   responsibilities have a tested owner. Exit: measured comparison and a wrapper ruling.
+5. **Validate the selected Tauri host.** Use the reduced document service for the bounded native
+   validation above, including browser preview and native macOS automation. Check the Windows/Linux
+   packaging path. Retire daemon and browser-choice machinery only when their responsibilities have
+   a tested owner. Exit: file-safety and review interactions survive the host change, with measured
+   runtime behavior and explicit evidence gaps.
 6. **Build the chosen review flow.** Implement native file access, multi-file review, graphical
    onboarding, and the graphical setup/demo flow against settled contracts. App session
    state ends on quit; restoration is deferred. Evaluate frontmatter rows and renderer replacement
@@ -416,5 +386,5 @@ cover the previously failing schedules; a browser smoke check exercised source a
 external reload, author labels, soft wraps, and selected input text. The next batch added guarded
 conflict comparison and hidden resolved discussions with per-comment deletion. Fresh prepared
 translation, translated-view comments, public reply guidance, and removal of
-hand-back and the live service followed. Cross-list mark handling, responsive chrome, wrapper
-selection, and the explicitly open contracts remain ahead.
+hand-back and the live service followed. Root document cleanup has also landed. Cross-list mark
+handling, responsive chrome, Tauri host validation, and the explicitly open contracts remain ahead.

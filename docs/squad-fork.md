@@ -98,8 +98,9 @@ never enforced a human-only author role.
 
 **Instruction surfaces**
 
-- [`AGENT_SETUP.md`](../AGENT_SETUP.md), "Plan reviews via Mastermind": the pasteable block calls
-  marks the user's feedback, requires direct revision and removal of resolved marks, explicitly
+- `AGENT_SETUP.md` (now [agent setup](../assets/agent/README.md)), "Plan reviews via Mastermind":
+  the pasteable block calls marks the user's feedback, requires direct revision and removal of
+  resolved marks, explicitly
   says "Do not add CriticMarkup of your own," and presents the revision diff as the way to see
   agent changes. This is the explicit prohibition that an in-file answer would violate.
 - The same file, "How the protocol behaves": the comment-thread bullet explicitly shows
@@ -148,7 +149,8 @@ never enforced a human-only author role.
   prose prohibition or distinguishes resolved discussion from outstanding feedback.
 
 Outside the requested shipped surfaces, [`README.md`](../README.md)'s review workflow and
-[`feature-test.md`](../feature-test.md)'s demonstration also describe one-direction feedback.
+the `feature-test.md` demonstration also describe one-direction feedback. The example now lives in
+[manual interactions](../tests/manual/review-interactions.md).
 The public guidance now follows the squad ruling.
 
 The later ruling and public protocol govern answered threads and their retention. This inventory

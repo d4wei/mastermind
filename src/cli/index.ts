@@ -33,11 +33,10 @@ async function openBrowser(url: string, override?: string): Promise<void> {
   if (process.platform !== 'darwin') return
   const args = browserOpenArgs(url, override, readConfig().browser)
   if (args.length === 1) {
-    // system default browser — fire and forget
     spawn('open', args, { stdio: 'ignore', detached: true }).unref()
     return
   }
-  // a specific app (`-a <name>`): detect "no such application" and fall back to the default
+  // A configured browser may have been uninstalled; retain the OS default as a fallback.
   const ok = await new Promise<boolean>((resolve) => {
     const child = spawn('open', args, { stdio: 'ignore' })
     child.on('error', () => resolve(false))
@@ -217,7 +216,6 @@ program
     process.exit(0)
   })
 
-/** Port of a live, healthy daemon, or null when none runs (config edits then go straight to disk). */
 async function liveDaemonPort(): Promise<number | null> {
   const state = readServerState()
   if (!state) return null
@@ -262,8 +260,7 @@ configCmd
       die(2, err instanceof Error ? err.message : String(err))
     }
     try {
-      // Daemon up → PUT so the change persists AND broadcasts config-changed to open tabs;
-      // daemon down → write the file directly (no tabs to notify).
+      // Route live changes through the daemon so open tabs receive the new configuration.
       if (port) await putJson<MastermindConfig>(port, '/api/config', patch)
       else updateConfig(patch as ConfigPatch)
     } catch (err) {
@@ -305,7 +302,7 @@ function installAgents(opts: { all: boolean; global: boolean }): void {
       fs.writeFileSync(gf, upsertMarkedBlock(existing, globalBody))
       note += ` + global (${t.globalFile})`
     } else if (opts.global && !t.globalFile) {
-      note += ` + global skipped (no known memory file for ${t.id}; see AGENT_SETUP.md)`
+      note += ` + global skipped (no known memory file for ${t.id}; see ${path.join(pkgRoot, 'assets/agent/README.md')})`
     }
     done.push(`${note} → ${base}`)
   }

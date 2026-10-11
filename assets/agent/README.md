@@ -6,14 +6,15 @@ immediately; there is no hand-back signal, generated completion summary, or tran
 
 ## Install the public skill
 
-Make [the Mastermind skill](.claude/skills/mastermind/SKILL.md) and its `reference/` directory
+Make [the Mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `reference/` directory
 available through your harness's normal skill installation mechanism. The `master` alias is
 optional. The skill is self-contained and works without any private plugin.
 
 The app's existing `install-agents` and `uninstall-agents` commands remain available during the
 browser-to-desktop transition. They copy skills and add or remove a marked global instruction block;
-run uninstall only when you intend to remove those installed copies. Future installation belongs
-to the harness, rather than app-owned directory detection.
+run `mastermind uninstall-agents` to remove those copies and marked blocks. It removes the
+`mastermind` and `master` skill directories, including local edits; retain any edits you need first.
+Future installation belongs to the harness, rather than app-owned directory detection.
 
 For a project that uses Mastermind to review plans, an instruction can be as small as:
 
@@ -34,10 +35,10 @@ and uses its existing context. `translate-blocks` emits the preparation inputs w
 and target languages; `--save` validates and replaces the complete prepared artifact. The commands
 and public protocol are maintained with the bundled skill:
 
-- [Preparation instructions](.claude/skills/mastermind/SKILL.md)
-- [Review protocol](.claude/skills/mastermind/reference/review-protocol.md)
+- [Preparation instructions](../../.claude/skills/mastermind/SKILL.md)
+- [Review protocol](../../.claude/skills/mastermind/reference/review-protocol.md)
 
 A translation artifact is a disposable reading aid. Feedback, including quoted passages selected
 from translations, belongs in the original Markdown file. Clean buffers reload external changes;
 dirty buffers retain both versions and pause saving for explicit comparison. The file-write limits
-are documented in [`src/server/files.md`](src/server/files.md).
+are documented in the source checkout at `src/server/files.md`.

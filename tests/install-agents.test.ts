@@ -62,6 +62,9 @@ describe('install-agents helpers', () => {
         ['--import', 'tsx', path.resolve('src/cli/index.ts'), 'install-agents', '--all'],
         { env: { ...process.env, HOME: home }, encoding: 'utf8' })
       expect(run.status, run.stderr).toBe(0)
+      const setupGuide = path.resolve('assets/agent/README.md')
+      expect(run.stdout).toContain(`see ${setupGuide}`)
+      expect(fs.existsSync(setupGuide)).toBe(true)
       const references = path.resolve('.claude/skills/mastermind/reference')
       for (const target of AGENT_TARGETS) {
         const installed = path.join(home, target.dir, 'skills/mastermind')
@@ -82,7 +85,7 @@ describe('install-agents helpers', () => {
     expect(once).toContain('# My memory')
     expect(once).toContain('ALPHA')
     const twice = upsertMarkedBlock(once, 'BETA')
-    expect(twice.split(MM_BEGIN).length - 1).toBe(1) // still exactly one block
+    expect(twice.split(MM_BEGIN).length - 1).toBe(1)
     expect(twice).toContain('BETA')
     expect(twice).not.toContain('ALPHA')
   })
