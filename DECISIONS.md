@@ -24,6 +24,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Resolved discussions remain in a hidden in-file archive
+
+**Ruled.** Delete removes an individual comment; Resolve archives a completed thread, including its
+quoted context and authors, in a marked HTML comment at the file tail. Both actions support undo.
+The app exposes resolved discussion separately; agents treat it as history and may clean it up.
+Resolution does not implicitly accept or reject an attached edit. The approved architecture plan
+sets the sequence; record encoding and compatibility checks belong to that work.
+
+**Beat:** conflating resolution with deletion or keeping discussion only outside the Markdown file.
+
 ## 2026-10-10 — Repo language is a repository setting
 
 **Ruled.** The language used for repository communication and bookkeeping is scoped to the repo;

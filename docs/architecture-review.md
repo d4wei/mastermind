@@ -5,10 +5,10 @@ exit: approved changes ship with colocated contracts, or the remaining proposals
 ---
 # Architecture review and proposed ablation
 
-This plan incorporates the user's review. Unmarked recommendations stand as recommended; the
-amendments below supersede the earlier proposals. This settles the design content, not authorization
-to implement it. Binding constraints live in [DECISIONS.md](../DECISIONS.md). The code findings
-describe the checkout after `005bbd0`; no implementation changes accompany this revision.
+The user approved execution of this plan and the hidden-content recommendation on 2026-10-10.
+Binding constraints live in [DECISIONS.md](../DECISIONS.md). Execution starts with document/save
+ownership and obsolete-code removal; choices explicitly left open below remain open. The original
+source findings describe the checkout after `005bbd0`; completion notes identify work landed since.
 
 ## Recommendation
 
@@ -39,8 +39,8 @@ its exclusively draft-related machinery. Source editing of existing files remain
 Opens a real directory tree. [`Navigator.tsx`](../src/ui/app/Navigator.tsx) and
 [`Tree.tsx`](../src/ui/app/Tree.tsx) provide Files/Outline navigation, lazy children, recent
 files, and review badges. [`WorkspaceView.tsx`](../src/ui/app/WorkspaceView.tsx) renders one active
-file through the ordinary session view. It is not a collection of independently retained document
-buffers. The trial found this separate workspace experience disconnected and underdeveloped. Retire
+file through the ordinary session view. The first execution batch added retained document buffers
+beneath this view. The trial found the workspace experience disconnected and underdeveloped. Retire
 that experience and use the desktop host's native facilities to open and browse files. Do not
 rebuild or transplant the custom workspace tree by default. Keep path validation at file-access
 boundaries; any retained root-scoped operation must still enforce its root.
@@ -100,31 +100,15 @@ state, not a dependency or a second store for review feedback in this iteration.
 
 ## File-safety findings to address first
 
-These are source-level findings. The proposed tests below should reproduce each schedule before a
-fix is attempted; this review has not run a controlled concurrency reproduction.
+The original source findings below now have controlled regressions and fixes for navigation, stale
+responses, slow saves, and competing writes. Document ownership lives in
+[`store.md`](../src/ui/app/store.md); filesystem guarantees and limits live in
+[`files.md`](../src/server/files.md). The detailed comparison/merge UI remains unbuilt.
 
-1. **A file switch can abandon pending edits.** In
-   [`workspaceStore.openFile`](../src/ui/app/workspaceStore.ts), the editor flush updates the buffer
-   but does not await a disk save before navigation. [`store.load`](../src/ui/app/store.ts) then
-   replaces that buffer and clears the shared autosave timer. Blur/visibility handlers do not cover
-   every in-window switch. Test editing A and immediately opening B, with delayed reads and writes.
-2. **Async completion has no document identity guard.** The singleton store changes `sessionId`
-   before loading, while earlier load/save responses can still update source or saved metadata.
-   `load` also retains the review undo history. Test reversed load completion, a save completing
-   after navigation, and undo on B after review edits on A.
-3. **An edit during a slow save can remain dirty.** A debounce firing while `saving` is true returns
-   without writing, and save completion does not schedule the remaining dirty buffer. Test a write
-   lasting beyond the debounce while another edit arrives, with no further keystrokes afterward.
-4. **The filesystem check is not atomic.** [`files.ts`](../src/server/files.ts) checks mtime and
-   subsequently calls `writeFile`; another writer can intervene. Missing files also pass the mtime
-   check. [`handback.ts`](../src/server/handback.ts) duplicates this path. Reads obtain text and
-   stat separately. Test competing app saves, external replacement/deletion, and same-mtime content
-   changes. A shorter debounce does not establish conflict resolution.
-
-Proposed model: each open document owns its base disk version, buffer, undo history, and pending
-write. Serialize this app's writes per canonical path, retain edits made during a write, and reject
-late responses belonging to another document/version. Keep dirty buffers through navigation and
-make close wait for completion or present a recoverable failure. Keep a user-visible save state.
+The implemented regression cases live in `tests/document-store.test.ts` and
+`tests/file-safety.test.ts`. Keep these cases when changing the host. Browser unload currently
+requests a prompt while retained buffers are dirty or saving; native close must wait for completion
+or present a recoverable failure. Keep a user-visible save state.
 
 For external changes, propose automatic reload only when the buffer is clean; otherwise retain base,
 local, and disk versions for an explicit comparison/merge. Content-based version checks are stronger
@@ -136,20 +120,10 @@ The interaction details remain to be designed before implementation.
 
 ## Proposed deletion and consolidation
 
-- **Remove unused Markdown serialization.** Reading uses parse/transform, and Source uses CodeMirror
-  over the canonical string. No current caller supplies a Markdown compiler. In
-  [`remark-critic.ts`](../src/shared/markdown/remark-critic.ts), remove compiler wrapping and
-  serialization registration, then the serializer-only helpers in `critic-mdast.ts`,
-  `critic-to-markdown.ts`, and direct dependencies no longer needed. Confirm dependency reachability
-  first. Keep masking, the critic AST transform, and source positions; these are used by reading.
-- **Remove the feedback-language pass-through.**
-  [`feedback.ts`](../src/server/feedback.ts) returns its input unchanged. Collapse its save callers
-  and the unreachable rewritten-content response branch; keep a direct regression check that
-  multilingual comments reach disk verbatim.
-- **Remove legacy history deletion on open.**
-  [`sessions.ts`](../src/server/sessions.ts) still deletes old `.mastermind/history/<file>` data
-  despite rounds being absent. Opening a review should not double as a recurring legacy cleanup.
-  Leave existing historical files alone; do not migrate or delete them in this plan.
+Completed in the first execution batch: serializer removal, feedback pass-through removal, and
+legacy history-pruning removal. A deterministic regression identified pruning as the cause of the
+intermittent translation-cache failure. The remaining deletions below retain their prerequisites.
+
 - **Delete the explicit hand-back path after safe saving lands.** Remove the button, pulse/toast,
   summary generation, endpoint, and waiting-loop completion event together with their callers.
   Preserve ordinary file watching and review counts. Decide treatment of existing summary blocks
@@ -162,9 +136,9 @@ The interaction details remain to be designed before implementation.
 - **Retire the separate workspace UI and app-owned harness installer.** Replace their entry points
   with native file access and harness-owned installation guidance. Remove tree/badge/session code
   only after checking which pieces remain necessary for opening an agent-selected set of files.
-- **Repair the architecture map with the ablation.** `src/README.md` still references missing
-  snapshots/rounds and three tsconfigs; there are two. `AGENT_SETUP.md` promises an absent revision
-  diff. Update directly coupled claims as each arc lands. Do not sweep unrelated comments.
+- **Repair remaining protocol guidance with skill consolidation.** `AGENT_SETUP.md` still promises
+  an absent revision diff. The architecture map was updated with the initial ablation; keep it
+  aligned as later responsibilities move. Do not sweep unrelated comments.
 
 ## Desktop wrapper choice
 
@@ -216,11 +190,11 @@ The trial raises a separate question from agent replies: deleting one comment ve
 whole thread, and whether resolution retains a record. Current behavior is inventoried in
 [the trial notes](squad-fork.md#trial-notes).
 
-Recommendation for review: Delete removes an individual comment; Resolve moves a completed thread
+Approved direction: Delete removes an individual comment; Resolve moves a completed thread
 into an in-file archive at the document's tail. Both actions support undo. Resolution preserves the
 quoted context, authors, and discussion, while removing its active comment marks from the body.
-Resolving a discussion must not implicitly accept or reject an attached suggested edit. Archive
-retention and the representation below are proposals for review, not a shipped contract.
+Resolving a discussion must not implicitly accept or reject an attached suggested edit. Retention
+in a hidden tail archive is approved; the record encoding below still needs implementation fixtures.
 
 Markdown can hide content with [HTML comments][commonmark-html]. The current renderer already hides
 comment nodes, the review scanner excludes HTML ranges, and translation skips HTML blocks. A
@@ -316,18 +290,10 @@ presentation direction.
 
 [mods]: https://github.com/anthropics/claude-code-playground/blob/main/claude-code/mods/README.md
 
-## {==Reviewed implementation sequence==}{>>@Da-Wei: There's also a list of UI/UX quirks that I've
-been accumulating as I use the product. What would be the ideal place to put them onto the
-table?<<}{>>@codex: Bring them in now, before the ablation and wrapper work. Paste the raw list in
-this chat, or add it under Trial notes in docs/squad-fork.md; that section is already the home for
-observations from actual use. Rough notes are enough. Where available, include what you were doing,
-what happened, and what you expected. We can then identify which problems disappear with planned
-deletions, which need fixes, and which should amend this architecture plan before implementation.
-Only unresolved design questions graduate to DIRECTION.md and settled constraints to DECISIONS.md;
-the raw quirk list belongs in the trial notes.<<}
+## Reviewed implementation sequence
 
-The next implementation arc should be document/save ownership, after review of this plan. Keep the
-scope small enough to validate before beginning the wrapper or broader product changes.
+The first approved implementation arc is document/save ownership and obsolete-code removal. Keep
+the scope small enough to validate before beginning the wrapper or broader product changes.
 
 1. **Reproduce save failures and settle conflict interaction.** Add controlled cases for navigation,
    out-of-order responses, edits during saves, and external changes. Investigate the intermittent
@@ -368,5 +334,9 @@ byte-preservation cases when touching Markdown, selection, or writes; preserve f
 before CLI/manual review. Wrapper validation must include external edits, missing paths, window
 close/reopen, and actual platform builds, not just a framework's support list.
 
-The reviewed recommendations and amendments are recorded here. Implementation has not begun.
-Wrapper selection and the explicitly open contracts above remain unresolved.
+Execution is approved. The first batch delivered document-owned buffers and save scheduling,
+version-checked file writes, the initial ablation, and the three small comment-display fixes. Tests
+cover the previously failing schedules; a browser smoke check exercised source autosave, clean
+external reload, author labels, soft wraps, and selected input text. The conflict-comparison flow,
+archive implementation, cross-list mark handling, responsive chrome, wrapper selection, and other
+explicitly open contracts remain ahead.
