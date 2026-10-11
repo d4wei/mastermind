@@ -8,7 +8,7 @@ immediately; there is no hand-back signal, generated completion summary, or tran
 
 Make [the Mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `reference/` directory
 available through your harness's normal skill installation mechanism. The `master` alias is
-optional. The skill is self-contained and works without any private plugin.
+optional. The skill and its reference files contain the complete review instructions.
 
 The app's existing `install-agents` and `uninstall-agents` commands remain available during the
 browser-to-desktop transition. They copy skills and add or remove a marked global instruction block;

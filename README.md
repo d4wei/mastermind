@@ -4,11 +4,11 @@ Review Markdown with your coding agent. Read a document, add author-tagged Criti
 and proposed edits, and let the agent reread the same file. Edits save continuously. Discussions,
 including agent replies and resolved history, stay in the Markdown file.
 
-This squad fork is maintained by [Da Wei](https://github.com/d4wei), based on Kevin Ding's
+Maintained by [Da Wei](https://github.com/d4wei), Mastermind is based on Kevin Ding's
 [Mastermind](https://github.com/Jingquank/Mastermind) v0.2.1 at `3687c91`, under the
 [MIT license](LICENSE). It currently runs in a desktop browser with local file services; the planned
-Tauri desktop host will replace that runtime. The package and executable still use upstream's names,
-so install this fork from source while its distribution identity is being chosen.
+Tauri desktop host will replace that runtime. Install from this repository using the instructions
+below.
 
 ## Run from source
 

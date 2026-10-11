@@ -36,7 +36,7 @@ no-database invariant, or the option is dropped.
 
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
 
-**Open question.** The reviewed [plan](docs/architecture-review.md) still leaves the agent launch
+**Open question.** The [architecture plan](docs/architecture-review.md) leaves the agent launch
 interface unresolved. Tauri is selected in `DECISIONS.md`; the launch contract determines how an
 agent passes files and optional setup values into the running app.
 
@@ -53,25 +53,17 @@ choose a repo-settings mechanism.
 
 ## 2026-10-10 — Package and CLI identity
 
-**Open question.** The fork still publishes as `mastermind-md`, installs `mastermind`, and writes
-`~/.config/mastermind`, so a teammate with both upstream and the fork installed collides on all
-three.
+**Open question.** This repository retains the package name `mastermind-md`, the `mastermind`
+command, and `~/.config/mastermind` configuration path from
+[Jingquank/Mastermind](https://github.com/Jingquank/Mastermind). Installing both versions creates
+collisions on all three.
 
 **Exit:** a ruling on the name, applied to `package.json`, the bin, and the config directory.
 
 ## 2026-10-10 — Markdown wrapping stays manual
 
-**Deferral.** The squad's operating docs are hard-wrapped at 100 columns, but the rewrap pre-commit
-hook reflows every staged `.md`, and `tests/fixtures/*.md` must stay byte-exact for the round-trip
-tests. Until the hook can exclude paths, wrapping is by hand.
+**Deferral.** Project Markdown is hard-wrapped at 100 columns by hand. Automatic formatting must
+exclude `tests/fixtures/*.md`, whose bytes are inputs to round-trip tests. No wrapping hook is
+installed.
 
-**Exit:** the rewrap engine gains a path exclusion and the hook is installed, or the squad rules
-that unwrapped Markdown is fine.
-
-## 2026-10-10 — The product doc describes upstream's owner
-
-**Gap.** [`docs/product.md`](docs/product.md) names upstream's author as the one user and cites a
-spec file that is not in the repo. The squad has three users, a different language mix, and a shared
-review loop.
-
-**Exit:** `docs/product.md` re-baselined for the squad, with the stale citation removed.
+**Exit:** a formatter with path exclusions is adopted, or the wrapping requirement is dropped.

@@ -33,7 +33,6 @@
 ## Component treatments
 
 - Top bar: elevated surface, bottom hairline; filename in mono sm; dirty indicator = 6px accent dot.
-- Primary CTA ("Save & hand back"): solid pill (`--color-cta-bg` / `--radius-full`) with `--color-cta-text` ink, sentence case, leading paper-plane (send) icon. On Grid that's the red accent + white ink; per-theme it follows the CTA tokens above (Nacht = electric-blue pill + dark ink, Sepia = ink pill).
 - Secondary/ghost buttons + view-mode toggle: pill shape, muted ink, sentence case; the active segment gains text color + elevated fill. Each mode segment carries a glyph (eye / pencil / code).
 - Selection toolbar: the dark band device miniaturized (invert-bg surface, invert-text ink).
 - Focus ring: 2px `--focus-ring`, offset 2px — ink on the light themes, the accent on Nacht.

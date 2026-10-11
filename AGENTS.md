@@ -1,8 +1,5 @@
 # mastermind — agentic rules
 
-A fork of Mastermind — local-first review of Markdown in the browser, where the file on disk is the
-only channel between a person and an agent — re-optimized for a three-person squad.
-
 - Record settled rulings in [`DECISIONS.md`](DECISIONS.md).
 - Record open questions and deferrals in [`DIRECTION.md`](DIRECTION.md).
 - Put forward designs under [`docs/`](docs/).
@@ -61,6 +58,9 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 - Put longer explanation in a sidecar beside the code it governs; use a directory `README.md` only
   for directory-level orientation.
 - Keep overview docs as maps to authoritative code and colocated docs; do not copy their contracts.
+- Make project descriptions understandable without the development conversation. Name or link
+  necessary referents; keep private team labels and temporary workstream framing out of product
+  copy.
 
 ### Inline comment hygiene
 

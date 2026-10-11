@@ -1,34 +1,43 @@
-# Mastermind
+# Product purpose
 
-> Distilled from the user-authored spec (docs/spec/mastermind-first-shot-prompt.md). Source of truth for design context.
+Mastermind is a local Markdown reviewer for people working with coding agents. A reviewer reads a
+plan or other document, edits its source, and leaves comments or proposed changes as CriticMarkup.
+The agent reads and responds in that same file. Review does not require an account, remote service,
+or separate discussion store.
 
-register: product
+## Review experience
 
-## Product Purpose
+The document is the primary surface. Typography, reading measure, and margin comments support
+focused review; navigation and controls should leave room for the text. The
+[theme contract](../themes/README.md) defines the visual system. Review colors distinguish proposed
+insertions, deletions, highlights, and comment anchors from ordinary prose.
 
-A local-first markdown viewer/editor for reviewing and discussing documents with AI coding agents. The loop: agent writes a plan `.md` → the user reads, edits, highlights, and comments with CriticMarkup → Save & hand back → the agent re-reads the file. The file on disk is the protocol; Mastermind is the reviewer-grade reading surface over it.
+Reading and source views share one document buffer. Accepting or rejecting a mark changes its exact
+source span. Edits save continuously; a reviewer can work across files without a separate completion
+action for each one. People and agents can both contribute author-tagged replies. Resolved
+conversations remain as hidden history in the Markdown file; deleting a comment removes it.
 
-## Users
+Single-language review is complete on its own. For comfort-language reading, the agent preparing a
+document can also prepare a translation using its existing context. Opening the original never waits
+for translation. Comments made from a translated passage retain the selected quote and language in
+the original document. Exact text edits remain anchored to the original source.
 
-- **KD (the owner).** A designer-engineer reviewing agent-written plans several times a day, on a Mac desktop browser, usually in long focused sessions. Bilingual (EN / 简体中文). High taste; lives in tools like VS Code, Figma, and terminal apps.
-- **AI agents** (indirectly): they never see the UI, only the file and the CLI's stdout. Everything agent-facing must stay machine-readable and stable.
+## Product boundaries
 
-## Brand & Tone
+The app reviews existing files. The invoking agent chooses which files need review; Git changes and
+conversation context may inform that judgment. The app does not infer that choice from Git alone.
+The public [review skill](../.claude/skills/mastermind/SKILL.md) describes preparation and agent
+participation.
 
-- **"Reviewer-grade reading experience"** is a core principle: typography and rendering quality matter as much as features. This is a tool for *thinking about documents*.
-- Visual identity: **Swiss International** — one grotesque (Schibsted Grotesk) carries display, body, and labels; Geist Mono for the machine-flavored bits (filenames, code, CriticMarkup source). Flat surfaces, hairline rules, a generous grid, one accent per theme. Three themes: **Grid** (light, Swiss-red, the default), **Nacht** (dark, electric blue), **Sepia** (warm paper, ochre). Restrained Swiss *in service of reading* — precision, not poster maximalism. Quiet until something needs attention.
-- Review marks use a fixed semantic language: green = insertion, brick = deletion, gold = highlight, blue dotted underline = comment anchor — tuned per theme so the accent never collides with a mark hue. The accent is chrome-only (CTA / active / focus), never document ink.
+The current application uses a desktop browser and local file service. The planned Tauri host will
+own native file access and application lifetime, while retaining the web interface. Graphical
+onboarding and native multi-file opening are planned; they are not yet the shipped launch flow.
 
-## Anti-references
+## Authoritative references
 
-- Google Docs' chrome-heavy review UI (we want the margin-rail *idea* without the toolbar forest).
-- Generic SaaS dashboards; AI-slop gradients/glassmorphism; anything that reads "web app" more than "document".
-- Electron-style over-chrome. The document is the interface.
-
-## Strategic principles
-
-1. The document column is sacred: nothing competes with reading.
-2. Marks are the data: every review affordance hangs off CriticMarkup spans.
-3. Local, fast, silent: no network, no spinners unless real work is happening.
-4. Keyboard-first where it counts: Cmd+S, Cmd+E, Esc.
-5. One file per session; the agent loop (--wait / hand back) is the product's spine.
+- [README](../README.md): installation and current usage.
+- [Review protocol](../.claude/skills/mastermind/reference/review-protocol.md): in-file feedback.
+- [Implementation map](../src/README.md): source modules and their contracts.
+- [Decisions](../DECISIONS.md): settled constraints.
+- [Architecture plan](architecture-review.md) and [direction](../DIRECTION.md): remaining work and
+  unresolved choices.

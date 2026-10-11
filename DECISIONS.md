@@ -1,5 +1,10 @@
 # Decisions
 
+These rulings govern this repository. In older entries, "squad" means the initial group of three
+reviewers, and "upstream" means [Jingquank/Mastermind](https://github.com/Jingquank/Mastermind).
+The [README](README.md) describes the current application; the
+[architecture plan](docs/architecture-review.md) records implementation status.
+
 - Add an entry only when deleting it would change a future choice.
 - Keep execution history in commits, figures in their measured artifacts, and inventories in their
   manifests.

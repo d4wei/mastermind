@@ -1,7 +1,7 @@
 # Review protocol
 
-The original Markdown file contains active feedback. People and agents can both participate with
-ordinary file edits; no private skill or external discussion service is required.
+The original Markdown file contains active feedback. People and agents participate through
+ordinary edits to that file.
 
 ## Marks and authors
 

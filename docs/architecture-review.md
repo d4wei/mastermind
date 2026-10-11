@@ -5,8 +5,10 @@ exit: approved changes ship with colocated contracts, or the remaining proposals
 ---
 # Architecture review and proposed ablation
 
-The user approved execution of this plan and the hidden-content recommendation on 2026-10-10.
-Binding constraints live in [DECISIONS.md](../DECISIONS.md). Execution starts with document/save
+Da Wei approved this implementation plan on 2026-10-10, including retaining resolved discussions
+in hidden HTML comments within the document. Binding constraints live in
+[DECISIONS.md](../DECISIONS.md); the archive format now lives in
+[review-archive.md](../src/shared/review-archive.md). The sequence begins with document/save
 ownership and obsolete-code removal; choices explicitly left open below remain open. The original
 source findings describe the checkout after `005bbd0`; completion notes identify work landed since.
 
@@ -40,7 +42,8 @@ Opens a real directory tree. [`Navigator.tsx`](../src/ui/app/Navigator.tsx) and
 [`Tree.tsx`](../src/ui/app/Tree.tsx) provide Files/Outline navigation, lazy children, recent
 files, and review badges. [`WorkspaceView.tsx`](../src/ui/app/WorkspaceView.tsx) renders one active
 file through the ordinary session view. The first execution batch added retained document buffers
-beneath this view. The trial found the workspace experience disconnected and underdeveloped. Retire
+beneath this view. During the 2026-10-10 review, Da Wei found this separate navigation experience
+disconnected and underdeveloped. Retire
 that experience and use the desktop host's native facilities to open and browse files. Do not
 rebuild or transplant the custom workspace tree by default. Keep path validation at file-access
 boundaries; any retained root-scoped operation must still enforce its root.
@@ -95,7 +98,7 @@ the detached daemon and its status/stop workflow once those responsibilities run
 lifetime. Review-session state is in memory and ends when the app quits; saved Markdown remains on
 disk. Existing preferences and prepared translation files are separate from session restoration, and
 this ruling does not require deleting them. SQLite is a possible later choice for restoring app
-state, not a dependency or a second store for review feedback in this iteration.
+state, not a dependency or a second store for review feedback in the desktop migration.
 
 ## File-safety findings to address first
 
@@ -165,33 +168,33 @@ For this codebase, that means adapting the existing `files.ts`, `watch.ts`, conf
 services instead of rewriting them in another language. A consistent Chromium renderer reduces
 engine variation in selection, geometry, CodeMirror, and Chinese text input, although operating
 system differences still require testing. These are repository-specific advantages, not measured
-claims about our future desktop build.
+claims about the planned desktop build.
 
 The cost is carrying a browser and Node runtime for a small document utility. Package size, total
 process memory, startup, and update burden matter; no size or memory estimate is established here.
-Electron itself does not require keeping our HTTP server. Its host owns the application lifetime.
+Electron does not require keeping the existing HTTP server. Its host owns application lifetime.
 
 [Playwright's Electron support][electron-tests] drives the real application and is currently
 experimental. Browser tests remain useful, but native dialogs, menus, focus, and quit handling need
-separate checks. This is the shortest apparent route to reuse our existing implementation and tests.
+separate checks. This is the shortest apparent route to reuse the existing implementation and tests.
 
 ### Tauri with native file services: a credible smaller-runtime alternative
 
 [Tauri][tauri-architecture] uses a Rust host and system webviews. It avoids shipping Chromium by
 default. [Its process model][tauri-process] uses different webview implementations across platforms;
-that makes our actual selection and editing behavior a required comparison, not an assumed match.
+that makes selection and editing behavior a required comparison, not an assumed match.
 The React/TypeScript document core can remain intact; choosing Tauri does not mean rewriting the UI
 or CriticMarkup parser in Rust.
 
 Tauri's [filesystem plugin][tauri-fs] supplies reads, writes, watching, and path scopes. The missing
-work is our application-specific file contract: version tokens, competing writes, symlink and inode
+work is the application-specific file contract: version tokens, competing writes, symlink and inode
 behavior, watcher echoes, and save completion before close. Implement that in a focused native
 service and port its behavioral tests. Avoid rebuilding the retired workspace or queue machinery.
 
 The strongest argument for Tauri is the final product: a small local document utility with a narrow
-native boundary. The strongest argument against it is that we have just stabilized precisely the
-file-safety code that would need porting. Rust is an additional implementation and build toolchain;
-its presence is neither a disqualifier nor a reason to rewrite more than this boundary needs.
+native boundary. The strongest argument against it is that the native port must preserve the
+behavior of the existing file-safety implementation. Rust adds an implementation and build
+toolchain; its presence does not require rewriting more than this boundary needs.
 Do not overstate that port: the current file read/write and watcher modules together occupy only
 140 lines at the inspected revision. That is not an effort estimate, but it argues against choosing
 Electron merely because Node code already exists. The difficult part is preserving behavior.
@@ -199,25 +202,25 @@ Electron merely because Node code already exists. The difficult part is preservi
 Current [Tauri WebDriver guidance][tauri-tests] supports macOS through WebdriverIO's embedded
 provider, alongside Windows and Linux. The older claim that desktop macOS automation is unavailable
 is too broad. Include that debug-only integration in the experiment; do not ship an automation
-server in release builds. Its reliability for our app remains unmeasured.
+server in release builds. Its reliability for this application remains unmeasured.
 
 ### Other shapes considered
 
 - **Tauri with a Node sidecar:** [supported][tauri-sidecar], and it could reuse file services. It
   adds the Rust host, a packaged Node process, and another lifecycle/communication boundary. It
-  need not use HTTP, but for our reduced app it weakens the reason to prefer Tauri. Keep it out of
+  need not use HTTP, but for this application it weakens the reason to prefer Tauri. Keep it out of
   the implementation; a concrete native-port blocker would require revisiting the wrapper ruling.
 - **Electrobun:** worth knowing about, but not the initial baseline. Its current
   [platform guide][electrobun] offers system webviews or bundled CEF and requires native
   build/test runners; its published architecture matrix has caveats, including no macOS x64 core
-  artifact in the documented release workflow. We have not validated its runtime compatibility,
-  lifecycle, or automation against this app. It earns a trial if the two main candidates both fail
-  a requirement; a framework change alone is not a product benefit.
+  artifact in the documented release workflow. Its runtime compatibility, lifecycle, and automation
+  have not been validated against this application. It earns a trial if Tauri fails a requirement;
+  a framework change alone is not a product benefit.
 - **Neutralinojs:** [its architecture][neutralino] uses HTTP for resources and WebSockets for native
   calls. That is a weak match for the desired removal of the server-shaped runtime, even though the
   server is local. No first-round experiment recommended.
 - **A custom macOS-only shell:** conflicts with the approved cross-platform direction. A native UI
-  rewrite would also discard the web rendering/selection layer we intend to keep.
+  rewrite would also discard the retained web rendering/selection layer.
 
 ### Validate the selected host
 
@@ -274,7 +277,7 @@ also checked against the emitted archive: historical marks remain inactive.
 
 Receiving-agent guidance distinguishes active feedback from resolved history. Author-tagged agent
 replies use the self-contained [public protocol][public-protocol]. The shipped instructions use
-neutral examples and require no private skill or helper. Reopening
+neutral examples and include all required review instructions. Reopening
 archived threads and relocating their anchors can wait for an actual need; undo covers immediate
 accidental resolution.
 
@@ -297,17 +300,17 @@ separate product expansion and is not proposed here.
 
 Include the trial's cross-list insertion reproduction, author tags containing spaces, and comment
 soft-line wrapping in that comparison. Preserve screenshot-only observations as such; the original
-document is unavailable. See [trial notes](squad-fork.md#trial-notes) for evidence.
+document is unavailable. See [trial notes](fork-rationale.md#trial-notes) for evidence.
 
 For frontmatter, [Obsidian Properties](https://obsidian.md/help/properties) is a useful prior: named
 rows with values at the top, typed simple properties, and raw YAML/source mode for structures its
 property UI cannot represent. Proposal: a quiet, read-only property list for simple keys and values,
 with a source fallback for nested/unknown/invalid YAML. Keep bytes, key order, comments, and body
-offsets intact. Do not turn display into a YAML rewrite or add a property editor in this arc.
+offsets intact. Display changes should neither rewrite YAML nor introduce a property editor.
 The landed literal frontmatter support is the baseline; property-list display is the reviewed
 presentation direction.
 
-## Wishlist mapped to product work
+## Planned product work
 
 - **One graphical onboarding flow:** combine setup, handle, repository-scoped language, optional
   comfort language, and a localized demo. Prefill invocation values, then settings/Git defaults as
@@ -322,7 +325,7 @@ presentation direction.
 - **Continuous saving:** autosave has replaced explicit hand-back.
   Optional Git commits remain a separate proposal, with file scope and timing unresolved; autosave
   should not implicitly stage or commit unrelated repository changes.
-- **Translation and squad configuration:** support repo-language-only operation and an optional
+- **Translation and repository preferences:** support repo-language-only operation and an optional
   comfort language, with fresh translations supplied by the invoking agent. Nonblocking opening
   and prepared delivery have shipped. Repository settings still need storage and discovery;
   comfort language remains a personal preference.
@@ -352,8 +355,8 @@ the scope small enough to validate before beginning the wrapper or broader produ
    legacy-history deletion in separate commits; repair their module maps. Exit: pending writes and
    undo belong to the right document, edits survive navigation and slow saves, and obsolete paths
    have no remaining callers.
-3. **Make the trial comfortable.** Address input selection contrast, author-label consistency, and
-   comment soft wraps in tested fixes. Preserve paragraph breaks and source bytes. Characterize
+3. **Fix review interaction issues.** Address input selection contrast, author-label consistency,
+   and comment soft wraps in tested fixes. Preserve paragraph breaks and source bytes. Characterize
    the cross-list insertion separately: the lost original cannot establish its exact cause, and
    invalid multi-block marks must not silently become accepted edits. Validate narrow-window chrome
    in the browser development view; a wrapper alone does not fix that preview. Exit: targeted
@@ -372,7 +375,7 @@ the scope small enough to validate before beginning the wrapper or broader produ
    onboarding, and the graphical setup/demo flow against settled contracts. App session
    state ends on quit; restoration is deferred. Evaluate frontmatter rows and renderer replacement
    independently. Choose package identity before distribution. Optional Git commits and Claude Mods
-   remain deferred. Exit: a teammate can open, review, save, and revisit chosen files without
+   remain deferred. Exit: a reviewer can open, review, save, and revisit chosen files without
    operating the CLI or handing files back individually.
 
 Each implementation commit must pass the full test suite and both typechecks. Run the corpus and
