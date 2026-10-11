@@ -17,7 +17,10 @@ import { CheckIcon, GearIcon } from '../icons'
 import { previewTargetLang, useTranslation } from '../translate/translationStore'
 import { openEvents } from './api'
 import { useConfig } from './configStore'
-import { useDirty, useDoc, type ViewMode } from './store'
+import { useDoc, type ViewMode } from './store'
+import { parseResolvedThreads } from '../../shared/review-archive'
+import { ResolvedThreads } from '../review/ResolvedThreads'
+import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
 
 // Code-split the heavy / conditionally-rendered views so the initial bundle stays
@@ -41,8 +44,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
-  const conflict = useDoc((s) => s.conflict)
-  const diskChange = useDoc((s) => s.diskChange)
   const handedBack = useDoc((s) => s.handedBack)
   const notice = useDoc((s) => s.notice)
   const handbackPulse = useDoc((s) => s.handbackPulse)
@@ -50,9 +51,9 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const meta = useDoc((s) => s.meta)
   const mode = useDoc((s) => s.mode)
   const externalVersion = useDoc((s) => s.externalVersion)
+  const comparisonOpen = useDoc((s) => s.conflictDraft?.open ?? false)
   const load = useDoc((s) => s.load)
   const applyEdits = useDoc((s) => s.applyEdits)
-  const dirty = useDirty()
 
   const t = useT()
   const lang = useLang()
@@ -61,14 +62,22 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const [railOpen, setRailOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [findOpen, setFindOpen] = useState(false)
-  // settings and find share one home and are mutually exclusive:
-  // opening one closes the other (SlideOver handles Escape/click-out/focus).
+  const [resolvedOpen, setResolvedOpen] = useState(false)
+  const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
+  // Transient panels share one overlay home; opening one closes the others.
   const toggleSettings = useCallback(() => {
     setSettingsOpen((v) => {
-      if (!v) setFindOpen(false)
+      if (!v) { setFindOpen(false); setResolvedOpen(false); useDoc.getState().closeConflict() }
       return !v
     })
   }, [])
+  useEffect(() => {
+    if (comparisonOpen) {
+      setSettingsOpen(false)
+      setFindOpen(false)
+      setResolvedOpen(false)
+    }
+  }, [comparisonOpen])
   const closeSettings = useCallback(() => setSettingsOpen(false), [])
   const [agentWaiting, setAgentWaiting] = useState(false)
   const [assistAvailable, setAssistAvailable] = useState(false)
@@ -224,7 +233,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         if (s.mode === 'reading') {
           e.preventDefault()
           setFindOpen((v) => {
-            if (!v) setSettingsOpen(false)
+            if (!v) { setSettingsOpen(false); setResolvedOpen(false); useDoc.getState().closeConflict() }
             return !v
           })
         }
@@ -332,6 +341,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   return (
     <>
       <TopBar
+        resolved={{ count: resolvedCount, open: resolvedOpen, onToggle: () => {
+          setResolvedOpen((value) => !value)
+          setSettingsOpen(false)
+          setFindOpen(false)
+          useDoc.getState().closeConflict()
+        } }}
         railOpen={railOpen}
         // Both controls stay mounted so the bar morphs between layouts; their
         // applicability (not their presence) is what changes per view.
@@ -386,30 +401,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           <RenameDialog />
         </Suspense>
       )}
-      {conflict && (
-        <div className="banner" role="alert">
-          <span className="banner-text">{t('savePaused')}</span>
-          <button type="button" className="btn-ghost" onClick={() => void useDoc.getState().reloadFromDisk()}>
-            {t('reloadDiscard')}
-          </button>
-          <button type="button" className="btn-ghost" onClick={() => void useDoc.getState().saveForce()}>
-            {t('saveAnyway')}
-          </button>
-        </div>
-      )}
-      {!conflict && diskChange && (
-        <div className="banner" role="status">
-          <span className="banner-text">{diskChange.deleted ? t('fileDeleted') : t('fileChanged')}</span>
-          {!diskChange.deleted && (
-            <button type="button" className="btn-ghost" onClick={() => void useDoc.getState().reloadFromDisk()}>
-              {dirty ? t('reloadDiscard') : t('reload')}
-            </button>
-          )}
-          <button type="button" className="btn-ghost" onClick={() => useDoc.getState().dismissDiskChange()}>
-            {t('keepMine')}
-          </button>
-        </div>
-      )}
+      {resolvedOpen && <ResolvedThreads source={source} onClose={() => setResolvedOpen(false)} />}
+      <ConflictPanel />
       <div className={`doc-shell${showRail ? ' with-rail' : ''}`}>
         <div className="doc-column">
           {showTranslated && (
@@ -462,7 +455,10 @@ export function SessionView({ sessionId }: { sessionId: string }) {
             authorTag={authorTag}
             activeSpan={activeCardSpan}
             onActivate={setActiveSpan}
-            onEdit={applyEdits}
+            onEdit={(edits) => {
+              const current = useDoc.getState()
+              if (current.sessionId === sessionId && current.source === source) current.applyEdits(edits)
+            }}
           />
         )}
       </div>

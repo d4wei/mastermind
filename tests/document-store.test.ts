@@ -204,9 +204,7 @@ it('invalidates an external read overtaken by a successful write', async () => {
   const stale = deferred<Response>(); reads.set('A', stale)
   store.getState().notifyDiskChange(2)
   store.getState().setSource('local')
-  const fresh = deferred<Response>(); reads.set('A', fresh)
-  const save = store.getState().saveForce()
-  fresh.resolve(response({ content: 'external', mtimeMs: 2, version: 'A-2' }))
+  const save = store.getState().autosave()
   await vi.advanceTimersByTimeAsync(0)
   writes[0]!.pending.resolve(response({ mtimeMs: 3, version: 'A-3' }))
   await save

@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { useT } from '../i18n'
 import { CommentBody } from './CommentBody'
-import { acceptEdit } from '../../shared/critic/resolve'
+import { deleteCommentEdits, resolveThreadEdits } from '../../shared/review-archive'
+import './ResolvedThreads.css'
 import { prefersReducedMotion } from '../util/presence'
 import type { CriticSpan, ReviewItem } from '../../shared/critic/types'
 import type { TextEdit } from '../../shared/types'
@@ -31,15 +32,9 @@ interface CardLayout {
 }
 
 const CARD_GAP = 8
-/** matches --dur-base; how long a resolved card lingers to play its leave */
 const EXIT_MS = 180
 
-/**
- * Content-derived identity for a thread. Span indices shift on every edit, so a
- * positional key would remount (and re-animate) every card on each action — and
- * break exit-diffing. A content key is stable across unrelated edits, so a card
- * only enters when its thread is genuinely new and leaves when it's resolved.
- */
+/** Span indices shift after unrelated edits; content keys retain cards through those shifts and exits. */
 function threadKey(thread: ThreadItem, anchorText: string): string {
   return JSON.stringify([anchorText, thread.comments.map((c) => [c.author ?? '', c.body])])
 }
@@ -55,6 +50,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   const [railHeight, setRailHeight] = useState(0)
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
+  const [resolveError, setResolveError] = useState<string | null>(null)
 
   const threads = items.filter((i): i is ThreadItem => i.type === 'thread')
 
@@ -80,7 +76,6 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         next.push({ key, spanIndex, naturalTop, top: naturalTop, anchorText, thread })
       }
       next.sort((a, b) => a.naturalTop - b.naturalTop)
-      // push down to avoid overlap, using rendered card heights when known
       let cursor = 0
       for (const card of next) {
         card.top = Math.max(card.naturalTop, cursor)
@@ -88,8 +83,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         cursor = card.top + (el?.offsetHeight ?? 96) + CARD_GAP
       }
 
-      // a card whose key is gone leaves the page — keep it around (frozen at its
-      // last position) just long enough to play its exit, unless a key reappears.
+      // Keep disappearing cards at their last measured positions until their exit finishes.
       const nextKeys = new Set(next.map((c) => c.key))
       const gone = layoutsRef.current.filter((p) => !nextKeys.has(p.key))
       layoutsRef.current = next
@@ -97,7 +91,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         setExiting((cur) => {
           let result = cur.filter((x) => {
             if (!nextKeys.has(x.key)) return true
-            const tm = exitTimers.current.get(x.key) // resurrected before its timer fired
+            const tm = exitTimers.current.get(x.key)
             if (tm) { clearTimeout(tm); exitTimers.current.delete(x.key) }
             return false
           })
@@ -134,16 +128,22 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, items, spans, replyFor, activeSpan])
 
-  // cancel any in-flight leave timers only when the rail itself unmounts
   useLayoutEffect(() => {
     const timers = exitTimers.current
     return () => timers.forEach(clearTimeout)
   }, [])
 
   const resolveThread = (thread: ThreadItem): void => {
-    const edits: TextEdit[] = thread.comments.map((c) => ({ from: c.span.start, to: c.span.end, insert: '' }))
-    if (thread.anchor) edits.push(acceptEdit(source, thread.anchor)) // unwrap the highlight
+    let edits: TextEdit[]
+    try {
+      edits = resolveThreadEdits(source, thread)
+    } catch (error) {
+      setResolveError(error instanceof Error ? error.message : String(error))
+      return
+    }
+    if (edits.length === 0) return
     onEdit(edits)
+    setResolveError(null)
     onActivate(null)
   }
 
@@ -160,6 +160,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
 
   return (
     <div ref={railRef} className="rail" style={{ height: railHeight || undefined }}>
+      {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
       {layouts.map((card, i) => {
         const isActive = activeSpan !== null && card.spanIndex === activeSpan
         return (
@@ -170,7 +171,6 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
               else cardRefs.current.delete(card.key)
             }}
             className={`rail-card${isActive ? ' active' : ''}`}
-            // stagger the entrance so a full rail cascades in (capped so a long list doesn't crawl)
             style={{ top: card.top, '--enter-delay': `${Math.min(i, 5) * 55}ms` } as CSSProperties}
             onClick={() => onActivate(card.spanIndex)}
             role="button"
@@ -187,6 +187,13 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
               <div key={i} className="rail-comment">
                 {c.author && <span className="rail-author">@{c.author}</span>}
                 <CommentBody body={c.body} />
+                <button type="button" className="btn-ghost rail-delete" onClick={(event) => {
+                  event.stopPropagation()
+                  onEdit(deleteCommentEdits(source, card.thread, i))
+                  onActivate(null)
+                }}>
+                  {t('deleteComment')}
+                </button>
               </div>
             ))}
             {replyFor === card.key ? (

@@ -90,10 +90,10 @@ describe('autosave', () => {
 
   it('saves unedited YAML frontmatter byte-for-byte, including CRLF', async () => {
     const source = '---\ntitle: "Plan"\nitems: [one, two]\n---\n\n# Body\n'
-    seed({ source, savedSource: source, eol: 'crlf' })
+    seed({ source, savedSource: '', eol: 'crlf' })
     vi.mocked(getFile).mockResolvedValue({ content: source, mtimeMs: 100, version: 'disk' })
-    await useDoc.getState().saveForce()
-    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), 'disk')
+    await useDoc.getState().autosave()
+    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), 'base')
   })
 
   it('an unnamed draft prompts for a filename instead of writing', async () => {

@@ -7,6 +7,7 @@ import { SlotLabel } from '../util/SlotLabel'
 import { useDoc, type ViewMode } from './store'
 
 interface TopBarProps {
+  resolved?: { count: number; open: boolean; onToggle: () => void }
   railOpen?: boolean
   onToggleRail?: () => void
   /** Whether the comment-rail toggle applies in the current view. It collapses
@@ -21,20 +22,15 @@ interface TopBarProps {
   }
 }
 
-export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation }: TopBarProps) {
+export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation, resolved }: TopBarProps) {
   const t = useT()
   const headerRef = useRef<HTMLElement | null>(null)
   const meta = useDoc((s) => s.meta)
   const mode = useDoc((s) => s.mode)
   const setMode = useDoc((s) => s.setMode)
-  // The bar's two optional controls morph in/out (max-width/opacity) rather than
-  // mount/unmount, so the floating pill resizes smoothly instead of snapping.
-  // Translation applies only in reading view; the comment toggle only when the
-  // caller says comments are present (reading the original, with threads).
+  // Retain hidden controls so the floating bar animates between their widths.
   const transVisible = mode === 'reading'
   const commentsVisible = mode === 'reading' && !!commentsAvailable
-  // mtimeMs changes only when the file is (re)loaded from disk — never on local
-  // edits — so it's the clean signal to re-roll the filename on a refresh.
   const mtimeMs = useDoc((s) => s.mtimeMs)
 
   const MODES: { id: ViewMode; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
@@ -56,9 +52,6 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation 
 
   return (
     <header className="topbar" ref={headerRef}>
-      {/* Lead cluster: the icon-only view-mode toggle leads the bar, a hairline,
-          then the filename — which rolls in on load and re-rolls with a rainbow
-          sweep whenever the .md content is refreshed from disk. */}
       <div className="topbar-lead">
         <ToggleGroup.Root
           className="seg"
@@ -69,7 +62,6 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation 
           title={`⌘E ${t('viewMode')}`}
         >
           {MODES.map(({ id, label, Icon }) => (
-            // Icon-only: the label rides aria-label + the native tooltip.
             <ToggleGroup.Item key={id} value={id} className="seg-btn" aria-label={label} title={label}>
               <Icon />
             </ToggleGroup.Item>
@@ -110,6 +102,12 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation 
             title={t('toggleRail')}
           >
             <ChatIcon />
+          </button>
+        )}
+        {resolved && (
+          <button type="button" className={`btn-ghost topbar-resolved${resolved.open ? ' active' : ''}`}
+            aria-pressed={resolved.open} onClick={resolved.onToggle}>
+            {t('resolved')} ({resolved.count})
           </button>
         )}
         <HandBackButton />

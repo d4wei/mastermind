@@ -13,12 +13,39 @@ write if the buffer changed during the request.
 
 A clean external change replaces the displayed source and base. A dirty change keeps the base
 and local buffer and captures the disk content and version in `diskChange`; further automatic
-writes pause. Events arriving during writes are reconciled afterward. The comparison interaction
-remains a separate design. `saveForce` reads the current disk version and submits the captured
-local text against that version; it does not bypass the server's conflict guard.
+writes pause. Events arriving during writes are reconciled afterward. Comparison is explicit,
+and does not depend on Source mode.
+
+## Conflict comparison
+
+Each document retains its comparison draft through panel close and navigation. The draft holds
+Base, captured Local and its monotonically increasing source revision, the reviewed Disk token
+and bytes, and an editable Result initialized to Local. Editing Result changes no document or
+disk bytes. Later local or disk changes mark the draft stale; they never replace Result.
+An explicit refresh updates the comparison snapshots while preserving Result. Edits arriving
+during that refresh still invalidate its captured Local revision.
+
+Save result requires both the captured Local revision and the displayed Disk token to remain
+current. The write sends that exact token to the server. A conflict response refreshes the latest
+Disk for comparison while preserving the stale draft; the user must explicitly refresh before
+retrying against a different version. Successful completion changes only its originating document.
+If local edits arrived during the write, they remain in the buffer and saving stays paused rather
+than silently replacing them with Result. Save failure retains the result for retry.
+
+Use disk validates the displayed token with a disk read and rechecks its Local revision and read
+generation before adopting it. The discarded Local buffer remains in review undo. Missing paths
+block both apply actions; refresh retries reading without recreating the file. Any failed read
+invalidates the comparison's apply token while retaining its text. An unavailable response can mean
+missing or unreadable; only a deletion event establishes the missing-file notice. Repeated disk reads
+and refreshes share generation guards, and write boundaries invalidate older reads.
+
+`ConflictPanel.tsx` presents the persistent viewport notice and the shared SlideOver comparison
+shell. Result is a manual text merge; no automatic merge or normalized Markdown serialization is
+involved. Ordinary writes and accepted Result restore the appropriate original line endings.
 
 `documentLifecycle.ts` registers at the app level so retained documents remain protected outside
 a document route. Blur and visibility changes start saves for all retained records. Browser
-unload cannot await those writes: while any record is dirty or saving, the handler requests the
-browser's leave-page prompt. Accepting that prompt, process termination, and app crashes can
-still lose unsaved in-memory buffers. Native close waiting belongs to the future desktop host.
+unload cannot await those writes: while any record is dirty, saving, or holds a distinct edited
+Result, the handler requests the browser's leave-page prompt. Accepting that prompt, process
+termination, and app crashes can still lose unsaved in-memory buffers. Native close waiting belongs
+to the future desktop host.

@@ -1,0 +1,44 @@
+.resolved-threads {
+  padding: calc(var(--space-unit) * 4);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+.resolved-thread + .resolved-thread {
+  margin-top: calc(var(--space-unit) * 4);
+  padding-top: calc(var(--space-unit) * 4);
+  border-top: 1px solid var(--color-border);
+}
+.resolved-thread h3 {
+  margin: 0 0 calc(var(--space-unit) * 2);
+  font-size: var(--font-size-sm);
+}
+.resolved-context {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+}
+.resolved-comment,
+.resolved-thread details {
+  margin-top: calc(var(--space-unit) * 3);
+}
+.resolved-thread pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+.rail-comment .rail-delete {
+  margin-top: var(--space-unit);
+  font-size: var(--font-size-micro);
+  color: var(--color-text-muted);
+}
+
+.rail-resolution-error {
+  position: relative;
+  z-index: var(--z-rail);
+  padding: calc(var(--space-unit) * 2);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
