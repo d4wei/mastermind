@@ -45,12 +45,12 @@ These choices determine which existing paths can be removed and where their resp
 ## 2026-10-10 — Translation opening and interaction (updated 2026-10-10)
 
 **Open question.** Single-language operation and repo/comfort language roles are settled. When
-translation is enabled, nonblocking opening, freshness, and review against a translated view need
-a contract. The proposed long-term path is preparation by the document agent, with no live queue or
-separate translator. See the
+translation is enabled, nonblocking opening, freshness, and artifact storage need a contract.
+Block-anchored comments from the comfort-language view are ruled. The proposed long-term path is
+fresh preparation by the document agent, with no live queue or separate translator. See the
 [design discussion](docs/architecture-review.md#translation-without-a-live-service).
 
-**Exit:** rulings on nonblocking opening, translation delivery, source anchoring for review, and
+**Exit:** rulings on nonblocking opening, translation delivery and freshness, artifact storage, and
 storage/discovery/precedence for repository settings. Repo language is repo-scoped; comfort language
 is personal, as ruled in `DECISIONS.md`.
 

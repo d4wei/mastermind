@@ -81,24 +81,35 @@ preparing agent's turn; opening the original need not wait for it.
 
 The remaining contract should cover:
 
-- **Freshness:** associate translated output with the source revision and target language. Current
-  block hashes detect changed block bytes, but unchanged wording can change meaning when surrounding
-  context changes. Require the preparing agent to reassess translation after document revisions;
-  do not treat an unchanged block hash as evidence of semantic freshness.
+- **Freshness proposal:** generate a fresh full-document translation on each explicit preparation
+  pass, with no automatic reuse across passes. Retain a local artifact for the current prepared
+  snapshot so reopening it needs no live translator. The preparation pass is an agent operation,
+  not a waiting app session. Actual source prose or proposed-edit changes invalidate that snapshot;
+  comments, highlights, and resolved history alone should not. This distinction requires a tested
+  projection and source mapping; it must not rewrite the document on disk. Keep review discussion
+  in its authored language rather than making each new comment demand translation.
+- **Context boundary:** the app can check whether a translation corresponds to its source snapshot;
+  it cannot establish that the preparing agent considered every relevant contextual dependency.
+  Preparing anew avoids cross-pass reuse assumptions but does not make semantic drift impossible.
+  The agent owns context selection. A changed Git HEAD misses uncommitted changes and also reacts
+  to unrelated commits; it should not be the translation-validity key. A declared dependency list
+  is a possible later optimization only if repeat use warrants the added discovery and validation
+  machinery; it cannot represent undisclosed conversation context.
 - **Missing preparation:** show the current original with a clear unavailable/stale indication until
   the preparing agent supplies current output. Do not display stale translations as current or make
   the app create a request that needs another agent to wait on it.
-- **Feedback anchoring:** read-only translated prose was a proposal about mapping feedback back to
-  source, not retaining old data. A minimal useful review surface could accept comments against the
-  corresponding original block, in the reviewer's language. Exact selected-text edits still need
-  the original; a translated character offset cannot identify an original character offset.
+- **Feedback anchoring, approved:** accept comments against the corresponding original block, in
+  the reviewer's language. Preserve the precise selected translated passage and its language in
+  the comment as historical context, even after translation refresh. Exact selected-text edits
+  still use the original. Check the current source mapping before applying the comment; quote
+  serialization must preserve CriticMarkup boundaries, including delimiter-like selected text.
 - **Storage and languages:** choose a simple derived artifact and explicit source/target metadata.
   Repo language, personal comfort language, file discovery, and freshness validation must agree;
   there is no requirement to preserve the old cache format or language-pair heuristic.
 
 Feedback in a comfort language remains in the original Markdown file. Translation artifacts contain
-no exclusive review state. Whether block-anchored commenting is sufficient needs the user's ruling
-before implementation.
+no exclusive review state. The block-anchored comment direction is ruled; freshness and artifact
+storage remain proposals for review.
 
 ### `install-agents` / `uninstall-agents`
 

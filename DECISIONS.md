@@ -24,6 +24,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Translated review comments anchor to the original block
+
+**Ruled.** A reader may comment from the comfort-language view. Store the comment in the original
+Markdown file against the corresponding source block, retaining the precise selected translated
+passage as quoted context and identifying its language. Keep exact text edits on the original;
+best-effort translated review does not require character-level alignment or a second feedback store.
+
+**Beat:** requiring a reader to switch languages for every comment, or treating translated offsets
+as positions in the source.
+
 ## 2026-10-10 — The fork does not carry legacy review compatibility
 
 **Ruled.** Existing hand-back summaries and translation caches impose no compatibility requirement;
