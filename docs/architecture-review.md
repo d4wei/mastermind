@@ -5,14 +5,16 @@ exit: approved changes ship with colocated contracts, or the remaining proposals
 ---
 # Architecture review and proposed ablation
 
-This is a plan for review, not authorization to refactor. The user requested this checkpoint before
-further development. Binding product directions live in [DECISIONS.md](../DECISIONS.md). Findings
-below describe the checkout after `005bbd0`; implementation proposals remain unapproved.
+This plan incorporates the user's review. Unmarked recommendations stand as recommended; the
+amendments below supersede the earlier proposals. This settles the design content, not authorization
+to implement it. Binding constraints live in [DECISIONS.md](../DECISIONS.md). The code findings
+describe the checkout after `005bbd0`; no implementation changes accompany this revision.
 
 ## Recommendation
 
-Keep the source-preserving Markdown and CriticMarkup core, the reading surface, and the file tree.
-First make document ownership and saving reliable across file switches. Then remove obsolete
+Keep the source-preserving Markdown and CriticMarkup core and the reading surface. Use native file
+access in the desktop host instead of preserving the separate workspace experience. First make
+document ownership and saving reliable across file switches. Then remove obsolete
 serialization and feedback machinery before changing the host. Let the desktop shell own lifecycle,
 and retain a small agent-facing way to open chosen files. Avoid moving the whole detached daemon and
 its waiting-session protocol into a wrapper unchanged.
@@ -29,9 +31,8 @@ The command definitions are in [`src/cli/index.ts`](../src/cli/index.ts).
 
 Creates a blank file, or an unnamed temporary draft if no path is supplied, then opens it. The
 unnamed path brings naming UI, a rename endpoint, session rekeying, and abandoned-draft cleanup.
-It is an authoring feature, not necessary to review an existing file. Proposed deletion: the public
-command and its exclusively draft-related machinery, unless blank-document authoring earns a place
-in the product. Source editing of existing files does not depend on keeping it.
+It is an authoring feature, not necessary to review an existing file. Remove the public command and
+its exclusively draft-related machinery. Source editing of existing files remains supported.
 
 ### `workspace .`
 
@@ -39,10 +40,32 @@ Opens a real directory tree. [`Navigator.tsx`](../src/ui/app/Navigator.tsx) and
 [`Tree.tsx`](../src/ui/app/Tree.tsx) provide Files/Outline navigation, lazy children, recent
 files, and review badges. [`WorkspaceView.tsx`](../src/ui/app/WorkspaceView.tsx) renders one active
 file through the ordinary session view. It is not a collection of independently retained document
-buffers. Keep the tree and containment checks; replace the command's human-facing role with a
-graphical folder/open-files action. A selected review set can coexist with a broader folder tree.
+buffers. The trial found this separate workspace experience disconnected and underdeveloped. Retire
+that experience and use the desktop host's native facilities to open and browse files. Do not
+rebuild or transplant the custom workspace tree by default. Keep path validation at file-access
+boundaries; any retained root-scoped operation must still enforce its root.
 
 ### `translate-blocks <file>`
+
+{>>@Da-Wei: Got it, this feels like the one legitimate place where the app needs input from a model.
+I'm going to assume that the invoking agent is the one providing it.
+That does remind me, at a semantic level - first of all, we should allow a uni-language model of
+operation. Some people don't need another language. Secondly, we should make it clear what the two
+languages are - language one is the language the repo communicates and bookkeeps in; the other is
+the user's comfort language.
+How are translation blocks applied when viewing files? What happens when comments are left in the
+user's comfortable language?<<}{>>@codex: Yes: the invoking agent prepares translations, or serves
+requests through the current assist channel. The viewer segments the original source, looks up
+cached translations by block hash and target language, and renders each hit in place of that block.
+A miss shows the source with an indicator; with no cached hits the toggle stays on the original.
+This only changes the display, never the document on disk. The translated view is read-only and
+hides the comment rail, so comments currently have to be made against the original view. A comment
+in your comfort language is saved verbatim in that language: there is no translation-on-save. Adding
+it changes that block's hash, so the old cached translation no longer matches. If the agent later
+translates the changed block, the comment text travels inside it; that still does not rewrite the
+original comment. I have added single-language operation and the repo-language/comfort-language
+semantics to the design. Reviewing directly in the comfort-language view would need source-anchor
+mapping that the current block replacement does not provide.<<}
 
 Emits missing translation blocks as JSON; `--save` accepts translated JSON and writes the cache.
 The agent supplies the translation. A block is a source slice derived from a top-level Markdown
@@ -55,6 +78,12 @@ blocks survive surrounding edits. The language pair and a CJK heuristic choose t
 this is original text plus cached target blocks, not two fully translated copies of every document.
 The translated view is read-only, with source fallback for misses.
 
+The new language model has a repo language for communication and bookkeeping, plus an optional
+personal comfort language. Single-language operation is a complete mode: no second language or
+translation preparation is required. The invoking agent supplies translations when needed. Replace
+preferred/secondary language semantics and the script-based direction guess with these explicit
+roles; preference scope, mixed-language documents, and review interactions need detailed design.
+
 Today `open` refuses a cold cache unless `--no-translate` is supplied. There is also a live assist
 queue served by an attached agent. Preserve reusable segmentation/cache logic; decide separately
 whether both provisioning paths justify their machinery. The earlier proposal that translation
@@ -62,21 +91,28 @@ must never gate opening still needs its own ruling.
 
 ### `install-agents` / `uninstall-agents`
 
-Copies the bundled main and alias skills into detected harness directories and inserts marked
-global instructions where a supported global file is known. Uninstall removes those installed
-surfaces. See [`install-agents.ts`](../src/cli/install-agents.ts) and the command implementation.
-This is provisioning, not a runtime dependency of Markdown review. Move the human entry point into
-onboarding, preserving reversible installation and harness-specific adapters. Assess ordinary
-plugin packaging before retaining custom file-copy installation; a GUI button alone does not
-simplify the underlying maintenance.
+Today these commands copy bundled skills into detected harness directories and insert marked global
+instructions; uninstall removes those surfaces. See
+[`install-agents.ts`](../src/cli/install-agents.ts) and the command implementation.
+
+Remove harness-directory detection, skill copying, and global-instruction injection from the app.
+Installation guidance belongs with the skill/package README so the invoking harness can install it
+through its own facilities. An installation skill is optional if the README is insufficient;
+there is no replacement app installer in this plan. Existing installations need a documented removal
+path when retiring the commands, not a background cleanup that edits harness files on app launch.
 
 ### `status` / `stop`
 
-Inspect or terminate the detached localhost server. That server serves the UI, reads/writes files,
-watches external edits, maintains file/workspace sessions, and brokers assist tasks. Hand-back is
-only one responsibility. The browser currently needs this filesystem bridge even without hand-back.
-The proposed desktop app should own those capabilities and their lifetime; normal users should
-not manage a daemon. Keep developer diagnostics only where they still answer a real question.
+Today these commands inspect or terminate the detached localhost server. It serves the UI, performs
+file I/O and watching, maintains sessions, and brokers assist tasks. Removing hand-back alone does
+not eliminate those responsibilities; the desktop host takes them over.
+
+The target is an editor-style app whose wrapper owns its runtime and review-session state. Remove
+the detached daemon and its status/stop workflow once those responsibilities run under the app's
+lifetime. Review-session state is in memory and ends when the app quits; saved Markdown remains on
+disk. Existing preferences and translation-cache files are separate from session restoration, and
+this ruling does not require deleting them. SQLite is a possible later choice for restoring app
+state, not a dependency or a second store for review feedback in this iteration.
 
 ## File-safety findings to address first
 
@@ -111,7 +147,8 @@ local, and disk versions for an explicit comparison/merge. Content-based version
 than mtime alone. Atomic replacement can avoid partial file contents but does not make a preceding
 read/check atomic against unrelated writers. Do not claim lossless concurrent editing without a
 cooperative protocol. Symlinks, permissions, and platform replacement behavior need explicit tests.
-The precise conflict UX remains a decision before implementation.
+The reviewed direction is clean-buffer reload and explicit comparison/merge for a dirty buffer.
+The interaction details remain to be designed before implementation.
 
 ## Proposed deletion and consolidation
 
@@ -136,8 +173,11 @@ The precise conflict UX remains a decision before implementation.
 - **Untangle assist lifetime from hand-back.** `open --wait` currently also enables translation
   service. Removing its wait loop must not silently remove translation. Either retain an independent
   agent adapter or choose cache preparation as the supported path before deleting queue machinery.
-- **Retire draft-only machinery if `new` is dropped.** Trace rename and session rekey callers first;
-  keep any operation that still supports an independently chosen file-management capability.
+- **Retire `new` and draft-only machinery.** Trace rename and session rekey callers first; keep any
+  operation that still supports an independently chosen file-management capability.
+- **Retire the separate workspace UI and app-owned harness installer.** Replace their entry points
+  with native file access and harness-owned installation guidance. Remove tree/badge/session code
+  only after checking which pieces remain necessary for opening an agent-selected set of files.
 - **Repair the architecture map with the ablation.** `src/README.md` still references missing
   snapshots/rounds and three tsconfigs; there are two. `AGENT_SETUP.md` promises an absent revision
   diff. Update directly coupled claims as each arc lands. Do not sweep unrelated comments.
@@ -185,13 +225,15 @@ rows with values at the top, typed simple properties, and raw YAML/source mode f
 property UI cannot represent. Proposal: a quiet, read-only property list for simple keys and values,
 with a source fallback for nested/unknown/invalid YAML. Keep bytes, key order, comments, and body
 offsets intact. Do not turn display into a YAML rewrite or add a property editor in this arc.
-The landed literal frontmatter support is the safe baseline; presentation is still for review.
+The landed literal frontmatter support is the baseline; property-list display is the reviewed
+presentation direction.
 
 ## Wishlist mapped to product work
 
-- **One graphical onboarding flow:** combine setup, handle/language selection, harness integration,
-  and a localized demo. Prefill invocation-provided values, then existing settings/Git defaults as
-  appropriate. Precedence, first-run persistence, and which integrations to offer remain open.
+- **One graphical onboarding flow:** combine setup, handle, repo language, optional comfort
+  language, and a localized demo. Prefill invocation values, then existing settings/Git defaults as
+  appropriate. Keep harness installation in its skill/package guidance. Preference precedence,
+  first-run persistence, and repo-versus-user configuration scope remain open.
 - **One review skill:** replace separate setup/demo entry points with the normal launch flow. Blend
   the existing file-review instructions with the squad's `z:markup` convention after ruling on
   agent-authored replies and thread resolution. Keep that protocol portable across harnesses.
@@ -201,9 +243,10 @@ The landed literal frontmatter support is the safe baseline; presentation is sti
 - **Continuous saving:** use the file-safety work above as the prerequisite to deleting hand-back.
   Optional Git commits remain a separate proposal, with file scope and timing unresolved; autosave
   should not implicitly stage or commit unrelated repository changes.
-- **Translation and squad configuration:** preserve the useful bilingual model; decide nonblocking
-  opening, live versus prepared translation, and shared versus personal defaults before changing
-  these contracts. Graphical onboarding owns the personal language choice.
+- **Translation and squad configuration:** support repo-language-only operation and an optional
+  comfort language, with translations supplied by the invoking agent. Decide nonblocking opening
+  when translation is enabled, live versus prepared translation, and configuration scope before
+  changing those contracts. Graphical onboarding owns the personal language choice.
 - **Package identity:** choose the name before distribution changes; package, executable, and config
   migration still need a ruling. A wrapper does not remove collisions with upstream automatically.
 - **Claude Code Mods:** retain as an aspiration. Anthropic's
@@ -214,26 +257,28 @@ The landed literal frontmatter support is the safe baseline; presentation is sti
 
 [mods]: https://github.com/anthropics/claude-code-playground/blob/main/claude-code/mods/README.md
 
-## Sequence proposed for approval
+## Reviewed implementation sequence
 
 1. **Characterize and fix document/save ownership.** Reproduce the schedules listed above; choose
-   the conflict UX; land isolated fixes with failing-before/passing-after tests. No new features.
+   the detailed conflict interaction; land isolated fixes with failing-before/passing-after tests.
+   No new features.
 2. **Ablate obsolete machinery.** Remove serialization remnants, pass-through feedback handling,
    and recurring legacy-history deletion in separate coherent commits. Reconcile module maps.
-3. **Approve the remaining contracts.** Resolve blank drafts, summary compatibility, translation
-   lifetime/open policy, agent replies, and the minimal agent launch interface before deleting their
-   existing paths. Record rulings where they constrain future work.
+3. **Resolve the remaining contracts.** Settle summary compatibility, translation lifetime/open
+   policy, agent replies, and the minimal agent launch interface before deleting their existing
+   paths. Record rulings where they constrain future work. Blank-draft removal is settled.
 4. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
    experiment, then record the choice. Retire detached-daemon and browser-choice machinery only when
    their remaining responsibilities have a tested owner.
-5. **Build the chosen review flow.** Implement multi-file navigation, graphical onboarding, skill
-   consolidation, and hand-back removal against the settled contracts. Evaluate frontmatter rows
-   and the renderer independently so a renderer swap cannot hold the lifecycle work hostage.
+5. **Build the chosen review flow.** Implement native file access, multi-file review, graphical
+   onboarding, skill consolidation, and hand-back removal against the settled contracts. App session
+   state ends on quit; session restoration is deferred. Evaluate frontmatter rows and the renderer
+   independently so a renderer swap cannot hold the lifecycle work hostage.
 
 Each implementation commit must pass the full test suite and both typechecks. Run the corpus and
 byte-preservation cases when touching Markdown, selection, or writes; preserve fixture bytes. Build
 before CLI/manual review. Wrapper validation must include external edits, missing paths, window
 close/reopen, and actual platform builds, not just a framework's support list.
 
-The checkpoint now is approval or revision of this sequence and its proposed scope. No refactoring,
-wrapper implementation, or heavy-track behavior change has been made in this review.
+The reviewed recommendations and amendments are recorded here. Implementation has not begun.
+Wrapper selection and the explicitly open contracts above remain unresolved.

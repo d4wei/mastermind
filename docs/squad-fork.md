@@ -45,12 +45,12 @@ The historical behaviors plan at upstream `3687c91` adds integration rationale w
   shared segmentation and target-language selection keep CLI-written entries compatible with the
   browser. Retain that useful preparation path and the bilingual toggle. Whether preparation may
   gate opening is a separate, unresolved squad decision.
-- **One preferred/secondary language pair.** Setup and the reading toggle share `langPair`, rather
-  than maintaining competing preferences. Two squad members benefit directly from the second
-  reading language; there is no reason to discard the feature with its upstream defaults.
-- **Portable, reversible provisioning.** Skills target multiple coding harnesses through the same
-  CLI; global instruction blocks have explicit markers and an uninstall path. Preserve that
-  boundary and avoid growing agent-specific hooks where ordinary instructions suffice.
+- **One preferred/secondary language pair.** Setup and the reading toggle share `langPair`, avoiding
+  competing preferences. Retain consistent language configuration and optional translated reading;
+  the later squad ruling replaces the pair's semantics with repo and optional comfort languages.
+- **Portable, reversible provisioning.** Upstream's shared installer and marked global blocks make
+  installation reversible across harnesses. Retain portability and clear removal guidance; the
+  later squad ruling moves installation ownership to the harness through skill/package guidance.
 
 The historical plan has been distilled here and deleted. These are reasons to preserve working
 parts of the fork, not retrospective entries in `DECISIONS.md`.
@@ -74,15 +74,15 @@ The four fixes from the first day of use have landed in separate upstream-shaped
 
 [`DECISIONS.md`](../DECISIONS.md) records settled product directions. The
 [`architecture review`](architecture-review.md) owns the wishlist, proposed ablation sequence, and
-remaining implementation choices. The user reviews that plan before any refactoring begins.
+remaining implementation choices. The user's review is incorporated; implementation has not begun.
 
 The following original questions still need rulings before implementation:
 
-- Translation available on demand, never a gate on `open`; language pair per user at first run.
+- Translation delivery and nonblocking `open` when enabled; repo/comfort configuration scope.
 - Agent-authored comments in the file (the squad's convention) versus upstream's one-direction
   marks, including how the renderer shows an agent's reply.
 - Package, CLI, and config-directory rename.
-- Squad-level configuration: a shared default for the review convention and language pair, with
+- Squad-level configuration: shared repo-language and review-convention defaults, with
   per-user author tags.
 
 The browser-container bet has graduated to the desktop-wrapper ruling. GUI onboarding, continuous

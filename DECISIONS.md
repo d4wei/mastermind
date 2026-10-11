@@ -24,6 +24,54 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Clean external changes reload; dirty buffers retain both versions
+
+**Ruled.** Reload external changes automatically only when the buffer is clean. When it is dirty,
+retain base, local, and disk versions for explicit comparison and merge. The detailed interaction
+remains open; saving more frequently is not conflict resolution.
+
+**Beat:** treating a shorter autosave delay or unconditional overwrite as conflict handling.
+
+## 2026-10-10 — The app owns an ephemeral review session
+
+**Ruled.** The desktop wrapper owns file services and runtime state, replacing the detached daemon
+and its status/stop workflow. Review-session state ends on app quit; document edits remain on disk.
+Session restoration, including a possible SQLite store, is deferred. Existing preferences and
+translation caches are separate from review-session restoration.
+
+**Beat:** carrying the detached daemon and its independent lifetime into the desktop product.
+
+## 2026-10-10 — Harness installation belongs outside the app
+
+**Ruled.** Retire app-owned harness detection, skill copying, and global-instruction injection.
+Describe installation in skill/package guidance for the invoking harness to carry out; a dedicated
+installation skill is optional if ordinary guidance is insufficient.
+
+**Beat:** moving a custom harness installer behind a graphical onboarding button.
+
+## 2026-10-10 — Language roles are repo language and optional comfort language
+
+**Ruled.** Support complete single-language operation. When translation is wanted, distinguish the
+repo's communication/bookkeeping language from the user's comfort language; the invoking agent
+supplies translations. Configuration scope and translation interaction details remain open.
+
+**Beat:** requiring two symmetric preferred/secondary languages for every user.
+
+## 2026-10-10 — Native file access replaces the separate workspace experience
+
+**Ruled.** Use the desktop host's OS-native facilities to open and browse files. Retire the separate
+workspace experience instead of transplanting its custom tree into the wrapper. File-access
+validation and containment for any retained root-scoped operations remain required.
+
+**Beat:** preserving the underdeveloped workspace UI as the basis of desktop navigation.
+
+## 2026-10-10 — Blank-draft creation is outside the review product
+
+**Ruled.** Remove `new` and its exclusively draft-related machinery; reviewing and source-editing
+existing documents do not require a blank-file creation workflow.
+
+**Beat:** retaining draft naming, temporary files, and abandoned-draft cleanup for this use case.
+
 ## 2026-10-10 — The session agent chooses which files need review
 
 **Ruled.** The default skill request deliberately leaves file selection to the invoking agent's

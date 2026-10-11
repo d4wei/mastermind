@@ -26,13 +26,21 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-10 — Architecture ablation and the wishlist need a reviewed plan
+## 2026-10-10 — Restoring app sessions is deferred
 
-**Gap.** The product directions are settled in `DECISIONS.md`; their implementation is not.
-[`docs/architecture-review.md`](docs/architecture-review.md) maps the current system, deletion
-candidates, file-safety risks, and remaining choices, including wrapper selection and onboarding.
+**Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible
+SQLite implementation are later options; no database or alternate review-feedback store is adopted.
 
-**Exit:** the user reviews the plan and rules on the choices needed by its first implementation arc.
+**Exit:** a concrete restoration need and a ruling on persisted state, storage, and the existing
+no-database invariant, or the option is dropped.
+
+## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
+
+**Open question.** The reviewed [plan](docs/architecture-review.md) still leaves wrapper selection,
+summary compatibility, the agent launch interface, and detailed conflict interaction unresolved.
+These choices determine which existing paths can be removed and where their responsibilities go.
+
+**Exit:** those contracts receive rulings and graduate into their implementations or are dropped.
 
 ## 2026-10-10 — Agents answering in the file versus upstream's one-direction marks
 
@@ -43,15 +51,14 @@ renderer support are inventoried in [`docs/squad-fork.md`](docs/squad-fork.md).
 **Exit:** a `DECISIONS.md` ruling, with the shipped skills, `AGENT_SETUP.md`, and the renderer's
 treatment of agent-authored comments brought to match.
 
-## 2026-10-10 — Translation: wanted by the squad, but never a gate on opening
+## 2026-10-10 — Translation opening and interaction (updated 2026-10-10)
 
-**Open question.** Two of three squad members read Chinese more comfortably, so the bilingual toggle
-is a feature, not a quirk. But `open` refusing a cold translation cache turns every open into an
-agent translation round or a `--no-translate` flag, and the default language pair is hardcoded to
-upstream's author.
+**Open question.** Single-language operation and repo/comfort language roles are settled. When
+translation is enabled, cold-cache opening, live versus prepared translations, and review against a
+translated view remain unresolved. See the [current behavior](docs/architecture-review.md).
 
-**Exit:** a ruling on the default — translation available on demand, open never blocked — and the
-per-user language pair set at first run.
+**Exit:** rulings on nonblocking opening, translation delivery, source anchoring for review, and
+repo-versus-user configuration scope.
 
 ## 2026-10-10 — Package and CLI identity
 
