@@ -24,6 +24,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — Tauri hosts the desktop app with native file services
+
+**Ruled.** Use Tauri with a narrow Rust host and retain the React/TypeScript document core. The
+maintainer accepts the Rust learning and maintenance cost. Preserve browser development and validate
+native file safety, shutdown, Chinese input, and cross-platform packaging against the reviewed plan.
+The production app does not retain the HTTP server, detached daemon, or a Node sidecar.
+
+**Beat:** choosing Electron for Node reuse or requiring a two-framework prototype before proceeding.
+
 ## 2026-10-10 — Translation is freshly prepared without a live service
 
 **Ruled.** The document's preparing agent supplies a complete fresh translation on each preparation

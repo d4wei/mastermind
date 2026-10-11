@@ -5,13 +5,19 @@
   "description": "Review Markdown with your coding agent — local-first, CriticMarkup review loop, bilingual, the file is the protocol",
   "license": "MIT",
   "author": "Kevin Ding <kevincentding@gmail.com>",
-  "homepage": "https://github.com/Jingquank/Mastermind#readme",
+  "contributors": [
+    {
+      "name": "Da Wei",
+      "url": "https://github.com/d4wei"
+    }
+  ],
+  "homepage": "https://github.com/d4wei/mastermind#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Jingquank/Mastermind.git"
+    "url": "git+https://github.com/d4wei/mastermind.git"
   },
   "bugs": {
-    "url": "https://github.com/Jingquank/Mastermind/issues"
+    "url": "https://github.com/d4wei/mastermind/issues"
   },
   "keywords": [
     "markdown",

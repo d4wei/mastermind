@@ -164,9 +164,9 @@ durable guidance belongs at the destination.
 
 ## Desktop wrapper choice
 
-Research checked on 2026-10-10 against the reduced implementation at `7ae2863`. No wrapper is
-selected. Recommendation: shortlist Electron and Tauri with native file services; favor Electron
-provisionally for this repository, then test whether Tauri earns its extra porting work.
+Research checked on 2026-10-10 against the reduced implementation at `7ae2863`. The subsequent
+wrapper ruling lives in [DECISIONS.md](../DECISIONS.md). The comparison below preserves the
+tradeoffs; the remaining validation plan now targets Tauri with native file services.
 
 ### The architecture both candidates should serve
 
@@ -237,7 +237,7 @@ server in release builds. Its reliability for our app remains unmeasured.
 - **Tauri with a Node sidecar:** [supported][tauri-sidecar], and it could reuse file services. It
   adds the Rust host, a packaged Node process, and another lifecycle/communication boundary. It
   need not use HTTP, but for our reduced app it weakens the reason to prefer Tauri. Keep it out of
-  the first comparison unless a native port reveals a concrete blocker.
+  the implementation; a concrete native-port blocker would require revisiting the wrapper ruling.
 - **Electrobun:** worth knowing about, but not the initial baseline. Its current
   [platform guide][electrobun] offers system webviews or bundled CEF and requires native
   build/test runners; its published architecture matrix has caveats, including no macOS x64 core
@@ -250,18 +250,17 @@ server in release builds. Its reliability for our app remains unmeasured.
 - **A custom macOS-only shell:** conflicts with the approved cross-platform direction. A native UI
   rewrite would also discard the web rendering/selection layer we intend to keep.
 
-### What would decide the choice
+### Validate the selected host
 
-The crux is whether carrying Chromium costs more in daily use than porting and maintaining the
-native file boundary plus testing different webviews. Generic framework benchmarks cannot answer
-that for this app. Cross-platform support provides a path, not free release validation. Both
-[Electron][electron-distribution] and [Tauri][tauri-distribution] still require packaging,
+The remaining work is to validate the native file boundary and the review UI across webviews.
+Generic framework benchmarks cannot establish those behaviors for this app. Cross-platform support
+provides a path, not free release validation. [Tauri][tauri-distribution] still requires packaging,
 signing, and actual platform tests.
 
-Proposed bounded comparison, before a framework ruling:
+Bounded validation before replacing the existing host:
 
-1. Run the same current React UI and corpus in one Electron host and one Tauri host. Pin the trial
-   dependencies. Start with one window and chosen files, not onboarding or a new navigation design.
+1. Run the current React UI and corpus in one Tauri host. Pin the dependencies. Start with one
+   window and chosen files; onboarding and a new navigation design remain separate work.
 2. Exercise unchanged CRLF round trips, exact mark splices, translated quotes, external replacement,
    conflicting writes, two open documents, slow saves, and a failed save during attempted quit.
    Verify file permissions/symlinks and all affected document bytes, not just visible success.
@@ -270,24 +269,22 @@ Proposed bounded comparison, before a framework ruling:
    drag/drop are separate native entry points to the same operation.
 4. Test Chinese IME composition, selection across formatted text, comment popover placement,
    keyboard shortcuts, file dialogs, and focus in the real macOS app. Demonstrate an automated
-   desktop smoke test and the ordinary browser preview for each candidate.
+   desktop smoke test and the ordinary browser preview.
 5. Measure packaged size, cold open-to-readable time, aggregate idle memory across app processes,
    and native code/adapter complexity using identical documents and repeated runs. Record hardware,
    build mode, framework versions, and the measurement method with the results.
 6. Build and smoke-test Windows and Linux packages on native runners before claiming portability.
-   A missing runner is an explicit evidence gap. Choose after reviewing correctness and measured
-   tradeoffs; neither candidate wins merely by launching a blank window.
+   A missing runner is an explicit evidence gap. Launching a blank window does not establish that
+   the review and file-safety contracts survive the host change.
 
-Favor Electron if both pass and Tauri's smaller package does not produce a worthwhile daily-use
-improvement. Favor Tauri if its file service stays small, its native automation works reliably, and
-its measured footprint justifies the port without weakening file safety or review interactions.
-No numerical performance threshold is invented before seeing the baseline; agree a threshold if
-measurements expose a real tradeoff. The initial comparison remains a proposal for review.
+Keep the native service focused and review the measured footprint without weakening file safety or
+review interactions. No numerical performance threshold is invented before seeing the baseline;
+agree a threshold if measurements expose a real tradeoff. A concrete correctness or portability
+blocker warrants revisiting the ruling.
 
 [electron-process]: https://www.electronjs.org/docs/latest/tutorial/process-model
 [electron-ipc]: https://www.electronjs.org/docs/latest/tutorial/ipc
 [electron-tests]: https://playwright.dev/docs/api/class-electron
-[electron-distribution]: https://www.electronjs.org/docs/latest/tutorial/distribution-overview
 [tauri-architecture]: https://v2.tauri.app/concept/architecture/
 [tauri-process]: https://v2.tauri.app/concept/process-model/
 [tauri-fs]: https://v2.tauri.app/plugin/file-system/

@@ -36,11 +36,11 @@ no-database invariant, or the option is dropped.
 
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
 
-**Open question.** The reviewed [plan](docs/architecture-review.md) still leaves wrapper selection,
-and the agent launch interface unresolved.
-These choices determine which existing paths can be removed and where their responsibilities go.
+**Open question.** The reviewed [plan](docs/architecture-review.md) still leaves the agent launch
+interface unresolved. Tauri is selected in `DECISIONS.md`; the launch contract determines how an
+agent passes files and optional setup values into the running app.
 
-**Exit:** those contracts receive rulings and graduate into their implementations or are dropped.
+**Exit:** the launch contract receives a ruling and graduates into its implementation or is dropped.
 
 ## 2026-10-10 — Repository language settings (updated 2026-10-10)
 
