@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { useT } from '../i18n'
+import { CommentBody } from './CommentBody'
 import { acceptEdit } from '../../shared/critic/resolve'
 import { prefersReducedMotion } from '../util/presence'
 import type { CriticSpan, ReviewItem } from '../../shared/critic/types'
@@ -185,7 +186,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             {card.thread.comments.map((c, i) => (
               <div key={i} className="rail-comment">
                 {c.author && <span className="rail-author">@{c.author}</span>}
-                <div className="rail-body">{c.body}</div>
+                <CommentBody body={c.body} />
               </div>
             ))}
             {replyFor === card.key ? (
@@ -246,7 +247,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
           {card.thread.comments.map((c, i) => (
             <div key={i} className="rail-comment">
               {c.author && <span className="rail-author">@{c.author}</span>}
-              <div className="rail-body">{c.body}</div>
+              <CommentBody body={c.body} />
             </div>
           ))}
         </div>
