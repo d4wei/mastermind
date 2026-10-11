@@ -216,15 +216,49 @@ The trial raises a separate question from agent replies: deleting one comment ve
 whole thread, and whether resolution retains a record. Current behavior is inventoried in
 [the trial notes](squad-fork.md#trial-notes).
 
-Recommendation for review: provide Delete for an individual comment and Resolve for a completed
-thread, with undo. For the first iteration, keep the convention's removal of completed threads and
-make that effect clear; do not introduce an archive merely because the action is called Resolve.
-This is a proposal, not a ruling that resolution must remain destructive.
+Recommendation for review: Delete removes an individual comment; Resolve moves a completed thread
+into an in-file archive at the document's tail. Both actions support undo. Resolution preserves the
+quoted context, authors, and discussion, while removing its active comment marks from the body.
+Resolving a discussion must not implicitly accept or reject an attached suggested edit. Archive
+retention and the representation below are proposals for review, not a shipped contract.
 
-If retaining resolved discussion is required, define an explicit in-file representation and how an
-agent ignores it as outstanding feedback. An archive elsewhere, including SQLite, cannot be the
-only copy of review state under the file-only protocol. Decide retention before implementing the
-action labels; the current format has no resolved-state field to toggle.
+Markdown can hide content with [HTML comments][commonmark-html]. The current renderer already hides
+comment nodes, the review scanner excludes HTML ranges, and translation skips HTML blocks. A
+read-only synthetic check with a Critic comment inside an HTML comment produced no active spans and
+an untranslatable HTML block. These existing behaviors make a hidden tail archive a small extension;
+they do not constitute an archive reader or a lifecycle implementation.
+
+Proposed shape: a versioned HTML-comment block with an explicit resolved-discussion marker and
+readable records. Keep quoted context and the original thread text, including author tags; avoid
+stale source offsets as the only context after the document changes. Finalize the minimal record
+syntax with fixtures before implementation. Arbitrary discussion can contain HTML-comment openers
+and terminators, so define reversible escaping and test it rather than inserting raw text blindly.
+Preserve unknown versions and malformed records verbatim; surface a diagnostic instead of discarding
+them. An unedited open/save must preserve archive bytes and line endings along with the document.
+
+The normal reading surface stays quiet. An explicit Resolved view can expose the archived threads;
+source readers and agents can always inspect the tail. Archived discussion is historical context,
+not outstanding feedback or new instructions. The receiving agent may clean it up when appropriate,
+as the user suggested; retaining it must not force a permanent audit log. Specify that discretion in
+the shipped review guidance. Do not automatically resurrect archived marks. Reopening a thread and
+relocating its anchor can wait for an actual need; undo covers immediate accidental resolution.
+
+A visible appendix is the simpler fallback if hidden records make source editing awkward.
+[GitHub also supports collapsed `<details>` sections][collapsed-sections], but Mastermind currently
+renders those tags literally. Collapsed content is also still part of the ordinary document, and
+Critic marks inside it need explicit exclusion from active review. Prefer HTML comments for this
+proposal rather than adding general HTML rendering just for an archive. Neither option makes the
+content private; it remains in the file and its Git history.
+
+Acceptance cases for the lifecycle arc: standalone and anchored threads, consecutive replies,
+Unicode and spaced author names, literal comment delimiters, CRLF/no-final-newline input, repeated
+resolution, undo, unknown archive versions, and external edits during resolution. Check counts,
+rendering, translation, and agent mark discovery against the same fixtures. The external markup
+skill's parser is a compatibility boundary to verify, not something this app's HTML exclusion checks
+establish. No SQLite-only or sidecar-only discussion store satisfies the file-only protocol.
+
+[commonmark-html]: https://spec.commonmark.org/0.31.2/#html-blocks
+[collapsed-sections]: https://docs.github.com/en/get-started/writing-on-github
 
 ## Rendering and frontmatter
 
@@ -292,22 +326,42 @@ deletions, which need fixes, and which should amend this architecture plan befor
 Only unresolved design questions graduate to DIRECTION.md and settled constraints to DECISIONS.md;
 the raw quirk list belongs in the trial notes.<<}
 
-1. **Characterize and fix document/save ownership.** Reproduce the schedules listed above; choose
-   the detailed conflict interaction; land isolated fixes with failing-before/passing-after tests.
-   No new features.
-2. **Ablate obsolete machinery.** Remove serialization remnants, pass-through feedback handling,
-   and recurring legacy-history deletion in separate coherent commits. Reconcile module maps.
-3. **Resolve the remaining contracts.** Settle summary compatibility, translation lifetime/open
-   policy, agent replies, comment deletion/resolution, and the minimal agent launch interface before
-   deleting their existing paths. Record rulings where they constrain future work. Blank-draft
-   removal is settled.
-4. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
-   experiment, then record the choice. Retire detached-daemon and browser-choice machinery only when
-   their remaining responsibilities have a tested owner.
-5. **Build the chosen review flow.** Implement native file access, multi-file review, graphical
-   onboarding, skill consolidation, and hand-back removal against the settled contracts. App session
-   state ends on quit; session restoration is deferred. Evaluate frontmatter rows and the renderer
-   independently so a renderer swap cannot hold the lifecycle work hostage.
+The next implementation arc should be document/save ownership, after review of this plan. Keep the
+scope small enough to validate before beginning the wrapper or broader product changes.
+
+1. **Reproduce save failures and settle conflict interaction.** Add controlled cases for navigation,
+   out-of-order responses, edits during saves, and external changes. Investigate the intermittent
+   translation-cache test failures seen during documentation-only runs so failures in later arcs
+   are attributable. Propose a fixed conflict notice opening base/local/disk comparison;
+   pause conflicting writes while preserving local edits. Review the detailed interaction before
+   building it. Exit: reproduced failures, expected outcomes, and an approved conflict flow.
+2. **Fix ownership, then remove dead machinery.** Land isolated fixes with failing-before and
+   passing-after tests. Remove obsolete serialization, pass-through feedback handling, and recurring
+   legacy-history deletion in separate commits; repair their module maps. Exit: pending writes and
+   undo belong to the right document, edits survive navigation and slow saves, and obsolete paths
+   have no remaining callers.
+3. **Make the trial comfortable.** Address input selection contrast, author-label consistency, and
+   comment soft wraps in tested fixes. Preserve paragraph breaks and source bytes. Characterize
+   the cross-list insertion separately: the lost original cannot establish its exact cause, and
+   invalid multi-block marks must not silently become accepted edits. Validate narrow-window chrome
+   in the browser development view; a wrapper alone does not fix that preview. Exit: targeted
+   regressions plus visual checks across themes and representative viewport sizes.
+4. **Settle and implement the file protocol.** Review the archive proposal above alongside
+   agent replies, summary compatibility, translation opening/lifetime, and the minimal agent
+   launch interface. Record rulings before changing contracts. Implement comment deletion/resolution
+   and align shipped skill guidance after the archive fixtures are agreed. Exit: app and receiving
+   agent agree on active versus historical feedback; translation does not accidentally depend on a
+   removed completion loop.
+5. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper
+   experiment, including browser preview and native macOS automation. Record the choice with a
+   credible Windows/Linux packaging path. Retire daemon and browser-choice machinery only when their
+   responsibilities have a tested owner. Exit: measured comparison and a wrapper ruling.
+6. **Build the chosen review flow.** Implement native file access, multi-file review, graphical
+   onboarding, skill consolidation, and hand-back removal against settled contracts. App session
+   state ends on quit; restoration is deferred. Evaluate frontmatter rows and renderer replacement
+   independently. Choose package identity before distribution. Optional Git commits and Claude Mods
+   remain deferred. Exit: a teammate can open, review, save, and revisit chosen files without
+   operating the CLI or handing files back individually.
 
 Each implementation commit must pass the full test suite and both typechecks. Run the corpus and
 byte-preservation cases when touching Markdown, selection, or writes; preserve fixture bytes. Build
