@@ -734,6 +734,11 @@ button:disabled {
   padding: calc(var(--space-unit) * 1.5);
 }
 
+.sel-composer textarea::selection {
+  background: var(--color-invert-text);
+  color: var(--color-invert-bg);
+}
+
 .sel-composer-actions {
   display: flex;
   justify-content: flex-end;
