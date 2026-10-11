@@ -71,6 +71,35 @@ queue served by an attached agent. Preserve reusable segmentation/cache logic; d
 whether both provisioning paths justify their machinery. The earlier proposal that translation
 must never gate opening still needs its own ruling.
 
+### Translation without a live service
+
+The user proposes preparation and refresh by the same agent that prepares the document, using its
+existing context. There is no need to preserve upstream translation caches. The app would read
+prepared artifacts; no translator agent, request queue, or waiting session is necessary. This is a
+long-term proposal, not a compatibility mode. Translation still requires generation time in the
+preparing agent's turn; opening the original need not wait for it.
+
+The remaining contract should cover:
+
+- **Freshness:** associate translated output with the source revision and target language. Current
+  block hashes detect changed block bytes, but unchanged wording can change meaning when surrounding
+  context changes. Require the preparing agent to reassess translation after document revisions;
+  do not treat an unchanged block hash as evidence of semantic freshness.
+- **Missing preparation:** show the current original with a clear unavailable/stale indication until
+  the preparing agent supplies current output. Do not display stale translations as current or make
+  the app create a request that needs another agent to wait on it.
+- **Feedback anchoring:** read-only translated prose was a proposal about mapping feedback back to
+  source, not retaining old data. A minimal useful review surface could accept comments against the
+  corresponding original block, in the reviewer's language. Exact selected-text edits still need
+  the original; a translated character offset cannot identify an original character offset.
+- **Storage and languages:** choose a simple derived artifact and explicit source/target metadata.
+  Repo language, personal comfort language, file discovery, and freshness validation must agree;
+  there is no requirement to preserve the old cache format or language-pair heuristic.
+
+Feedback in a comfort language remains in the original Markdown file. Translation artifacts contain
+no exclusive review state. Whether block-anchored commenting is sufficient needs the user's ruling
+before implementation.
+
 ### `install-agents` / `uninstall-agents`
 
 Today these commands copy bundled skills into detected harness directories and insert marked global
@@ -122,8 +151,8 @@ intermittent translation-cache failure. The remaining deletions below retain the
 
 - **Delete the explicit hand-back path after safe saving lands.** Remove the button, pulse/toast,
   summary generation, endpoint, and waiting-loop completion event together with their callers.
-  Preserve ordinary file watching and review counts. Decide treatment of existing summary blocks
-  before removing their reader; do not silently strip document content on open.
+  Preserve ordinary file watching and review counts. No legacy summary compatibility is required;
+  remove summary-specific behavior without silently rewriting arbitrary document content on open.
 - **Untangle assist lifetime from hand-back.** `open --wait` currently also enables translation
   service. Removing its wait loop must not silently remove translation. Either retain an independent
   agent adapter or choose cache preparation as the supported path before deleting queue machinery.
@@ -189,9 +218,11 @@ is needed. Regression cases cover byte preservation, safe escaping, active mark 
 translation exclusion, malformed records, stale actions, and undo. The external markup parser was
 also checked against the emitted archive: historical marks remain inactive.
 
-Receiving-agent guidance distinguishes active feedback from resolved history. Agent-authored
-replies remain a separate open ruling. Reopening archived threads and relocating their anchors can
-wait for an actual need; undo covers immediate accidental resolution.
+Receiving-agent guidance distinguishes active feedback from resolved history. Author-tagged agent
+replies are now approved; the public convention must be self-contained and use neutral examples.
+Port only the required protocol, confirming ambiguous private material before inclusion. Reopening
+archived threads and relocating their anchors can wait for an actual need; undo covers immediate
+accidental resolution.
 
 ## Rendering and frontmatter
 
@@ -227,8 +258,8 @@ presentation direction.
   appropriate. Keep harness installation in its skill/package guidance. Preference precedence,
   first-run persistence, and the repository-settings storage/discovery mechanism remain open.
 - **One review skill:** replace separate setup/demo entry points with the normal launch flow. Blend
-  the existing file-review instructions with the squad's `z:markup` convention after ruling on
-  agent-authored replies and thread resolution. Keep that protocol portable across harnesses.
+  the existing file-review instructions with the approved author-tagged reply and resolution
+  conventions. Publish self-contained guidance suitable for every supported harness.
 - **Smart open:** the session agent has full discretion over the files needing review now. Provide
   a deterministic operation to open its chosen paths; do not encode a Git-only or session-only
   eligibility rule. Git is useful context and is optional. Multi-file UI details remain open.
@@ -272,9 +303,9 @@ the scope small enough to validate before beginning the wrapper or broader produ
    in the browser development view; a wrapper alone does not fix that preview. Exit: targeted
    regressions plus visual checks across themes and representative viewport sizes.
 4. **Settle and implement the file protocol.** Review the archive proposal above alongside
-   agent replies, summary compatibility, translation opening/lifetime, and the minimal agent
-   launch interface. Record rulings before changing contracts. Implement comment deletion/resolution
-   and align shipped skill guidance after the archive fixtures are agreed. Exit: app and receiving
+   translation opening/lifetime and the minimal agent
+   launch interface. Agent replies and dropping legacy compatibility are ruled. Delete/Resolve
+   have shipped; align the remaining skill guidance with the public reply convention. Exit: app and receiving
    agent agree on active versus historical feedback; translation does not accidentally depend on a
    removed completion loop.
 5. **Compare and select the desktop host.** Use the reduced document service for the bounded wrapper

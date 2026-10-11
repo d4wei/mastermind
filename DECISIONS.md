@@ -24,6 +24,24 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-10 — The fork does not carry legacy review compatibility
+
+**Ruled.** Existing hand-back summaries and translation caches impose no compatibility requirement;
+there is no squad data to migrate. Retire summary-specific behavior with hand-back and choose future
+translation storage for the new workflow. This does not authorize rewriting arbitrary input files.
+
+**Beat:** retaining readers, migration paths, or old cache formats for an unused workflow.
+
+## 2026-10-10 — Agents may answer in author-tagged file threads
+
+**Ruled.** Agents may append author-tagged replies to active discussions in the Markdown file.
+Ship a self-contained public convention with neutral examples; private skill material is not a
+runtime dependency or an automatically publishable source. Confirm ambiguous material before
+porting.
+
+**Beat:** upstream's human-only mark rule and copying a private workflow wholesale into the public
+package.
+
 ## 2026-10-10 — Conflict application uses the reviewed versions
 
 **Ruled.** Keep Base, Local, Disk, and an editable Result in a persistent comparison. Applying a

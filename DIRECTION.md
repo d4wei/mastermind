@@ -37,25 +37,18 @@ no-database invariant, or the option is dropped.
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-10)
 
 **Open question.** The reviewed [plan](docs/architecture-review.md) still leaves wrapper selection,
-summary compatibility, and the agent launch interface unresolved.
+and the agent launch interface unresolved.
 These choices determine which existing paths can be removed and where their responsibilities go.
 
 **Exit:** those contracts receive rulings and graduate into their implementations or are dropped.
 
-## 2026-10-10 — Agents answering in the file versus upstream's one-direction marks
-
-**Open question.** Upstream's setup block forbids agent marks; another section permits replies.
-The squad convention uses consecutive harness-tagged replies. The conflicts and author-neutral
-renderer support are inventoried in [`docs/squad-fork.md`](docs/squad-fork.md).
-
-**Exit:** a `DECISIONS.md` ruling, with the shipped skills, `AGENT_SETUP.md`, and the renderer's
-treatment of agent-authored comments brought to match.
-
 ## 2026-10-10 — Translation opening and interaction (updated 2026-10-10)
 
 **Open question.** Single-language operation and repo/comfort language roles are settled. When
-translation is enabled, cold-cache opening, live versus prepared translations, and review against a
-translated view remain unresolved. See the [current behavior](docs/architecture-review.md).
+translation is enabled, nonblocking opening, freshness, and review against a translated view need
+a contract. The proposed long-term path is preparation by the document agent, with no live queue or
+separate translator. See the
+[design discussion](docs/architecture-review.md#translation-without-a-live-service).
 
 **Exit:** rulings on nonblocking opening, translation delivery, source anchoring for review, and
 storage/discovery/precedence for repository settings. Repo language is repo-scoped; comfort language

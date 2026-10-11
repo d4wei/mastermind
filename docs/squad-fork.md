@@ -79,8 +79,6 @@ remaining implementation choices and execution status. Implementation follows th
 The following original questions still need rulings before implementation:
 
 - Translation delivery and nonblocking `open` when enabled; repository-settings mechanics.
-- Agent-authored comments in the file (the squad's convention) versus upstream's one-direction
-  marks, including how the renderer shows an agent's reply.
 - Package, CLI, and config-directory rename.
 - Repository settings: storage, discovery, and precedence for repo language; whether the review
   convention also needs a shared setting. Comfort language and author tags remain personal.
@@ -91,9 +89,9 @@ viability are also settled there; their implementation remains ahead.
 
 ### Agent-authored comments: current assumptions and existing support
 
-Inspection on 2026-10-10, after the light fixes. This is an inventory for a future ruling, not a
-change to the review protocol. The shipped instructions conflict; the renderer does not enforce a
-human-only author role.
+Inspection on 2026-10-10, after the light fixes. The subsequent ruling in `DECISIONS.md` permits
+author-tagged agent replies. This dated inventory guides the remaining public-protocol work; the
+shipped instructions still conflict, while the renderer does not enforce a human-only author role.
 
 **Instruction surfaces**
 
