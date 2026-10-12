@@ -71,9 +71,9 @@ session-size limit. Those are reasons not to ship this experiment as a host impl
 Windows uses a console-subsystem executable for captured output. Its spawned GUI host uses
 `CREATE_NO_WINDOW` and disables handle inheritance: redirecting its own standard streams alone
 would leave inherited launcher pipes open and prevent a capturing agent from receiving EOF.
-Direct Explorer launch without a console and a final console/GUI executable
-layout remain unvalidated. Endpoint checks do not establish isolation from a malicious same-user
-process; execution under another OS user still needs a test. Windows reads compare open-handle
+Direct Explorer launch without a console and a final console/GUI executable layout remain
+unvalidated. The second-account test checks access denial, but endpoint checks do not establish
+isolation from administrators or malicious same-user processes. Windows reads compare open-handle
 volume/file IDs; this is admission testing, not validation of production writes or watcher behavior.
 Linux retains the Unix implementation but needs native packaging and GUI tests. macOS bundles are
 local development artifacts, not signed/notarized distribution releases.

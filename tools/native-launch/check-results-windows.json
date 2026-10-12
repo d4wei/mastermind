@@ -1,0 +1,19 @@
+{
+  "passed": [
+    "release executable / Unicode / spaces / leading hyphen",
+    "cwd / case alias / warm reuse / partial failure / directory rejection",
+    "incomplete onboarding accompanies admission",
+    "visible native host window",
+    "incompatible protocol rejected",
+    "malformed request rejected",
+    "oversized frame bounded",
+    "unterminated frame bounded",
+    "host termination and concurrent cold starts keep one owner",
+    "admission precedes delayed window creation",
+    "lost response reports unknown outcome",
+    "retry after lost response reuses admission",
+    "document bytes unchanged"
+  ],
+  "cold_seconds": 0.09400000000005093,
+  "warm_seconds": 0.016000000000076398
+}
