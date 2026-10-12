@@ -38,11 +38,21 @@ try {
     $sameUser = [System.IO.Pipes.NamedPipeClientStream]::new('.', $pipeName, [System.IO.Pipes.PipeDirection]::InOut)
     try { $sameUser.Connect(10000) } finally { $sameUser.Dispose() }
     $credential = [PSCredential]::new("$env:COMPUTERNAME\$user", $password)
-    $other = Start-Process -FilePath 'powershell.exe' -Credential $credential -LoadUserProfile `
+    # The process budget includes alternate-user logon and PowerShell startup.
+    $started = [System.Diagnostics.Stopwatch]::StartNew()
+    $other = Start-Process -FilePath 'powershell.exe' -Credential $credential `
         -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$client`"", '-PipeName', $pipeName) `
         -RedirectStandardOutput (Join-Path $shared 'stdout.txt') `
         -RedirectStandardError (Join-Path $shared 'stderr.txt') -PassThru
-    if (-not $other.WaitForExit(15000)) { $other.Kill(); throw 'Other-user client timed out' }
+    $remaining = [int][Math]::Max(0, 45000 - [int]$started.ElapsedMilliseconds)
+    if ($remaining -eq 0 -or -not $other.WaitForExit($remaining)) {
+        if (-not $other.HasExited) { $other.Kill(); $other.WaitForExit() }
+        Write-Host 'Other-user stdout:'
+        Get-Content (Join-Path $shared 'stdout.txt') -ErrorAction SilentlyContinue
+        Write-Host 'Other-user stderr:'
+        Get-Content (Join-Path $shared 'stderr.txt') -ErrorAction SilentlyContinue
+        throw "Other-user client timed out after $($started.ElapsedMilliseconds) ms"
+    }
     Get-Content (Join-Path $shared 'stdout.txt')
     if ($other.ExitCode -ne 0) {
         Get-Content (Join-Path $shared 'stderr.txt')
