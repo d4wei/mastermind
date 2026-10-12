@@ -130,7 +130,7 @@ ordering preserves cross-platform viability without claiming that every platform
 ### Real reviewer on macOS
 
 The optional reviewer build bundles the actual React reading and source views, with no Node sidecar
-or HTTP listener. This local build reported 12.22 MiB; it is not a repeated size/performance
+or HTTP listener. This local build reported 12.23 MiB; it is not a repeated size/performance
 comparison. The diagnostic file selector switches among admitted files. Packaged UI checks
 through native accessibility automation exercised:
 
@@ -144,6 +144,10 @@ through native accessibility automation exercised:
 - An external edit while local text remained unsaved opened the existing Base/Local/Disk/Result
   comparison. Saving its reviewed result wrote the intended bytes with CRLF and permissions intact.
 - Cmd+Q after the successful save exited the process.
+- Deleting a fixture immediately after admission left its original text visible, with saving paused
+  and comparison available. The first read consumed the admitted snapshot instead of losing it to
+  a later failed disk read.
+- The ordinary localhost browser preview still rendered the same document through its HTTP adapter.
 
 The failed-save check caught a macOS lifecycle hazard: the framework's predefined Quit item calls
 AppKit termination directly. A custom Quit item now requests the same save check as window close.
@@ -154,6 +158,18 @@ identical-content replacement, changed descriptors, missing paths, write size li
 splices, and Unix inode/permission/symlink preservation. Adapter and store tests cover command/error
 mapping, asynchronous listener cleanup, preference-write ordering, slow saves, and retained conflict
 results during quit. These checks do not establish every filesystem race or native interaction.
+
+### Reviewer build verification
+
+At source commit `5d4f0c8`, the macOS reviewer package passes the existing 18 process checks and
+15 Rust tests. The application suite has 405 passing tests; both TypeScript configurations,
+the browser build, and native Clippy checks pass.
+
+[Windows run 38213282288][reviewer-windows-run] builds the React reviewer into the NSIS package,
+installs it, passes 17 Rust tests and Clippy, and passes all 13 installed-package process checks.
+The separate temporary-account check confirms another ordinary user cannot connect to its pipe.
+That runner verifies window presence and native services; it does not exercise editing through
+WebView2, Chinese input, or interactive conflict/quit behavior.
 
 ### Production host and distribution
 
@@ -183,3 +199,5 @@ remains outstanding. Keep the current app available until the native reviewer me
 [tauri-ci]: https://v2.tauri.app/develop/tests/webdriver/ci/
 
 [windows-run]: https://github.com/d4wei/mastermind/actions/runs/38209655085
+
+[reviewer-windows-run]: https://github.com/d4wei/mastermind/actions/runs/38213282288
