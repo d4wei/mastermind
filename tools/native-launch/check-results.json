@@ -1,0 +1,24 @@
+{
+  "passed": [
+    "cold bundled executable / cwd / Unicode / spaces / leading hyphen",
+    "warm reuse / alias deduplication / partial failure / directory rejection",
+    "incomplete onboarding accompanies admission",
+    "incompatible protocol rejected",
+    "malformed request rejected",
+    "oversized frame bounded",
+    "unterminated frame rejected",
+    "FIFO rejected without blocking",
+    "unreadable file rejected",
+    "unrepresentable filename rejected without substitution",
+    "concurrent cold starts and stale socket recovery keep one owner",
+    "admission succeeds before delayed window creation",
+    "lost response reports unknown outcome",
+    "retry after lost response reuses admitted file",
+    "nonprivate endpoint directory rejected",
+    "symlink endpoint directory rejected",
+    "unresponsive peer reaches bounded unknown outcome",
+    "document bytes unchanged"
+  ],
+  "cold_seconds": 0.9274717080406845,
+  "warm_seconds": 0.013478000066243112
+}

@@ -5,7 +5,7 @@ exit: the launch contract is ruled and implemented with colocated docs, or the p
 ---
 # Opening files from an agent
 
-Reviewed launch behavior, with onboarding interaction and native transport still to validate.
+Approved launch and onboarding behavior, with native transport and packaging still to validate.
 Settled constraints live in [DECISIONS.md](../DECISIONS.md). This design does not change the current
 command; the proof of concept below precedes desktop integration.
 
@@ -115,7 +115,7 @@ language flags. The agent-facing interface should expose incomplete onboarding a
 prefills through a separate setup operation. People see, edit, and confirm those suggestions in the
 GUI. The setup operation's command spelling and payload remain implementation details.
 
-Recommended interaction for review:
+Initial setup and file admission:
 
 1. `open` starts or reuses the app and returns the file results. If setup is incomplete, include an
    `onboarding_needed` indication and guidance for the agent to offer setup assistance.
@@ -123,11 +123,19 @@ Recommended interaction for review:
    separate setup operation. It reports which suggestions were accepted for display and which
    were ignored because the person has already configured or started editing that field.
 3. The app shows suggestions in onboarding. Only the person's edit or confirmation saves them.
-   Files remain readable during setup; completing it does not require another opening request.
+   One short setup screen precedes the normal reviewer. Completing it reveals the accepted files;
+   another opening request is unnecessary. Additional requests add files without restarting setup.
 
-{>>@codex: I recommend reporting incomplete onboarding alongside successful file results rather than
-rejecting open. That lets the agent assist without making setup a prerequisite for reading. Does
-that match your intended interaction?<<}
+Confirm a usable Name, initially suggested by the agent or Git. Interface language starts with a
+supported system language or fallback. Translation language starts with Original only or an agent
+suggestion and remains optional. Setup/demo guidance is not a completion requirement. There is no
+partially enabled reader and no per-action onboarding gate.
+
+Changing Interface language updates controls. Changing Translation language clears the previous
+translated view; a matching fresh translation can be shown, otherwise the original remains
+available with an explanation. Existing comments retain their authors, quoted passages, and
+language tags. Changing Name affects future comments. These are ordinary settings behaviors,
+shared with onboarding rather than a separate first-run implementation.
 
 Saved choices win, including an explicit Original only translation choice. Opening alone never
 writes settings. An unconfirmed prefill is transient and is lost on quit. A later agent request
@@ -176,6 +184,9 @@ development adapter can remain HTTP-based without entering the shipped desktop r
 
 ### Validate the launch boundary before migration
 
+The isolated [native launch experiment](../tools/native-launch/README.md) and its
+[observations](../tools/native-launch/results.md) own validation evidence and remaining gaps.
+
 Build a disposable, packaged native proof of concept before connecting the production editor or
 removing the current host. It needs a launcher, a minimal window, admitted-file state in memory,
 and controllable failures. Validate the actual release packaging and terminal invocation; a Rust
@@ -220,13 +231,13 @@ old command contracts. No Node sidecar enters the desktop app.
 6. A packaged macOS launch plus Windows/Linux native runs for arguments, IPC ownership, console
    output, and app focus behavior. Missing platform runners remain explicit evidence gaps.
 
-## Remaining review and next step
+## Validation next step
 
 The review settles additive opening, per-path results, preservation of existing documents,
 separation of opening from preference suggestions, and no compatibility obligation to the old CLI.
-The open question is whether incomplete onboarding accompanies successful opening or blocks it;
-the recommendation above keeps reading available. Front-load the native proof of concept before
-host migration, then revise this document from its findings.
+Incomplete onboarding accompanies successful file admission; the GUI shows setup before the
+reviewer. Front-load the native proof of concept before host migration, then revise this document
+from its findings.
 
 [single-instance]: https://v2.tauri.app/plugin/single-instance/
 [macos]: https://github.com/tauri-apps/plugins-workspace/tree/v2/plugins/single-instance/src

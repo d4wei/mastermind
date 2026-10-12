@@ -19,7 +19,7 @@ access in the desktop host instead of preserving the separate workspace experien
 document ownership and saving reliable across file switches. Then remove obsolete
 serialization and feedback machinery before changing the host. Let the desktop shell own lifecycle,
 and retain a small agent-facing way to open chosen files. The
-[launch design](agent-launch.md) records reviewed behavior and the remaining onboarding question.
+[launch design](agent-launch.md) records the approved opening and onboarding behavior.
 Validate its native launch proof of concept before migrating the host. Avoid moving
 the whole detached daemon and its waiting-session protocol into a wrapper unchanged.
 

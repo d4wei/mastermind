@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-11 — File admission succeeds independently of initial setup
+
+**Ruled.** The launcher acknowledges admitted files and reports incomplete setup without waiting
+for it. The GUI presents one initial setup screen before the normal reviewer, retaining files
+admitted during setup. Confirm Name; provide a usable Interface language default and optional
+Translation language. Agent suggestions use a separate setup operation and cannot overwrite saved
+or actively edited fields. Subsequent preference changes use ordinary settings behavior; existing
+comments retain attribution and quoted-language context.
+
+**Beat:** rejecting file admission until setup completes or maintaining a partly enabled reader.
+
 ## 2026-10-11 — Opening files and assisting onboarding are separate operations
 
 **Ruled.** Opening adds explicit files, returns each path's result, and preserves existing buffers

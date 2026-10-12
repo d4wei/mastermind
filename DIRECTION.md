@@ -36,12 +36,12 @@ no-database invariant, or the option is dropped.
 
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-11)
 
-**Open question.** The [launch design](docs/agent-launch.md) separates file opening from onboarding
-assistance. Whether incomplete setup blocks opening remains under review. Native launcher shape,
-transport, and packaging need proof-of-concept evidence before host migration.
+**Gap.** The [launch design](docs/agent-launch.md) settles admission and onboarding behavior. Native
+launcher shape, transport, and packaging need platform evidence before host migration. The
+[native experiment](tools/native-launch/results.md) records observations and remaining gaps.
 
-**Exit:** onboarding interaction is ruled, native launch is validated, and the design graduates
-into its implementation or is dropped.
+**Exit:** native launch is validated and the design graduates into implementation or is revised
+from the failed checks.
 
 ## 2026-10-10 — Repository language settings (updated 2026-10-10)
 
