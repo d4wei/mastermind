@@ -43,8 +43,7 @@ impl Response {
 
 #[derive(Default)]
 pub struct Documents {
-    // Retaining bytes tests admission independently of renderer startup and subsequent disk changes.
-    pub files: BTreeMap<PathBuf, Vec<u8>>,
+    pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
     pub order: Vec<String>,
 }
 
@@ -98,8 +97,8 @@ impl Documents {
         if self.files.contains_key(&canonical) {
             return Ok((display, "already_open"));
         }
-        let bytes = crate::files::read(&canonical)?.bytes;
-        self.files.insert(canonical, bytes);
+        let snapshot = crate::files::read(&canonical)?;
+        self.files.insert(canonical, Some(snapshot));
         self.order.push(display.clone());
         Ok((display, "opened"))
     }
@@ -171,7 +170,10 @@ mod tests {
             docs.admit(fixture.request(&["file"])).results[0].status,
             "already_open"
         );
-        assert_eq!(docs.files.values().next().unwrap(), original);
+        assert_eq!(
+            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            original
+        );
     }
 
     #[test]

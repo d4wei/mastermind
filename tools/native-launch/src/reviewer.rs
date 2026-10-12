@@ -58,10 +58,22 @@ pub fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileError> {
     )
 }
 
+fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
+    let path = {
+        let mut docs = docs.lock().unwrap();
+        let path = admitted(&docs, id)?;
+        if let Some(snapshot) = docs.files.get_mut(&path).and_then(Option::take) {
+            return Ok(snapshot);
+        }
+        path
+    };
+    files::read(&path).map_err(FileError::from)
+}
+
 #[tauri::command]
 pub async fn read_document(id: String, docs: State<'_>) -> Result<Snapshot, FileError> {
-    let path = admitted(&docs.lock().unwrap(), &id)?;
-    tauri::async_runtime::spawn_blocking(move || files::read(&path).map_err(FileError::from))
+    let docs = docs.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || read_registered_document(&docs, &id))
         .await
         .map_err(|e| FileError {
             status: 500,
@@ -135,7 +147,7 @@ pub fn read_translation(
             target_lang
         ));
     let raw = files::read(&artifact)?;
-    serde_json::from_str(&raw.content).map_err(|_| FileError {
+    serde_json::from_str(&raw.content()).map_err(|_| FileError {
         status: 409,
         error: "invalid_translation".into(),
     })
@@ -192,4 +204,51 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
     let edit = edit.undo().redo().separator();
     let edit = edit.cut().copy().paste().select_all().build()?;
     Menu::with_items(app, &[&application, &edit])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::admission::{Request, VERSION};
+
+    #[test]
+    fn admission_snapshot_survives_deletion_before_the_first_ui_read() {
+        let path = std::env::temp_dir().join(format!(
+            "mastermind-first-read-{}-{}.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::write(&path, b"admitted\r\n").unwrap();
+        let mut docs = Documents::default();
+        assert_eq!(
+            docs.admit(Request {
+                version: VERSION,
+                paths: vec![path.to_str().unwrap().into()]
+            })
+            .results[0]
+                .status,
+            "opened"
+        );
+        fs::remove_file(&path).unwrap();
+        let docs = Mutex::new(docs);
+        let initial = read_registered_document(&docs, "0").unwrap();
+        assert_eq!(initial.bytes, b"admitted\r\n");
+        assert_eq!(
+            read_registered_document(&docs, "0").unwrap_err().status,
+            404
+        );
+        assert!(!path.exists());
+        assert!(docs.lock().unwrap().files.values().all(Option::is_none));
+    }
+
+    #[test]
+    fn reads_require_an_admitted_document_id() {
+        let docs = Mutex::new(Documents::default());
+        for id in ["0", "-1", "../file.md", "/tmp/file.md"] {
+            assert_eq!(read_registered_document(&docs, id).unwrap_err().status, 404);
+        }
+    }
 }

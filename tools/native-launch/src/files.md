@@ -2,7 +2,10 @@
 
 `files.rs` owns bounded, versioned reads and guarded writes. `reviewer.rs` accepts document IDs
 from the admitted path registry; webview commands cannot name an arbitrary write destination.
-Admission canonicalizes paths, so an opened symlink and its target share one document.
+Admission canonicalizes paths, so an opened symlink and its target share one document. The first
+webview read receives the admitted snapshot even if the path changed or disappeared after opening
+was acknowledged. Subscribing after the document loads triggers a fresh read, retaining that base
+and surfacing subsequent disk changes. Delivering the initial snapshot releases its host copy.
 
 Reads open an existing regular file without following a final symlink or Windows reparse point.
 They compare descriptor metadata before and after reading, then compare a second descriptor at

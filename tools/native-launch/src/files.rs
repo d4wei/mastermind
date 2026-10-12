@@ -12,11 +12,20 @@ pub const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
-    pub content: String,
     pub mtime_ms: f64,
     pub version: String,
-    #[serde(skip)]
+    #[serde(rename = "content", serialize_with = "serialize_content")]
     pub bytes: Vec<u8>,
+}
+
+impl Snapshot {
+    pub fn content(&self) -> std::borrow::Cow<'_, str> {
+        String::from_utf8_lossy(&self.bytes)
+    }
+}
+
+fn serialize_content<S: serde::Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&String::from_utf8_lossy(bytes))
 }
 
 #[derive(Debug, Serialize)]
@@ -117,7 +126,6 @@ fn finish_snapshot(file: &File, path: &Path, before: &str, bytes: Vec<u8>) -> io
         return Err(io::Error::other("file_changed"));
     }
     Ok(Snapshot {
-        content: String::from_utf8_lossy(&bytes).into_owned(),
         mtime_ms: after
             .modified()?
             .duration_since(UNIX_EPOCH)
@@ -164,14 +172,14 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
         return Err(FileError::conflict());
     }
     // Lossy decoding must not rewrite unedited bytes that are not valid UTF-8.
-    if content == base.content {
+    if content == base.content() {
         return Ok(base);
     }
     file.seek(SeekFrom::Start(0))?;
     file.write_all(content.as_bytes())?;
     file.set_len(content.len() as u64)?;
     let written = snapshot(&mut file, path).map_err(|_| FileError::conflict())?;
-    if written.content != content {
+    if written.content() != content {
         return Err(FileError::conflict());
     }
     Ok(written)
@@ -236,7 +244,11 @@ mod tests {
         let bytes = [0xef, 0xbb, 0xbf, b'a', b'\r', b'\n', 0xff];
         fs::write(f.file(), bytes).unwrap();
         let base = read(&f.file()).unwrap();
-        let saved = write(&f.file(), &base.content, &base.version).unwrap();
+        let payload = serde_json::to_value(&base).unwrap();
+        assert_eq!(payload["content"], "\u{feff}a\r\n\u{fffd}");
+        assert!(payload.get("bytes").is_none());
+        assert!(payload["mtimeMs"].is_number());
+        let saved = write(&f.file(), &base.content(), &base.version).unwrap();
         assert_eq!(saved.version, base.version);
         assert_eq!(fs::read(f.file()).unwrap(), bytes);
     }
@@ -338,7 +350,7 @@ mod tests {
         let f = Fixture::new();
         fs::write(f.file(), "标题\r\n{++新增++} {>>@Alex: 保留<<}\r\n").unwrap();
         let base = read(&f.file()).unwrap();
-        let result = base.content.replace("{++新增++}", "新增");
+        let result = base.content().replace("{++新增++}", "新增");
         write(&f.file(), &result, &base.version).unwrap();
         assert_eq!(fs::read(f.file()).unwrap(), result.as_bytes());
     }
