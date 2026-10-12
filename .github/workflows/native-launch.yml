@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'tools/native-launch/**'
+      - '!tools/native-launch/*.md'
+      - '!tools/native-launch/check-results*.json'
       - '.github/workflows/native-launch.yml'
 permissions:
   contents: read

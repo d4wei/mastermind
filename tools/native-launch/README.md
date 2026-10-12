@@ -68,8 +68,10 @@ Read checks detect some replacements and in-place changes; they are not a filesy
 A read blocked in the OS can outlive the response deadline. The retained document map has no
 session-size limit. Those are reasons not to ship this experiment as a host implementation.
 
-Windows uses a console-subsystem executable for captured output; its spawned GUI host uses
-`CREATE_NO_WINDOW`. Direct Explorer launch without a console and a final console/GUI executable
+Windows uses a console-subsystem executable for captured output. Its spawned GUI host uses
+`CREATE_NO_WINDOW` and disables handle inheritance: redirecting its own standard streams alone
+would leave inherited launcher pipes open and prevent a capturing agent from receiving EOF.
+Direct Explorer launch without a console and a final console/GUI executable
 layout remain unvalidated. Endpoint checks do not establish isolation from a malicious same-user
 process; execution under another OS user still needs a test. Windows reads compare open-handle
 volume/file IDs; this is admission testing, not validation of production writes or watcher behavior.

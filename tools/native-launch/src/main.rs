@@ -1,11 +1,11 @@
 mod admission;
 mod endpoint;
+mod host_process;
 mod transport;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
 use std::{
     io,
     path::PathBuf,
-    process::{Command, Stdio},
     sync::{Arc, Mutex},
 };
 
@@ -60,20 +60,7 @@ async fn launch(root: PathBuf, request: Request) -> io::Result<Response> {
             ) => {}
         Err(error) => return Err(error),
     }
-    let mut command = Command::new(std::env::current_exe()?);
-    command
-        .arg("host")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
-        // The terminal launcher keeps stdout; its GUI child must not create a console window.
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    let mut child = command.spawn()?;
+    let mut child = host_process::spawn()?;
     loop {
         match transport::exchange(&root, &request).await {
             Ok(response) => return Ok(response),

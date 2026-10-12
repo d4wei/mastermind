@@ -175,8 +175,8 @@ Research checked 2026-10-11:
   output as requiring additional handling in production GUI applications. Test the packaged
   launcher from a real terminal; do not assume a development executable's stdout behavior transfers.
 - [Interprocess local sockets][local-sockets] provide Unix-domain sockets on Unix and named pipes on
-  Windows. This is a candidate for the request/response transport, not an adopted dependency or
-  evidence that endpoint permissions and packaging already meet this application's contract.
+  Windows. The isolated experiment pins this dependency; production adoption still depends on its
+  validation results. Its API alone does not establish endpoint permissions or packaging behavior.
 
 Pin adopted versions and test their relied-on behavior when implementing. Keep this transport
 separate from the React-to-Rust host bridge for reads, writes, and file watching. The browser

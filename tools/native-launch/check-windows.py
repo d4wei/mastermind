@@ -4,10 +4,12 @@ import ctypes
 from ctypes import wintypes
 import json
 import os
+import queue
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import uuid
 
@@ -38,22 +40,44 @@ def check(name, condition):
 def invoke(identifier, files, cwd=None, extra=None):
     env = dict(os.environ, MM_LAUNCH_CHECK_ID=identifier, **(extra or {}))
     started = time.monotonic()
-    run = subprocess.run([binary, 'open', '--', *map(str, files)], cwd=cwd, env=env,
-                         capture_output=True, timeout=20)
+    process = subprocess.Popen([binary, 'open', '--', *map(str, files)], cwd=cwd, env=env,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = queue.Queue()
+    def stdout_reader():
+        output.put(('result', process.stdout.readline()))
+        output.put(('tail', process.stdout.read()))
+    def stderr_reader():
+        output.put(('diagnostics', process.stderr.read()))
+    threading.Thread(target=stdout_reader, daemon=True).start()
+    threading.Thread(target=stderr_reader, daemon=True).start()
+    response = None
+    captured = {}
     try:
-        response = json.loads(run.stdout)
-    except ValueError as error:
-        raise AssertionError((run.returncode, run.stdout, run.stderr)) from error
-    if response['results']:
-        owned_pids.add(response['pid'])
-    return run.returncode, response, time.monotonic() - started
+        while len(captured) < 3:
+            kind, data = output.get(timeout=max(0.1, 20 - (time.monotonic() - started)))
+            captured[kind] = data
+            if kind == 'result':
+                response = json.loads(data)
+                if response['results']:
+                    owned_pids.add(response['pid'])
+        if captured['tail']:
+            raise AssertionError('Launcher emitted more than one result')
+        process.wait(timeout=max(0.1, 20 - (time.monotonic() - started)))
+        return process.returncode, response, time.monotonic() - started
+    except queue.Empty as error:
+        raise AssertionError(('Launcher result/EOF deadline', process.poll(), captured)) from error
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=3)
+
 
 
 def pipe_name(identifier):
     return rf'\\.\pipe\mastermind-launch-check-{identity}-{identifier}'
 
 
-def wire(identifier, payload):
+def blocking_wire(identifier, payload):
     handle = kernel.CreateFileW(pipe_name(identifier), 0xC0000000, 0, None, 3, 0, None)
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
@@ -78,6 +102,23 @@ def wire(identifier, payload):
         return json.loads(chunks) if chunks else {'error': 'connection_closed'}
     finally:
         kernel.CloseHandle(handle)
+
+
+def wire(identifier, payload):
+    result = queue.Queue()
+    def exchange():
+        try:
+            result.put((blocking_wire(identifier, payload), None))
+        except Exception as error:
+            result.put((None, error))
+    threading.Thread(target=exchange, daemon=True).start()
+    try:
+        response, error = result.get(timeout=15)
+    except queue.Empty as error:
+        raise AssertionError('Named-pipe probe exceeded its deadline') from error
+    if error:
+        raise error
+    return response
 
 
 def stop(pid):
