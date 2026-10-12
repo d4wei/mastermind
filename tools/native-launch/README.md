@@ -57,9 +57,10 @@ A read blocked in the OS can outlive the response deadline. The retained documen
 session-size limit. Those are reasons not to ship this experiment as a host implementation.
 
 Windows intentionally refuses startup until endpoint ownership and ACL behavior are implemented and
-tested on a native runner. Interprocess supports named pipes, but that alone does not establish
-user isolation. Linux uses the Unix path but still needs native packaging and GUI tests. The macOS
-bundle is a local development artifact, not a signed/notarized distribution release.
+tested on a native runner. This guard is experiment code, not a Tauri platform limitation.
+Interprocess supports named pipes, but that alone does not establish user isolation. Linux uses the
+Unix path but still needs native packaging and GUI tests. The macOS bundle is a local development
+artifact, not a signed/notarized distribution release.
 
 See [results](results.md) for observed outcomes and remaining evidence gaps. The forward contract is
 [agent launch](../../docs/agent-launch.md). Delete the experiment once its useful checks and

@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-11 — Portability takes priority over distributable size
+
+**Ruled.** Current use is macOS-only; Windows support remains important and Linux is lower priority.
+Preserve a credible cross-platform filesystem and packaging path. A smaller distributable does not
+justify inadequate file support; revisit the wrapper choice if required behavior lacks a viable
+implementation. This refines platform priority without changing the selected Tauri direction.
+
+**Beat:** treating macOS success or package size as sufficient evidence for the desktop choice.
+
 ## 2026-10-11 — File admission succeeds independently of initial setup
 
 **Ruled.** The launcher acknowledges admitted files and reports incomplete setup without waiting

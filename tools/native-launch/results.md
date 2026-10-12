@@ -43,10 +43,62 @@ performance benchmark. Dependencies were downloaded during setup; the running ho
 
 ## Remaining evidence and implementation gaps
 
-Windows needs a console/GUI executable test and named-pipe endpoint ownership/ACL implementation;
-this experiment explicitly refuses Windows startup. Linux needs native packaging and GUI execution.
-There were no native Windows/Linux runners in this run. The library's cross-platform API does not
-close these gaps. Keep the separate console-launcher option open until Windows is exercised.
+### Windows support: implementation gaps, not a failed framework test
+
+The Windows refusal comes from our own `runtime_dir()` guard in
+[src/transport.rs](src/transport.rs). The experiment implements Unix directory permissions and
+socket cleanup only. It has not run on Windows, so this is neither an observed Windows failure nor
+evidence that Tauri lacks Windows filesystem support. The launcher transport is our use of
+Interprocess; it is separate from Tauri's webview-to-Rust bridge.
+
+There are three different questions:
+
+- **Ordinary file access is supported.** Tauri's [filesystem documentation][tauri-fs] covers
+  Windows, macOS, and Linux, and directs Rust host code to `std::fs` or `tokio::fs`. Rust's
+  [filesystem API][rust-fs] exposes cross-platform operations. Our source-preserving saves, external
+  change detection, conflict checks, and save-aware quit remain application behavior to implement
+  and test. The experiment's replacement checks also contain Unix-only branches; passing on macOS
+  does not establish equivalent Windows file safety.
+- **Console behavior is a documented platform difference.** Tauri's [CLI documentation][tauri-cli]
+  warns that production Windows GUI apps cannot write to the invoking console by default and links
+  a workaround. That is known; whether one packaged executable meets our captured-output and exit
+  status contract is untested. A small console launcher remains an option, not a framework change.
+- **Endpoint permissions need a Windows implementation.** Windows named pipes have
+  [access-control rules][pipe-security] that differ from Unix socket-directory permissions. Our
+  implementation must restrict access and establish endpoint ownership; a unique pipe name alone
+  does not do that. These are documented OS facilities, not missing Tauri filesystem APIs.
+
+### Does Electron change the conclusion?
+
+Electron's [Node main process][electron-process] could reuse the existing JavaScript file service;
+its Chromium renderer also reduces variation between browser engines. That can reduce porting work.
+It does not supply mastermind's document conflict policy or make platform testing unnecessary:
+[Node documents platform differences in file watching][node-watch]. Electron's
+[single-instance API][electron-instance] returns lock ownership and forwards launch data, not
+per-file admission results. Our acknowledgment contract still needs application-level handling.
+
+The evidence here does not establish a filesystem-maturity reason to switch to Electron. Continue
+with Tauri while testing Windows early, and revisit the choice if those checks expose an unsupported
+required behavior or a disproportionate amount of platform-specific machinery. Package size is
+secondary to reliable file handling and portability. The measured diagnostic bundle is not a
+production size comparison; no equivalent Electron bundle was built or measured.
+
+### Validation without a local Windows machine
+
+Tauri publishes a [GitHub Actions example][tauri-ci] that runs Rust and WebDriver tests on native
+Windows and Linux runners. Use hosted Windows CI for build, packaged command invocation, process
+races, endpoint permissions, and filesystem behavior, then automate the window smoke test. Do not
+stop at cross-compilation: executing the Windows binary is the relevant evidence.
+
+CI can establish repeatable behavior on its runner, but does not replace later interactive checks
+of installation, focus, Chinese input, and normal desktop use. Some permission checks need an
+explicit second-user test setup rather than the default runner identity. No Windows or Linux
+execution results have been collected yet.
+
+Prioritize Windows after macOS; retain a Linux build and smoke-test path at lower priority. This
+ordering preserves cross-platform viability without claiming that every platform is already ready.
+
+### Production host and distribution
 
 This is not the production file host. Validate source-preserving reads and writes, replacement
 races, dirty buffers, conflict comparison, failed/slow saves, and save-aware quit with the reviewer.
@@ -59,8 +111,18 @@ Shell/PATH installation, moved bundles, Finder document-opening events, normal i
 notarization, and other-user endpoint isolation were not tested. No production settings, language
 changes, translation views, or onboarding form are implemented by this experiment.
 
-Next, close the Windows launcher/endpoint gap on a native runner and port only the validated parts
-into a bounded real-reviewer host test. Keep the existing app available until that host meets the
-[architecture checks][host-checks].
+Next, implement the missing Windows launcher and endpoint handling in the isolated experiment,
+then execute the admission and file-safety checks on a hosted Windows runner. Keep the current app
+available until the real-reviewer host meets the [architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
+
+[tauri-fs]: https://v2.tauri.app/plugin/file-system/
+[rust-fs]: https://doc.rust-lang.org/std/fs/index.html
+[tauri-cli]: https://v2.tauri.app/plugin/cli/
+[pipe-security]:
+  https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights
+[electron-process]: https://www.electronjs.org/docs/latest/tutorial/process-model
+[node-watch]: https://nodejs.org/api/fs.html#caveats
+[electron-instance]: https://www.electronjs.org/docs/latest/api/app
+[tauri-ci]: https://v2.tauri.app/develop/tests/webdriver/ci/
