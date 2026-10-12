@@ -17,7 +17,7 @@ permissions:
 jobs:
   windows:
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: tools/native-launch
@@ -68,6 +68,41 @@ jobs:
         timeout-minutes: 2
         run: |
           ./check-access.ps1 -Binary "$env:RUNNER_TEMP/mastermind-launch-installed/mastermind-launch-check.exe"
+      - name: Install pinned Tauri WebDriver
+        timeout-minutes: 10
+        run: |
+          cargo install tauri-driver --version 2.0.6 --locked
+          exit $LASTEXITCODE
+      - name: Download Edge driver matching the WebView2 runtime
+        run: |
+          $client = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          $registryPaths = @(
+            "Registry::HKEY_CURRENT_USER\Software\Microsoft\EdgeUpdate\Clients\$client",
+            "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\$client"
+          )
+          $version = $null
+          foreach ($path in $registryPaths) {
+            $candidate = (Get-ItemProperty -Path $path -Name pv -ErrorAction SilentlyContinue).pv
+            if ($candidate -match '^\d+\.\d+\.\d+\.\d+$' -and $candidate -ne '0.0.0.0') {
+              $version = $candidate
+              break
+            }
+          }
+          if (-not $version) { throw 'WebView2 Runtime version is unavailable' }
+          Write-Host "WebView2 Runtime: $version"
+          $archive = Join-Path $env:RUNNER_TEMP 'edgedriver_win64.zip'
+          $directory = Join-Path $env:RUNNER_TEMP 'edgedriver'
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$version/edgedriver_win64.zip" -OutFile $archive
+          Expand-Archive $archive -DestinationPath $directory
+          if (-not (Test-Path "$directory/msedgedriver.exe")) { throw 'Edge driver was not extracted' }
+      - name: Exercise the installed reviewer through WebDriver
+        timeout-minutes: 5
+        run: |
+          python check-reviewer-windows.py `
+            "$env:RUNNER_TEMP/mastermind-launch-installed/mastermind-launch-check.exe" `
+            "$env:USERPROFILE/.cargo/bin/tauri-driver.exe" `
+            "$env:RUNNER_TEMP/edgedriver/msedgedriver.exe"
+          exit $LASTEXITCODE
       - name: Upload observations and installer
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
