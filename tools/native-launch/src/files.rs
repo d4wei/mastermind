@@ -355,6 +355,17 @@ mod tests {
         assert_eq!(fs::read(f.file()).unwrap(), result.as_bytes());
     }
 
+    #[test]
+    fn saved_version_remains_valid_after_the_write_handle_closes() {
+        let f = Fixture::new();
+        let base = read(&f.file()).unwrap();
+        let saved = write(&f.file(), "first edit\r\n", &base.version).unwrap();
+        assert_eq!(saved.version, read(&f.file()).unwrap().version);
+        let next = write(&f.file(), "second edit\r\n", &saved.version).unwrap();
+        assert_eq!(next.version, read(&f.file()).unwrap().version);
+        assert_eq!(fs::read(f.file()).unwrap(), b"second edit\r\n");
+    }
+
     #[cfg(unix)]
     #[test]
     fn canonical_writes_preserve_links_permissions_and_inode() {

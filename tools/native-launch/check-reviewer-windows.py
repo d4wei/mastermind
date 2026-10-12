@@ -1,6 +1,7 @@
 """Exercise the installed reviewer through Tauri's Windows WebDriver bridge."""
 import ctypes
 from ctypes import wintypes
+import base64
 import json
 import os
 from pathlib import Path
@@ -62,6 +63,10 @@ def element(session, selector):
 
 def text(session, selector):
     return command(session, 'GET', f'/element/{element(session, selector)}/text')
+
+
+def attribute(session, selector, name):
+    return command(session, 'GET', f'/element/{element(session, selector)}/attribute/{name}')
 
 
 def click(session, selector):
@@ -146,8 +151,11 @@ def check(session, path, namespace):
     path.chmod(0o444)
     local = '# reviewer\n\nUnsaved local edit.\n'
     replace_editor(session, local)
+    until('local changes remain in the editor before the failed save',
+          lambda: 'Unsaved local edit.' in editor(session))
     until('failed autosave reports an error and keeps disk bytes',
-          lambda: 'Autosave failed' in text(session, '.toast-error') and
+          lambda: 'Autosave failed' in (attribute(
+              session, '.toast-error [aria-label]', 'aria-label') or '') and
           path.read_bytes() == disk.encode(), 20)
     path.chmod(0o666)
     competing = '# reviewer\r\n\r\nExternal competing edit.\r\n'
@@ -169,7 +177,8 @@ def check(session, path, namespace):
     path.chmod(0o444)
     replace_editor(session, '# reviewer\n\nFailed quit edit.\n')
     until('second failed save preserves the file',
-          lambda: 'Autosave failed' in text(session, '.toast-error') and
+          lambda: 'Autosave failed' in (attribute(
+              session, '.toast-error [aria-label]', 'aria-label') or '') and
           path.read_bytes() == result.replace('\n', '\r\n').encode(), 20)
     close_window(pid)
     until('title-bar close refuses unsaved changes',
@@ -183,11 +192,29 @@ def check(session, path, namespace):
     until('title-bar close exits after save', lambda: not window_for(pid))
 
 
+def capture_diagnostics(session, path, directory):
+    directory.mkdir(exist_ok=True)
+    state = {'file': str(path),
+             'disk_bytes_hex': path.read_bytes().hex() if path.exists() else None}
+    for label, route in [('source', '/source'), ('screenshot', '/screenshot')]:
+        try:
+            value = command(session, 'GET', route)
+            if label == 'screenshot':
+                (directory / 'reviewer.png').write_bytes(base64.b64decode(value))
+            else:
+                (directory / 'reviewer.html').write_text(value, encoding='utf-8')
+        except Exception as error:
+            state[label + '_error'] = str(error)
+    (directory / 'state.json').write_text(json.dumps(state, indent=2), encoding='utf-8')
+
+
 with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
     path = Path(directory) / 'reviewer 中文.md'
     namespace = uuid.uuid4().hex
     environment = dict(os.environ, MM_LAUNCH_CHECK_ID=namespace)
-    log = open(Path(directory) / 'tauri-driver.log', 'w+b')
+    diagnostics = Path(__file__).with_name('check-reviewer-diagnostics')
+    diagnostics.mkdir(exist_ok=True)
+    log = open(diagnostics / 'tauri-driver.log', 'w+b')
     driver = subprocess.Popen([str(driver_binary), '--native-driver', str(edge_driver)],
                               env=environment, stdout=log, stderr=subprocess.STDOUT)
     session = None
@@ -203,6 +230,11 @@ with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
         check(session, path, namespace)
     except BaseException:
         failed = True
+        if session:
+            try:
+                capture_diagnostics(session, path, diagnostics)
+            except Exception as error:
+                print(f'Could not capture diagnostics: {error}', file=sys.stderr)
         raise
     finally:
         if path.exists():
@@ -212,7 +244,11 @@ with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
                 command(session, 'DELETE', '')
             except Exception:
                 pass
-        driver.terminate()
+        try:
+            subprocess.run(['taskkill', '/PID', str(driver.pid), '/T', '/F'],
+                           capture_output=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            driver.kill()
         try:
             driver.wait(timeout=5)
         except subprocess.TimeoutExpired:

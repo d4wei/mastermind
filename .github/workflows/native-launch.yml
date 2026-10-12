@@ -110,5 +110,6 @@ jobs:
           name: native-launch-windows
           path: |
             tools/native-launch/check-results-windows.json
+            tools/native-launch/check-reviewer-diagnostics/**
             tools/native-launch/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
