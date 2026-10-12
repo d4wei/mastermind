@@ -28,6 +28,9 @@ On Windows, build with `npx tauri build --bundles nsis -- --locked`. Run
 `python check-windows.py <installed-executable>` after installing the generated NSIS package.
 The [Windows workflow](../../.github/workflows/native-launch.yml) builds, installs, and exercises
 that package on a hosted runner. It uploads the installer and process-check output.
+`check-access.ps1 -Binary <installed-executable>` additionally requires an administrator on a
+disposable Windows machine: it creates a temporary local account, checks pipe access denial, and
+removes the account and test files.
 
 ## Boundary under test
 

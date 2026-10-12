@@ -32,6 +32,7 @@ def check(name, condition):
     if not condition:
         raise AssertionError(name)
     results.append(name)
+    print(name, file=sys.stderr, flush=True)
 
 
 def invoke(identifier, files, cwd=None, extra=None):
@@ -60,6 +61,8 @@ def wire(identifier, payload):
         sent = wintypes.DWORD()
         data = ctypes.create_string_buffer(payload)
         if not kernel.WriteFile(handle, data, len(payload), ctypes.byref(sent), None):
+            if ctypes.get_last_error() in (109, 232):
+                return {'error': 'connection_closed'}
             raise ctypes.WinError(ctypes.get_last_error())
         chunks = bytearray()
         while b'\n' not in chunks:
