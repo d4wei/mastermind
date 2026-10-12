@@ -45,11 +45,10 @@ performance benchmark. Dependencies were downloaded during setup; the running ho
 
 ### Windows support: implementation gaps, not a failed framework test
 
-The Windows refusal comes from our own `runtime_dir()` guard in
-[src/transport.rs](src/transport.rs). The experiment implements Unix directory permissions and
-socket cleanup only. It has not run on Windows, so this is neither an observed Windows failure nor
-evidence that Tauri lacks Windows filesystem support. The launcher transport is our use of
-Interprocess; it is separate from Tauri's webview-to-Rust bridge.
+The initial Windows refusal came from our experiment's own guard, not a failed Tauri test.
+The current [Windows endpoint](src/endpoint/windows.rs) implements named-pipe ownership and access
+checks. Native Windows execution is pending the first hosted run; implemented code is not a passing
+platform check. The launcher transport uses Interprocess separately from Tauri's webview bridge.
 
 There are three different questions:
 
@@ -57,16 +56,17 @@ There are three different questions:
   Windows, macOS, and Linux, and directs Rust host code to `std::fs` or `tokio::fs`. Rust's
   [filesystem API][rust-fs] exposes cross-platform operations. Our source-preserving saves, external
   change detection, conflict checks, and save-aware quit remain application behavior to implement
-  and test. The experiment's replacement checks also contain Unix-only branches; passing on macOS
-  does not establish equivalent Windows file safety.
+  and test. Admission now compares Windows volume/file IDs, but passing on macOS does not establish
+  equivalent Windows file safety.
 - **Console behavior is a documented platform difference.** Tauri's [CLI documentation][tauri-cli]
   warns that production Windows GUI apps cannot write to the invoking console by default and links
   a workaround. That is known; whether one packaged executable meets our captured-output and exit
   status contract is untested. A small console launcher remains an option, not a framework change.
-- **Endpoint permissions need a Windows implementation.** Windows named pipes have
+- **Endpoint permissions need native validation.** Windows named pipes have
   [access-control rules][pipe-security] that differ from Unix socket-directory permissions. Our
-  implementation must restrict access and establish endpoint ownership; a unique pipe name alone
-  does not do that. These are documented OS facilities, not missing Tauri filesystem APIs.
+  implementation restricts access and checks the server's user; a unique pipe name alone would not
+  do that. Another-user execution still needs testing. These are documented OS facilities, not
+  missing Tauri filesystem APIs.
 
 ### Does Electron change the conclusion?
 
@@ -111,9 +111,10 @@ Shell/PATH installation, moved bundles, Finder document-opening events, normal i
 notarization, and other-user endpoint isolation were not tested. No production settings, language
 changes, translation views, or onboarding form are implemented by this experiment.
 
-Next, implement the missing Windows launcher and endpoint handling in the isolated experiment,
-then execute the admission and file-safety checks on a hosted Windows runner. Keep the current app
-available until the real-reviewer host meets the [architecture checks][host-checks].
+Next, run the implemented Windows launcher, admission, and endpoint checks through the
+[hosted workflow](../../.github/workflows/native-launch.yml), then record its actual outcomes.
+Keep the current app available until the real-reviewer host meets the
+[architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
 

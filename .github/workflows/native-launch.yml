@@ -1,0 +1,56 @@
+name: Native launch experiment
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/native-launch/**'
+      - '.github/workflows/native-launch.yml'
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: tools/native-launch
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --component clippy
+          rustup override set 1.98.0
+      - name: Build Windows release and installer
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npx tauri build --bundles nsis -- --locked
+          exit $LASTEXITCODE
+      - name: Native unit tests and lint
+        run: |
+          cargo test --release --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --release --locked -- -D warnings
+          exit $LASTEXITCODE
+      - name: Install and exercise the Windows package
+        run: |
+          $installer = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
+          $destination = Join-Path $env:RUNNER_TEMP 'mastermind-launch-installed'
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
+          if ($install.ExitCode) { exit $install.ExitCode }
+          python check-windows.py "$destination/mastermind-launch-check.exe" | Tee-Object check-results-windows.json
+          exit $LASTEXITCODE
+      - name: Upload observations and installer
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-launch-windows
+          path: |
+            tools/native-launch/check-results-windows.json
+            tools/native-launch/target/release/bundle/nsis/*.exe
+          if-no-files-found: warn

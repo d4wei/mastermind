@@ -1,4 +1,5 @@
 mod admission;
+mod endpoint;
 mod transport;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
 use std::{
@@ -59,12 +60,20 @@ async fn launch(root: PathBuf, request: Request) -> io::Result<Response> {
             ) => {}
         Err(error) => return Err(error),
     }
-    let mut child = Command::new(std::env::current_exe()?)
+    let mut command = Command::new(std::env::current_exe()?);
+    command
         .arg("host")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()?;
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
+        // The terminal launcher keeps stdout; its GUI child must not create a console window.
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = command.spawn()?;
     loop {
         match transport::exchange(&root, &request).await {
             Ok(response) => return Ok(response),
@@ -83,7 +92,7 @@ async fn launch(root: PathBuf, request: Request) -> io::Result<Response> {
 
 fn main() {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
-    let root = match transport::runtime_dir() {
+    let root = match endpoint::discover() {
         Ok(root) => root,
         Err(error) => {
             eprintln!("{error}");
@@ -125,8 +134,8 @@ fn main() {
         println!("{}", serde_json::to_string(&response).unwrap());
         std::process::exit(code);
     }
-    let _owner = match transport::ownership(&root) {
-        Ok(owner) => owner,
+    let (_owner, listener) = match tauri::async_runtime::block_on(async { endpoint::bind(&root) }) {
+        Ok(bound) => bound,
         Err(error) if error.kind() == io::ErrorKind::WouldBlock => return,
         Err(error) => {
             eprintln!("{error}");
@@ -139,12 +148,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![snapshot])
         .setup(move |app| {
             let runtime = tauri::async_runtime::handle();
-            runtime.spawn(async move {
-                match transport::listen(&root) {
-                    Ok(listener) => transport::serve(listener, docs).await,
-                    Err(error) => eprintln!("{error}"),
-                }
-            });
+            runtime.spawn(transport::serve(listener, docs));
             let handle = app.handle().clone();
             let delay = std::env::var("MM_LAUNCH_CHECK_UI_DELAY_MS")
                 .ok()

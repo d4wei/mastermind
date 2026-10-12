@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-11 — Preserve the review experience while reassessing native machinery
+
+**Ruled.** Continue with Tauri. Porting the Node implementation is an opportunity to simplify;
+existing machinery has no presumption of retention. Preserve the approved review experience and
+file-safety requirements, and evaluate each native implementation against those requirements.
+
+**Beat:** selecting or retaining infrastructure chiefly to avoid rewriting existing Node code.
+
 ## 2026-10-11 — Portability takes priority over distributable size
 
 **Ruled.** Current use is macOS-only; Windows support remains important and Linux is lower priority.

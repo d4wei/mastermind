@@ -24,6 +24,11 @@ private runtime directories and document fixtures under `/tmp`, and terminates o
 started. It tests unresponsive peers and lost responses; allow the bounded request deadline to run.
 The check script requires Unix sockets and is not a Windows test runner.
 
+On Windows, build with `npx tauri build --bundles nsis -- --locked`. Run
+`python check-windows.py <installed-executable>` after installing the generated NSIS package.
+The [Windows workflow](../../.github/workflows/native-launch.yml) builds, installs, and exercises
+that package on a hosted runner. It uploads the installer and process-check output.
+
 ## Boundary under test
 
 One executable has a short-lived command mode and a GUI host mode. The command resolves paths
@@ -31,9 +36,12 @@ against its own cwd, rejects non-UTF-8 paths explicitly, and emits one JSON resu
 0 for all admitted, 1 for file failures, 2 for malformed invocation/request, and 3 for unknown
 outcome. The prototype always reports incomplete onboarding; it implements no preferences UI.
 
-The host owns a filesystem lock for its lifetime. A private, owner-checked runtime directory holds
-that lock and a local socket. Concurrent host starts contend for the lock. Only its holder may
-remove a stale socket before listening. The protocol uses a bounded newline-terminated JSON frame,
+On Unix, the host owns a filesystem lock for its lifetime. A private, owner-checked runtime
+directory holds that lock and a local socket. Only its holder may remove a stale socket.
+On Windows, a user-scoped named pipe reserves its first instance exclusively. Its access descriptor
+allows the current user; clients check the server process's user before sending paths. Interprocess
+rejects remote clients and Windows reclaims the pipe when its last handle closes. The protocol uses
+a bounded newline-terminated JSON frame,
 version checking, connection deadlines, and bounded concurrent connection handling. It carries
 opening requests and status, not document contents or comments. There is no HTTP/TCP listener.
 
@@ -42,7 +50,8 @@ in-memory document map. A lost acknowledgment may follow successful admission, s
 already-admitted records. The renderer pulls a snapshot rather than relying on a startup event.
 A short refresh interval is diagnostic plumbing, not a proposed production update mechanism.
 
-`MM_LAUNCH_CHECK_DIR` chooses a disposable runtime directory. `MM_LAUNCH_CHECK_DROP_REPLY` drops one
+`MM_LAUNCH_CHECK_DIR` chooses a disposable Unix runtime directory. `MM_LAUNCH_CHECK_ID` chooses a
+Windows test namespace within the current user's pipe name. `MM_LAUNCH_CHECK_DROP_REPLY` drops one
 response after processing it. `MM_LAUNCH_CHECK_UI_DELAY_MS` delays native window creation.
 These are trusted test-harness controls, not repository-discovered
 configuration or proposed product settings. The default runtime directory is also experiment-only.
@@ -56,11 +65,13 @@ Read checks detect some replacements and in-place changes; they are not a filesy
 A read blocked in the OS can outlive the response deadline. The retained document map has no
 session-size limit. Those are reasons not to ship this experiment as a host implementation.
 
-Windows intentionally refuses startup until endpoint ownership and ACL behavior are implemented and
-tested on a native runner. This guard is experiment code, not a Tauri platform limitation.
-Interprocess supports named pipes, but that alone does not establish user isolation. Linux uses the
-Unix path but still needs native packaging and GUI tests. The macOS bundle is a local development
-artifact, not a signed/notarized distribution release.
+Windows uses a console-subsystem executable for captured output; its spawned GUI host uses
+`CREATE_NO_WINDOW`. Direct Explorer launch without a console and a final console/GUI executable
+layout remain unvalidated. Endpoint checks do not establish isolation from a malicious same-user
+process; execution under another OS user still needs a test. Windows reads compare open-handle
+volume/file IDs; this is admission testing, not validation of production writes or watcher behavior.
+Linux retains the Unix implementation but needs native packaging and GUI tests. macOS bundles are
+local development artifacts, not signed/notarized distribution releases.
 
 See [results](results.md) for observed outcomes and remaining evidence gaps. The forward contract is
 [agent launch](../../docs/agent-launch.md). Delete the experiment once its useful checks and

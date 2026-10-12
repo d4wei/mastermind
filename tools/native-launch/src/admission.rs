@@ -110,8 +110,22 @@ impl Documents {
         options.read(true);
         #[cfg(unix)]
         options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+            options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+        }
         let file = options.open(&canonical)?;
         let before = file.metadata()?;
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+            if before.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+                return Err(io::Error::other("file_replaced"));
+            }
+        }
         if !before.is_file() || before.len() > MAX_FILE_BYTES {
             return Err(io::Error::other("not_supported_file"));
         }
@@ -121,6 +135,10 @@ impl Documents {
         let at_path = fs::metadata(&canonical)?;
         #[cfg(unix)]
         if before.dev() != at_path.dev() || before.ino() != at_path.ino() {
+            return Err(io::Error::other("file_replaced"));
+        }
+        #[cfg(windows)]
+        if file_identity(&file)? != file_identity(&options.open(&canonical)?)? {
             return Err(io::Error::other("file_replaced"));
         }
         if bytes.len() as u64 > MAX_FILE_BYTES
@@ -134,6 +152,29 @@ impl Documents {
         self.order.push(display.clone());
         Ok((display, "opened"))
     }
+}
+
+#[cfg(windows)]
+fn file_identity(file: &fs::File) -> io::Result<(u64, [u8; 16])> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
+    };
+    let mut info = std::mem::MaybeUninit::<FILE_ID_INFO>::uninit();
+    // Query the open handle rather than its path; a pathname can already refer to a replacement.
+    if unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle(),
+            FileIdInfo,
+            info.as_mut_ptr().cast(),
+            size_of::<FILE_ID_INFO>() as u32,
+        )
+    } == 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    let info = unsafe { info.assume_init() };
+    Ok((info.VolumeSerialNumber, info.FileId.Identifier))
 }
 
 #[cfg(test)]
@@ -166,6 +207,25 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn identity_distinguishes_files_with_identical_content() {
+        let fixture = Fixture::new();
+        let a = fixture.0.join("a");
+        let b = fixture.0.join("b");
+        fs::write(&a, b"same").unwrap();
+        fs::write(&b, b"same").unwrap();
+        let original = fs::File::open(&a).unwrap();
+        assert_eq!(
+            file_identity(&original).unwrap(),
+            file_identity(&fs::File::open(&a).unwrap()).unwrap()
+        );
+        assert_ne!(
+            file_identity(&original).unwrap(),
+            file_identity(&fs::File::open(&b).unwrap()).unwrap()
+        );
     }
 
     #[test]
@@ -202,7 +262,8 @@ mod tests {
             ["opened", "error", "already_open", "opened"]
         );
         assert_eq!(docs.order.len(), 2);
-        assert!(docs.order[0].ends_with("/a") && docs.order[1].ends_with("/b"));
+        assert_eq!(PathBuf::from(&docs.order[0]).file_name().unwrap(), "a");
+        assert_eq!(PathBuf::from(&docs.order[1]).file_name().unwrap(), "b");
     }
 
     #[test]
