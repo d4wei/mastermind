@@ -134,7 +134,17 @@ fn main() {
         }
     };
     let docs = Arc::new(Mutex::new(Documents::default()));
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_web_content_process_terminate(|webview| {
+        termination::renderer_lost(webview.app_handle());
+    });
+    builder
+        .on_page_load(|webview, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                termination::renderer_lost(webview.app_handle());
+            }
+        })
         .manage(docs.clone())
         .manage(reviewer::CloseGate::default())
         .invoke_handler(tauri::generate_handler![

@@ -27,3 +27,13 @@ pub fn close_ready() {
     #[cfg(target_os = "macos")]
     macos::ready();
 }
+
+pub fn renderer_lost(app: &tauri::AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        macos::disarm();
+        let _ = complete(app.clone(), false);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}

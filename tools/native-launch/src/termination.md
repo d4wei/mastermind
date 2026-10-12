@@ -15,6 +15,8 @@ fails if the class changes or already implements the callback, so a framework up
 this boundary explicitly. This adapter should disappear when the framework provides the hook.
 
 Before the renderer has subscribed, the callback cancels quit rather than waiting on a lost event.
+Page navigation and web-content-process termination disarm readiness and cancel a pending reply;
+the replacement renderer must subscribe before rearming it. This does not recover crashed buffers.
 Once subscribed, it returns `NSTerminateLater` while the store checks saves. Completion replies to
 AppKit on the main thread with approval or cancellation. Other platforms and macOS window-close
 requests use Tauri's exit path after the same store check. Forced process termination, crashes, and power

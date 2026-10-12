@@ -99,6 +99,10 @@ pub fn ready() {
     READY.store(true, Ordering::SeqCst);
 }
 
+pub fn disarm() {
+    READY.store(false, Ordering::SeqCst);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,6 +114,9 @@ mod tests {
             .unwrap()
             .register();
         add_termination_method(class).unwrap();
+        ready();
+        disarm();
+        assert!(!READY.load(Ordering::SeqCst));
         // Before the renderer subscribes, a quit cannot wait on an event with no consumer.
         unsafe {
             let object: objc2::rc::Retained<AnyObject> = msg_send![class, new];
