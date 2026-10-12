@@ -1,5 +1,8 @@
 mod admission;
 mod endpoint;
+mod files;
+mod reviewer;
+use tauri::{Emitter, Manager};
 mod host_process;
 mod transport;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
@@ -132,8 +135,23 @@ fn main() {
     let docs = Arc::new(Mutex::new(Documents::default()));
     tauri::Builder::default()
         .manage(docs.clone())
-        .invoke_handler(tauri::generate_handler![snapshot])
+        .manage(reviewer::CloseGate::default())
+        .invoke_handler(tauri::generate_handler![
+            snapshot,
+            reviewer::document_meta,
+            reviewer::read_document,
+            reviewer::write_document,
+            reviewer::watch_document,
+            reviewer::read_translation,
+            reviewer::read_preferences,
+            reviewer::write_preferences,
+            reviewer::finish_close
+        ])
         .setup(move |app| {
+            app.manage(Mutex::new(reviewer::FileWatch::new(app.handle().clone())?));
+            if cfg!(feature = "reviewer") {
+                app.set_menu(reviewer::menu(app.handle())?)?;
+            }
             let runtime = tauri::async_runtime::handle();
             runtime.spawn(transport::serve(listener, docs));
             let handle = app.handle().clone();
@@ -150,10 +168,17 @@ fn main() {
                         match tauri::WebviewWindowBuilder::new(
                             &main_handle,
                             "main",
-                            tauri::WebviewUrl::App("index.html".into()),
+                            tauri::WebviewUrl::App(
+                                if cfg!(feature = "reviewer") {
+                                    "native.html"
+                                } else {
+                                    "index.html"
+                                }
+                                .into(),
+                            ),
                         )
                         .title("mastermind — native launch check")
-                        .inner_size(760.0, 480.0)
+                        .inner_size(1100.0, 760.0)
                         .build()
                         {
                             Ok(window) => {
@@ -165,6 +190,34 @@ fn main() {
             });
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("native host failed");
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "quit-reviewer" {
+                let _ = app.emit("close-requested", ());
+            }
+        })
+        .on_window_event(|window, event| {
+            if cfg!(feature = "reviewer")
+                && let tauri::WindowEvent::CloseRequested { api, .. } = event
+            {
+                api.prevent_close();
+                let _ = window.emit("close-requested", ());
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("native host failed")
+        .run(|app, event| {
+            if cfg!(feature = "reviewer")
+                && let tauri::RunEvent::ExitRequested { api, .. } = event
+            {
+                if app
+                    .state::<reviewer::CloseGate>()
+                    .0
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    return;
+                }
+                api.prevent_exit();
+                let _ = app.emit("close-requested", ());
+            }
+        });
 }

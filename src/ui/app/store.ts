@@ -71,6 +71,7 @@ export interface DocStore {
 
   flushAll(): Promise<void>
   hasPendingWrites(): boolean
+  prepareToClose(): Promise<boolean>
   load(sessionId: string): Promise<void>
   undo(): void
   notifyDiskChange(mtimeMs: number, deleted?: boolean): void
@@ -113,6 +114,7 @@ type DocumentState = Pick<DocStore,
 export function createDocStore() {
   const documents = new Map<string, DocumentState>()
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
+  const writes = new Map<string, Promise<boolean>>()
   let loadRequest = 0
   const diskRequests = new Map<string, number>()
   const pendingDiskChanges = new Map<string, { mtimeMs: number; deleted: boolean }>()
@@ -132,7 +134,7 @@ export function createDocStore() {
     clearAutosave(id)
     timers.set(id, setTimeout(() => { timers.delete(id); void saveDocument(id) }, AUTOSAVE_MS))
   }
-  const saveDocument = async (id: string): Promise<boolean> => {
+  const writeDocument = async (id: string): Promise<boolean> => {
     clearAutosave(id)
     const doc = documents.get(id)
     if (!doc || doc.saving || doc.meta?.isDraft || doc.conflict) return false
@@ -160,6 +162,13 @@ export function createDocStore() {
       pendingDiskChanges.delete(id)
       if (pending) void readDiskChange(id, pending.mtimeMs, pending.deleted)
     }
+  }
+  const saveDocument = (id: string): Promise<boolean> => {
+    const pending = writes.get(id)
+    if (pending) return pending
+    const write = writeDocument(id).finally(() => { if (writes.get(id) === write) writes.delete(id) })
+    writes.set(id, write)
+    return write
   }
   const reconcileDisk = (id: string, file: Awaited<ReturnType<typeof getFile>>): void => {
     const doc = documents.get(id)
@@ -266,6 +275,13 @@ export function createDocStore() {
     async flushAll() {
       get().flushEditor?.()
       await Promise.all([...documents.keys()].map((id) => saveDocument(id)))
+    },
+
+    async prepareToClose() {
+      get().flushEditor?.()
+      await Promise.all([...writes.values()])
+      await get().flushAll()
+      return !get().hasPendingWrites()
     },
 
     hasPendingWrites() {

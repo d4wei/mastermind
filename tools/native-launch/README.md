@@ -1,8 +1,8 @@
 # Native launch validation
 
-This isolated experiment checks the launcher and app boundary before migrating the editor to Tauri.
+This isolated experiment checks native launch and the reviewer before migrating the app to Tauri.
 It is not the product's desktop host, installer, settings flow, or final application identity.
-Its window lists admitted paths; the host retains initial document bytes without editing files.
+Its default window lists admitted paths. The optional reviewer build edits through native commands.
 The existing web app and CLI are unchanged.
 
 ## Run
@@ -31,6 +31,26 @@ that package on a hosted runner. It uploads the installer and process-check outp
 `check-access.ps1 -Binary <installed-executable>` additionally requires an administrator on a
 disposable Windows machine: it creates a temporary local account, checks pipe access denial, and
 removes the account and test files.
+
+## Real reviewer build
+
+With root dependencies installed, run `npm run build:reviewer --prefix tools/native-launch` from
+the repository root. It bundles the React reader, source editor, themes, and fonts in the same
+macOS app. The launcher invocation is unchanged. On Windows, generate assets with
+`node --import tsx tools/native-launch/build-reviewer.mts`, then build from this directory with
+`npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles nsis -- --locked`.
+The Windows workflow builds this variant and runs its native unit and process checks.
+
+The reviewer has a diagnostic file selector, native guarded reads/writes, file invalidations,
+prepared-translation reads, and isolated experimental preferences. It starts no Node process or
+HTTP service. The shared document store still owns source edits, autosave, undo, and conflicts.
+Contracts live in [native file I/O](src/files.md) and the
+[UI adapter](../../src/ui/native/README.md).
+
+Window close and the custom Quit menu action await the document store's save check. The predefined
+macOS Quit menu action is deliberately absent because it directly terminates through AppKit.
+Dock and OS termination paths still need a cancellable lifecycle integration; this build must not
+be treated as a production-safe replacement for the browser app.
 
 ## Boundary under test
 
@@ -62,8 +82,9 @@ No shell profile, current app config, or production command installation is chan
 
 ## Limits
 
-This experiment does not validate the complete production file-I/O contract, editing, autosave,
-conflict comparison, native close waiting, Finder document events, agent setup, or translations.
+The reviewer build exercises native editing and conflicts, but does not complete the production
+validation matrix. Finder document events, dialogs, onboarding, full termination coverage, and
+interactive platform checks remain. See the results for what has actually been exercised.
 Read checks detect some replacements and in-place changes; they are not a filesystem transaction.
 A read blocked in the OS can outlive the response deadline. The retained document map has no
 session-size limit. Those are reasons not to ship this experiment as a host implementation.
@@ -74,7 +95,8 @@ would leave inherited launcher pipes open and prevent a capturing agent from rec
 Direct Explorer launch without a console and a final console/GUI executable layout remain
 unvalidated. The second-account test checks access denial, but endpoint checks do not establish
 isolation from administrators or malicious same-user processes. Windows reads compare open-handle
-volume/file IDs; this is admission testing, not validation of production writes or watcher behavior.
+volume/file IDs; native unit tests also exercise guarded writes. Windows GUI editing and watcher
+checks remain outstanding.
 Linux retains the Unix implementation but needs native packaging and GUI tests. macOS bundles are
 local development artifacts, not signed/notarized distribution releases.
 

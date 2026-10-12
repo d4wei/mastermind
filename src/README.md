@@ -17,6 +17,8 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
   Source (`modes/source/SourceEditor.tsx`, CodeMirror). `review/` holds the comment rail,
   accept/reject, find, and inline-suggestion proposals. `app/store.ts` owns buffers and saves;
   `app/store.md` describes their lifetime, conflict comparison, and concurrency boundaries.
+- **`ui/native/`** — the Tauri reviewer adapter and validation entry point; see its `README.md`.
+  The experimental native commands and versioned file service live under `tools/native-launch/`.
 - **`shared/`** — imported by all three, so it stays browser-safe. `critic/scanner.ts` parses
   CriticMarkup into typed marks; `critic/resolve.ts` accepts or rejects a mark as an exact source
   splice; `critic/mask.ts` and `critic/suggest.ts` back find and suggestions. `markdown/` is the
@@ -25,8 +27,8 @@ CLI, server, and UI layers over one shared core; two tsconfigs check browser and
   `review-archive.ts` implements comment deletion and resolution; `review-archive.md` defines the
   hidden in-file record. `translation.ts` validates prepared snapshots and encodes translated-view
   comments; `translation.md` describes freshness and source mapping. `blocks.ts`, `edits.ts`,
-  `eol.ts`, `types.ts`, and `constants.ts` hold segmentation, source edits, EOL preservation, and
-  client–server contract.
+  `eol.ts`, `types.ts`, `config.ts`, and `constants.ts` hold segmentation, source edits, line endings,
+  shared defaults, and the client–server contract.
 
 The invariants the tests assert — byte-exact round trips (`critic-resolve.test.ts`,
 `selection-ranges.test.ts`), marks reaching disk only by user acceptance, workspace containment

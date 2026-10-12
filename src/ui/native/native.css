@@ -1,0 +1,9 @@
+.native-documents {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 3);
+  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+.native-documents select { max-width: 60%; }

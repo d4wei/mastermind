@@ -11,14 +11,14 @@ import { registerDocumentLifecycle } from './documentLifecycle'
 import { SessionView } from './SessionView'
 import { WorkspaceView } from './WorkspaceView'
 
-export function App() {
+export function App({ home, native = false }: { home?: ReactNode; native?: boolean }) {
   const load = useConfig((s) => s.load)
   const route = useRoute()
   useEffect(() => {
     void load()
   }, [load])
 
-  useEffect(() => registerDocumentLifecycle(), [])
+  useEffect(() => native ? undefined : registerDocumentLifecycle(), [native])
 
   return (
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
@@ -33,7 +33,7 @@ export function App() {
           <WorkspaceView key={route.workspaceId} workspaceId={route.workspaceId} sessionId={route.sessionId} />
         </AppFrame>
       )}
-      {route.kind === 'home' && <HomeView />}
+      {route.kind === 'home' && (home ?? <HomeView />)}
       <GrainOverlay />
     </Tooltip.Provider>
   )

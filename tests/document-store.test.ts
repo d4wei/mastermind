@@ -240,3 +240,38 @@ it('cancels browser unload when an inactive document has pending edits', async (
   expect(clean.defaultPrevented).toBe(false)
   teardown()
 })
+
+it('native quit waits for an in-flight save, then saves edits made behind it', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('first')
+  const saving = store.getState().autosave()
+  store.getState().setSource('latest')
+  let settled = false
+  const closing = store.getState().prepareToClose().then((ready) => { settled = true; return ready })
+  await Promise.resolve()
+  expect(settled).toBe(false)
+  writes[0]!.pending.resolve(response({ mtimeMs: 2, version: 'A-2' }))
+  await saving
+  await vi.advanceTimersByTimeAsync(0)
+  expect(writes[1]).toMatchObject({ content: 'latest', baseVersion: 'A-2' })
+  expect(settled).toBe(false)
+  writes[1]!.pending.resolve(response({ mtimeMs: 3, version: 'A-3' }))
+  expect(await closing).toBe(true)
+  expect(store.getState().hasPendingWrites()).toBe(false)
+})
+
+it('native quit retains failed saves and edited comparison results', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('local')
+  const closing = store.getState().prepareToClose()
+  await vi.advanceTimersByTimeAsync(0)
+  writes[0]!.pending.resolve(response({ error: 'unavailable' }, 500))
+  expect(await closing).toBe(false)
+  expect(store.getState().source).toBe('local')
+  await store.getState().openConflict()
+  store.getState().setConflictResult('unapplied result')
+  expect(await store.getState().prepareToClose()).toBe(false)
+  expect(store.getState().conflictDraft?.result).toBe('unapplied result')
+})

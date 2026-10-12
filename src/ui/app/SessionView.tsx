@@ -115,7 +115,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   }, [notice])
 
   useEffect(() => {
-    // UI liveness keeps the review session open while its window remains attached.
+    if (status !== 'ready') return
     const es = openEvents(sessionId)
     es.addEventListener('file-changed', (e) => {
       const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
@@ -128,7 +128,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       void useConfig.getState().load()
     })
     return () => es.close()
-  }, [sessionId])
+  }, [sessionId, status])
 
   const showTranslated = mode === 'reading' && transActive
   const analysis = useMemo(

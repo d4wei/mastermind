@@ -1,15 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fs,
-    io::{self, Read},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fs, io, path::PathBuf};
 
 pub const VERSION: u32 = 1;
 pub const MAX_FRAME: usize = 64 * 1024;
 pub const MAX_FILES: usize = 64;
-const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -104,77 +98,11 @@ impl Documents {
         if self.files.contains_key(&canonical) {
             return Ok((display, "already_open"));
         }
-        #[cfg(unix)]
-        use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
-        let mut options = fs::OpenOptions::new();
-        options.read(true);
-        #[cfg(unix)]
-        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
-            options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
-        }
-        let file = options.open(&canonical)?;
-        let before = file.metadata()?;
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::MetadataExt;
-            use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
-            if before.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-                return Err(io::Error::other("file_replaced"));
-            }
-        }
-        if !before.is_file() || before.len() > MAX_FILE_BYTES {
-            return Err(io::Error::other("not_supported_file"));
-        }
-        let mut bytes = Vec::new();
-        (&file).take(MAX_FILE_BYTES + 1).read_to_end(&mut bytes)?;
-        let after = file.metadata()?;
-        let at_path = fs::metadata(&canonical)?;
-        #[cfg(unix)]
-        if before.dev() != at_path.dev() || before.ino() != at_path.ino() {
-            return Err(io::Error::other("file_replaced"));
-        }
-        #[cfg(windows)]
-        if file_identity(&file)? != file_identity(&options.open(&canonical)?)? {
-            return Err(io::Error::other("file_replaced"));
-        }
-        if bytes.len() as u64 > MAX_FILE_BYTES
-            || before.len() != after.len()
-            || before.modified()? != after.modified()?
-            || after.modified()? != at_path.modified()?
-        {
-            return Err(io::Error::other("file_changed"));
-        }
+        let bytes = crate::files::read(&canonical)?.bytes;
         self.files.insert(canonical, bytes);
         self.order.push(display.clone());
         Ok((display, "opened"))
     }
-}
-
-#[cfg(windows)]
-fn file_identity(file: &fs::File) -> io::Result<(u64, [u8; 16])> {
-    use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::Storage::FileSystem::{
-        FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
-    };
-    let mut info = std::mem::MaybeUninit::<FILE_ID_INFO>::uninit();
-    // Query the open handle rather than its path; a pathname can already refer to a replacement.
-    if unsafe {
-        GetFileInformationByHandleEx(
-            file.as_raw_handle(),
-            FileIdInfo,
-            info.as_mut_ptr().cast(),
-            size_of::<FILE_ID_INFO>() as u32,
-        )
-    } == 0
-    {
-        return Err(io::Error::last_os_error());
-    }
-    let info = unsafe { info.assume_init() };
-    Ok((info.VolumeSerialNumber, info.FileId.Identifier))
 }
 
 #[cfg(test)]
@@ -219,12 +147,12 @@ mod tests {
         fs::write(&b, b"same").unwrap();
         let original = fs::File::open(&a).unwrap();
         assert_eq!(
-            file_identity(&original).unwrap(),
-            file_identity(&fs::File::open(&a).unwrap()).unwrap()
+            crate::files::file_identity(&original).unwrap(),
+            crate::files::file_identity(&fs::File::open(&a).unwrap()).unwrap()
         );
         assert_ne!(
-            file_identity(&original).unwrap(),
-            file_identity(&fs::File::open(&b).unwrap()).unwrap()
+            crate::files::file_identity(&original).unwrap(),
+            crate::files::file_identity(&fs::File::open(&b).unwrap()).unwrap()
         );
     }
 

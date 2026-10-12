@@ -1,3 +1,4 @@
+import { reviewerHost, type DocumentEvents } from './host'
 import type { FileResponse, SessionMeta } from '../../shared/types'
 
 export class ApiError extends Error {
@@ -32,28 +33,34 @@ function jsonInit(method: string, body: unknown): RequestInit {
 }
 
 export function getSession(sessionId: string): Promise<SessionMeta> {
+  if (reviewerHost()) return reviewerHost()!.getSession(sessionId)
   return request<SessionMeta>(`/api/sessions/${sessionId}`)
 }
 
 export function getFile(sessionId: string): Promise<FileResponse> {
+  if (reviewerHost()) return reviewerHost()!.getFile(sessionId)
   return request<FileResponse>(`/api/sessions/${sessionId}/file`)
 }
 
 export function putFile(sessionId: string, content: string, baseVersion: string): Promise<{ mtimeMs: number; version: string }> {
+  if (reviewerHost()) return reviewerHost()!.putFile(sessionId, content, baseVersion)
   return request<{ mtimeMs: number; version: string }>(`/api/sessions/${sessionId}/file`, jsonInit('PUT', { content, baseVersion }))
 }
 
 export function postRename(sessionId: string, filename: string): Promise<{ path: string; displayName: string; version: string }> {
+  if (reviewerHost()) return reviewerHost()!.rename(sessionId, filename)
   return request<{ path: string; displayName: string; version: string }>(
     `/api/sessions/${sessionId}/rename`,
     jsonInit('POST', { filename }),
   )
 }
 
-export function openEvents(sessionId: string): EventSource {
+export function openEvents(sessionId: string): DocumentEvents {
+  if (reviewerHost()) return reviewerHost()!.events(sessionId)
   return new EventSource(`/api/sessions/${sessionId}/events?role=ui`)
 }
 
 export function getPreparedTranslation(sessionId: string, targetLang: string): Promise<unknown> {
+  if (reviewerHost()) return reviewerHost()!.translation(sessionId, targetLang)
   return request<unknown>(`/api/sessions/${sessionId}/translation?targetLang=${encodeURIComponent(targetLang)}`)
 }

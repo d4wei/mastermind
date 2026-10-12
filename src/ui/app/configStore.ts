@@ -1,3 +1,4 @@
+import { reviewerHost } from './host'
 import { create } from 'zustand'
 import type { BrowserInfo, ClientConfig, ThemeInfo } from '../../shared/types'
 
@@ -24,30 +25,26 @@ export const useConfig = create<ConfigState>((set, get) => ({
 
   async load() {
     const [config, themes, browsers] = await Promise.all([
-      fetchJson<ClientConfig>('/api/config'),
-      fetchJson<ThemeInfo[]>('/api/themes'),
-      // Non-essential + newer endpoint: a missing/older /api/browsers (version skew) must
-      // never reject the whole load and blank `config` — degrade to no detected browsers.
-      fetchJson<BrowserInfo[]>('/api/browsers').catch(() => [] as BrowserInfo[]),
+      reviewerHost()?.config() ?? fetchJson<ClientConfig>('/api/config'),
+      reviewerHost()?.themes() ?? fetchJson<ThemeInfo[]>('/api/themes'),
+      (reviewerHost()?.browsers() ?? fetchJson<BrowserInfo[]>('/api/browsers')).catch(() => []),
     ])
     set({ config, themes, browsers })
   },
 
   async update(patch) {
-    // optimistic for snappy sliders; server response settles it
     const current = get().config
     if (current) {
       set({ config: { ...current, ...patch } as ClientConfig })
     }
     try {
-      const config = await fetchJson<ClientConfig>('/api/config', {
+      const config = await (reviewerHost()?.updateConfig(patch) ?? fetchJson<ClientConfig>('/api/config', {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(patch),
-      })
+      }))
       set({ config })
     } catch {
-      // never leave an optimistic value lying about persisted state
       await get()
         .load()
         .catch(() => {})

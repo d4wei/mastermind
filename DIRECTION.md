@@ -37,8 +37,8 @@ no-database invariant, or the option is dropped.
 ## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-11)
 
 **Gap.** The [launch design](docs/agent-launch.md) settles admission and onboarding behavior. Native
-host integration still needs production file safety, save-aware quit, and a Windows graphical
-entry point without a console. Linux validation remains lower priority. The
+host integration still needs complete native termination handling, production file-safety checks,
+and a Windows graphical entry point without a console. Linux validation remains lower priority. The
 [native experiment](tools/native-launch/results.md) records platform evidence and remaining gaps.
 
 **Exit:** native launch is validated and the design graduates into implementation or is revised

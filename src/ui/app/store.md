@@ -36,7 +36,7 @@ Use disk validates the displayed token with a disk read and rechecks its Local r
 generation before adopting it. The discarded Local buffer remains in review undo. Missing paths
 block both apply actions; refresh retries reading without recreating the file. Any failed read
 invalidates the comparison's apply token while retaining its text. An unavailable response can mean
-missing or unreadable; only a deletion event establishes the missing-file notice. Repeated disk reads
+missing or unreadable; only a deletion event establishes the missing-file notice. Repeated reads
 and refreshes share generation guards, and write boundaries invalidate older reads.
 
 `ConflictPanel.tsx` presents the persistent viewport notice and the shared SlideOver comparison
@@ -47,5 +47,10 @@ involved. Ordinary writes and accepted Result restore the appropriate original l
 a document route. Blur and visibility changes start saves for all retained records. Browser
 unload cannot await those writes: while any record is dirty, saving, or holds a distinct edited
 Result, the handler requests the browser's leave-page prompt. Accepting that prompt, process
-termination, and app crashes can still lose unsaved in-memory buffers. Native close waiting belongs
-to the future desktop host.
+termination, and app crashes can still lose unsaved in-memory buffers.
+
+`prepareToClose` flushes the editor, awaits existing ordinary writes, and saves any remaining
+buffer changes before checking all retained documents. It returns false for unresolved work,
+including a distinct comparison result or an active comparison save. The native adapter locks
+editing while awaiting this check and keeps the window open on failure. Native operating-system
+quit coverage is tracked in the [host observations](../../../tools/native-launch/results.md).

@@ -8,6 +8,10 @@ on:
       - '!tools/native-launch/*.md'
       - '!tools/native-launch/check-results*.json'
       - '.github/workflows/native-launch.yml'
+      - 'src/ui/**'
+      - 'src/shared/**'
+      - 'themes/**'
+      - 'package-lock.json'
 permissions:
   contents: read
 jobs:
@@ -31,11 +35,18 @@ jobs:
         with:
           workspaces: tools/native-launch
           cache-on-failure: true
+      - name: Build the reviewer frontend
+        working-directory: .
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node --import tsx tools/native-launch/build-reviewer.mts
+          exit $LASTEXITCODE
       - name: Build Windows release and installer
         run: |
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          npx tauri build --bundles nsis -- --locked
+          npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles nsis -- --locked
           exit $LASTEXITCODE
       - name: Native unit tests and lint
         run: |

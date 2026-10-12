@@ -1,8 +1,9 @@
 # Native launch observations — 2026-10-11
 
 The packaged macOS experiment and installed Windows experiment pass their launch checks. This
-supports continuing with Tauri and testing the real reviewer next. Windows still needs a normal
-graphical entry point without a console; neither run validates production editing and saving.
+supports continuing with Tauri. A subsequent macOS reviewer build now exercises native editing,
+autosave, external changes, and conflict recovery. Windows still needs a normal graphical entry
+point without a console and equivalent reviewer interaction checks.
 
 ## Environment and reproduction
 
@@ -126,23 +127,48 @@ execution evidence remains outstanding.
 Prioritize Windows after macOS; retain a Linux build and smoke-test path at lower priority. This
 ordering preserves cross-platform viability without claiming that every platform is already ready.
 
+### Real reviewer on macOS
+
+The optional reviewer build bundles the actual React reading and source views, with no Node sidecar
+or HTTP listener. This local build reported 12.22 MiB; it is not a repeated size/performance
+comparison. The diagnostic file selector switches among admitted files. Packaged UI checks
+through native accessibility automation exercised:
+
+- Two admitted documents in one window, including frontmatter, Chinese headings, CriticMarkup, the
+  outline, and a comment card.
+- Source editing and Chinese text pasted into the editor; disk inspection confirmed CRLF retention.
+  This does not establish Chinese IME composition behavior.
+- A clean external edit reloaded through native file notifications.
+- A read-only file caused autosave failure. The corrected custom Cmd+Q action and title-bar close
+  button kept the window and unsaved text available.
+- An external edit while local text remained unsaved opened the existing Base/Local/Disk/Result
+  comparison. Saving its reviewed result wrote the intended bytes with CRLF and permissions intact.
+- Cmd+Q after the successful save exited the process.
+
+The failed-save check caught a macOS lifecycle hazard: the framework's predefined Quit item calls
+AppKit termination directly. A custom Quit item now requests the same save check as window close.
+**Dock and OS termination remain unvalidated and need explicit integration before release.**
+
+Rust unit tests cover unchanged invalid UTF-8/BOM/CRLF bytes, stale versions, same-mtime edits,
+identical-content replacement, changed descriptors, missing paths, write size limits, multilingual
+splices, and Unix inode/permission/symlink preservation. Adapter and store tests cover command/error
+mapping, asynchronous listener cleanup, preference-write ordering, slow saves, and retained conflict
+results during quit. These checks do not establish every filesystem race or native interaction.
+
 ### Production host and distribution
 
-This is not the production file host. Validate source-preserving reads and writes, replacement
-races, dirty buffers, conflict comparison, failed/slow saves, and save-aware quit with the reviewer.
-Bound resource use for retained documents and blocking file reads before exposing the host as a
-production entry point. Structured file-error codes and final command/distribution identity also
-remain implementation work; this experiment uses diagnostic identities and OS error messages.
+This remains a validation host. Complete normal termination paths, translated-review interaction,
+Chinese IME composition, file dialogs, native entry points, and Windows reviewer checks before
+replacing the current app. Bound retained documents and blocking filesystem work, and settle
+structured file errors and command/distribution identity. Watcher coverage for parent-directory
+replacement and unusual filesystems remains open.
 
-App discovery was exercised through the explicit bundle path and the desktop automation tool.
-Shell/PATH installation, moved bundles, Finder document-opening events, macOS installation and
-notarization, and interactive Windows installation were not tested. No production settings,
-language changes, translation views, or onboarding form are implemented by this experiment.
-
-Next, connect a bounded real-reviewer host and validate native reads, writes, external changes,
-conflicts, and save-aware quit. Settle the Windows graphical entry point before distribution, and
-retain the lower-priority Linux checks. Keep the current app available until the native reviewer
-meets the [architecture checks][host-checks].
+App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
+installation, moved bundles, Finder document events, macOS installation/notarization, interactive
+Windows installation, and onboarding were not tested. Prepared-translation reads and experimental
+preferences are wired, but their native UI interactions still need verification. Linux execution
+remains outstanding. Keep the current app available until the native reviewer meets the
+[architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
 
