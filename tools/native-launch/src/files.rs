@@ -177,7 +177,7 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
     Ok(written)
 }
 #[cfg(windows)]
-pub fn file_identity(file: &fs::File) -> io::Result<(u64, [u8; 16])> {
+pub fn file_identity(file: &File) -> io::Result<(u64, [u8; 16])> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
