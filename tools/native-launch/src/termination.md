@@ -19,7 +19,7 @@ Page navigation and web-content-process termination disarm readiness and cancel 
 the replacement renderer must subscribe before rearming it. This does not recover crashed buffers.
 Once subscribed, it returns `NSTerminateLater` while the store checks saves. Completion replies to
 AppKit on the main thread with approval or cancellation. Other platforms and macOS window-close
-requests use Tauri's exit path after the same store check. Forced process termination, crashes, and power
-loss cannot wait for the renderer; this mechanism is not crash recovery.
+requests use Tauri's exit path after the same store check. Forced process termination, crashes, and
+power loss cannot wait for the renderer; this mechanism is not crash recovery.
 
 [termination]: https://developer.apple.com/documentation/appkit/nsapplicationdelegate

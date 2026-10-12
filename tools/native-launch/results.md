@@ -1,9 +1,9 @@
-# Native launch observations — 2026-10-11
+# Native launch observations
 
 The packaged macOS experiment and installed Windows experiment pass their launch checks. This
-supports continuing with Tauri. A subsequent macOS reviewer build now exercises native editing,
-autosave, external changes, and conflict recovery. Windows still needs a normal graphical entry
-point without a console and equivalent reviewer interaction checks.
+supports continuing with Tauri. Packaged macOS checks and installed Windows WebDriver checks now
+exercise native editing, autosave, external changes, conflict recovery, and save-aware close.
+Windows still needs a normal graphical entry point without a console and interactive input checks.
 
 ## Environment and reproduction
 
@@ -82,9 +82,10 @@ There are three different questions:
 - **Ordinary file access is supported.** Tauri's [filesystem documentation][tauri-fs] covers
   Windows, macOS, and Linux, and directs Rust host code to `std::fs` or `tokio::fs`. Rust's
   [filesystem API][rust-fs] exposes cross-platform operations. Our source-preserving saves, external
-  change detection, conflict checks, and save-aware quit remain application behavior to implement
-  and test. Admission now compares Windows volume/file IDs; the Windows unit test distinguishes
-  identical-content files. Production write, replacement-race, and watcher tests remain ahead.
+  change detection, conflict checks, and save-aware quit remain application responsibilities.
+  The native tests and reviewer checks below exercise those behaviors. Admission compares Windows
+  volume/file IDs; the native unit test distinguishes identical-content files. Production
+  replacement-race and broader watcher tests remain ahead.
 - **Console behavior is a documented platform difference.** Tauri's [CLI documentation][tauri-cli]
   warns that production Windows GUI apps cannot write to the invoking console by default and links
   a workaround. Our installed console executable passes captured-output and exit-status tests;
@@ -116,7 +117,7 @@ production size comparison; no equivalent Electron bundle was built or measured.
 
 Tauri publishes a [GitHub Actions example][tauri-ci] that runs Rust and WebDriver tests on native
 Windows and Linux runners. The experiment's Windows workflow now executes its installed package
-and a window smoke test. Continue using native runners for production file and GUI checks; a
+and reviewer interaction tests. Continue using native runners for production file and GUI checks; a
 cross-compilation result alone would not establish runtime behavior.
 
 CI can establish repeatable behavior on its runner, but does not replace later interactive checks
@@ -186,19 +187,49 @@ Packaged macOS checks exercised:
 The callback cancels a quit during renderer startup, before a close-event subscriber exists.
 A native ABI test checks callback dispatch and refusal to override an existing method. The app
 suite also checks that a failed exit waits for native cancellation before unlocking the editor.
-This build passes 16 native tests, Clippy, all 18 packaged process checks, 406 application tests,
-both TypeScript configurations, and both browser and native builds.
+At `883530f`, this build passed 16 native tests, Clippy, all 18 packaged process checks, 406
+application tests, both TypeScript configurations, and both browser and native builds. The adapter
+also disarms quit readiness on renderer navigation or termination. The final macOS package passed
+failed-save quit, conflict recovery, exact CRLF bytes, and clean quit after the notice fix below.
 
 Dock Quit and normal logout/restart are routed through the same AppKit delegate callback, but these
 interactions have not been exercised separately. The automation tool timed out trying to inspect
 the Dock; no logout or restart was attempted on the development machine. They remain validation
 gaps. Forced termination and crash recovery are outside this save-aware lifecycle.
 
+### Windows reviewer interaction — 2026-10-12
+
+[Run 38216953199][windows-interaction-run] passed at `e0d50c1` on Windows Server 2022. It built and
+installed the NSIS reviewer package, passed 18 native tests and Clippy, passed the 13 process
+checks, and confirmed that another ordinary user cannot connect to the native pipe.
+
+Tauri WebDriver 2.0.6 with an Edge driver matched to the installed WebView2 Runtime exercised the
+actual installed reviewer:
+
+- Admit and render a Markdown file, then switch to its source editor.
+- Edit English and Chinese text and verify saved bytes retain CRLF. This is text injection,
+  not an IME-composition test.
+- Reload an external edit while clean; retain local edits after a read-only-file save failure.
+- Open the conflict comparison after an external competing edit, verify all three versions,
+  edit the merge result, and save its exact bytes.
+- Request native window close after another failed save, verify the unsaved editor remains,
+  restore file access, retry autosave, and close successfully.
+
+The run exposed an obsolete error toast covering Compare versions. Disk conflict transitions now
+clear transient notices so the persistent recovery control remains usable; three app regressions
+cover changed, deleted, and unreadable files. The corrected sequence also passed in packaged macOS.
+An earlier harness assertion read animated glyphs instead of the toast's accessible label; it now
+reads that label. Failed runs retain screenshot, DOM, driver log, and fixture bytes.
+
+The local app suite has 409 passing tests; both typechecks and browser/native builds pass. macOS
+has 17 native tests, including a save-version check that also runs on Windows. These observations
+do not establish IME, native dialogs, Windows logoff/shutdown, or everyday focus behavior.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, translated-review interaction,
-Chinese IME composition, file dialogs, native entry points, and Windows reviewer checks before
-replacing the current app. Bound retained documents and blocking filesystem work, and settle
+Chinese IME composition, file dialogs, native entry points, and interactive Windows input checks
+before replacing the current app. Bound retained documents and blocking filesystem work, and settle
 structured file errors and command/distribution identity. Watcher coverage for parent-directory
 replacement and unusual filesystems remains open.
 
@@ -224,3 +255,5 @@ remains outstanding. Keep the current app available until the native reviewer me
 [windows-run]: https://github.com/d4wei/mastermind/actions/runs/38209655085
 
 [reviewer-windows-run]: https://github.com/d4wei/mastermind/actions/runs/38213282288
+
+[windows-interaction-run]: https://github.com/d4wei/mastermind/actions/runs/38216953199

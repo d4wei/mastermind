@@ -98,8 +98,8 @@ would leave inherited launcher pipes open and prevent a capturing agent from rec
 Direct Explorer launch without a console and a final console/GUI executable layout remain
 unvalidated. The second-account test checks access denial, but endpoint checks do not establish
 isolation from administrators or malicious same-user processes. Windows reads compare open-handle
-volume/file IDs; native unit tests also exercise guarded writes. Windows GUI editing and watcher
-checks remain outstanding.
+volume/file IDs. See the results for native file and WebView2 reviewer coverage and remaining
+interactive checks.
 Linux retains the Unix implementation but needs native packaging and GUI tests. macOS bundles are
 local development artifacts, not signed/notarized distribution releases.
 
