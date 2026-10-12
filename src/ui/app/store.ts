@@ -188,14 +188,14 @@ export function createDocStore() {
         conflict: false, diskChange: null })
       if (store.getState().sessionId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
     } else {
-      updateDocument(id, { conflict: true, diskChange: { mtimeMs: file.mtimeMs,
+      updateDocument(id, { conflict: true, notice: null, diskChange: { mtimeMs: file.mtimeMs,
         deleted: false, content: file.content, version: file.version } })
     }
   }
   const retainReadFailure = (id: string): void => {
     const doc = documents.get(id)!
     // Read failures cannot distinguish a missing path from an unreadable one.
-    updateDocument(id, { conflict: true, diskChange: {
+    updateDocument(id, { conflict: true, notice: null, diskChange: {
       ...doc.diskChange, mtimeMs: doc.diskChange?.mtimeMs ?? 0,
       deleted: doc.diskChange?.deleted ?? false, version: undefined,
     }, ...(doc.conflictDraft ? { conflictDraft: { ...doc.conflictDraft,
@@ -210,7 +210,7 @@ export function createDocStore() {
       ? { conflictDraft: { ...doc.conflictDraft, refreshing: false } } : {}) })
     const request = (diskRequests.get(id) ?? 0) + 1
     diskRequests.set(id, request)
-    if (deleted) { updateDocument(id, { conflict: true }); return }
+    if (deleted) { updateDocument(id, { conflict: true, notice: null }); return }
     try {
       const file = await getFile(id)
       if (diskRequests.get(id) === request) reconcileDisk(id, file)

@@ -14,7 +14,8 @@ write if the buffer changed during the request.
 A clean external change replaces the displayed source and base. A dirty change keeps the base
 and local buffer and captures the disk content and version in `diskChange`; further automatic
 writes pause. Events arriving during writes are reconciled afterward. Comparison is explicit,
-and does not depend on Source mode.
+and does not depend on Markdown mode. A disk conflict or unavailable file clears the previous
+transient notice; the persistent conflict notice presents the current recovery action.
 
 ## Conflict comparison
 

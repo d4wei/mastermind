@@ -149,6 +149,28 @@ it('does not let a delayed reload replace edits made while reading disk', async 
   expect(store.getState().source).toBe('local')
 })
 
+it.each(['changed', 'deleted', 'unreadable'] as const)(
+  'replaces an obsolete save-error toast with the %s file conflict', async (event) => {
+    const store = createDocStore()
+    await store.getState().load('A')
+    store.getState().setSource('local')
+    const save = store.getState().autosave()
+    writes[0]!.pending.resolve(response({ error: 'read only' }, 500))
+    await save
+    expect(store.getState().notice?.msg).toBe('saveFailed')
+    const disk = deferred<Response>()
+    reads.set('A', disk)
+    store.getState().notifyDiskChange(2, event === 'deleted')
+    disk.resolve(event === 'unreadable' ? response({ error: 'unavailable' }, 500)
+      : response({ content: 'external', mtimeMs: 2, version: 'A-2' }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.getState().conflict).toBe(true)
+    expect(store.getState().notice).toBeNull()
+    expect(store.getState().source).toBe('local')
+    expect(store.getState().savedSource).toBe('A')
+  },
+)
+
 it('revalidates retained documents and captures inactive external changes', async () => {
   const store = createDocStore()
   await store.getState().load('A')
