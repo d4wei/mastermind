@@ -150,8 +150,8 @@ through native accessibility automation exercised:
 - The ordinary localhost browser preview still rendered the same document through its HTTP adapter.
 
 The failed-save check caught a macOS lifecycle hazard: the framework's predefined Quit item calls
-AppKit termination directly. A custom Quit item now requests the same save check as window close.
-**Dock and OS termination remain unvalidated and need explicit integration before release.**
+AppKit termination directly. The initial custom Quit workaround is superseded by the termination
+adapter described below.
 
 Rust unit tests cover unchanged invalid UTF-8/BOM/CRLF bytes, stale versions, same-mtime edits,
 identical-content replacement, changed descriptors, missing paths, write size limits, multilingual
@@ -170,6 +170,29 @@ installs it, passes 17 Rust tests and Clippy, and passes all 13 installed-packag
 The separate temporary-account check confirms another ordinary user cannot connect to its pipe.
 That runner verifies window presence and native services; it does not exercise editing through
 WebView2, Chinese input, or interactive conflict/quit behavior.
+
+### AppKit termination — 2026-10-12
+
+The [termination adapter](src/termination.md) implements AppKit's asynchronous termination callback
+without replacing the framework delegate. The real standard Quit menu now uses this callback.
+Packaged macOS checks exercised:
+
+- Standard Cmd+Q after a read-only-file save failure retained the window and unsaved source.
+- Restoring write permission changed the file version; the comparison retained the local edits and
+  saved the reviewed result. A subsequent standard Cmd+Q exited with those bytes on disk.
+- Editing and immediately pressing Cmd+Q flushed the pending edit before process exit, retaining
+  CRLF line endings.
+
+The callback cancels a quit during renderer startup, before a close-event subscriber exists.
+A native ABI test checks callback dispatch and refusal to override an existing method. The app
+suite also checks that a failed exit waits for native cancellation before unlocking the editor.
+This build passes 16 native tests, Clippy, all 18 packaged process checks, 406 application tests,
+both TypeScript configurations, and both browser and native builds.
+
+Dock Quit and normal logout/restart are routed through the same AppKit delegate callback, but these
+interactions have not been exercised separately. The automation tool timed out trying to inspect
+the Dock; no logout or restart was attempted on the development machine. They remain validation
+gaps. Forced termination and crash recovery are outside this save-aware lifecycle.
 
 ### Production host and distribution
 

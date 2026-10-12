@@ -1813,6 +1813,8 @@ dependencies = [
  "interprocess",
  "libc",
  "notify",
+ "objc2",
+ "objc2-app-kit",
  "serde",
  "serde_json",
  "sha2",

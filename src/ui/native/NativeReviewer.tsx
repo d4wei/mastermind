@@ -31,11 +31,15 @@ export function NativeReviewer() {
     const close = createCloseHandler({ prepareToClose: () => useDoc.getState().prepareToClose() },
       () => nativeBridge.invoke('finish_close'),
       (locked) => { document.getElementById('root')!.inert = locked },
-      () => { setBlocked(true) })
+      async () => {
+        setBlocked(true)
+        try { await nativeBridge.invoke('cancel_close') }
+        catch (error) { setError(String(error)) }
+      })
     let unlisten: (() => void) | undefined
     void nativeBridge.listen('close-requested', () => { void close() }).then((stop) => {
       if (disposed) stop()
-      else unlisten = stop
+      else { unlisten = stop; return nativeBridge.invoke<void>('close_ready') }
     }).catch((error) => setError(String(error)))
     return () => { disposed = true; clearInterval(timer); unlisten?.(); window.removeEventListener('focus', revalidate) }
   }, [])

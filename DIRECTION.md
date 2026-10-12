@@ -34,10 +34,10 @@ SQLite implementation are later options; no database or alternate review-feedbac
 **Exit:** a concrete restoration need and a ruling on persisted state, storage, and the existing
 no-database invariant, or the option is dropped.
 
-## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-11)
+## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-12)
 
 **Gap.** The [launch design](docs/agent-launch.md) settles admission and onboarding behavior. Native
-host integration still needs complete native termination handling, production file-safety checks,
+host integration still needs native termination validation, production file-safety checks,
 and a Windows graphical entry point without a console. Linux validation remains lower priority. The
 [native experiment](tools/native-launch/results.md) records platform evidence and remaining gaps.
 

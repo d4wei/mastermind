@@ -183,22 +183,39 @@ pub fn write_preferences(app: tauri::AppHandle, config: Value) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn finish_close(app: tauri::AppHandle, gate: tauri::State<'_, CloseGate>) {
+pub fn finish_close(
+    app: tauri::AppHandle,
+    gate: tauri::State<'_, CloseGate>,
+) -> Result<(), String> {
     gate.0.store(true, std::sync::atomic::Ordering::SeqCst);
-    app.exit(0);
+    crate::termination::complete(app, true).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn cancel_close(
+    app: tauri::AppHandle,
+    gate: tauri::State<'_, CloseGate>,
+) -> Result<(), String> {
+    gate.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    crate::termination::complete(app, false).map_err(|e| e.to_string())
 }
 
 pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, MenuItem, SubmenuBuilder};
-    // The predefined macOS Quit item calls AppKit termination directly, bypassing our save gate.
-    let quit = MenuItem::with_id(
+    use tauri::menu::{Menu, SubmenuBuilder};
+    #[cfg(not(target_os = "macos"))]
+    let quit = tauri::menu::MenuItem::with_id(
         app,
         "quit-reviewer",
         "Quit mastermind",
         true,
         Some("CmdOrCtrl+Q"),
     )?;
-    let application = SubmenuBuilder::new(app, "mastermind").item(&quit).build()?;
+    let application = SubmenuBuilder::new(app, "mastermind");
+    #[cfg(target_os = "macos")]
+    let application = application.quit();
+    #[cfg(not(target_os = "macos"))]
+    let application = application.item(&quit);
+    let application = application.build()?;
     let edit = SubmenuBuilder::new(app, "Edit");
     #[cfg(target_os = "macos")]
     let edit = edit.undo().redo().separator();

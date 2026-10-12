@@ -9,7 +9,9 @@ application config directory, separate from the existing browser app's preferenc
 `NativeReviewer.tsx` provides a diagnostic open-file selector and subscribes to native close
 requests. It locks editing while `store.prepareToClose()` waits for saves, then authorizes exit
 only when no retained document has unsaved source, an active save, or a distinct comparison result.
-Failed saves keep the window and buffers available. `close.ts` coalesces repeated close requests.
+Failed saves keep the window and buffers available. `close.ts` coalesces repeated close requests and
+awaits native termination cancellation before unlocking the editor. Native lifecycle details live
+beside the [termination adapter](../../../tools/native-launch/src/termination.md).
 The browser entry point retains its own unload prompt and localhost adapter.
 
 This entry point belongs to the [native validation build](../../../tools/native-launch/README.md),

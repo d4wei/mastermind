@@ -4,6 +4,7 @@ mod files;
 mod reviewer;
 use tauri::{Emitter, Manager};
 mod host_process;
+mod termination;
 mod transport;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
 use std::{
@@ -145,11 +146,14 @@ fn main() {
             reviewer::read_translation,
             reviewer::read_preferences,
             reviewer::write_preferences,
-            reviewer::finish_close
+            reviewer::finish_close,
+            reviewer::cancel_close,
+            termination::close_ready
         ])
         .setup(move |app| {
             app.manage(Mutex::new(reviewer::FileWatch::new(app.handle().clone())?));
             if cfg!(feature = "reviewer") {
+                termination::install(app.handle())?;
                 app.set_menu(reviewer::menu(app.handle())?)?;
             }
             let runtime = tauri::async_runtime::handle();

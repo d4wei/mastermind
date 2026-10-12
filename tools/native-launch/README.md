@@ -39,7 +39,10 @@ the repository root. It bundles the React reader, source editor, themes, and fon
 macOS app. The launcher invocation is unchanged. On Windows, generate assets with
 `node --import tsx tools/native-launch/build-reviewer.mts`, then build from this directory with
 `npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles nsis -- --locked`.
-The Windows workflow builds this variant and runs its native unit and process checks.
+The Windows workflow builds this variant and runs its native unit, process, and WebDriver checks.
+`check-reviewer-windows.py` drives the installed reviewer using `tauri-driver` 2.0.6 and an Edge
+driver matching the installed WebView2 Runtime. It checks editing, autosave, external changes,
+conflicts, and window close. Driver and fixture files belong to the disposable test run.
 
 The reviewer has a diagnostic file selector, native guarded reads/writes, file invalidations,
 prepared-translation reads, and isolated experimental preferences. It starts no Node process or
@@ -47,10 +50,10 @@ HTTP service. The shared document store still owns source edits, autosave, undo,
 Contracts live in [native file I/O](src/files.md) and the
 [UI adapter](../../src/ui/native/README.md).
 
-Window close and the custom Quit menu action await the document store's save check. The predefined
-macOS Quit menu action is deliberately absent because it directly terminates through AppKit.
-Dock and OS termination paths still need a cancellable lifecycle integration; this build must not
-be treated as a production-safe replacement for the browser app.
+Window close and Quit await the document store's save check. The macOS
+[termination adapter](src/termination.md) connects AppKit termination to that check, including the
+standard Quit menu. Observed behavior and untested termination paths remain recorded in the results;
+this build must not be treated as a production-safe replacement for the browser app.
 
 ## Boundary under test
 

@@ -108,6 +108,24 @@ it.each([false, new Error('save failed')])('native close retains the window on u
   expect(lock).toHaveBeenLastCalledWith(false)
 })
 
+it('waits for native termination cancellation before unlocking or accepting another close', async () => {
+  const cancelled = deferred<void>()
+  const blocked = vi.fn(() => cancelled.promise)
+  const lock = vi.fn()
+  const finish = vi.fn().mockRejectedValue(new Error('exit unavailable'))
+  const close = createCloseHandler({ prepareToClose: async () => true }, finish, lock, blocked)
+  const pending = close()
+  await vi.waitFor(() => expect(blocked).toHaveBeenCalledOnce())
+  await close()
+  expect(lock).toHaveBeenCalledExactlyOnceWith(true)
+  expect(finish).toHaveBeenCalledOnce()
+  cancelled.resolve()
+  await pending
+  expect(lock).toHaveBeenLastCalledWith(false)
+  await close()
+  expect(finish).toHaveBeenCalledTimes(2)
+})
+
 it('falls back to bounded periodic invalidation when watcher registration fails', async () => {
   vi.useFakeTimers()
   try {
