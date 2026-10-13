@@ -45,7 +45,7 @@ it('requires explicit language codes and saves a complete fresh artifact', async
   const fresh = await run(args)
   expect(JSON.parse(fresh.stdout).blocks).toEqual(plan.blocks)
   expect((await run([...args, '--save'], JSON.stringify({ ...artifact, blocks: [] }))).code).toBe(2)
-})
+}, 15_000)
 
 it('opens a cold untranslated file and exits without an agent wait protocol', async () => {
   server = createServer((req, res) => {

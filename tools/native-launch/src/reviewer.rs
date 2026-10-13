@@ -216,11 +216,19 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
     #[cfg(not(target_os = "macos"))]
     let application = application.item(&quit);
     let application = application.build()?;
+    let open = tauri::menu::MenuItem::with_id(
+        app,
+        "open-files",
+        "Open files…",
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
+    let file = SubmenuBuilder::new(app, "File").item(&open).build()?;
     let edit = SubmenuBuilder::new(app, "Edit");
     #[cfg(target_os = "macos")]
     let edit = edit.undo().redo().separator();
     let edit = edit.cut().copy().paste().select_all().build()?;
-    Menu::with_items(app, &[&application, &edit])
+    Menu::with_items(app, &[&application, &file, &edit])
 }
 
 #[cfg(test)]

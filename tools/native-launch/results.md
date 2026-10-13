@@ -225,16 +225,38 @@ The local app suite has 409 passing tests; both typechecks and browser/native bu
 has 17 native tests, including a save-version check that also runs on Windows. These observations
 do not establish IME, native dialogs, Windows logoff/shutdown, or everyday focus behavior.
 
+### Graphical opening — 2026-10-12
+
+The packaged macOS reviewer now shares admission between the launcher, native picker, Finder
+document events, and window file drops. Desktop automation exercised the Open files button and
+Cmd+O, opened a file with no extension, and cancelled the picker without changing the selection.
+Finder's Open With menu listed the bundle; opening a Chinese filename from a stopped app retained
+the document through startup. Opening another document while running switched the same app to it.
+A launcher request containing a missing path followed by two valid paths selected the first valid
+file. The bundle's document declaration has alternate handler rank; Launch Services still displayed
+it as the default on this machine. The app does not explicitly set the system default handler.
+
+All 18 packaged process checks pass. There are 21 native tests and 415 application tests; both
+typechecks, browser/native builds, and native Clippy pass. The five-process translation CLI test
+passed alone but repeatedly exceeded its implicit timeout under full-suite concurrency; it now has
+an explicit integration-test budget with all assertions retained. This reviewer bundle reports
+12.77 MiB, a single observation rather than a performance comparison.
+
+The Windows WebDriver script now checks first-success selection, inventory order, repeated opening,
+and retaining unsaved source across a switch away and repeat-open request. Its updated run is still
+pending. Actual drag-and-drop gestures, multi-selection in native pickers, and Windows dialogs have
+not yet been exercised. Implementation details live in [native opening](src/opening.md).
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, translated-review interaction,
-Chinese IME composition, file dialogs, native entry points, and interactive Windows input checks
+Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
 before replacing the current app. Bound retained documents and blocking filesystem work, and settle
 structured file errors and command/distribution identity. Watcher coverage for parent-directory
 replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
-installation, moved bundles, Finder document events, macOS installation/notarization, interactive
+installation, moved bundles, macOS installation/notarization, interactive
 Windows installation, and onboarding were not tested. Prepared-translation reads and experimental
 preferences are wired, but their native UI interactions still need verification. Linux execution
 remains outstanding. Keep the current app available until the native reviewer meets the

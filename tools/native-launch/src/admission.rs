@@ -45,6 +45,9 @@ impl Response {
 pub struct Documents {
     pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
     pub order: Vec<String>,
+    pub activation_revision: u64,
+    pub active_id: Option<usize>,
+    pub opening_errors: Vec<String>,
 }
 
 impl Documents {
@@ -61,7 +64,7 @@ impl Documents {
         {
             return Response::error("invalid_request");
         }
-        let results = request
+        let results: Vec<FileResult> = request
             .paths
             .into_iter()
             .map(|path| match self.open(&path) {
@@ -79,6 +82,10 @@ impl Documents {
                 },
             })
             .collect();
+        if let Some(canonical) = results.iter().find_map(|result| result.canonical.as_ref()) {
+            self.active_id = self.order.iter().position(|path| path == canonical);
+            self.activation_revision += 1;
+        }
         Response {
             version: VERSION,
             pid: std::process::id(),
@@ -174,6 +181,8 @@ mod tests {
             docs.files.values().next().unwrap().as_ref().unwrap().bytes,
             original
         );
+        assert_eq!(docs.active_id, Some(0));
+        assert_eq!(docs.activation_revision, 2);
     }
 
     #[test]
@@ -194,6 +203,68 @@ mod tests {
         assert_eq!(docs.order.len(), 2);
         assert_eq!(PathBuf::from(&docs.order[0]).file_name().unwrap(), "a");
         assert_eq!(PathBuf::from(&docs.order[1]).file_name().unwrap(), "b");
+        assert_eq!(docs.active_id, Some(0));
+        assert_eq!(docs.activation_revision, 1);
+    }
+
+    #[test]
+    fn first_success_selects_its_existing_order_index() {
+        let fixture = Fixture::new();
+        for name in ["a", "b", "c", "d"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a", "b"]));
+        let result = docs.admit(fixture.request(&["missing", "./b", "c", "a"]));
+        assert_eq!(result.results[1].status, "already_open");
+        assert_eq!(docs.active_id, Some(1));
+        assert_eq!(docs.activation_revision, 2);
+
+        let result = docs.admit(fixture.request(&["missing", "d", "b"]));
+        assert_eq!(result.results[1].status, "opened");
+        assert_eq!(docs.active_id, Some(3));
+        assert_eq!(docs.activation_revision, 3);
+        assert_eq!(docs.order.len(), 4);
+    }
+
+    #[test]
+    fn failures_and_invalid_requests_retain_selection_and_snapshot() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a"), "first").unwrap();
+        fs::write(fixture.0.join("b"), "second").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a", "b"]));
+        docs.opening_errors.push("graphical opening error".into());
+        docs.admit(fixture.request(&["b"]));
+        let canonical = fs::canonicalize(fixture.0.join("b")).unwrap();
+        let snapshot = docs.files[&canonical].as_ref().unwrap().clone();
+        fs::remove_file(fixture.0.join("b")).unwrap();
+
+        let result = docs.admit(fixture.request(&["b", "missing", "."]));
+        assert!(result.results.iter().all(|r| r.status == "error"));
+        assert_eq!(docs.active_id, Some(1));
+        assert_eq!(docs.activation_revision, 2);
+        let mut wrong_version = fixture.request(&["a"]);
+        wrong_version.version += 1;
+        for request in [
+            wrong_version,
+            fixture.request(&[]),
+            fixture.request(&vec!["a"; MAX_FILES + 1]),
+            Request {
+                version: VERSION,
+                paths: vec!["relative".into()],
+            },
+        ] {
+            assert!(docs.admit(request).error.is_some());
+            assert_eq!(docs.active_id, Some(1));
+            assert_eq!(docs.activation_revision, 2);
+            assert_eq!(docs.order.len(), 2);
+            assert_eq!(docs.opening_errors, ["graphical opening error"]);
+            let retained = docs.files[&canonical].as_ref().unwrap();
+            assert_eq!(retained.bytes, snapshot.bytes);
+            assert_eq!(retained.version, snapshot.version);
+            assert_eq!(retained.mtime_ms, snapshot.mtime_ms);
+        }
     }
 
     #[test]
@@ -216,6 +287,8 @@ mod tests {
             Some("invalid_request")
         );
         assert!(docs.files.is_empty());
+        assert_eq!(docs.active_id, None);
+        assert_eq!(docs.activation_revision, 0);
     }
 
     #[test]
@@ -226,5 +299,7 @@ mod tests {
         assert!(result.results.iter().all(|r| r.status == "error"));
         assert!(!fixture.0.join("missing").exists());
         assert!(docs.files.is_empty());
+        assert_eq!(docs.active_id, None);
+        assert_eq!(docs.activation_revision, 0);
     }
 }

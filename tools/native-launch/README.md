@@ -47,6 +47,8 @@ conflicts, and window close. Driver and fixture files belong to the disposable t
 The reviewer has a diagnostic file selector, native guarded reads/writes, file invalidations,
 prepared-translation reads, and isolated experimental preferences. It starts no Node process or
 HTTP service. The shared document store still owns source edits, autosave, undo, and conflicts.
+Native dialogs, file drops, and macOS document events use the same
+[opening operation](src/opening.md) as the launcher.
 Contracts live in [native file I/O](src/files.md) and the
 [UI adapter](../../src/ui/native/README.md).
 
@@ -86,7 +88,7 @@ No shell profile, current app config, or production command installation is chan
 ## Limits
 
 The reviewer build exercises native editing and conflicts, but does not complete the production
-validation matrix. Finder document events, dialogs, onboarding, full termination coverage, and
+validation matrix. Onboarding, full termination coverage, and
 interactive platform checks remain. See the results for what has actually been exercised.
 Read checks detect some replacements and in-place changes; they are not a filesystem transaction.
 A read blocked in the OS can outlive the response deadline. The retained document map has no

@@ -1,6 +1,7 @@
 mod admission;
 mod endpoint;
 mod files;
+mod opening;
 mod reviewer;
 use tauri::{Emitter, Manager};
 mod host_process;
@@ -17,13 +18,20 @@ use std::{
 struct Snapshot {
     pid: u32,
     files: Vec<String>,
+    activation_revision: u64,
+    active_id: Option<usize>,
+    opening_errors: Vec<String>,
 }
 
 #[tauri::command]
 fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Snapshot {
+    let docs = state.lock().unwrap();
     Snapshot {
         pid: std::process::id(),
-        files: state.lock().unwrap().order.clone(),
+        files: docs.order.clone(),
+        activation_revision: docs.activation_revision,
+        active_id: docs.active_id,
+        opening_errors: docs.opening_errors.clone(),
     }
 }
 
@@ -140,6 +148,7 @@ fn main() {
         termination::renderer_lost(webview.app_handle());
     });
     builder
+        .plugin(tauri_plugin_dialog::init())
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 termination::renderer_lost(webview.app_handle());
@@ -149,6 +158,8 @@ fn main() {
         .manage(reviewer::CloseGate::default())
         .invoke_handler(tauri::generate_handler![
             snapshot,
+            opening::choose_files,
+            opening::dismiss_opening_errors,
             reviewer::document_meta,
             reviewer::read_document,
             reviewer::write_document,
@@ -167,7 +178,7 @@ fn main() {
                 app.set_menu(reviewer::menu(app.handle())?)?;
             }
             let runtime = tauri::async_runtime::handle();
-            runtime.spawn(transport::serve(listener, docs));
+            runtime.spawn(transport::serve(listener, docs, app.handle().clone()));
             let handle = app.handle().clone();
             let delay = std::env::var("MM_LAUNCH_CHECK_UI_DELAY_MS")
                 .ok()
@@ -205,11 +216,17 @@ fn main() {
             Ok(())
         })
         .on_menu_event(|app, event| {
+            if event.id().as_ref() == "open-files" {
+                opening::choose_files(app.clone());
+            }
             if event.id().as_ref() == "quit-reviewer" {
                 let _ = app.emit("close-requested", ());
             }
         })
         .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                opening::open(window.app_handle(), paths.iter().cloned().map(Ok).collect());
+            }
             if cfg!(feature = "reviewer")
                 && let tauri::WindowEvent::CloseRequested { api, .. } = event
             {
@@ -220,6 +237,18 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("native host failed")
         .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { ref urls } = event {
+                opening::open(
+                    app,
+                    urls.iter()
+                        .map(|url| {
+                            url.to_file_path()
+                                .map_err(|_| format!("Not a local file: {url}"))
+                        })
+                        .collect(),
+                );
+            }
             if cfg!(feature = "reviewer")
                 && let tauri::RunEvent::ExitRequested { api, .. } = event
             {

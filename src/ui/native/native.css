@@ -1,5 +1,6 @@
 .native-documents {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: calc(var(--space-unit) * 3);
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
@@ -7,3 +8,6 @@
   color: var(--color-text);
 }
 .native-documents select { max-width: 60%; }
+
+.native-opening-errors { flex-basis: 100%; }
+.native-opening-errors ul { margin-block: calc(var(--space-unit) * 2); }

@@ -38,7 +38,7 @@ pub async fn exchange(root: &Path, request: &Request) -> io::Result<Response> {
     Ok(response)
 }
 
-pub async fn serve(listener: Listener, docs: Arc<Mutex<Documents>>) {
+pub async fn serve(listener: Listener, docs: Arc<Mutex<Documents>>, app: tauri::AppHandle) {
     let drop_reply = Arc::new(AtomicBool::new(
         std::env::var_os("MM_LAUNCH_CHECK_DROP_REPLY").is_some(),
     ));
@@ -48,6 +48,7 @@ pub async fn serve(listener: Listener, docs: Arc<Mutex<Documents>>) {
             continue;
         };
         let docs = docs.clone();
+        let app = app.clone();
         let drop_reply = drop_reply.clone();
         tokio::spawn(async move {
             let _permit = permit;
@@ -62,6 +63,13 @@ pub async fn serve(listener: Listener, docs: Arc<Mutex<Documents>>) {
                     }
                     Err(_) => Response::error("invalid_request"),
                 };
+                if response
+                    .results
+                    .iter()
+                    .any(|result| result.canonical.is_some())
+                {
+                    crate::opening::focus(&app);
+                }
                 if drop_reply.swap(false, Ordering::SeqCst) {
                     return;
                 }

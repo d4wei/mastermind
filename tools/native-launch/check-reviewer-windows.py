@@ -119,24 +119,51 @@ def close_window(pid):
     assert user.PostMessageW(wintypes.HWND(handle), 0x0010, 0, 0), 'WM_CLOSE failed'
 
 
-def admit(path, namespace):
-    process = subprocess.run([str(binary), 'open', '--', str(path)], capture_output=True,
+def admit(paths, namespace, statuses):
+    process = subprocess.run([str(binary), 'open', '--', *map(str, paths)], capture_output=True,
                              text=True, timeout=20,
                              env=dict(os.environ, MM_LAUNCH_CHECK_ID=namespace))
-    assert process.returncode == 0, (process.stdout, process.stderr)
+    expected_code = 1 if 'error' in statuses else 0
+    assert process.returncode == expected_code, (process.stdout, process.stderr)
     response = json.loads(process.stdout)
-    assert response['results'][0]['status'] == 'opened', response
-    return response['pid']
+    assert [result['status'] for result in response['results']] == statuses, response
+    assert [result['path'] for result in response['results']] == list(map(str, paths)), response
+    return response
 
 
 def check(session, path, namespace):
     original = '# reviewer\r\n\r\nOriginal.\r\n'
     path.write_bytes(original.encode())
-    pid = admit(path, namespace)
+    initial = admit([path], namespace, ['opened'])
+    pid = initial['pid']
     until('installed reviewer renders the admitted Markdown',
           lambda: 'Original.' in text(session, 'article'))
     click(session, '.seg-btn[aria-label="Markdown"]')
     until('Markdown editor loads the source', lambda: 'Original.' in editor(session))
+
+    first = path.with_name('first admitted.md')
+    second = path.with_name('second admitted 中文.md')
+    missing = path.with_name('missing.md')
+    first.write_text('# First admitted\n\nFirst successful request file.\n', encoding='utf-8')
+    second.write_text('# Second admitted\n\nSecond successful request file.\n', encoding='utf-8')
+    batch = admit([missing, first, second], namespace, ['error', 'opened', 'opened'])
+    assert batch['pid'] == pid, batch
+    until('multi-file request activates its first successful file',
+          lambda: 'First successful request file.' in editor(session))
+    expected_files = [initial['results'][0]['canonical'],
+                      batch['results'][1]['canonical'], batch['results'][2]['canonical']]
+
+    def inventory_matches():
+        options = command(session, 'POST', '/elements',
+                          {'using': 'css selector', 'value': '.native-documents option[value]'})
+        paths = [command(session, 'GET', f'/element/{option[element_key]}/text')
+                 for option in options[1:]]
+        return paths == expected_files
+
+    until('file inventory preserves admission order and omits the failed path', inventory_matches)
+    reopened = admit([path], namespace, ['already_open'])
+    assert reopened['pid'] == pid, reopened
+    until('repeat CLI open restores the original document', lambda: 'Original.' in editor(session))
 
     edited = '# reviewer\n\nEdited 中文.\n'
     replace_editor(session, edited)
@@ -157,6 +184,14 @@ def check(session, path, namespace):
           lambda: 'Autosave failed' in (attribute(
               session, '.toast-error [aria-label]', 'aria-label') or '') and
           path.read_bytes() == disk.encode(), 20)
+    admit([first], namespace, ['already_open'])
+    until('switching documents keeps the other admitted source available',
+          lambda: 'First successful request file.' in editor(session))
+    reopened = admit([path], namespace, ['already_open'])
+    assert reopened['pid'] == pid, reopened
+    until('reopening a failed-save document retains its unsaved source',
+          lambda: 'Unsaved local edit.' in editor(session))
+    assert path.read_bytes() == disk.encode(), 'Reopening changed the failed-save disk version'
     path.chmod(0o666)
     competing = '# reviewer\r\n\r\nExternal competing edit.\r\n'
     path.write_bytes(competing.encode())
