@@ -3,14 +3,13 @@ import type { CriticSpan } from '../../../shared/critic/types'
 import type { TextEdit } from '../../../shared/types'
 import { useT } from '../../i18n'
 import { ChatIcon, MoreIcon, StrikethroughIcon } from '../../icons'
+import { useCompositionGuard } from '../../util/composition'
 import { blockContentRanges, markEdits } from './selection'
 import { commentEdits, deletionWrap } from './marks'
 
-/** Only leaf text blocks get a hover affordance — never code fences, tables, or
- *  the blockquote wrapper (those map to many ranges or corrupt their structure). */
+// Wrapping structural containers can break Markdown syntax; mark their text blocks instead.
 const BLOCK_SELECTOR = 'p,li,h1,h2,h3,h4,h5,h6'
 const HIDE_MS = 220
-/** the menu/composer flips above the trigger when this much space isn't free below */
 const FLIP_THRESHOLD = 220
 
 interface Props {
@@ -28,16 +27,9 @@ interface Active {
   mode: Mode
 }
 
-/**
- * Hover a leaf block → a quiet ⋯ button at its right edge → a light dropdown to
- * Comment / Suggest deletion on the whole block. The block's content range is
- * derived from its inline `[data-ps]` offsets ({@link blockContentRanges}), so
- * markdown prefixes (`## `, `- `) stay out of the mark and inline formatting
- * (`**bold**`) doesn't break the mapping. This is a pointer affordance; keyboard
- * users reach the same actions through the text-selection toolbar.
- */
 export function BlockActions({ containerRef, source, spans, authorTag, onEdit }: Props) {
   const t = useT()
+  const ime = useCompositionGuard()
   const [active, setActive] = useState<Active | null>(null)
   const [comment, setComment] = useState('')
   const [, setTick] = useState(0) // re-measure on scroll/resize without re-anchoring
@@ -45,10 +37,7 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
   activeRef.current = active
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // hover tracking: surface the ⋯ on a block, and dismiss the button/menu shortly
-  // after the pointer leaves — but keep it while the pointer is over the menu or the
-  // block it belongs to, and never dismiss an open composer (a half-written comment
-  // must not vanish on a stray move).
+  // Pointer movement must not discard a partially written comment.
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout> | null = null
     const clearHide = (): void => {
@@ -68,11 +57,10 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
         return
       }
       const cur = activeRef.current
-      if (cur?.mode === 'compose') return // pinned while composing
+      if (cur?.mode === 'compose') return
       const block = target.closest(BLOCK_SELECTOR) as HTMLElement | null
       const inDoc = block && containerRef.current?.contains(block)
       if (cur?.mode === 'menu') {
-        // keep an open menu while over its own block; dismiss when truly elsewhere
         if (inDoc && block === cur.block) clearHide()
         else scheduleHide()
         return
@@ -91,7 +79,6 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
     }
   }, [containerRef])
 
-  // keep the button/menu anchored to its block while the page scrolls
   useEffect(() => {
     let raf = 0
     const onScroll = (): void => {
@@ -110,9 +97,9 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
     }
   }, [])
 
-  // Escape closes an open menu/composer
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (ime.isComposing(e)) return
       if (e.key === 'Escape' && activeRef.current && activeRef.current.mode !== 'button') {
         setActive(null)
         setComment('')
@@ -122,7 +109,6 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // move focus into the dropdown when it opens, so it's operable once surfaced
   useEffect(() => {
     if (active?.mode === 'menu') menuRef.current?.querySelector('button')?.focus()
   }, [active?.mode])
@@ -149,10 +135,7 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
 
   const rect = active.block.getBoundingClientRect()
   const top = Math.max(8, Math.min(rect.top + 2, window.innerHeight - 40))
-  // anchor the ⋯ in the right gutter; the menu/composer hang below it, right-aligned
-  // (CSS) so they grow leftward over the text and never run off the right edge.
   const left = Math.max(8, Math.min(rect.right + 8, window.innerWidth - 32))
-  // flip the dropdown above the trigger when there isn't room for it below
   const flipUp = rect.top > window.innerHeight - FLIP_THRESHOLD
 
   return (
@@ -190,12 +173,17 @@ export function BlockActions({ containerRef, source, spans, authorTag, onEdit }:
         <div className="block-compose">
           <textarea
             autoFocus
+            ref={ime.textareaRef}
+            onCompositionStart={ime.onCompositionStart}
+            onCompositionEnd={ime.onCompositionEnd}
+            onBlur={ime.onBlur}
             rows={3}
             placeholder={t('commentPlaceholder')}
             title={t('commentHint')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => {
+              if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && comment.trim()) applyComment()
               else if (e.key === 'Escape') close()
               e.stopPropagation()

@@ -108,3 +108,24 @@ it('decodes translated comments into safe literal quote and authored-language di
   expect(host.textContent).toContain('My authored note {++literal++} line two')
   expect(host.textContent).not.toContain('translated-selection v1')
 })
+
+it('preserves the translated-comment draft across IME cancellation without submitting', () => {
+  compose()
+  const textarea = host.querySelector('textarea')!
+  const draft = textarea.value
+  act(() => {
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', metaKey: true,
+      isComposing: true, bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true,
+      keyCode: 229, bubbles: true }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 229, bubbles: true }))
+  })
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe(draft)
+  expect(useDoc.getState().source).toBe(source)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(host.querySelector('textarea')).toBeNull()
+})

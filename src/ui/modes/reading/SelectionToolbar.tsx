@@ -4,10 +4,10 @@ import type { TextEdit } from '../../../shared/types'
 import { useT } from '../../i18n'
 import { ChatIcon, StrikethroughIcon } from '../../icons'
 import { usePresence } from '../../util/presence'
+import { useCompositionGuard } from '../../util/composition'
 import { rangeToSourceRanges, markEdits, type SelRange } from './selection'
 import { commentEdits, deletionWrap } from './marks'
 
-/** matches --dur-fast; the toolbar's pop-out duration */
 const EXIT_MS = 120
 
 interface Props {
@@ -26,6 +26,7 @@ interface Active {
 
 export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdit }: Props) {
   const t = useT()
+  const ime = useCompositionGuard()
   const [active, setActive] = useState<Active | null>(null)
   const [composing, setComposing] = useState(false)
   const [comment, setComment] = useState('')
@@ -68,15 +69,15 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      if (ime.isComposing(e)) return
       if (e.key === 'Escape') {
-        // overlays (settings, dialogs) consume Escape first
+        // Leave Escape to active settings or dialog overlays.
         if (document.querySelector('.settings-panel, .modal-backdrop')) return
         setComposing(false)
         setComment('')
         setActive(null)
       }
     }
-    // keep the floating toolbar anchored to its selection while scrolling
     let raf = 0
     const onScroll = (): void => {
       if (raf) return
@@ -146,17 +147,20 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
         <div className="sel-composer">
           <textarea
             autoFocus
+            ref={ime.textareaRef}
+            onCompositionStart={ime.onCompositionStart}
+            onCompositionEnd={ime.onCompositionEnd}
+            onBlur={ime.onBlur}
             rows={3}
             placeholder={t('commentPlaceholder')}
             title={t('commentHint')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={(e) => {
+              if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && comment.trim()) {
                 applyComment()
               } else if (e.key === 'Escape') {
-                // the textarea swallows keydowns (stopPropagation below), so
-                // the window-level Escape handler never sees this one
                 setComposing(false)
                 setComment('')
                 setActive(null)

@@ -4,6 +4,7 @@ import { CommentBody } from './CommentBody'
 import { deleteCommentEdits, resolveThreadEdits } from '../../shared/review-archive'
 import './ResolvedThreads.css'
 import { prefersReducedMotion } from '../util/presence'
+import { useCompositionGuard } from '../util/composition'
 import type { CriticSpan, ReviewItem } from '../../shared/critic/types'
 import type { TextEdit } from '../../shared/types'
 
@@ -41,6 +42,7 @@ function threadKey(thread: ThreadItem, anchorText: string): string {
 
 export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, onActivate, onEdit }: Props) {
   const t = useT()
+  const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
   const [layouts, setLayouts] = useState<CardLayout[]>([])
@@ -193,11 +195,16 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
               <div className="rail-reply">
                 <textarea
                   autoFocus
+                  ref={ime.textareaRef}
+                  onCompositionStart={ime.onCompositionStart}
+                  onCompositionEnd={ime.onCompositionEnd}
+                  onBlur={ime.onBlur}
                   rows={2}
                   value={replyText}
                   placeholder={t('replyPlaceholder')}
                   onChange={(e) => setReplyText(e.target.value)}
                   onKeyDown={(e) => {
+                    if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitReply(card.thread)
                     if (e.key === 'Escape') {
                       setReplyFor(null)

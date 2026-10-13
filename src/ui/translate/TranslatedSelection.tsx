@@ -3,6 +3,7 @@ import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslati
 import { useDoc } from '../app/store'
 import { useConfig } from '../app/configStore'
 import { useT } from '../i18n'
+import { useCompositionGuard } from '../util/composition'
 import { useTranslation } from './translationStore'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 interface Selection { blockId: string; quote: string; top: number; left: number }
 export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale }: Props) {
   const t = useT()
+  const ime = useCompositionGuard()
   const [selection, setSelection] = useState<Selection | null>(null)
   const [composing, setComposing] = useState(false)
   const [body, setBody] = useState('')
@@ -73,8 +75,10 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
     onMouseDown={(event) => { if ((event.target as HTMLElement).tagName !== 'TEXTAREA') event.preventDefault() }}>
     {!composing ? <button type="button" onClick={() => setComposing(true)}>{t('comment')}</button> :
       <div className="sel-composer">
-        <textarea autoFocus rows={3} value={body} placeholder={t('commentPlaceholder')}
+        <textarea ref={ime.textareaRef} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
+          onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur} value={body} placeholder={t('commentPlaceholder')}
           onChange={(event) => setBody(event.target.value)} onKeyDown={(event) => {
+            if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
             if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') void submit()
             if (event.key === 'Escape') close()
             event.stopPropagation()

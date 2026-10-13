@@ -336,8 +336,9 @@ Linux parent-replacement interaction remains untested.
 Periodic checks now skip while the same document has a native read in flight, allowing slow reads
 to settle. Other documents' reads do not suppress the active document's polling, and native events
 remain immediate. Deferred-read regressions cover success, rejection, and overlapping reads. All 431
-application tests, both typechecks, and the browser build pass; this final polling guard has not yet
-completed an installed-package run.
+application tests, both typechecks, and the browser build pass. The final polling guard at `d0c74cc`
+also passed its [Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38359268425)
+and [Linux package run](https://github.com/d4wei/mastermind/actions/runs/38359268430).
 
 In the rebuilt macOS package, a native picker selected two disposable Markdown files at once. The
 first file rendered, and a subsequent launcher request for the second returned `already_open`,
@@ -357,6 +358,24 @@ concurrent preference writes. The rebuilt macOS reviewer passes all 18 packaged 
 Windows native and process checks passed before its parent-replacement UI failure. The gate does
 not impose a filesystem deadline, bound retained documents, or isolate other requests from a stalled
 admission that holds the registry.
+
+### Apple Pinyin composition — 2026-10-13
+
+In the packaged macOS source editor, physical key events entered Apple Pinyin marked text, Space
+committed `你好`, and Escape cancelled a subsequent composition. Disk assertions checked the final
+UTF-8 text and retained CRLF. The selected-text comment composer exposed a separate defect: Escape
+during composition dismissed the composer and discarded its draft.
+
+The comment composers now guard their dismissal and submit shortcuts during composition, including
+WebKit's final legacy IME key event. Lifecycle regressions cover cancellation, retained drafts,
+modified Enter, ordinary shortcuts afterward, and closing/reopening without blur. All 439 application
+tests and both typechecks pass. The [composition sidecar](../../src/ui/util/composition.md) records
+the event contract and sources.
+
+The native retest could not re-establish Pinyin composition: input-source shortcuts yielded plain
+Latin text and no candidate commit. That attempt does not validate the fix with Apple Pinyin.
+Repeat the comment cancellation and submission checks with confirmed native composition before
+closing this gap; injected composition events do not substitute for that check.
 
 ### Production host and distribution
 

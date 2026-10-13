@@ -150,3 +150,23 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   expect(store.getState().source).toBe(source + '{>>@reviewer: Answer 中文<<}')
   expect(edit).toHaveBeenCalledTimes(1)
 })
+
+it('keeps the reply draft and ignores submit while the IME handles keys', () => {
+  render('{>>@Da Wei: question<<}')
+  click('Reply')
+  const textarea = host.querySelector('textarea')!
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Existing reply')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }))
+    textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }))
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 229, bubbles: true }))
+  })
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe('Existing reply')
+  expect(edit).not.toHaveBeenCalled()
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(store.getState().source).toContain('{>>@reviewer: Existing reply<<}')
+})
