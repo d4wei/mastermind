@@ -22,10 +22,20 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     const saved = await invoke<Partial<ClientConfig> | null>('read_preferences')
     return { ...DEFAULT_CONFIG, ...saved, version: 1 }
   }
+  const pendingReads = new Map<string, number>()
+  const getFile: ReviewerHost['getFile'] = async (id) => {
+    pendingReads.set(id, (pendingReads.get(id) ?? 0) + 1)
+    try { return await invoke('read_document', { id }) }
+    finally {
+      const remaining = pendingReads.get(id)! - 1
+      if (remaining) pendingReads.set(id, remaining)
+      else pendingReads.delete(id)
+    }
+  }
   let preferenceWrite: Promise<unknown> = Promise.resolve()
   return {
     getSession: (id) => invoke('document_meta', { id }),
-    getFile: (id) => invoke('read_document', { id }),
+    getFile,
     putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),
     rename: async () => { throw new ApiError(501, 'Native file renaming is not implemented') },
     translation: (id, targetLang) => invoke('read_translation', { id, targetLang }),
@@ -51,17 +61,18 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
         const event = new MessageEvent('file-changed', { data: JSON.stringify({ mtimeMs: 0 }) })
         listeners.get('file-changed')?.forEach((listener) => listener(event))
       }
+      const poll = (): void => { if (!pendingReads.has(id)) invalidate() }
       // Subscribe before watching, then revalidate to cover changes during registration.
       void bridge.listen('document-invalidated', invalidate).then(async (stop) => {
         if (closed) { stop(); return }
         unlisten = stop
         await invoke('watch_document', { id })
         if (closed) return
-        revalidation = setInterval(invalidate, 5000)
+        revalidation = setInterval(poll, 5000)
         invalidate()
       }).catch(() => {
         if (closed) return
-        revalidation = setInterval(invalidate, 1000)
+        revalidation = setInterval(poll, 1000)
         invalidate()
       })
       return {

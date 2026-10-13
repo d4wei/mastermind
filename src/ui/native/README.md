@@ -10,8 +10,11 @@ The active document receives immediate native watcher invalidations and periodic
 cover silent event loss or a watch left on a replaced parent directory. Healthy watcher registration
 uses a five-second interval; registration failure uses a one-second interval. Closing the document
 event source releases its listener and timer, including registrations that finish after navigation.
-Each revalidation reads and hashes the active file through the versioned native read path, even if
-its contents have not changed. This adds periodic filesystem and renderer work; it does not repair
+Periodic invalidation skips an interval while that document has native reads in flight, so a slow
+read can settle without being superseded by the timer. Reads of other documents do not pause it.
+Native watcher events still invalidate immediately. Each revalidation reads and hashes the active
+file through the versioned native read path even when contents have not changed. This adds periodic
+filesystem and renderer work; it does not repair
 the underlying OS watch. The [notify watcher caveat][notify-watch] describes path replacement
 behavior.
 

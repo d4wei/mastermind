@@ -245,8 +245,8 @@ an explicit integration-test budget with all assertions retained. This reviewer 
 
 The Windows WebDriver script now checks first-success selection, inventory order, repeated opening,
 and retaining unsaved source across a switch away and repeat-open request. Its updated run passed in
-the Windows validation recorded below. Actual drag-and-drop gestures, Windows picker multi-selection,
-and Windows dialogs have not yet been exercised. Implementation details live in
+the Windows validation recorded below. File-drop gestures, Windows picker multi-selection, and
+Windows dialogs have not yet been exercised. Implementation details live in
 [native opening](src/opening.md).
 
 ### macOS comments and translated review — 2026-10-12
@@ -327,7 +327,17 @@ show replacement bytes on disk and the old source still visible, without a confl
 The native adapter now periodically revalidates the active document even after successful watcher
 registration; events still invalidate immediately. Fake-timer tests check silent-watch recovery and
 cleanup after delayed registration or failure. All 425 application tests and both typechecks pass.
-The updated installed Windows scenario and Linux parent-replacement interaction remain pending.
+The [corrected Windows run](https://github.com/d4wei/mastermind/actions/runs/38358538986) at
+`ed4c156` passed both replacement and later-edit checks, then all existing conflict and close checks.
+Its native suite passed 32 tests and Clippy. The same commit's
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38358538970) also passed;
+Linux parent-replacement interaction remains untested.
+
+Periodic checks now skip while the same document has a native read in flight, allowing slow reads
+to settle. Other documents' reads do not suppress the active document's polling, and native events
+remain immediate. Deferred-read regressions cover success, rejection, and overlapping reads. All 431
+application tests, both typechecks, and the browser build pass; this final polling guard has not yet
+completed an installed-package run.
 
 In the rebuilt macOS package, a native picker selected two disposable Markdown files at once. The
 first file rendered, and a subsequent launcher request for the second returned `already_open`,

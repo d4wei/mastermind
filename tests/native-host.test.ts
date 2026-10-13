@@ -214,3 +214,90 @@ it('does not install fallback polling when subscription fails after close', asyn
     expect(vi.getTimerCount()).toBe(0)
   } finally { vi.useRealTimers() }
 })
+
+
+it.each([
+  { watchFails: false, readFails: false, interval: 5000 },
+  { watchFails: false, readFails: true, interval: 5000 },
+  { watchFails: true, readFails: false, interval: 1000 },
+  { watchFails: true, readFails: true, interval: 1000 },
+])('pauses periodic invalidation during a read ($watchFails, $readFails)', async ({ watchFails, readFails, interval }) => {
+  vi.useFakeTimers()
+  try {
+    let finishRead!: () => void
+    let failRead!: (error: unknown) => void
+    const read = new Promise<void>((resolve, reject) => { finishRead = resolve; failRead = reject })
+    let invalidate!: () => void
+    const invoke = vi.fn((command: string) => {
+      if (command === 'read_document') return read
+      return watchFails ? Promise.reject('watch unavailable') : Promise.resolve()
+    }) as NativeBridge['invoke']
+    const host = createNativeHost({ invoke, listen: async (_, callback) => {
+      invalidate = callback
+      return () => {}
+    } }, [])
+    const events = host.events('0')
+    const listener = vi.fn()
+    events.addEventListener('file-changed', listener)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(listener).toHaveBeenCalledOnce()
+    const pendingRead = host.getFile('0').catch((error: unknown) => error)
+    await vi.advanceTimersByTimeAsync(interval * 3)
+    expect(listener).toHaveBeenCalledOnce()
+    invalidate()
+    expect(listener).toHaveBeenCalledTimes(2)
+    if (readFails) failRead(new Error('read unavailable'))
+    else finishRead()
+    await pendingRead
+    await vi.advanceTimersByTimeAsync(interval)
+    expect(listener).toHaveBeenCalledTimes(3)
+    events.close()
+    expect(vi.getTimerCount()).toBe(0)
+  } finally { vi.useRealTimers() }
+})
+
+it('another document read does not suppress the active document backstop', async () => {
+  vi.useFakeTimers()
+  try {
+    const read = deferred<void>()
+    const invoke = vi.fn((command: string) => command === 'read_document'
+      ? read.promise : Promise.resolve()) as NativeBridge['invoke']
+    const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
+    const events = host.events('0')
+    const listener = vi.fn()
+    events.addEventListener('file-changed', listener)
+    await vi.advanceTimersByTimeAsync(0)
+    const pendingRead = host.getFile('1')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(listener).toHaveBeenCalledTimes(2)
+    read.resolve()
+    await pendingRead
+    events.close()
+  } finally { vi.useRealTimers() }
+})
+
+it('waits for all concurrent reads of one document before periodic invalidation resumes', async () => {
+  vi.useFakeTimers()
+  try {
+    const first = deferred<void>()
+    const second = deferred<void>()
+    const invoke = vi.fn().mockResolvedValue(undefined)
+    const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
+    const events = host.events('0')
+    const listener = vi.fn()
+    events.addEventListener('file-changed', listener)
+    await vi.advanceTimersByTimeAsync(0)
+    invoke.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    const firstRead = host.getFile('0')
+    const secondRead = host.getFile('0')
+    first.resolve()
+    await firstRead
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(listener).toHaveBeenCalledOnce()
+    second.resolve()
+    await secondRead
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(listener).toHaveBeenCalledTimes(2)
+    events.close()
+  } finally { vi.useRealTimers() }
+})
