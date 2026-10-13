@@ -9,6 +9,7 @@ use tauri::{Emitter, Manager};
 mod host_process;
 mod termination;
 mod transport;
+mod worker;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
 use std::{
     io,
@@ -26,15 +27,21 @@ struct Snapshot {
 }
 
 #[tauri::command]
-fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Snapshot {
-    let docs = state.lock().unwrap();
-    Snapshot {
-        pid: std::process::id(),
-        files: docs.order.clone(),
-        activation_revision: docs.activation_revision,
-        active_id: docs.active_id,
-        opening_errors: docs.opening_errors.clone(),
-    }
+async fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Result<Snapshot, String> {
+    let state = state.inner().clone();
+    worker::blocking_work()
+        .run(move || {
+            let docs = state.lock().unwrap();
+            Snapshot {
+                pid: std::process::id(),
+                files: docs.order.clone(),
+                activation_revision: docs.activation_revision,
+                active_id: docs.active_id,
+                opening_errors: docs.opening_errors.clone(),
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn request(args: Vec<std::ffi::OsString>) -> io::Result<Request> {
@@ -178,7 +185,9 @@ fn main() {
             termination::close_ready
         ])
         .setup(move |app| {
-            app.manage(Mutex::new(reviewer::FileWatch::new(app.handle().clone())?));
+            app.manage(Arc::new(Mutex::new(reviewer::FileWatch::new(
+                app.handle().clone(),
+            )?)));
             if cfg!(feature = "reviewer") {
                 termination::install(app.handle())?;
                 app.set_menu(reviewer::menu(app.handle())?)?;

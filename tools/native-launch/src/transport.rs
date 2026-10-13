@@ -56,11 +56,10 @@ pub async fn serve(listener: Listener, docs: Arc<Mutex<Documents>>, app: tauri::
                 let response = match frame(&stream).await.and_then(|bytes| {
                     serde_json::from_slice::<Request>(&bytes).map_err(io::Error::from)
                 }) {
-                    Ok(request) => {
-                        tokio::task::spawn_blocking(move || docs.lock().unwrap().admit(request))
-                            .await
-                            .unwrap()
-                    }
+                    Ok(request) => crate::worker::blocking_work()
+                        .run(move || docs.lock().unwrap().admit(request))
+                        .await
+                        .unwrap(),
                     Err(_) => Response::error("invalid_request"),
                 };
                 if response

@@ -59,9 +59,17 @@ fn admit_graphical(docs: &mut Documents, paths: Vec<Result<PathBuf, String>>) {
 pub fn open(app: &tauri::AppHandle, paths: Vec<Result<PathBuf, String>>) {
     let docs = app.state::<Arc<Mutex<Documents>>>().inner().clone();
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        admit_graphical(&mut docs.lock().unwrap(), paths);
-        focus(&app);
+    tauri::async_runtime::spawn(async move {
+        let focus_app = app.clone();
+        if crate::worker::blocking_work()
+            .run(move || {
+                admit_graphical(&mut docs.lock().unwrap(), paths);
+            })
+            .await
+            .is_ok()
+        {
+            focus(&focus_app);
+        }
     });
 }
 
@@ -85,8 +93,14 @@ pub fn choose_files(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-pub fn dismiss_opening_errors(docs: tauri::State<'_, Arc<Mutex<Documents>>>) {
-    docs.lock().unwrap().opening_errors.clear();
+pub async fn dismiss_opening_errors(
+    docs: tauri::State<'_, Arc<Mutex<Documents>>>,
+) -> Result<(), String> {
+    let docs = docs.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || docs.lock().unwrap().opening_errors.clear())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

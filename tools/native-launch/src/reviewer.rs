@@ -49,13 +49,25 @@ fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
 }
 
 #[tauri::command]
-pub fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileError> {
-    let docs = docs.lock().unwrap();
-    let path = admitted(&docs, &id)?;
-    Ok(
-        json!({"sessionId": id, "path": path, "displayName": path.file_name().unwrap().to_string_lossy(),
-        "isDraft": false, "mtimeMs": 0}),
-    )
+pub async fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileError> {
+    let docs = docs.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || {
+            let docs = docs.lock().unwrap();
+            let path = admitted(&docs, &id)?;
+            Ok(json!({
+                "sessionId": id,
+                "path": path,
+                "displayName": path.file_name().unwrap().to_string_lossy(),
+                "isDraft": false,
+                "mtimeMs": 0
+            }))
+        })
+        .await
+        .map_err(|e| FileError {
+            status: 500,
+            error: e.to_string(),
+        })?
 }
 
 fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
@@ -73,12 +85,24 @@ fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapsho
 #[tauri::command]
 pub async fn read_document(id: String, docs: State<'_>) -> Result<Snapshot, FileError> {
     let docs = docs.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || read_registered_document(&docs, &id))
+    crate::worker::blocking_work()
+        .run(move || read_registered_document(&docs, &id))
         .await
         .map_err(|e| FileError {
             status: 500,
             error: e.to_string(),
         })?
+}
+
+fn serialized_write<T>(
+    docs: &Mutex<Documents>,
+    id: &str,
+    write: impl FnOnce(PathBuf) -> Result<T, FileError>,
+) -> Result<T, FileError> {
+    static WRITES: Mutex<()> = Mutex::new(());
+    let _write = WRITES.lock().unwrap();
+    let path = admitted(&docs.lock().unwrap(), id)?;
+    write(path)
 }
 
 #[tauri::command]
@@ -89,41 +113,65 @@ pub async fn write_document(
     docs: State<'_>,
 ) -> Result<Snapshot, FileError> {
     let docs = docs.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let docs = docs.lock().unwrap();
-        files::write(&admitted(&docs, &id)?, &content, &base_version)
-    })
-    .await
-    .map_err(|e| FileError {
-        status: 500,
-        error: e.to_string(),
-    })?
+    crate::worker::blocking_work()
+        .run(move || {
+            serialized_write(&docs, &id, |path| {
+                files::write(&path, &content, &base_version)
+            })
+        })
+        .await
+        .map_err(|e| FileError {
+            status: 500,
+            error: e.to_string(),
+        })?
 }
 
 #[tauri::command]
-pub fn watch_document(
+pub async fn watch_document(
     id: String,
     docs: State<'_>,
-    watch: tauri::State<'_, Mutex<FileWatch>>,
+    watch: tauri::State<'_, Arc<Mutex<FileWatch>>>,
 ) -> Result<(), String> {
-    let path = admitted(&docs.lock().unwrap(), &id).map_err(|e| e.error)?;
-    let parent = path.parent().unwrap().to_owned();
-    let mut watch = watch.lock().unwrap();
-    if !watch.parents.contains(&parent) {
-        watch
-            .watcher
-            .watch(&parent, RecursiveMode::NonRecursive)
-            .map_err(|e| e.to_string())?;
-        watch.parents.insert(parent);
-    }
-    Ok(())
+    let docs = docs.inner().clone();
+    let watch = watch.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || {
+            let path = admitted(&docs.lock().unwrap(), &id).map_err(|e| e.error)?;
+            let parent = path.parent().unwrap().to_owned();
+            let mut watch = watch.lock().unwrap();
+            if !watch.parents.contains(&parent) {
+                watch
+                    .watcher
+                    .watch(&parent, RecursiveMode::NonRecursive)
+                    .map_err(|e| e.to_string())?;
+                watch.parents.insert(parent);
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn read_translation(
+pub async fn read_translation(
     id: String,
     target_lang: String,
     docs: State<'_>,
+) -> Result<Value, FileError> {
+    let docs = docs.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || read_registered_translation(&docs, &id, &target_lang))
+        .await
+        .map_err(|e| FileError {
+            status: 500,
+            error: e.to_string(),
+        })?
+}
+
+fn read_registered_translation(
+    docs: &Mutex<Documents>,
+    id: &str,
+    target_lang: &str,
 ) -> Result<Value, FileError> {
     if target_lang.is_empty()
         || !target_lang.starts_with(|c: char| c.is_ascii_alphabetic())
@@ -136,7 +184,7 @@ pub fn read_translation(
             error: "invalid_language".into(),
         });
     }
-    let path = admitted(&docs.lock().unwrap(), &id)?;
+    let path = admitted(&docs.lock().unwrap(), id)?;
     let artifact = path
         .parent()
         .unwrap()
@@ -159,23 +207,34 @@ fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn read_preferences(app: tauri::AppHandle) -> Result<Option<Value>, String> {
-    match fs::read(preference_path(&app)?) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
-            .map(Some)
-            .map_err(|e| e.to_string()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e.to_string()),
-    }
+pub async fn read_preferences(app: tauri::AppHandle) -> Result<Option<Value>, String> {
+    crate::worker::blocking_work()
+        .run(move || match fs::read(preference_path(&app)?) {
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .map(Some)
+                .map_err(|e| e.to_string()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(e.to_string()),
+        })
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn write_preferences(app: tauri::AppHandle, config: Value) -> Result<(), String> {
+pub async fn write_preferences(app: tauri::AppHandle, config: Value) -> Result<(), String> {
+    crate::worker::blocking_work()
+        .run(move || write_preferences_file(preference_path(&app)?, config))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn write_preferences_file(path: PathBuf, config: Value) -> Result<(), String> {
+    static WRITES: Mutex<()> = Mutex::new(());
+    let _write = WRITES.lock().unwrap();
     let bytes = serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?;
     if !config.is_object() || bytes.len() > 64 * 1024 {
         return Err("invalid_preferences".into());
     }
-    let path = preference_path(&app)?;
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
     let temp = path.with_extension("json.tmp");
     fs::write(&temp, bytes).map_err(|e| e.to_string())?;
@@ -235,6 +294,85 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 mod tests {
     use super::*;
     use crate::admission::{Request, VERSION};
+
+    #[test]
+    fn concurrent_preferences_writes_leave_one_complete_object() {
+        let root = std::env::temp_dir().join(format!(
+            "mastermind-preferences-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let path = root.join("reviewer.json");
+        let start = Arc::new(std::sync::Barrier::new(9));
+        let writers = (0..8)
+            .map(|index| {
+                let path = path.clone();
+                let start = start.clone();
+                std::thread::spawn(move || {
+                    start.wait();
+                    write_preferences_file(path, json!({"index": index, "value": "x".repeat(1024)}))
+                })
+            })
+            .collect::<Vec<_>>();
+        start.wait();
+        for writer in writers {
+            writer.join().unwrap().unwrap();
+        }
+        let saved: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        assert!(saved["index"].as_u64().unwrap() < 8);
+        assert_eq!(saved["value"], "x".repeat(1024));
+        assert!(!path.with_extension("json.tmp").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn writes_are_serialized_without_holding_the_document_registry() {
+        use std::sync::mpsc;
+        use std::time::Duration;
+        let docs = Arc::new(Mutex::new(Documents {
+            order: vec!["/admitted/document.md".into()],
+            ..Documents::default()
+        }));
+        let (first_started_tx, first_started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let first_docs = docs.clone();
+        let first = std::thread::spawn(move || {
+            serialized_write(&first_docs, "0", |path| {
+                first_started_tx.send(path).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                Ok(())
+            })
+            .unwrap();
+        });
+        assert_eq!(
+            first_started_rx
+                .recv_timeout(Duration::from_secs(2))
+                .unwrap(),
+            PathBuf::from("/admitted/document.md")
+        );
+        assert!(docs.try_lock().is_ok());
+        let (second_started_tx, second_started_rx) = mpsc::channel();
+        let second = std::thread::spawn(move || {
+            serialized_write(&docs, "0", |_| {
+                second_started_tx.send(()).unwrap();
+                Ok(())
+            })
+            .unwrap();
+        });
+        let blocked = second_started_rx
+            .recv_timeout(Duration::from_millis(30))
+            .is_err();
+        release_tx.send(()).unwrap();
+        first.join().unwrap();
+        second_started_rx
+            .recv_timeout(Duration::from_secs(2))
+            .unwrap();
+        second.join().unwrap();
+        assert!(blocked);
+    }
 
     #[test]
     fn admission_snapshot_survives_deletion_before_the_first_ui_read() {

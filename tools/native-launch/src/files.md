@@ -13,7 +13,8 @@ the path. Versions include filesystem identity, metadata, and SHA-256 of the raw
 Windows identity is the volume and file ID; Unix uses device and inode plus metadata timestamps.
 A changed or replaced path rejects the snapshot. Reads and changed writes have a size limit.
 
-The command holds the document registry mutex across a write, serializing this host's writes.
+A separate write mutex serializes this host's writes. The document registry is locked only to
+resolve the admitted path, so writes do not hold that registry during disk I/O.
 Each write rechecks its supplied base version through the opened descriptor. Missing paths are
 conflicts and are never recreated. An unchanged decoded string returns without writing, retaining
 original bytes even when they contain invalid UTF-8. Changed content is written and truncated
@@ -31,3 +32,7 @@ access events are ignored. Watch errors also invalidate. The UI revalidates on f
 to periodic reads if watcher registration fails. Inactive retained documents revalidate on return;
 their saves still check versions. Network filesystem notification behavior and parent-directory
 replacement need further validation before adopting this as the production host.
+
+Native filesystem commands and admission share the blocking-work gate described in
+[`worker.md`](worker.md). Filesystem work runs outside the event loop; response deadlines do not
+cancel operations already running.

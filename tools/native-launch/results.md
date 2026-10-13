@@ -322,11 +322,25 @@ away and a new directory and file were created at the original path. A subsequen
 replacement directory also updated the view, without navigation or focus changes. This checks the
 observed macOS watcher behavior; Windows and Linux parent replacement still need their own checks.
 
+### Blocking filesystem work — 2026-10-12
+
+Native commands and launcher admission now share a bounded worker gate. A worker retains its permit
+until completion even when its awaiting command is cancelled or its response deadline expires.
+Registry commands also run off the event loop, document writes release the registry before disk I/O,
+and preferences writes serialize access to their temporary file. The contract and limitations live
+in [native blocking work](src/worker.md).
+
+All 31 local native tests and all-feature, all-target Clippy pass. New tests check cancellation,
+timeout after worker startup, panic recovery, serialized writes without the registry lock, and
+concurrent preference writes. Installed-package checks for this change are pending. The gate does
+not impose a filesystem deadline, bound retained documents, or isolate other requests from a stalled
+admission that holds the registry.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
 Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
-before replacing the current app. Bound retained documents and blocking filesystem work, and settle
+before replacing the current app. Bound retained documents and settle
 structured file errors and command/distribution identity. Watcher coverage for parent-directory
 replacement and unusual filesystems remains open.
 
