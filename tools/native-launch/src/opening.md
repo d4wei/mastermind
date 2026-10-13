@@ -18,9 +18,10 @@ File reads run outside the event loop. The registry mutex serializes admissions 
 The pinned [Tauri dialog plugin](https://v2.tauri.app/plugin/dialog/) supplies the native multi-file
 picker; Rust opens the selected files through the application's admission checks. The frontend has
 no generic filesystem plugin permission. The macOS bundle declares Markdown support with alternate
-handler rank; it does not request ownership of the system's default Markdown handler. Windows file
-associations await the console/GUI executable layout, while dialogs and window drops use native
-events on both platforms.
+handler rank; it does not request ownership of the system's default Markdown handler. The Windows
+installer packages a GUI app and a short-lived console launcher. The launcher forwards requests to
+the GUI executable's command mode; both use the same admission protocol. Windows file associations
+remain unconfigured, while dialogs and window drops use native events on both platforms.
 
 This is the validation host. Inventory polling, raw OS error details, and the absence of a total
 retained-document limit are not a finished production opening service. See the

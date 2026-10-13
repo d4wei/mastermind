@@ -1,0 +1,88 @@
+name: Native Linux package validation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/native-launch/**'
+      - '!tools/native-launch/*.md'
+      - '!tools/native-launch/check-results*.json'
+      - '.github/workflows/native-linux.yml'
+      - 'src/ui/**'
+      - 'src/shared/**'
+      - 'themes/**'
+      - 'package-lock.json'
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: tools/native-launch
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Install Linux build and display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev \
+            libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+            xvfb xauth dbus-x11
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal --component clippy
+          rustup override set 1.98.0
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
+        with:
+          workspaces: tools/native-launch
+          cache-on-failure: true
+      - name: Build the reviewer frontend
+        working-directory: .
+        run: |
+          npm ci --ignore-scripts
+          node --import tsx tools/native-launch/build-reviewer.mts
+      - name: Build the Linux reviewer package
+        run: |
+          npm ci
+          npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles deb -- --locked
+      - name: Native unit tests and lint
+        run: |
+          cargo test --release --locked --features reviewer
+          cargo clippy --release --locked --features reviewer -- -D warnings
+      - name: Install the Debian package
+        run: |
+          packages=(target/release/bundle/deb/*.deb)
+          test "${#packages[@]}" -eq 1
+          test -f "${packages[0]}"
+          sudo apt-get install -y "./${packages[0]}"
+          package_name=$(dpkg-deb --field "${packages[0]}" Package)
+          dpkg-query --show "$package_name" > installed-package-linux.txt
+          dpkg-query --listfiles "$package_name" >> installed-package-linux.txt
+          test -x /usr/bin/mastermind-launch-check
+          dpkg-query --search /usr/bin/mastermind-launch-check >> installed-package-linux.txt
+          sha256sum /usr/bin/mastermind-launch-check >> installed-package-linux.txt
+      - name: Exercise the installed Unix launcher
+        timeout-minutes: 5
+        env:
+          GDK_BACKEND: x11
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          dbus-run-session -- xvfb-run -a python3 check.py /usr/bin/mastermind-launch-check \
+            2>check-process-linux.log | tee check-results-linux.json
+      - name: Upload package and process observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-launch-linux
+          path: |
+            tools/native-launch/installed-package-linux.txt
+            tools/native-launch/check-results-linux.json
+            tools/native-launch/check-process-linux.log
+            tools/native-launch/target/release/bundle/deb/*.deb
+          if-no-files-found: warn

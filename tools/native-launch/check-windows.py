@@ -5,6 +5,7 @@ from ctypes import wintypes
 import json
 import os
 import queue
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,7 @@ import time
 import uuid
 
 binary = str(Path(sys.argv[1]).resolve())
+gui_binary = str(Path(binary).with_name('mastermind-launch-check.exe'))
 results = []
 owned_pids = set()
 identity = subprocess.check_output([
@@ -35,6 +37,14 @@ def check(name, condition):
         raise AssertionError(name)
     results.append(name)
     print(name, file=sys.stderr, flush=True)
+
+
+def subsystem(path):
+    data = Path(path).read_bytes()
+    pe_offset = int.from_bytes(data[0x3c:0x40], 'little')
+    assert data[pe_offset:pe_offset + 4] == b'PE\0\0'
+    offset = pe_offset + 24 + 68
+    return int.from_bytes(data[offset:offset + 2], 'little')
 
 
 def invoke(identifier, files, cwd=None, extra=None):
@@ -155,12 +165,43 @@ def wait_window(pid):
 try:
     with tempfile.TemporaryDirectory(prefix='mm-launch-') as directory:
         files = Path(directory)
+        check('installed GUI and console executable subsystems',
+              subsystem(gui_binary) == 2 and subsystem(binary) == 3)
+        graphical_id = uuid.uuid4().hex
+        probe = subprocess.run(
+            [sys.executable, str(Path(__file__).with_name('check-console-windows.py')), gui_binary],
+            capture_output=True, encoding='utf-8', timeout=20,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+            env=dict(os.environ, MM_LAUNCH_CHECK_ID=graphical_id))
+        assert probe.returncode == 0, (probe.stdout, probe.stderr)
+        graphical = json.loads(probe.stdout)
+        owned_pids.add(graphical['pid'])
+        check('ordinary graphical startup has a visible window and no attached console',
+              graphical['visible_window'] and not graphical['console'])
+        empty = subprocess.run([binary], capture_output=True, timeout=20)
+        check('empty console invocation returns JSON and invocation status',
+              empty.returncode == 2 and
+              json.loads(empty.stdout)['error'] == 'invalid_invocation' and bool(empty.stderr))
+        missing_app = files / 'missing packaged app'
+        missing_app.mkdir()
+        isolated_launcher = missing_app / Path(binary).name
+        shutil.copyfile(binary, isolated_launcher)
+        failed_start = subprocess.run([str(isolated_launcher), 'open', '--', 'missing.md'],
+                                      capture_output=True, timeout=20)
+        check('missing packaged GUI returns shared unknown-outcome JSON and status',
+              failed_start.returncode == 3 and
+              json.loads(failed_start.stdout)['error'] == 'outcome_unknown' and
+              bool(failed_start.stderr))
         identifier = uuid.uuid4().hex
         originals = {}
         for name in ['a.md', '中文 notes.md', '-leading.md']:
             path = files / name
             path.write_bytes(b'# source\r\n\r\nUnchanged bytes.\r\n')
             originals[path] = path.read_bytes()
+        code, response, _ = invoke(graphical_id, [files / 'a.md'])
+        check('console opening reuses ordinary graphical startup',
+              code == 0 and response['pid'] == graphical['pid'])
+        stop(graphical['pid'])
         code, response, cold = invoke(identifier, originals, files)
         check('release executable / Unicode / spaces / leading hyphen',
               code == 0 and [r['status'] for r in response['results']] == ['opened'] * 3)

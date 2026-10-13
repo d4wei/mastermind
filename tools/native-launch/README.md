@@ -24,21 +24,34 @@ private runtime directories and document fixtures under `/tmp`, and terminates o
 started. It tests unresponsive peers and lost responses; allow the bounded request deadline to run.
 The check script requires Unix sockets and is not a Windows test runner.
 
-On Windows, build with `npx tauri build --bundles nsis -- --locked`. Run
-`python check-windows.py <installed-executable>` after installing the generated NSIS package.
+On Windows, build with
+`npx tauri build --features windows-launcher --bundles nsis -- --locked`. The installed GUI is
+`mastermind-launch-check.exe`; the console command is
+`mastermind-launch-console.exe open -- FILE...`.
+Run `python check-windows.py <installed-console-launcher>` after installing the NSIS package.
 The [Windows workflow](../../.github/workflows/native-launch.yml) builds, installs, and exercises
 that package on a hosted runner. It uploads the installer and process-check output.
 `check-access.ps1 -Binary <installed-executable>` additionally requires an administrator on a
 disposable Windows machine: it creates a temporary local account, checks pipe access denial, and
-removes the account and test files.
+removes the account and test files. Pass the installed GUI executable to its `-Binary` parameter.
+
+The [Linux workflow](../../.github/workflows/native-linux.yml) builds a reviewer `.deb`, installs it
+on Ubuntu 24.04, and runs the existing Unix process checks against `/usr/bin/mastermind-launch-check`
+under Xvfb and D-Bus. It retains package metadata and logs. This checks the installed native service;
+it does not exercise review interactions through the Linux webview.
 
 ## Real reviewer build
 
 With root dependencies installed, run `npm run build:reviewer --prefix tools/native-launch` from
 the repository root. It bundles the React reader, source editor, themes, and fonts in the same
 macOS app. The launcher invocation is unchanged. On Windows, generate assets with
-`node --import tsx tools/native-launch/build-reviewer.mts`, then build from this directory with
-`npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles nsis -- --locked`.
+`node --import tsx tools/native-launch/build-reviewer.mts`, then build from this directory:
+
+```powershell
+npx tauri build --config tauri.reviewer.conf.json --features reviewer,windows-launcher `
+  --bundles nsis -- --locked
+```
+
 The Windows workflow builds this variant and runs its native unit, process, and WebDriver checks.
 `check-reviewer-windows.py` drives the installed reviewer using `tauri-driver` 2.0.6 and an Edge
 driver matching the installed WebView2 Runtime. It checks editing, autosave, external changes,
@@ -59,8 +72,13 @@ this build must not be treated as a production-safe replacement for the browser 
 
 ## Boundary under test
 
-One executable has a short-lived command mode and a GUI host mode. The command resolves paths
-against its own cwd, rejects non-UTF-8 paths explicitly, and emits one JSON result. Exit codes are
+macOS and Linux use one executable with a short-lived command mode and a GUI host mode. Windows
+packages that executable with the GUI subsystem and adds a console launcher. The companion resolves
+the GUI executable beside itself, forwards native arguments and cwd, captures its command-mode
+output, and returns its exit status. It owns no endpoint or file-admission implementation and exits
+after the command-mode process. Wrapper failures emit the shared unknown-outcome JSON response and
+diagnostics on stderr. The GUI command resolves paths against its cwd, rejects non-UTF-8
+paths explicitly, and emits one JSON result. Exit codes are
 0 for all admitted, 1 for file failures, 2 for malformed invocation/request, and 3 for unknown
 outcome. The prototype always reports incomplete onboarding; it implements no preferences UI.
 
@@ -94,11 +112,15 @@ Read checks detect some replacements and in-place changes; they are not a filesy
 A read blocked in the OS can outlive the response deadline. The retained document map has no
 session-size limit. Those are reasons not to ship this experiment as a host implementation.
 
-Windows uses a console-subsystem executable for captured output. Its spawned GUI host uses
-`CREATE_NO_WINDOW` and disables handle inheritance: redirecting its own standard streams alone
-would leave inherited launcher pipes open and prevent a capturing agent from receiving EOF.
-Direct Explorer launch without a console and a final console/GUI executable layout remain
-unvalidated. The second-account test checks access denial, but endpoint checks do not establish
+The Windows launcher is a feature-gated Cargo binary, included beside the GUI app by the pinned
+Tauri NSIS bundler. The installer shortcut targets the GUI app. CLI output passes through pipes, so
+it does not require attaching the GUI command process to a console. The persistent host disables
+handle inheritance: redirecting its own standard streams alone would leave inherited launcher
+pipes open and prevent a capturing agent from receiving EOF. `CREATE_NO_WINDOW` is retained in the
+host spawn; Windows ignores it for GUI-subsystem executables. The installed Windows checks inspect
+both PE subsystems and start the GUI from a parent with no console; an attachment probe checks
+the running app. This layout awaits hosted Windows validation. The second-account test checks
+access denial, but endpoint checks do not establish
 isolation from administrators or malicious same-user processes. Windows reads compare open-handle
 volume/file IDs. See the results for native file and WebView2 reviewer coverage and remaining
 interactive checks.

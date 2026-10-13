@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 mod admission;
 mod endpoint;
 mod files;
@@ -90,7 +92,11 @@ async fn launch(root: PathBuf, request: Request) -> io::Result<Response> {
 }
 
 fn main() {
-    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let mut args: Vec<_> = std::env::args_os().skip(1).collect();
+    let console_launcher = cfg!(windows) && args.first().is_some_and(|arg| arg == "launcher");
+    if console_launcher {
+        args.remove(0);
+    }
     let root = match endpoint::discover() {
         Ok(root) => root,
         Err(error) => {
@@ -98,7 +104,7 @@ fn main() {
             std::process::exit(2);
         }
     };
-    if !args.is_empty() && args[0] != "host" {
+    if console_launcher || (!args.is_empty() && args[0] != "host") {
         let request = match request(args) {
             Ok(request) => request,
             Err(error) => {

@@ -1,6 +1,6 @@
 ---
 status: living
-updated: 2026-10-11
+updated: 2026-10-12
 exit: the launch contract is ruled and implemented with colocated docs, or the proposal is dropped
 ---
 # Opening files from an agent
@@ -21,6 +21,13 @@ mastermind open -- docs/plan.md "docs/design notes.md"
 
 `mastermind` illustrates the operation using the current command name. The installed executable,
 application ID, and configuration location still need the distribution-identity ruling.
+
+The Windows validation layout packages a GUI application and a short-lived console launcher beside
+it. The launcher forwards native arguments and its working directory to the GUI executable's
+command mode, captures its standard streams, and returns its exit status. That command mode uses
+the same admission protocol and starts or reuses one GUI host. No resident helper is introduced.
+macOS retains the same-executable command mode. Installed Windows checks must validate graphical
+startup without an attached console and terminal output before this layout graduates to production.
 
 The launcher is a command-line entry point packaged with the desktop application. It may be a small
 console executable or a mode of the app executable; packaging tests should decide that detail.

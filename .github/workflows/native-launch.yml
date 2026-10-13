@@ -46,13 +46,13 @@ jobs:
         run: |
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles nsis -- --locked
+          npx tauri build --config tauri.reviewer.conf.json --features reviewer,windows-launcher --bundles nsis -- --locked
           exit $LASTEXITCODE
       - name: Native unit tests and lint
         run: |
-          cargo test --release --locked
+          cargo test --release --locked --features windows-launcher
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo clippy --release --locked -- -D warnings
+          cargo clippy --release --locked --features windows-launcher -- -D warnings
           exit $LASTEXITCODE
       - name: Install and exercise the Windows package
         timeout-minutes: 5
@@ -62,7 +62,7 @@ jobs:
           $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$destination") -PassThru
           if (-not $install.WaitForExit(120000)) { $install.Kill(); throw 'Installer timed out' }
           if ($install.ExitCode) { exit $install.ExitCode }
-          python check-windows.py "$destination/mastermind-launch-check.exe" | Tee-Object check-results-windows.json
+          python check-windows.py "$destination/mastermind-launch-console.exe" | Tee-Object check-results-windows.json
           exit $LASTEXITCODE
       - name: Check another Windows user cannot access the endpoint
         timeout-minutes: 2

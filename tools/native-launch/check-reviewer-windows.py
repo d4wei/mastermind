@@ -15,6 +15,7 @@ import uuid
 
 
 binary = Path(sys.argv[1]).resolve()
+launcher_binary = binary.with_name('mastermind-launch-console.exe')
 driver_binary = Path(sys.argv[2]).resolve()
 edge_driver = Path(sys.argv[3]).resolve()
 base = 'http://127.0.0.1:4444'
@@ -120,8 +121,8 @@ def close_window(pid):
 
 
 def admit(paths, namespace, statuses):
-    process = subprocess.run([str(binary), 'open', '--', *map(str, paths)], capture_output=True,
-                             text=True, timeout=20,
+    process = subprocess.run([str(launcher_binary), 'open', '--', *map(str, paths)],
+                             capture_output=True, text=True, encoding='utf-8', timeout=20,
                              env=dict(os.environ, MM_LAUNCH_CHECK_ID=namespace))
     expected_code = 1 if 'error' in statuses else 0
     assert process.returncode == expected_code, (process.stdout, process.stderr)

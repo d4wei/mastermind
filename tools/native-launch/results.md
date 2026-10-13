@@ -3,7 +3,8 @@
 The packaged macOS experiment and installed Windows experiment pass their launch checks. This
 supports continuing with Tauri. Packaged macOS checks and installed Windows WebDriver checks now
 exercise native editing, autosave, external changes, conflict recovery, and save-aware close.
-Windows still needs a normal graphical entry point without a console and interactive input checks.
+The new Windows GUI/console executable layout awaits installed-package validation. Interactive
+Windows input checks remain outstanding.
 
 ## Environment and reproduction
 
@@ -89,8 +90,8 @@ There are three different questions:
 - **Console behavior is a documented platform difference.** Tauri's [CLI documentation][tauri-cli]
   warns that production Windows GUI apps cannot write to the invoking console by default and links
   a workaround. Our installed console executable passes captured-output and exit-status tests;
-  its spawned GUI child has no console. Direct graphical launch without a console and the final
-  executable layout remain to validate. A separate console launcher remains an option.
+  its spawned GUI child has no console. The experiment now separates the console launcher from the
+  GUI executable; the updated installed-package checks remain pending.
 - **Endpoint permissions differ by OS.** Windows named pipes have
   [access-control rules][pipe-security] that differ from Unix socket-directory permissions. Our
   implementation restricts access and checks the server's user; a unique pipe name alone would not
@@ -247,9 +248,45 @@ and retaining unsaved source across a switch away and repeat-open request. Its u
 pending. Actual drag-and-drop gestures, multi-selection in native pickers, and Windows dialogs have
 not yet been exercised. Implementation details live in [native opening](src/opening.md).
 
+### macOS comments and translated review — 2026-10-12
+
+Desktop automation exercised the packaged reviewer by selecting a word within bold text and
+composing a comment. Disk assertions checked the exact resulting CriticMarkup and retained CRLF.
+This checks selection within formatting, not selection across several formatting boundaries.
+
+In the prepared Chinese view, automation selected the exact passage `带` and composed a translated
+comment. The structured payload saved in the source file decoded to language `zh-CN`, the selected
+quote, and the entered comment; the file retained CRLF. An external prose change then hid the stale
+translation and displayed the update notice. Native Settings changed Translation language to
+Chinese and successfully restored Original only. These were packaged UI interactions and disk
+assertions; they do not establish Chinese IME composition behavior.
+
+### Windows graphical executable layout — 2026-10-12
+
+The experiment now builds `mastermind-launch-check.exe` with the Windows GUI subsystem and includes
+`mastermind-launch-console.exe` as a secondary Cargo binary in the NSIS installer. The console
+launcher captures the GUI executable's short-lived command-mode output and returns its status;
+file admission, IPC, and host startup remain in the existing implementation. The console process
+keeps ordinary terminal waiting behavior, while the installer shortcut targets the GUI executable.
+
+The updated hosted checks inspect both PE subsystems, start the GUI from a parent with no console,
+probe the app for an attached console, and then open a file through the console launcher into that
+same host. A copied launcher without its GUI sibling must return structured unknown-outcome JSON
+and status 3. Existing cold/warm, concurrency, captured-output EOF, and lost-response checks now run
+through the companion. The WebDriver harness explicitly decodes Rust JSON as UTF-8, avoiding the
+Windows locale decoder's corruption of Chinese paths. These are implementation and test changes;
+their installed Windows run is pending, so console-free graphical startup is not yet an observation.
+
+The layout follows the documented Windows subsystem distinction. Runtime console attachment cannot
+make a GUI executable block an interactive shell. The newer detached-console manifest policy
+requires Windows 11 24H2 or Windows Server 2025, outside the current Server 2022 runner. See
+[Microsoft's console policy][console-policy]
+and [Tauri's CLI guidance](https://v2.tauri.app/plugin/cli/). The pinned Tauri CLI detects enabled
+secondary Cargo binaries; its NSIS bundler installs them beside the primary GUI executable.
+
 ### Production host and distribution
 
-This remains a validation host. Complete normal termination paths, translated-review interaction,
+This remains a validation host. Complete normal termination paths, broader translated-review checks,
 Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
 before replacing the current app. Bound retained documents and blocking filesystem work, and settle
 structured file errors and command/distribution identity. Watcher coverage for parent-directory
@@ -257,12 +294,13 @@ replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
 installation, moved bundles, macOS installation/notarization, interactive
-Windows installation, and onboarding were not tested. Prepared-translation reads and experimental
-preferences are wired, but their native UI interactions still need verification. Linux execution
+Windows installation, and onboarding were not tested. Broader preference controls and translation
+refresh interactions still need verification beyond the packaged macOS checks above. Linux execution
 remains outstanding. Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
+[console-policy]: https://learn.microsoft.com/en-us/windows/console/console-allocation-policy
 
 [tauri-fs]: https://v2.tauri.app/plugin/file-system/
 [rust-fs]: https://doc.rust-lang.org/std/fs/index.html

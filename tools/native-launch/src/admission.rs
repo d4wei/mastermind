@@ -1,45 +1,7 @@
-use serde::{Deserialize, Serialize};
+pub use mastermind_launch_check::protocol::{
+    FileResult, MAX_FILES, MAX_FRAME, Request, Response, VERSION,
+};
 use std::{collections::BTreeMap, fs, io, path::PathBuf};
-
-pub const VERSION: u32 = 1;
-pub const MAX_FRAME: usize = 64 * 1024;
-pub const MAX_FILES: usize = 64;
-
-#[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct Request {
-    pub version: u32,
-    pub paths: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct FileResult {
-    pub path: String,
-    pub canonical: Option<String>,
-    pub status: String,
-    pub error: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct Response {
-    pub version: u32,
-    pub pid: u32,
-    pub onboarding_needed: bool,
-    pub results: Vec<FileResult>,
-    pub error: Option<String>,
-}
-
-impl Response {
-    pub fn error(error: &str) -> Self {
-        Self {
-            version: VERSION,
-            pid: std::process::id(),
-            onboarding_needed: true,
-            results: vec![],
-            error: Some(error.into()),
-        }
-    }
-}
 
 #[derive(Default)]
 pub struct Documents {
