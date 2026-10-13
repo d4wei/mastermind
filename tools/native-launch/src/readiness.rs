@@ -138,11 +138,8 @@ mod tests {
     #[test]
     fn public_fixture_matches_the_rendered_content_gate() {
         let fixture = include_str!("../fixtures/readiness.md");
-        let mut paragraphs = fixture.trim().split("\n\n");
-        assert_eq!(paragraphs.next(), Some(format!("# {HEADING}").as_str()));
-        let body = paragraphs.next().unwrap();
-        assert_eq!(body, BODY);
-        assert!(paragraphs.next().is_none());
+        let expected = [format!("# {HEADING}"), String::new(), BODY.into()];
+        assert_eq!(fixture.lines().collect::<Vec<_>>(), expected);
     }
 
     #[test]
