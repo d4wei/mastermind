@@ -525,17 +525,26 @@ already admitted document without reopening it. The name in this persistence che
 it adds no IME evidence. Preferences were absent before confirmation, and the document stayed
 byte-exact. Native inspection also covered metadata rows and the literal YAML disclosure.
 
+### macOS comment-composer Pinyin — 2026-10-13
+
+The retained `d558466` native reviewer accepted actual Apple Pinyin key input in the comment
+composer. Space committed `你好`; a subsequent `ni` composition disappeared on Escape while the
+composer and committed Chinese draft remained. Enter during a new composition left the composer
+open without submitting. Clicking Comment saved the exact expected author-tagged highlight/comment
+splice in the disposable source file, with CRLF and all other bytes preserved.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
-Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
+remaining graphical entry paths and interactive Windows input checks
 before replacing the current app. Bound retained documents and settle command/distribution identity.
 Broader watcher coverage for parent-directory replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
 installation, moved bundles, macOS installation/notarization, and interactive Windows installation
 were not tested. Broader preference controls and translation refresh interactions still need
-verification beyond the packaged macOS checks above. Linux webview interaction remains outstanding. Keep the current app available until the native reviewer meets the
+verification beyond the packaged macOS checks above. Linux webview interaction remains outstanding.
+Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
