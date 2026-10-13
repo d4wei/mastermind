@@ -23,7 +23,7 @@ function computeDecorations(view: EditorView): DecorationSet {
       builder.add(span.start, span.end, Decoration.mark({ class: CRITIC_CLASS[span.kind]! }))
     }
   } catch {
-    /* never block typing on a scan hiccup */
+    // A scanning failure must not interrupt editor input.
   }
   return builder.finish()
 }
@@ -58,35 +58,44 @@ const sourceTheme = EditorView.theme({
   '.cm-cursor': { borderLeftColor: 'var(--color-text)' },
 })
 
+const retainedStates = new Map<string, { state: EditorState; revision: number }>()
+
 export function SourceEditor() {
   const hostRef = useRef<HTMLDivElement>(null)
+  const sessionId = useDoc((s) => s.sessionId)
+  const externalVersion = useDoc((s) => s.externalVersion)
 
   useEffect(() => {
     const host = hostRef.current
-    if (!host) return
-    const { source: entry, sessionId, externalVersion } = useDoc.getState()
+    if (!host || !sessionId) return
+    const { source: entry, revision: entryRevision } = useDoc.getState()
+    let revision = entryRevision
+    const retained = retainedStates.get(sessionId)
     const ownsBuffer = (): boolean => useDoc.getState().sessionId === sessionId &&
       useDoc.getState().externalVersion === externalVersion
 
+    const state = retained?.revision === revision && retained.state.doc.toString() === entry
+      ? retained.state : EditorState.create({
+          doc: entry,
+          extensions: [
+            history(),
+            keymap.of([...defaultKeymap, ...historyKeymap]),
+            markdown(),
+            EditorView.lineWrapping,
+            criticHighlighter,
+            sourceTheme,
+          ],
+        })
     const view = new EditorView({
-      state: EditorState.create({
-        doc: entry,
-        extensions: [
-          history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
-          markdown(),
-          EditorView.lineWrapping,
-          criticHighlighter,
-          sourceTheme,
-          EditorView.updateListener.of((u) => {
-            // Push every edit straight into the canonical buffer — the store
-            // debounces the disk write (autosave). No remount: setSourceFromEditor
-            // leaves externalVersion untouched, so the cursor is preserved.
-            if (u.docChanged && ownsBuffer()) useDoc.getState().setSourceFromEditor(u.state.doc.toString())
-          }),
-        ],
-      }),
+      state,
       parent: host,
+      dispatchTransactions(transactions, currentView) {
+        currentView.update(transactions)
+        if (transactions.some((transaction) => transaction.docChanged) && ownsBuffer()) {
+          useDoc.getState().setSourceFromEditor(currentView.state.doc.toString())
+          revision = useDoc.getState().revision
+        }
+      },
     })
 
     const flush = (): void => {
@@ -95,9 +104,6 @@ export function SourceEditor() {
     }
     useDoc.getState().registerFlusher(flush)
     const registeredFlusher = useDoc.getState().flushEditor
-    // Outline navigation: scroll to the heading's source line, landed near the
-    // top of the page (the window is the scroll container — the CM scroller is
-    // sized to its content).
     useDoc.getState().registerScroller((offset) => {
       const pos = Math.min(Math.max(offset, 0), view.state.doc.length)
       view.dispatch({ selection: { anchor: pos } })
@@ -108,15 +114,13 @@ export function SourceEditor() {
 
     const registeredScroller = useDoc.getState().scroller
     return () => {
-      // Deliberately NOT flushing on unmount: every edit was already pushed live,
-      // so the store is current. A remount is triggered by an external buffer
-      // swap after a disk reload. Flushing the outgoing editor's stale text would
-      // overwrite the adopted content.
+      // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
+      retainedStates.set(sessionId, { state: view.state, revision })
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       view.destroy()
     }
-  }, [])
+  }, [sessionId, externalVersion])
 
   return <div ref={hostRef} className="source-host" />
 }
