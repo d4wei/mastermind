@@ -23,7 +23,6 @@
   --z-popover: 60; /* selection toolbar, hover actions, proposal card */
   --z-overlay: 65; /* off-canvas scrim for nav/rail at narrow widths */
   --z-toast: 70; /* toasts */
-  --z-modal: 80; /* rename dialog / modal backdrop */
   --z-grain: 100; /* film-grain overlay — always on top */
 
   /* ---- Typography (theme-invariant; per-theme tokens.css carries only color) ---- */
@@ -1530,41 +1529,6 @@ input[type='checkbox'] {
   color: var(--color-accent-dim);
 }
 
-/* ---------- modal ---------- */
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 22vh;
-}
-
-.modal {
-  width: 360px;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: calc(var(--space-unit) * 4);
-  box-shadow: 0 12px 40px rgb(0 0 0 / calc(0.22 * var(--shadow-strength)));
-}
-
-.modal h4 {
-  margin: 0 0 calc(var(--space-unit) * 3);
-  font-size: var(--font-size-sm);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-}
-
-.modal-error {
-  color: var(--review-delete-text);
-  font-size: var(--font-size-sm);
-  margin: calc(var(--space-unit) * 2) 0 0;
-}
-
 /* The document outline now lives in the left Navigator (see .nav-outline). */
 
 /* ---------- mark gutter / minimap ---------- */
@@ -1988,12 +1952,6 @@ input[type='checkbox'] {
   min-height: calc(var(--space-unit) * 6);
   padding: calc(var(--space-unit) * 1);
 }
-.nav-seg {
-  margin: calc(var(--space-unit) * 2);
-}
-.nav-seg .seg-btn {
-  flex: 1;
-}
 .nav-body {
   flex: 1;
   overflow-y: auto;
@@ -2075,106 +2033,6 @@ input[type='checkbox'] {
   .app-content {
     transition: none;
   }
-}
-
-.ws-recent {
-  padding: 6px 6px 8px;
-  border-bottom: 1px solid var(--color-border);
-}
-.ws-section-label {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-nano);
-  text-transform: uppercase;
-  letter-spacing: var(--ls-label);
-  color: var(--color-text-faint);
-  padding: 4px 8px 4px;
-}
-.ws-tree {
-  padding: 6px 6px 28px;
-}
-
-.ws-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 4px 8px;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--color-text);
-  text-align: left;
-  border-radius: 5px;
-}
-.ws-row:hover {
-  background: color-mix(in srgb, var(--color-text) 6%, transparent);
-}
-.ws-file.active {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-}
-.ws-file.non-md {
-  color: var(--color-text-faint);
-  cursor: default;
-}
-.ws-file.non-md:hover {
-  background: none;
-}
-.ws-icon {
-  flex: none;
-  opacity: 0.6;
-}
-.ws-chevron {
-  flex: none;
-  opacity: 0.55;
-  transition: transform var(--dur-fast) ease;
-}
-.ws-chevron.open {
-  transform: rotate(90deg);
-}
-.ws-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ws-marks {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.ws-count {
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-  border-radius: 8px;
-  padding: 0 6px;
-  min-width: 16px;
-  text-align: center;
-}
-.ws-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex: none;
-}
-.ws-dot-open {
-  background: var(--color-text-muted);
-}
-.ws-dot-agent {
-  background: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
-}
-.ws-dot-dirty {
-  background: var(--review-comment-anchor);
-}
-.ws-empty {
-  padding: 6px 12px;
-  color: var(--color-text-faint);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
 }
 
 /* Touch / stylus (coarse pointer): grow the compact icon controls to a
@@ -2315,8 +2173,7 @@ input[type='checkbox'] {
 }
 
 /* ---------- copy: sentence-case chrome ----------
-   Caps are reserved for the small mono eyebrow labels only (.settings-body h4 and
-   .ws-section-label). Every interactive control, toolbar verb, and panel title
+   Caps are reserved for the small mono eyebrow labels only (.settings-body h4). Every interactive control, toolbar verb, and panel title
    reads in sentence case — calmer and more legible, fewer shouted words. The
    prominent CTA / ghost / segmented controls drop their caps at their own rules. */
 .rail-author,
@@ -2327,7 +2184,6 @@ input[type='checkbox'] {
 .block-compose-actions button,
 .slide-over-title,
 .tooltip,
-.modal h4,
 .find-filter {
   text-transform: none;
   letter-spacing: var(--ls-normal);

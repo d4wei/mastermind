@@ -2,19 +2,17 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readSessionFile, writeSessionFile } from '../src/server/files'
-import { SessionRegistry, type Session } from '../src/server/sessions'
-import { createApp } from '../src/server/app'
-import { WorkspaceRegistry } from '../src/server/workspaces'
+import { readSessionFile, writeSessionFile } from '../src/node/files'
+import type { FileTarget } from '../src/node/files'
 
 let dir: string
 let file: string
-let session: Session
+let session: FileTarget
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mastermind-save-'))
   file = path.join(dir, 'document.md')
   await fs.writeFile(file, 'original\r\n')
-  session = { path: file, lastSelfWriteHash: null } as Session
+  session = { path: file } as FileTarget
 })
 afterEach(async () => {
   vi.restoreAllMocks()
@@ -42,29 +40,6 @@ describe('guarded file writes', () => {
     ])
     expect(results.filter((result) => result.ok)).toHaveLength(1)
     expect(await fs.readFile(file, 'utf8')).toBe(results[0]!.ok ? 'canonical' : 'alias')
-  })
-
-  it('requires a version on HTTP saves and retires the hand-back route', async () => {
-    const registry = new SessionRegistry()
-    const opened = registry.open(await fs.realpath(file)).session
-    const app = createApp({ registry, workspaces: new WorkspaceRegistry(), version: 'test', startedAt: 0, requestShutdown() {}, touch() {} })
-    const url = `http://localhost/api/sessions/${opened.id}`
-    const request = (route: string, content: object) => app.request(`${url}/${route}`, {
-      method: route === 'file' ? 'PUT' : 'POST',
-      headers: { host: 'localhost', 'content-type': 'application/json' }, body: JSON.stringify(content),
-    })
-    try {
-      expect((await request('file', { content: 'unsafe' })).status).toBe(400)
-      expect((await request('handback', { content: 'unsafe' })).status).toBe(404)
-      const base = await (await app.request(`${url}/file`, { headers: { host: 'localhost' } })).json() as { version: string }
-      const saved = await request('file', { content: 'saved', baseVersion: base.version })
-      expect(saved.status).toBe(200)
-      expect((await saved.json() as { version: string }).version).not.toBe(base.version)
-      expect((await request('file', { content: 'stale', baseVersion: base.version })).status).toBe(409)
-      expect(await fs.readFile(file, 'utf8')).toBe('saved')
-    } finally {
-      registry.closeAll('shutdown')
-    }
   })
 
   it('refuses a deleted file without recreating it', async () => {
@@ -112,17 +87,16 @@ describe('guarded file writes', () => {
       return handle
     })
     expect((await writeSessionFile(session, 'local', base.version)).ok).toBe(false)
-    expect(session.lastSelfWriteHash).toBeNull()
   })
 
   it('preserves symlinks, permissions, and verbatim multilingual bytes', async () => {
     const link = path.join(dir, 'link.md')
     await fs.symlink(file, link)
     await fs.chmod(file, 0o640)
-    const linkedSession = { ...session, path: link }
+    const linkedFileTarget = { ...session, path: link }
     const base = await readSessionFile(link)
     const content = '文档\r\n{>>@ke: 更多细节<<}\r\n'
-    const saved = await writeSessionFile(linkedSession, content, base.version)
+    const saved = await writeSessionFile(linkedFileTarget, content, base.version)
     expect(saved.ok).toBe(true)
     expect((await fs.lstat(link)).isSymbolicLink()).toBe(true)
     expect((await fs.stat(file)).mode & 0o777).toBe(0o640)

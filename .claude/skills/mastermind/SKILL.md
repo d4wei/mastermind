@@ -17,24 +17,29 @@ Use explicitly requested paths. With no paths, choose the Markdown files needing
 current conversation and working tree. File selection belongs to your judgment; Git is optional,
 and neither all uncommitted files nor the most recently edited file is a mandatory rule.
 
-Run `mastermind open <file>` for each chosen file. It opens immediately and returns its URL.
-Translation is optional and never prevents opening the original. When the person returns with
-feedback, reread the files before changing them; do not infer approval from the command returning.
+Use the repository launcher: `node /path/to/mastermind/bin/mastermind.js open -- FILE...`.
+It starts or reuses the native app and reports each file's admission result as JSON. It does not
+wait for review completion. The checkout must be built with `npm run desktop:build` first.
+Installed command identity is not yet configured; do not assume a global `mastermind` command
+belongs to this application. Translation never prevents opening the original. When the person
+returns with feedback, reread the files; do not infer approval from admission.
 
 ## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.
 Do not start a translation listener or delegate to a separate translator. Use the user's requested
-translation language; `mastermind config get` exposes the optional personal `translationLanguage`
-preference. If none is requested or configured, open the original without translation. Supply the
-source language explicitly; do not infer it from the language of a newly added comment.
+translation language from the request or known session context. If none is known, open the original
+without translation. Supply the source language explicitly; do not infer it from the language of a
+newly added comment.
 
+Build the standalone utility with `npm run build` in the checkout before preparation.
 For each preparation pass, translate the complete document afresh. Read it as a whole, including
 relevant context, even though the output is divided into blocks for display and source anchoring.
 Never fill a new preparation with previously cached block translations.
 
 ```sh
-mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN
+node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
+  --source-lang en --target-lang zh-CN
 ```
 
 Use the returned version, translation fingerprint (`sourceHash`), languages, and translation block
@@ -57,8 +62,9 @@ for every translatable block:
 Submit it through stdin:
 
 ```sh
-mastermind translate-blocks plan.md --source-lang en --target-lang zh-CN --save < prepared.json
-mastermind open plan.md
+node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
+  --source-lang en --target-lang zh-CN --save < prepared.json
+node /path/to/mastermind/bin/mastermind.js open -- plan.md
 ```
 
 A changed source or invalid/incomplete artifact is rejected as a whole. Reread the current document
@@ -67,9 +73,17 @@ the original available. The app reads prepared artifacts and never requests gene
 
 ## Optional setup and demonstration
 
-Use `mastermind config get` to inspect existing preferences and `mastermind config set` to apply
-requested changes. Do not force a setup questionnaire before opening a file. People can change
-appearance, their name, and their translation language in Settings.
+Opening reports `onboarding_needed`; the app retains admitted files while people confirm setup.
+When requested, suggest known values with a separate operation:
+
+```sh
+node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
+```
+
+Supported fields are `authorTag`, `uiLang` (`en` or `zh-CN`), and `translationLanguage` (a language
+code or null for Original only). Suggestions are transient and cannot overwrite saved or actively
+edited choices. Do not force a questionnaire before opening. People confirm their Name and language
+choices graphically and change them later in Settings.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; optional translation follows the same preparation

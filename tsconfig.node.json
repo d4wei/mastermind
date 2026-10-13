@@ -2,8 +2,21 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "lib": ["ES2023"],
-    "types": ["node"]
+    "lib": [
+      "ES2023"
+    ],
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src/cli", "src/server", "src/shared", "tests", "tsup.config.ts", "vitest.config.ts"]
+  "include": [
+    "src/node",
+    "src/shared",
+    "tests",
+    "tools/preview",
+    "tools/desktop/build-reviewer.mts",
+    "tsup.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

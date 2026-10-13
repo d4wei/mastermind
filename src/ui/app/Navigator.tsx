@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ToggleGroup } from 'radix-ui'
-import { ChevronLeftIcon, FolderIcon, OutlineIcon } from '../icons'
+import { ChevronLeftIcon, OutlineIcon } from '../icons'
 import { Tip } from './Tip'
 import { useT } from '../i18n'
 import { scrollToOffset } from '../util/scroll'
-import { FilesList } from './Tree'
 import { useNav } from './navStore'
 import { useDoc } from './store'
-import { useWorkspace } from './workspaceStore'
 
-/** Reactive `(max-width: 900px)` flag — drives the off-canvas vs in-flow nav. */
+/** Selects the off-canvas navigator when the viewport is narrow. */
 export function useIsNarrow(): boolean {
   const [narrow, setNarrow] = useState(
     () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 900px)').matches,
@@ -25,31 +22,12 @@ export function useIsNarrow(): boolean {
   return narrow
 }
 
-interface Props {
-  /** the active workspace (file tree shows only when set) */
-  workspaceId: string | null
-  /** the open file's session id (active-row highlight) */
-  openSessionId: string | null
-}
-
-/**
- * The single left navigator: one panel that holds the workspace file tree AND
- * the current document's heading outline, switched by a segmented toggle when
- * both exist. In-flow on wide screens; off-canvas over a scrim on narrow ones.
- */
-export function Navigator({ workspaceId, openSessionId }: Props) {
+export function Navigator() {
   const t = useT()
   const outline = useNav((s) => s.outline)
   const collapsed = useNav((s) => s.collapsed)
   const mobileOpen = useNav((s) => s.mobileOpen)
-  const sectionPref = useNav((s) => s.section)
-  const displayName = useWorkspace((s) => s.displayName)
   const narrow = useIsNarrow()
-
-  const showFiles = !!workspaceId
-  const showOutline = outline.length >= 2
-  // when only one section exists, force it; otherwise honor the toggle
-  const section = !showFiles ? 'outline' : !showOutline ? 'files' : sectionPref
 
   const panelOpen = narrow ? mobileOpen : !collapsed
 
@@ -76,54 +54,37 @@ export function Navigator({ workspaceId, openSessionId }: Props) {
   return (
     <>
       {!panelOpen && (
-        <Tip label={t('showFiles')}>
+        <Tip label={t('showOutline')}>
           <button
             type="button"
             className="nav-reveal"
-            aria-label={t('showFiles')}
+            aria-label={t('showOutline')}
             aria-expanded={false}
             onClick={reveal}
           >
-            {showFiles ? <FolderIcon /> : <OutlineIcon />}
+            <OutlineIcon />
           </button>
         </Tip>
       )}
       {narrow && mobileOpen && <div className="nav-scrim" onClick={hide} aria-hidden />}
       <aside
         className={`navigator${panelOpen ? '' : ' off'}`}
-        aria-label={showFiles ? t('files') : t('outline')}
+        aria-label={t('outline')}
         role={narrow && mobileOpen ? 'dialog' : undefined}
         aria-modal={narrow && mobileOpen ? true : undefined}
       >
         <div className="nav-head">
-          <span className="nav-title" title={showFiles ? displayName : undefined}>
-            {showFiles ? displayName : t('outline')}
+          <span className="nav-title">
+            {t('outline')}
           </span>
-          <Tip label={t('hideFiles')}>
-            <button type="button" className="btn-ghost nav-collapse" aria-label={t('hideFiles')} onClick={hide}>
+          <Tip label={t('hideOutline')}>
+            <button type="button" className="btn-ghost nav-collapse" aria-label={t('hideOutline')} onClick={hide}>
               <ChevronLeftIcon />
             </button>
           </Tip>
         </div>
 
-        {showFiles && showOutline && (
-          <ToggleGroup.Root
-            className="seg nav-seg"
-            type="single"
-            value={section}
-            onValueChange={(v) => v && useNav.getState().setSection(v as 'files' | 'outline')}
-            aria-label={t('files')}
-          >
-            <ToggleGroup.Item value="files" className="seg-btn">
-              {t('files')}
-            </ToggleGroup.Item>
-            <ToggleGroup.Item value="outline" className="seg-btn">
-              {t('outline')}
-            </ToggleGroup.Item>
-          </ToggleGroup.Root>
-        )}
-
-        <div className="nav-body">{section === 'files' ? <FilesList openSessionId={openSessionId} /> : <OutlineList />}</div>
+        <div className="nav-body"><OutlineList /></div>
       </aside>
     </>
   )
@@ -199,13 +160,9 @@ function OutlineList() {
   if (items.length < 2) return null
   const minDepth = Math.min(...items.map((i) => i.depth))
 
-  // Reading mode renders the article (docEl) with data-ps offsets, so scroll by
-  // offset. The editor modes have no such element — they register a scroller on
-  // the doc store that knows how to reach the heading (by source offset for
-  // Source, by heading index for the WYSIWYG Editing view). We deliberately
-  // don't set the active item on click — the indicator only reflects scroll
-  // position (the scroll-spy below), so it tracks the page as it scrolls to the
-  // target instead of jumping ahead and fighting the scroll animation.
+  // Reading scrolls to article source offsets; Markdown mode delegates to the
+  // editor's registered scroller. The active item follows scroll position so
+  // clicking a heading does not race the scroll animation.
   const go = (offset: number, index: number): void => {
     if (docEl) scrollToOffset({ current: docEl }, offset)
     else useDoc.getState().scroller?.(offset, index)

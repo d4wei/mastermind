@@ -50,7 +50,7 @@ translation. Keep it distinct from the original document's language and the inte
 
 Example: “Translation language: 简体中文.” Helper: “Use available translations in this language.”
 Use **Original only / 仅原文** for the null option instead of a contextless Off.
-The preference migration is defined in [the configuration contract][preferences].
+Preference persistence is defined in [the native setup contract][preferences].
 
 ### Interface language
 
@@ -271,9 +271,8 @@ Use **Restore open files / 恢复已打开的文件** for the deferred public ca
 restoration** for its technical scope. Naming does not decide which buffers, positions, or panels
 persist; restoration remains deferred in [DIRECTION.md][direction].
 
-Untitled draft means the temporary file created by `new`; conflict draft means a retained editable
-comparison. Use **untitled document / 未命名文档** for the first and **merge result**
-for the second. Do not rename draft-only code ahead of its approved removal.
+Use **merge result / 合并结果** for the retained editable conflict comparison. Blank-draft creation
+is retired; do not introduce an untitled-document workflow through terminology changes.
 
 ## 10. Version, revision, snapshot, and source
 
@@ -305,18 +304,17 @@ Use **Open selected files / 打开所选文件** for the operation and **agent-s
 explaining selection responsibility. The agent chooses files using its judgment; the app has no
 separate smart selection algorithm. Keep `open` as the concise typed command.
 
-Keep **Files / 文件**, **Recent / 最近**, **Outline / 大纲**, **file tree / 文件树**, and **Filename /
-文件名**. Use **workspace / 工作区** only for the existing rooted tree feature; **repository / 仓库**
-means a version-controlled project and is not a synonym for any folder. The workspace is scheduled
-for removal, so new product copy should describe opening files, not a renamed workspace product.
+Use **Open files / 打开的文件**, **Outline / 大纲**, and **Filename / 文件名** for document navigation.
+**Repository / 仓库** means a version-controlled project, not any folder. The workspace tree is
+retired; describe opening files rather than introducing a renamed workspace product.
 
 Use **desktop app / 桌面应用** publicly and **Tauri host / Tauri 宿主** in architecture docs.
 Keep **native host**, **host bridge**, and **IPC** as technical terms, defined on first use. The
 bridge carries specific document operations between the web interface and privileged local code.
 
-Use **local file service / 本地文件服务** in browser recovery guidance; retain daemon for developer
-commands describing the existing background process. Desktop wording should describe a save failure
-and recovery action without inventing a replacement background service.
+Desktop errors describe the failed operation and its recovery action. **Browser development
+preview / 浏览器开发预览** names the foreground developer tool; it is not a background app service.
+Daemon and its lifecycle commands are historical terms.
 
 ## 12. Appearance and layout
 
@@ -383,11 +381,11 @@ binding `DECISIONS.md` ledger.
 | Hand back, completion summary, waiting review process | Historical descriptions only |
 | Live translation queue, listener, separate translator | Historical removal rationale only |
 | Preferred/secondary language pair | Historical configuration model only |
-| New draft, draft naming, `new` | Remove with the draft workflow |
-| Workspace and its badges/tree-specific session names | Remove with the workspace workflow |
-| Browser-choice preference, `--in`, app-mode container | Remove with the browser launch workflow |
-| `install-agents`, global injection | Remove with app-owned harness installation |
-| Daemon, status, stop, health probes | Retain technically until native ownership replaces them |
+| New draft, draft naming, `new` | Historical descriptions only |
+| Workspace and its badges/tree-specific session names | Historical descriptions only |
+| Browser-choice preference, `--in`, app-mode container | Historical descriptions only |
+| `install-agents`, global injection | Historical descriptions only |
+| Daemon, status, stop, health probes | Historical descriptions only |
 | Keep mine, Reload (discard mine), Save anyway | Retired controls; historical descriptions only |
 | Squad, light/heavy track | Historical provenance, not current product vocabulary |
 
@@ -399,7 +397,8 @@ original release; its Hand back text remains historical until a site refresh is 
 
 The product name **mastermind** is settled. **Mastermind** names Kevin Ding's original project.
 Keep third-party names such as Markdown, CriticMarkup, Tauri, Electron, CodeMirror, React, and Git.
-The actual package, command aliases, and config path currently retain inherited identifiers.
+The private npm project retains its inherited name; native executable and app identifiers remain
+provisional. Repository launch commands do not establish a public distribution identity.
 
 Use **mastermind** as the product name and **open** as the launch operation. Package, executable,
 application ID, and configuration-directory collisions remain a separate decision tracked in
@@ -445,21 +444,21 @@ not require renaming every `version`, `source`, or other identifier whose local 
 This reference governs naming across features. Keep feature behavior and storage contracts beside
 the implementation, and keep unresolved product choices in [DIRECTION.md][direction].
 
-[preferences]: ../src/server/config.md
+[preferences]: ../src-tauri/src/setup.md
 [settings]: ../src/ui/settings/SettingsPanel.tsx
 [translation]: ../src/shared/translation.md
 [decisions]: ../DECISIONS.md
 [direction]: ../DIRECTION.md
 [toolbar]: ../src/ui/app/TopBar.tsx
-[prepared]: ../src/server/translate/prepared.md
+[prepared]: ../src/node/prepared-translations.md
 [view]: ../src/ui/translate/README.md
 [protocol]: ../.claude/skills/mastermind/reference/review-protocol.md
 [marks]: ../src/shared/critic/types.ts
 [labels]: ../src/ui/i18n/index.ts
 [archive]: ../src/shared/review-archive.md
 [store]: ../src/ui/app/store.md
-[files]: ../src/server/files.md
-[sessions]: ../src/server/sessions.ts
+[files]: ../src-tauri/src/files.md
+[sessions]: ../src-tauri/src/admission.rs
 [fonts]: ../src/shared/fonts.ts
 [colors]: ../src/shared/codeThemes.ts
 [themes]: ../themes/README.md

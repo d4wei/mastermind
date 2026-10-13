@@ -1,36 +1,23 @@
-# src/
+# Source map
 
-CLI, server, and UI layers over one shared core; two tsconfigs check browser and Node code.
+The React reviewer and translation utility share a browser-safe document core. Native file
+services live in [`src-tauri/`](../src-tauri/README.md). Both TypeScript configurations are checked.
 
-- **`cli/`** — the `mastermind` command (commander). A thin client: `daemon.ts` ensures one shared
-  background daemon is running; file operations use HTTP (`http.ts`). Opening returns immediately.
-  Translation preparation saves complete artifacts without a live agent service.
-- **`server/`** — a Hono app (`app.ts`) plus daemon lifecycle (`index.ts`: port scan from 5173, idle
-  self-exit, statefile under `~/.config/mastermind`). Registries: `sessions.ts` (open files by real
-  path) and `workspaces.ts` (file-tree roots). `translate/prepared.ts` validates and saves
-  prepared reading artifacts; its contract lives in `translate/prepared.md`. `files.ts` owns
-  versioned reads and writes; its contract lives
-  in `server/files.md`. `contain.ts` keeps workspace
-  trees inside their root; `watch.ts` (chokidar) reports external file changes.
-- **`ui/`** — React 19 + Vite, Zustand stores. Two views over one buffer, toggled with `Cmd+E`:
-  Reading (`modes/reading/Renderer.tsx`, rendered Markdown with CriticMarkup as a visual diff) and
-  Source (`modes/source/SourceEditor.tsx`, CodeMirror). `review/` holds the comment rail,
-  accept/reject, find, and inline-suggestion proposals. `app/store.ts` owns buffers and saves;
-  `app/store.md` describes their lifetime, conflict comparison, and concurrency boundaries.
-- **`ui/native/`** — the Tauri reviewer adapter and validation entry point; see its `README.md`.
-  The experimental native commands and versioned file service live under `tools/native-launch/`.
-- **`shared/`** — imported by all three, so it stays browser-safe. `critic/scanner.ts` parses
-  CriticMarkup into typed marks; `critic/resolve.ts` accepts or rejects a mark as an exact source
-  splice; `critic/mask.ts` and `critic/suggest.ts` back find and suggestions. `markdown/` is the
-  remark pipeline that carries CriticMarkup into the reading AST; its active-mark boundary lives in
-  `markdown/scan.md`. Saves splice the source string.
-  `review-archive.ts` implements comment deletion and resolution; `review-archive.md` defines the
-  hidden in-file record. `translation.ts` validates prepared snapshots and encodes translated-view
-  comments; `translation.md` describes freshness and source mapping. `blocks.ts`, `edits.ts`,
-  `eol.ts`, `types.ts`, `config.ts`, and `constants.ts` hold segmentation, source edits, line endings,
-  shared defaults, and the client–server contract.
+- **`ui/`** — React reading and Markdown views over document-owned buffers. `app/store.md` defines
+  saves, undo, and conflict ownership. `modes/reading/` renders source-positioned Markdown and
+  review marks; `modes/source/` contains the CodeMirror editor. `review/` owns review interactions.
+- **`ui/native/`** — the Tauri adapter, native opening controls, onboarding, and save-aware close.
+  Its `README.md` describes the frontend boundary; native operations have colocated Rust contracts.
+- **`node/`** — standalone translation preparation, theme discovery for builds, and guarded file
+  I/O for browser development. These modules do not run inside the desktop app.
+- **`shared/`** — Markdown and CriticMarkup parsing, exact source splices, resolved discussion
+  records, translation validation and quoted passages, configuration defaults, and types. Keep it
+  isomorphic so preparation and both UI hosts use the same document semantics.
 
-The invariants the tests assert — byte-exact round trips (`critic-resolve.test.ts`,
-`selection-ranges.test.ts`), marks reaching disk only by user acceptance, workspace containment
-(`workspace-contain.test.ts`), tokens-only styling (`theme-token-consistency.test.ts`) — are listed
-in the root `AGENTS.md`.
+The [development preview](../tools/preview/README.md) installs an HTTP implementation of the same
+reviewer host interface. It has no background daemon or independent product lifecycle.
+[Desktop checks](../tools/desktop/README.md) exercise the native implementation and packaging.
+
+Keep feature contracts beside their implementation: `shared/review-archive.md`,
+`shared/translation.md`, `shared/markdown/scan.md`, `ui/app/store.md`, and the native host sidecars.
+The root `AGENTS.md` defines the invariants and verification required when changing them.

@@ -1,3 +1,5 @@
+import { createBrowserHost } from '../src/ui/app/browserHost'
+import { installHost } from '../src/ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createDocStore } from '../src/ui/app/store'
 
@@ -11,6 +13,7 @@ let writes: Array<{ id: string; content: string; baseVersion: string; pending: R
 let disks: Map<string, unknown>
 let reads: Map<string, ReturnType<typeof deferred<Response>>>
 beforeEach(() => {
+  installHost(createBrowserHost())
   vi.useFakeTimers()
   writes = []
   disks = new Map()
@@ -29,7 +32,7 @@ beforeEach(() => {
     return response({ sessionId: id, displayName: id, path: id })
   }))
 })
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => { installHost(null); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 it('saves the departing buffer and keeps undo isolated across documents', async () => {
   const store = createDocStore()

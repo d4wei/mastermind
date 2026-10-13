@@ -38,7 +38,6 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     getSession: (id) => invoke('document_meta', { id }),
     getFile,
     putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),
-    rename: async () => { throw new ApiError(501, 'Native file renaming is not implemented') },
     translation: (id, targetLang) => invoke('read_translation', { id, targetLang }),
     config,
     updateConfig(patch) {
@@ -50,7 +49,6 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
       return write
     },
     themes: async () => themes,
-    browsers: async () => [],
     events(id) {
       const listeners = new Map<string, Set<(event: MessageEvent) => void>>()
       let closed = false

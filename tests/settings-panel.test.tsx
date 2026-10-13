@@ -9,7 +9,7 @@ import { SettingsPanel } from '../src/ui/settings/SettingsPanel'
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
   authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', translationLanguage: null, browser: '', grain: {},
+  uiLang: 'en', translationLanguage: null, grain: {},
 }
 
 let host: HTMLDivElement
@@ -22,7 +22,6 @@ beforeEach(() => {
   update.mockClear()
   useConfig.setState({
     config: { ...config },
-    browsers: [{ id: 'Safari', name: 'Safari' }],
     themes: [],
     update,
   })
@@ -37,17 +36,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('settings browser preference', () => {
-  it.each([['en', 'Open in browser'], ['zh-CN', '在浏览器中打开']] as const)(
-    'labels the browser choice in %s and updates the preference', (uiLang, label) => {
-      useConfig.setState({ config: { ...config, uiLang } })
-      act(() => root.render(<SettingsPanel onClose={() => {}} />))
-      const safari = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === 'Safari')!
-      expect(safari.closest('.settings-row')?.querySelector('span')?.textContent).toBe(label)
-      act(() => safari.click())
-      expect(update).toHaveBeenCalledWith({ browser: 'Safari' })
-    },
-  )
+it('omits browser selection while retaining appearance settings', () => {
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  expect(host.textContent).not.toContain('Open in browser')
+  expect(host.textContent).toContain('Appearance')
 })
 
 it('uses one optional translation-language field and turns translation off explicitly', () => {

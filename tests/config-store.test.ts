@@ -1,4 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createBrowserHost } from '../src/ui/app/browserHost'
+import { installHost } from '../src/ui/app/host'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useConfig } from '../src/ui/app/configStore'
 
 function mockFetch(routes: Record<string, unknown>) {
@@ -11,13 +13,16 @@ function mockFetch(routes: Record<string, unknown>) {
   })
 }
 
+beforeEach(() => installHost(createBrowserHost()))
+
 afterEach(() => {
+  installHost(null)
   vi.unstubAllGlobals()
-  useConfig.setState({ config: null, themes: [], browsers: [] })
+  useConfig.setState({ config: null, themes: [] })
 })
 
 describe('configStore.load resilience', () => {
-  it('still loads config + themes when /api/browsers 404s (version skew)', async () => {
+  it('loads config and themes without requesting a browser chooser', async () => {
     vi.stubGlobal(
       'fetch',
       mockFetch({
@@ -31,19 +36,7 @@ describe('configStore.load resilience', () => {
     expect(s.config).not.toBeNull()
     expect(s.config!.theme).toBe('grid')
     expect(s.themes).toHaveLength(1)
-    expect(s.browsers).toEqual([]) // degraded, not fatal
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(['/api/config', '/api/themes'])
   })
 
-  it('populates browsers when /api/browsers is available', async () => {
-    vi.stubGlobal(
-      'fetch',
-      mockFetch({
-        '/api/config': { version: 1, theme: 'grid', translationLanguage: null, browser: '' },
-        '/api/themes': [],
-        '/api/browsers': [{ id: 'Safari', name: 'Safari' }],
-      }),
-    )
-    await useConfig.getState().load()
-    expect(useConfig.getState().browsers).toEqual([{ id: 'Safari', name: 'Safari' }])
-  })
 })

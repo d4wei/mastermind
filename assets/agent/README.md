@@ -10,12 +10,6 @@ Make [the mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `r
 available through your harness's normal skill installation mechanism. The `master` alias is
 optional. The skill and its reference files contain the complete review instructions.
 
-The app's existing `install-agents` and `uninstall-agents` commands remain available during the
-browser-to-desktop transition. They copy skills and add or remove a marked global instruction block;
-run `mastermind uninstall-agents` to remove those copies and marked blocks. It removes the
-`mastermind` and `master` skill directories, including local edits; retain any edits you need first.
-Future installation belongs to the harness, rather than app-owned directory detection.
-
 For a project that uses mastermind to review plans, an instruction can be as small as:
 
 ```markdown
@@ -25,9 +19,11 @@ to address feedback, reread the current file and follow the skill's public revie
 
 ## Open and prepare
 
-`mastermind open <file>` opens the original without a translation prerequisite. A bare skill request
-lets the session agent choose which files need review; explicit paths take precedence. Repeat open
-for each chosen file. People can configure appearance, their name, and the optional translation
+`node /path/to/mastermind/bin/mastermind.js open -- FILE...` opens the original without waiting
+for translation. Build the source checkout with `npm run desktop:build` first. A bare skill request
+lets the session agent choose which files need review; explicit paths take precedence. Pass the
+chosen paths together; each receives an admission result. People can configure appearance, their
+name, and the optional translation
 language in Settings; they do not need to operate the CLI.
 
 The preparing agent supplies complete, fresh translations when wanted. It reads the whole document
@@ -41,4 +37,4 @@ and public protocol are maintained with the bundled skill:
 A translation artifact is a disposable reading aid. Feedback, including quoted passages selected
 from translations, belongs in the original Markdown file. Clean buffers reload external changes;
 dirty buffers retain both versions and pause saving for explicit comparison. The file-write limits
-are documented in the source checkout at `src/server/files.md`.
+are documented in the source checkout at `src-tauri/src/files.md`.

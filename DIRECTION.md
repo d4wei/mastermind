@@ -34,16 +34,14 @@ SQLite implementation are later options; no database or alternate review-feedbac
 **Exit:** a concrete restoration need and a ruling on persisted state, storage, and the existing
 no-database invariant, or the option is dropped.
 
-## 2026-10-10 — Architecture contracts still open after review (updated 2026-10-12)
+## 2026-10-13 — Native release hardening
 
-**Gap.** The [launch design](docs/agent-launch.md) settles admission and onboarding behavior. Native
-host integration still needs native termination validation, production file-safety checks,
-and broader native input checks. Windows graphical startup and Linux installed-process validation
-pass; Linux webview interaction remains lower priority. The
-[native experiment](tools/native-launch/results.md) records platform evidence and remaining gaps.
+**Gap.** Tauri is adopted. Remaining desktop interactions, filesystem coverage, installation, and
+platform input checks are recorded once in [native validation](tools/desktop/results.md).
+Adoption is not a claim that these release checks have passed.
 
-**Exit:** native launch is validated and the design graduates into implementation or is revised
-from the failed checks.
+**Exit:** the relevant checks pass before a release claims their support, or their scope is
+explicitly revised.
 
 ## 2026-10-10 — Repository language settings (updated 2026-10-10)
 
@@ -54,15 +52,17 @@ that does not choose a repo-settings mechanism.
 
 **Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 
-## 2026-10-10 — Package and CLI identity (updated 2026-10-12)
+## 2026-10-10 — Package and CLI identity (updated 2026-10-13)
 
-**Open question.** This repository retains the package name `mastermind-md`, the `mastermind`
-command, and `~/.config/mastermind` configuration path from
-[Jingquank/Mastermind](https://github.com/Jingquank/Mastermind). Installing both versions creates
-collisions on all three. Distribution identity is deliberately deferred while native validation
-continues; the experimental host names are not production choices.
+**Open question.** The npm project is private and retains the inherited name `mastermind-md`.
+The native app identifier and executable names remain provisional. Select public command, package,
+and settings
+identity before distributing or installing alongside
+[Mastermind](https://github.com/Jingquank/Mastermind).
+The repository launcher does not install a global command.
 
-**Exit:** a ruling on the name, applied to `package.json`, the bin, and the config directory.
+**Exit:** a distribution-identity ruling applied to packaging, launcher installation, and native
+settings storage.
 
 ## 2026-10-10 — Markdown wrapping stays manual
 

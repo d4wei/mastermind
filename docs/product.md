@@ -17,7 +17,7 @@ source span. Edits save continuously; a reviewer can work across files without a
 action for each one. People and agents can both contribute author-tagged replies. Resolved
 conversations remain as hidden history in the Markdown file; deleting a comment removes it.
 
-Single-language review is complete on its own. For comfort-language reading, the agent preparing a
+Single-language review is complete on its own. For translated reading, the agent preparing a
 document can also prepare a translation using its existing context. Opening the original never waits
 for translation. Comments made from a translated passage retain the selected quote and language in
 the original document. Exact text edits remain anchored to the original source.
@@ -29,9 +29,10 @@ conversation context may inform that judgment. The app does not infer that choic
 The public [review skill](../.claude/skills/mastermind/SKILL.md) describes preparation and agent
 participation.
 
-The current application uses a desktop browser and local file service. The planned Tauri host will
-own native file access and application lifetime, while retaining the web interface. Graphical
-onboarding and native multi-file opening are planned; they are not yet the shipped launch flow.
+Tauri owns native file access and application lifetime while React renders the review interface.
+Graphical onboarding confirms Name and language choices; native file opening retains documents
+admitted during setup. The foreground browser preview is development tooling. Signing and public
+distribution identity remain separate from adopting the native application.
 
 ## Authoritative references
 
@@ -39,5 +40,6 @@ onboarding and native multi-file opening are planned; they are not yet the shipp
 - [Review protocol](../.claude/skills/mastermind/reference/review-protocol.md): in-file feedback.
 - [Implementation map](../src/README.md): source modules and their contracts.
 - [Decisions](../DECISIONS.md): settled constraints.
-- [Architecture plan](architecture-review.md) and [direction](../DIRECTION.md): remaining work and
+- [Native validation](../tools/desktop/results.md) and [direction](../DIRECTION.md): release gaps
+  and
   unresolved choices.

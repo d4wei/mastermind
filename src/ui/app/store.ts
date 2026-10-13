@@ -7,7 +7,6 @@ import {
   ApiError,
   getFile,
   getSession,
-  postRename,
   putFile,
 } from './api'
 
@@ -86,11 +85,6 @@ export interface DocStore {
   saveConflictResult(): Promise<boolean>
   useConflictDisk(): Promise<boolean>
   setNotice(notice: DocStore['notice']): void
-  /** Draft naming: first save prompts for a filename. */
-  renamePrompt: boolean
-  renameError: string | null
-  cancelRename(): void
-  completeRename(filename: string): Promise<void>
   setSource(source: string): void
   /** Editor flush path — updates the buffer without remounting the editor. */
   setSourceFromEditor(source: string): void
@@ -98,9 +92,9 @@ export interface DocStore {
   registerScroller(fn: DocStore['scroller']): void
   applyEdits(edits: TextEdit[]): void
   setMode(mode: ViewMode): void
-  /** Debounced disk write triggered by every buffer edit (drafts prompt for a name first). */
+  /** Debounced disk write triggered by every buffer edit. */
   queueAutosave(): void
-  /** Flush the buffer to disk now (debounced via queueAutosave; also the rename follow-up). */
+  /** Flush the buffer to disk now (debounced via queueAutosave). */
   autosave(): Promise<boolean>
   /** Replace buffer + saved state from disk content (reload after external change). */
   adoptDiskContent(content: string, mtimeMs: number, version: string): void
@@ -108,8 +102,7 @@ export interface DocStore {
 
 type DocumentState = Pick<DocStore,
   'meta' | 'source' | 'savedSource' | 'eol' | 'mtimeMs' | 'version' | 'revision' | 'conflictDraft' | 'mode' | 'conflict' |
-  'saving' | 'savingKind' | 'notice' | 'history' | 'diskChange' |
-  'renamePrompt' | 'renameError'>
+  'saving' | 'savingKind' | 'notice' | 'history' | 'diskChange'>
 
 export function createDocStore() {
   const documents = new Map<string, DocumentState>()
@@ -137,7 +130,7 @@ export function createDocStore() {
   const writeDocument = async (id: string): Promise<boolean> => {
     clearAutosave(id)
     const doc = documents.get(id)
-    if (!doc || doc.saving || doc.meta?.isDraft || doc.conflict) return false
+    if (!doc || doc.saving || doc.conflict) return false
     const { source, savedSource, eol, version } = doc
     if (source === savedSource) return true
     diskRequests.set(id, (diskRequests.get(id) ?? 0) + 1)
@@ -269,8 +262,6 @@ export function createDocStore() {
     scroller: null,
     history: [],
     diskChange: null,
-    renamePrompt: false,
-    renameError: null,
 
     async flushAll() {
       get().flushEditor?.()
@@ -311,9 +302,9 @@ export function createDocStore() {
           revision: 0, conflictDraft: null,
           conflict: false, saving: false, savingKind: null, notice: null, history: [],
           diskChange: null,
-          renamePrompt: false, renameError: null, flushEditor: null, scroller: null,
+          flushEditor: null, scroller: null,
           externalVersion: s.externalVersion + 1,
-          mode: meta.isDraft ? 'source' : s.mode,
+          mode: s.mode,
         }))
         setTabTitle(meta.displayName)
       } catch (err) {
@@ -376,13 +367,7 @@ export function createDocStore() {
     },
 
     queueAutosave() {
-      const { meta, renamePrompt, conflict } = get()
-      // An unnamed draft has no path to write to — ask for a filename on first edit.
-      // Once named, completeRename writes and subsequent edits autosave normally.
-      if (meta?.isDraft) {
-        if (!renamePrompt) set({ renamePrompt: true })
-        return
-      }
+      const { conflict } = get()
       // Don't bury the conflict banner under retry churn — the user resolves it.
       if (conflict) return
       const id = get().sessionId
@@ -535,31 +520,6 @@ export function createDocStore() {
       }
     },
 
-    cancelRename() {
-      set({ renamePrompt: false, renameError: null })
-    },
-
-    async completeRename(filename) {
-      const { sessionId, meta } = get()
-      if (!sessionId || !meta) return
-      try {
-        const res = await postRename(sessionId, filename)
-        updateDocument(sessionId, {
-          meta: { ...meta, isDraft: false, path: res.path, displayName: res.displayName },
-          version: res.version,
-          renamePrompt: false,
-          renameError: null,
-        })
-        if (get().sessionId === sessionId) setTabTitle(res.displayName)
-        await saveDocument(sessionId)
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 409) {
-          updateDocument(sessionId, { renameError: '__exists__' })
-        } else {
-          updateDocument(sessionId, { renameError: err instanceof Error ? err.message : String(err) })
-        }
-      }
-    },
   }))
   store.subscribe((s) => {
     if (!s.sessionId || !s.meta) return
@@ -569,10 +529,9 @@ export function createDocStore() {
       return
     }
     const { meta, source, savedSource, eol, mtimeMs, version, revision, conflictDraft, mode, conflict, saving, savingKind,
-      notice, history, diskChange, renamePrompt, renameError } = s
+      notice, history, diskChange } = s
     documents.set(s.sessionId, { meta, source, savedSource, eol, mtimeMs, version, revision, conflictDraft, mode, conflict,
-      saving, savingKind, notice, history, diskChange,
-      renamePrompt, renameError })
+      saving, savingKind, notice, history, diskChange })
   })
   return store
 }

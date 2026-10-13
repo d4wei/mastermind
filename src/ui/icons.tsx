@@ -74,14 +74,6 @@ export const LanguageIcon = radix(RGlobeIcon, 14)
 
 /* ---- hand-drawn glyphs Radix lacks ---- */
 
-export function FolderIcon(props: IconProps) {
-  return (
-    <svg {...base(props, 14)}>
-      <path d="M2 4.5h4l1.2 1.4H14v6.1H2z" />
-    </svg>
-  )
-}
-
 export function OutlineIcon(props: IconProps) {
   return (
     <svg {...base(props, 14)}>
@@ -97,14 +89,6 @@ export function DiamondIcon(props: IconProps) {
   return (
     <svg {...base(props, 9)}>
       <path d="M8 1.5 14.5 8 8 14.5 1.5 8z" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
-export function PendingDot(props: IconProps) {
-  return (
-    <svg {...base(props, 8)}>
-      <circle cx="8" cy="8" r="3" fill="currentColor" stroke="none" opacity={0.55} />
     </svg>
   )
 }

@@ -72,7 +72,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       if (ime.isComposing(e)) return
       if (e.key === 'Escape') {
         // Leave Escape to active settings or dialog overlays.
-        if (document.querySelector('.settings-panel, .modal-backdrop')) return
+        if (document.querySelector('.settings-panel')) return
         setComposing(false)
         setComment('')
         setActive(null)

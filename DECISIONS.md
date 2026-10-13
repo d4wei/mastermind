@@ -2,8 +2,8 @@
 
 These rulings govern this repository. In older entries, "squad" means the initial group of three
 reviewers, and "upstream" means [Jingquank/Mastermind](https://github.com/Jingquank/Mastermind).
-The [README](README.md) describes the current application; the
-[architecture plan](docs/architecture-review.md) records implementation status.
+The [README](README.md) describes the current application;
+[native validation](tools/desktop/results.md) records platform evidence and remaining gaps.
 
 - Add an entry only when deleting it would change a future choice.
 - Keep execution history in commits, figures in their measured artifacts, and inventories in their
@@ -28,6 +28,18 @@ Use this entry shape:
 - Omit the pointer when the entry's own commit contains all necessary provenance.
 
 * * *
+
+## 2026-10-13 — Adopt Tauri and consolidate before further product work
+
+**Ruled.** The validated Tauri host becomes the application. Promote its implementation and retire
+superseded browser-runtime, daemon, workspace, blank-draft, and app-owned installation machinery.
+Preserve browser development as explicit development tooling. Track remaining native checks as
+bounded hardening and distribution work; they do not keep the host in experiment status.
+Consolidate code and documentation, then revisit the product plan before adding features.
+Distribution identity remains deferred.
+
+**Beat:** extending the native experiment and original feature backlog while retaining two product
+runtimes indefinitely.
 
 ## 2026-10-11 — Preserve the review experience while reassessing native machinery
 

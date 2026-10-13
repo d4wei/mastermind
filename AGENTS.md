@@ -34,15 +34,15 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
   or rejecting a mark is an exact source splice, never a re-render.
 - Nothing reaches disk without the user's acceptance: agent and assist suggestions render on screen
   only.
-- A workspace tree never lists or follows a path outside its root.
-- `src/shared/` is imported by the CLI, the server, and the browser; keep it isomorphic.
+- `src/shared/` is imported by translation tooling and both UI hosts; keep it isomorphic.
 - Components reference `var(--*)` only; colors and spacing live in `themes/*/tokens.css`, whose
   token names `themes/README.md` fixes. Review marks are the only color in the document body.
 
 ## Working the code
 
 - `npm run typecheck` runs both tsconfigs; both must pass. `npm test` before every commit.
-- `npm run build` before running `bin/mastermind.js` from a clone; the bin refuses without `dist/`.
+- Build with `npm run desktop:build` before opening files through `bin/mastermind.js` from a clone.
+  Build translation tooling with `npm run build` before using `translate-blocks`.
 - Touch `src/shared/critic/` only with the corpus tests green; it is the most test-covered code.
 - Plan in a `.md` file and review it through mastermind itself (`node bin/mastermind.js open
   <plan>.md`; optional translation preparation is in `assets/agent/README.md`). Reread the file

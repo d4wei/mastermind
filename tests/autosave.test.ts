@@ -18,7 +18,6 @@ vi.mock('../src/ui/app/api', () => {
     putFile: vi.fn(),
     getFile: vi.fn(),
     getSession: vi.fn(),
-    postRename: vi.fn(),
   }
 })
 
@@ -38,12 +37,11 @@ function seed(over: Partial<ReturnType<typeof useDoc.getState>> = {}): void {
     saving: false,
     savingKind: null,
     conflict: false,
-    renamePrompt: false,
     notice: null,
     history: [],
     externalVersion: 0,
     flushEditor: null,
-    meta: { isDraft: false, displayName: 'f.md', path: '/f.md' } as unknown as SessionMeta,
+    meta: { displayName: 'f.md', path: '/f.md' } as unknown as SessionMeta,
     ...over,
   })
 }
@@ -92,15 +90,6 @@ describe('autosave', () => {
     vi.mocked(getFile).mockResolvedValue({ content: source, mtimeMs: 100, version: 'disk' })
     await useDoc.getState().autosave()
     expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), 'base')
-  })
-
-  it('an unnamed draft prompts for a filename instead of writing', async () => {
-    seed({ meta: { isDraft: true, displayName: 'Untitled' } as unknown as SessionMeta })
-    useDoc.getState().setSource('first keystroke')
-    expect(useDoc.getState().renamePrompt).toBe(true)
-
-    await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(putFile).not.toHaveBeenCalled()
   })
 
   it('does not schedule writes while a disk conflict is unresolved', async () => {

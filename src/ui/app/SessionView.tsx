@@ -29,7 +29,6 @@ import { useIsNarrow } from './Navigator'
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
 const SettingsPanel = lazy(() => import('../settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
 const FindBar = lazy(() => import('../review/FindBar').then((m) => ({ default: m.FindBar })))
-const RenameDialog = lazy(() => import('./RenameDialog').then((m) => ({ default: m.RenameDialog })))
 const TranslatedView = lazy(() => import('../translate/TranslatedView').then((m) => ({ default: m.TranslatedView })))
 
 const MODE_CYCLE: Record<ViewMode, ViewMode> = { reading: 'source', source: 'reading' }
@@ -45,7 +44,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
   const notice = useDoc((s) => s.notice)
-  const renamePrompt = useDoc((s) => s.renamePrompt)
   const meta = useDoc((s) => s.meta)
   const mode = useDoc((s) => s.mode)
   const externalVersion = useDoc((s) => s.externalVersion)
@@ -377,11 +375,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       {findOpen && mode === 'reading' && !showTranslated && analysis && (
         <Suspense fallback={null}>
           <FindBar analysis={analysis} source={source} docRef={articleRef} onClose={() => setFindOpen(false)} />
-        </Suspense>
-      )}
-      {renamePrompt && (
-        <Suspense fallback={null}>
-          <RenameDialog />
         </Suspense>
       )}
       {resolvedOpen && <ResolvedThreads source={source} onClose={() => setResolvedOpen(false)} />}

@@ -2,10 +2,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../src/server/translate/prepared'
-import { createApp } from '../src/server/app'
-import { SessionRegistry } from '../src/server/sessions'
-import { WorkspaceRegistry } from '../src/server/workspaces'
+import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../src/node/prepared-translations'
+import { createPreview } from '../tools/preview/app'
 
 let dir: string
 let file: string
@@ -76,13 +74,10 @@ it('rejects path-shaped language codes rather than turning them into artifact fi
 })
 
 it('serves only a current prepared artifact and removes live generation and hand-back endpoints', async () => {
-  const registry = new SessionRegistry()
-  const session = registry.open(await fs.realpath(file)).session
-  const app = createApp({ registry, workspaces: new WorkspaceRegistry(), version: 'test', startedAt: 0,
-    requestShutdown() {}, touch() {} })
-  const request = (suffix: string, method = 'GET') => app.request(`http://localhost/api/sessions/${session.id}/${suffix}`, {
+  const app = await createPreview(file, path.resolve('themes'))
+  const request = (suffix: string, method = 'GET') => app.request(`http://localhost/api/sessions/preview/${suffix}`, {
     method, headers: { host: 'localhost' } })
-  try {
+  {
     expect((await request('translation?targetLang=zh-CN')).status).toBe(404)
     const valid = await artifactFor()
     await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
@@ -95,5 +90,5 @@ it('serves only a current prepared artifact and removes live generation and hand
     expect((await request('handback', 'POST')).status).toBe(404)
     expect((await app.request('http://localhost/api/translate', { method: 'POST', headers: { host: 'localhost' } })).status).toBe(404)
     expect((await app.request('http://localhost/api/assist/pending', { headers: { host: 'localhost' } })).status).toBe(404)
-  } finally { registry.closeAll('shutdown') }
+  }
 })

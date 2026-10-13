@@ -53,7 +53,7 @@ describe('native reviewer boundary', () => {
   ])('retains dirty text and selects the existing recovery path for $error', async (failure) => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'document_meta') return {
-        sessionId: '0', path: '/document.md', displayName: 'document.md', isDraft: false,
+        sessionId: '0', path: '/document.md', displayName: 'document.md',
       }
       if (command === 'read_document') return { content: 'original\r\n', mtimeMs: 1, version: 'base' }
       if (command === 'write_document') throw failure

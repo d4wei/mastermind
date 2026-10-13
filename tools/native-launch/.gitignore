@@ -1,8 +1,0 @@
-/target/
-/gen/
-/node_modules/
-/__pycache__/
-/check-results-windows.json
-/check-reviewer-diagnostics/
-
-reviewer-ui/

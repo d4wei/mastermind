@@ -4,12 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'tools/native-launch/**'
-      - '!tools/native-launch/*.md'
-      - '!tools/native-launch/check-results*.json'
+      - 'src-tauri/**'
+      - '!src-tauri/**/*.md'
+      - 'tools/desktop/**'
+      - '!tools/desktop/*.md'
+      - '!tools/desktop/check-results*.json'
       - '.github/workflows/native-linux.yml'
       - 'src/ui/**'
       - 'src/shared/**'
+      - 'src/node/**'
       - 'themes/**'
       - 'package-lock.json'
 permissions:
@@ -20,7 +23,7 @@ jobs:
     timeout-minutes: 50
     defaults:
       run:
-        working-directory: tools/native-launch
+        working-directory: tools/desktop
         shell: bash
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -37,29 +40,29 @@ jobs:
       - name: Install pinned Rust toolchain
         run: |
           rustup toolchain install 1.98.0 --profile minimal --component clippy
-          rustup override set 1.98.0
+          rustup default 1.98.0
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
         with:
-          workspaces: tools/native-launch
+          workspaces: src-tauri
           cache-on-failure: true
       - name: Build the reviewer frontend
         working-directory: .
         run: |
           npm ci --ignore-scripts
-          node --import tsx tools/native-launch/build-reviewer.mts
+          node --import tsx tools/desktop/build-reviewer.mts
       - name: Build the Linux reviewer package
         run: |
           npm ci
-          npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles deb -- --locked
+          node tauri.mjs build --bundles deb -- --locked
       - name: Native unit tests and lint
         run: |
           node --test check-readiness-script.cjs
           python3 check-readiness-harness.py
-          cargo test --release --locked --all-features
-          cargo clippy --release --locked --all-features --all-targets -- -D warnings
+          cargo test --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features
+          cargo clippy --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
       - name: Install the Debian package
         run: |
-          packages=(target/release/bundle/deb/*.deb)
+          packages=(../../src-tauri/target/release/bundle/deb/*.deb)
           test "${#packages[@]}" -eq 1
           test -f "${packages[0]}"
           sudo apt-get install -y "./${packages[0]}"
@@ -81,10 +84,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: native-launch-linux
+          name: native-linux
           path: |
-            tools/native-launch/installed-package-linux.txt
-            tools/native-launch/check-results-linux.json
-            tools/native-launch/check-process-linux.log
-            tools/native-launch/target/release/bundle/deb/*.deb
+            tools/desktop/installed-package-linux.txt
+            tools/desktop/check-results-linux.json
+            tools/desktop/check-process-linux.log
+            src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: warn

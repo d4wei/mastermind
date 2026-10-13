@@ -4,19 +4,18 @@ import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { App } from '../src/ui/app/App'
 
-const mocks = vi.hoisted(() => ({ load: vi.fn().mockResolvedValue(undefined) }))
+const mocks = vi.hoisted(() => ({ load: vi.fn().mockResolvedValue(undefined), home: false }))
 vi.mock('../src/ui/app/configStore', () => ({ useConfig: (selector: (state: unknown) => unknown) =>
   selector({ load: mocks.load }) }))
-vi.mock('../src/ui/app/route', () => ({ useRoute: () => ({ kind: 'doc', sessionId: '4' }) }))
+vi.mock('../src/ui/app/route', () => ({ useRoute: () => mocks.home ? { kind: 'home' } : { kind: 'doc', sessionId: '4' } }))
 vi.mock('../src/ui/app/navStore', () => ({ useNav: (selector: (state: unknown) => unknown) =>
   selector({ outline: [], collapsed: false }) }))
 vi.mock('../src/ui/app/Navigator', () => ({ Navigator: () => null, useIsNarrow: () => false }))
 vi.mock('../src/ui/app/SessionView', () => ({ SessionView: () => <article>Retained document</article> }))
-vi.mock('../src/ui/app/WorkspaceView', () => ({ WorkspaceView: () => null }))
 vi.mock('../src/ui/app/documentLifecycle', () => ({ registerDocumentLifecycle: () => () => {} }))
 vi.mock('../src/ui/theme/ThemeProvider', () => ({ ThemeEffects: () => null, GrainOverlay: () => null }))
 
-beforeEach(() => { mocks.load.mockReset().mockResolvedValue(undefined) })
+beforeEach(() => { mocks.home = false; mocks.load.mockReset().mockResolvedValue(undefined) })
 
 it('keeps the native reviewer unmounted during setup and exposes its retained route afterward', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -76,6 +75,23 @@ it('does not start a stale native config read while setup owns the confirmed rel
     expect(loadedName).toBe('Confirmed reader')
   } finally {
     act(() => root.unmount())
+    vi.unstubAllGlobals()
+  }
+})
+
+it('shows the repository preview command without blank-document creation', async () => {
+  mocks.home = true
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<App />))
+    expect(host.querySelector('code')?.textContent).toBe('npm run dev -- <file.md>')
+    expect(host.querySelector('button')).toBeNull()
+  } finally {
+    act(() => root.unmount())
+    host.remove()
     vi.unstubAllGlobals()
   }
 })

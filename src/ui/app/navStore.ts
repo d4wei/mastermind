@@ -22,11 +22,9 @@ interface NavState {
   collapsed: boolean
   /** narrow-mode off-canvas open (transient) */
   mobileOpen: boolean
-  section: 'files' | 'outline'
   publish(outline: OutlineItem[], docEl: HTMLElement | null): void
   setCollapsed(v: boolean): void
   setMobileOpen(v: boolean): void
-  setSection(s: 'files' | 'outline'): void
 }
 
 export const useNav = create<NavState>((set) => ({
@@ -34,7 +32,6 @@ export const useNav = create<NavState>((set) => ({
   docEl: null,
   collapsed: loadCollapsed(),
   mobileOpen: false,
-  section: 'files',
   publish: (outline, docEl) => set({ outline, docEl }),
   setCollapsed: (v) => {
     try {
@@ -45,5 +42,4 @@ export const useNav = create<NavState>((set) => ({
     set({ collapsed: v })
   },
   setMobileOpen: (v) => set({ mobileOpen: v }),
-  setSection: (s) => set({ section: s }),
 }))

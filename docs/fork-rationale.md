@@ -1,16 +1,14 @@
 ---
-status: living
-updated: 2026-10-10
-exit: every remaining design question is ruled in DECISIONS.md or dropped
+status: historical
+updated: 2026-10-13
 ---
-# Project origins and review design
+# Project origins
 
-This repository derives from Kevin Ding's
+This document preserves the design rationale inherited from Kevin Ding's
 [Jingquank/Mastermind](https://github.com/Jingquank/Mastermind) at `3687c91` (v0.2.1, MIT).
-It develops a review workflow with author-tagged discussions, continuous saving, and optional
-comfort-language reading, all anchored to Markdown files. This document records the inherited
-design rationale, early review observations, and remaining questions. Small independent fixes are
-kept suitable for contribution to the original project.
+Historical rationale may receive factual or link corrections; it does not govern current behavior.
+Current constraints live in [DECISIONS.md](../DECISIONS.md), and the application is described in
+[README.md](../README.md). Implementation history is retained in Git.
 
 ## What upstream got right
 
@@ -57,174 +55,9 @@ The original [behaviors plan][upstream-behaviors] adds integration rationale wor
   snapshots instead of cached-block reuse and opens files independently of translation.
 - **One preferred/secondary language pair.** Setup and the reading toggle share `langPair`, avoiding
   competing preferences. Retain consistent language configuration and optional translated reading;
-  `DECISIONS.md` defines repository and optional comfort languages in place of a symmetric pair.
+  `DECISIONS.md` defines repository and optional translation languages in place of a symmetric pair.
 - **Portable, reversible provisioning.** Upstream's shared installer and marked global blocks make
   installation reversible across harnesses. Retain portability and clear removal guidance; the
   harness installation ruling in `DECISIONS.md` assigns installation to the invoking harness.
 
 These inherited principles inform the application; current constraints live in `DECISIONS.md`.
-
-## Landed independent fixes
-
-Four fixes identified during review on 2026-10-10 landed in separate commits suitable for
-contribution to the original project:
-
-- Frontmatter renders as literal metadata while source bytes and body offsets remain intact.
-  Metadata is excluded from review marks and translation; see
-  [`frontmatter.md`](../src/shared/markdown/frontmatter.md).
-- An unset author tag defaults to the global Git name, normalized for CriticMarkup, with
-  `reviewer` as the fallback. Existing tags remain configured; see
-  [`config.md`](../src/server/config.md).
-- The English browser preference reads "Browser"; the Chinese label is unchanged. Its behavior
-  remains choosing which application opens review URLs.
-- Settings labels resist accidental selection. Author and language-search inputs remain
-  selectable and editable.
-
-## Remaining design questions
-
-[`DECISIONS.md`](../DECISIONS.md) records settled product directions. The
-[`architecture review`](architecture-review.md) describes proposed removal and refactoring work,
-remaining implementation choices, and execution status.
-
-The following original questions still need rulings before implementation:
-
-- Package, CLI, and config-directory rename.
-- Repository settings: storage, discovery, and precedence for repo language; whether the review
-  convention also needs a shared setting. Comfort language and author tags remain personal.
-
-The browser-container bet has graduated to the desktop-wrapper ruling. GUI onboarding, continuous
-saving without explicit hand-back, agent discretion over review-file selection, and cross-platform
-viability are also settled there. See the architecture review for execution status.
-
-### Agent-authored comments: current assumptions and existing support
-
-Inspection on 2026-10-10, after the four fixes listed above. A ruling in `DECISIONS.md` permits
-author-tagged agent replies. This dated inventory records the original conflicts, not current
-behavior. The [public protocol][protocol] replaces the conflicting instructions. The renderer has
-never enforced a human-only author role.
-
-[protocol]: ../.claude/skills/mastermind/reference/review-protocol.md
-
-**Instruction surfaces**
-
-- `AGENT_SETUP.md` (now [agent setup](../assets/agent/README.md)), "Plan reviews via Mastermind":
-  the pasteable block calls marks the user's feedback, requires direct revision and removal of
-  resolved marks, explicitly says "Do not add CriticMarkup of your own," and presents the revision
-  diff as the way to see
-  agent changes. This is the explicit prohibition that an in-file answer would violate.
-- The same file, "How the protocol behaves": the comment-thread bullet explicitly shows
-  `{==span==}{>>@ke: question<<}{>>@agent: answer<<}` and tells the agent to append a reply, while
-  preferring direct revision. That already permits the opposite behavior. Its translation
-  instructions preserve author tags without assigning a human or agent role.
-- [The main shipped skill](../.claude/skills/mastermind/SKILL.md), "Visualize flow," step 4:
-  the plan-review path tells the agent to apply or argue each mark and comment, remove resolved
-  marks and the summary, then reopen until approved. It does not say where an argument lives or
-  when an answered thread stays. Unlike the setup block, it contains no explicit ban on adding
-  marks. The demo path localizes the bundled template and preserves its marks.
-- [The demo template](../.claude/skills/mastermind/reference/demo.md), opening blockquote:
-  "Marks flow one direction only: you annotate, the agent re-reads." The comment and deletion
-  examples are notes for the agent; there is no agent reply example.
-- [The alias skill](../.claude/skills/master/SKILL.md) delegates to the main Visualize flow; it
-  adds no independent mark-direction rule.
-- [The global block](../assets/agent/global.md) routes plans through the main skill and `--wait`
-  and preserves CriticMarkup during translation. It has no explicit human-only mark rule and no
-  instructions for answering or retaining a thread. A protocol change must account for this
-  indirection, rather than treating this file as a second explicit prohibition.
-
-**Renderer and supporting behavior**
-
-- [`Renderer.tsx`](../src/ui/modes/reading/Renderer.tsx), `renderCritic`: comment markers expose
-  the raw comment content, including a tag, without classifying the author. A highlight is visible
-  as an anchor only when a thread follows it; bare highlights render as plain text. Insertions,
-  deletions, and substitutions are suggestions regardless of who wrote them, and their model has
-  no author field. This is a presentation distinction by mark kind, not a directional gate.
-- [`CommentRail.tsx`](../src/ui/review/CommentRail.tsx): both live and exiting cards render every
-  comment's tag and body with the same treatment. `submitReply` appends a consecutive comment
-  signed with the current user's tag. `resolveThread` removes all comments plus the anchor, with
-  no distinction between an unanswered question, an agent answer, and a human reply. Thus agent
-  replies already appear, but there is no agent styling, ownership check, or answered state.
-- [`SessionView.tsx`](../src/ui/app/SessionView.tsx): `activeCardSpan` maps any thread member to
-  its card, gutter ticks represent whole threads, and print footnotes include every comment's tag
-  and body. None filters agent authors. The rail is hidden in the translated view;
-  [`TranslatedView.tsx`](../src/ui/translate/TranslatedView.tsx) is read-only and directs review
-  back to the original, independently of author.
-- [`scanner.ts`](../src/shared/critic/scanner.ts), `parseAuthor`, `group`, and `reviewCounts`:
-  tags are strings, consecutive marks form threads, and every comment counts toward the hand-back
-  summary. An agent answer would therefore increase "comments" just like a human question.
-  [`critic-scanner.test.ts`](../tests/critic-scanner.test.ts) already checks an anchored human
-  comment followed by an `@agent` reply. There is no parser change required merely to admit one.
-- [`handback.ts`](../src/server/handback.ts) counts the grouped marks without author filtering;
-  [`feedback.ts`](../src/server/feedback.ts) preserves comment text on save. Neither enforces the
-  prose prohibition or distinguishes resolved discussion from outstanding feedback.
-
-Other guidance at that revision, including [`README.md`](../README.md)'s review workflow and
-the `feature-test.md` demonstration also describe one-direction feedback. The example now lives in
-[manual interactions](../tests/manual/review-interactions.md).
-The public guidance now follows the author-tagged reply ruling in `DECISIONS.md`.
-
-The later ruling and public protocol govern answered threads and their retention. This inventory
-remains evidence of the original design, not an additional policy source.
-
-## Trial notes
-
-Add dated review observations here; move anything that becomes a ruling or a direction entry
-out as it settles.
-
-- 2026-10-10 — `npx mastermind-md open --no-translate <file>` is the working invocation; a bare path
-  is parsed as an unknown command. The reading surface itself reads well.
-
-### 2026-10-10 — UI observations from document review
-
-Da Wei reported the following observations on 2026-10-10, with five screenshots. The images are
-not stored in this repository; the numbered descriptions below preserve their reported evidence.
-The source document for screenshots 2–3 is no longer available, so those cases cannot be reproduced
-from the original input. The code checks below describe the checkout at `0d83478`.
-
-These observations describe the initial trial. Subsequent implementation is recorded in the
-[architecture review](architecture-review.md); retain the evidence below as the original diagnosis,
-not a current bug-status list.
-
-1. **Selection is invisible in the comment composer (screenshot 1).** The reviewer reports selected
-   text has no visible highlight. `app.css` supplies one global selection color, while the composer
-   uses inverted surface/text tokens. In the light themes, that selection color derives from dark
-   text and is a plausible poor match for the dark composer. Reproduce in the affected theme before
-   calling this the confirmed cause; check focused and unfocused selection across themes. This
-   concerns comment inputs, not the intentional suppression of settings-label selection.
-2. **Author formatting differs (screenshot 2).** `@Da Wei:` appears in the body; `@claude` gets the
-   author label. `scanner.ts`'s `parseAuthor` rejects whitespace in an author token. A direct check
-   returns no author for `@Da Wei: A note` and `claude` for `@claude: A note`. `CommentRail.tsx`
-   only emits the label when an author was parsed. This explains the pictured distinction regardless
-   of the selected anchor "In". Decide whether names with spaces are supported or normalized; align
-   configuration, external markup, and rendering without silently changing existing signatures.
-3. **Insertion delimiters appear literally (screenshot 3).** The pictured insertion appears to span
-   two list items. A synthetic source with an opener at the end of one item and a closer in the next
-   produces one scanner insertion span but zero `criticInsert` AST nodes; both delimiters become
-   text. `critic-mdast.ts` pairs wrappers within each parent and restores unmatched wrappers as
-   literals. The original source is unavailable, so this is a related reproduction, not an exact
-   diagnosis of the screenshot. The review convention forbids marks spanning blocks; decide how
-   imported invalid placements are explained, and check same-block valid marks separately.
-4. **Soft wrapping becomes visible line breaks (screenshot 4).** `.rail-body` uses
-   `white-space: pre-wrap`, so source newlines survive in the card. This accounts for a hard-wrapped
-   comment breaking after "derived". Proposed display behavior: treat ordinary source newlines as
-   prose spacing while preserving stored bytes. Explicitly multiline content needs a defined rule;
-   do not repair this by rewriting the comment on disk.
-5. **The app toolbar overlaps Codex's composer (screenshot 5).** Both occupy the bottom region.
-   The app toolbar is fixed near the viewport bottom. A standalone desktop window removes this
-   particular host overlay, but the browser development view still needs usable controls. Compare
-   an ordinary browser and the embedded view; prefer a layout that avoids the collision over a
-   hardcoded Codex-specific offset. The screenshot does not identify the host's inset contract.
-6. **There is no per-comment Delete action.** Current `resolveThread` removes every comment in the
-   thread and unwraps its highlight, preserving the anchored prose. Autosave writes that removal;
-   there is no durable resolved-thread archive. Buffer undo and any existing Git history are not
-   such an archive. The Delete/Resolve distinction and retention policy need a product ruling; see
-   [the architecture discussion](architecture-review.md#comment-lifecycle).
-7. **External-change notices are easy to miss when scrolled.** The banner appears before the
-   document and `.banner` has no sticky/fixed positioning. The requested outcome is a persistent,
-   viewport-visible notice with actions while attention is required. Design it with the dirty-buffer
-   conflict flow, without covering the selection, comment composer, or app toolbar. Clean-buffer
-   automatic reload may remove some notices, but conflicts and deletion still require visibility.
-
-The parser/rendering mismatch belongs in the renderer comparison's regression cases. Selection,
-author labels, and comment wrapping survive a shell change and need their own checks. The host
-overlay collision is partly container-specific. Thread lifecycle and external-change notices feed
-the architecture plan before implementation; they are not merely styling tasks.

@@ -1,9 +1,0 @@
-{
-  "build": { "frontendDist": "reviewer-ui" },
-  "app": {
-    "security": {
-      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:",
-      "capabilities": [{ "identifier": "reviewer", "windows": ["main"], "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"] }]
-    }
-  }
-}

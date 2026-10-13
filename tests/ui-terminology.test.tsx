@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { Tooltip } from 'radix-ui'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -6,18 +7,17 @@ import type { ClientConfig } from '../src/shared/types'
 import { useConfig } from '../src/ui/app/configStore'
 import { ConflictPanel } from '../src/ui/app/ConflictPanel'
 import { createDocStore, useDoc } from '../src/ui/app/store'
-import { FilesList } from '../src/ui/app/Tree'
+import { Navigator } from '../src/ui/app/Navigator'
+import { useNav } from '../src/ui/app/navStore'
 import { TopBar } from '../src/ui/app/TopBar'
-import { useWorkspace } from '../src/ui/app/workspaceStore'
 
 vi.mock('../src/ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 const initialConfig = useConfig.getState()
 const initialDoc = useDoc.getState()
-const initialWorkspace = useWorkspace.getState()
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
   authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', translationLanguage: null, browser: '', grain: {},
+  uiLang: 'en', translationLanguage: null, grain: {},
 }
 let host: HTMLDivElement
 let root: Root
@@ -34,7 +34,6 @@ afterEach(() => {
   host.remove()
   useConfig.setState(initialConfig)
   useDoc.setState(initialDoc)
-  useWorkspace.setState(initialWorkspace)
   vi.unstubAllGlobals()
 })
 
@@ -70,22 +69,6 @@ it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLan
   expect(setMode).toHaveBeenCalledWith('source')
 })
 
-it.each([
-  ['en', { comments: 3, edits: 2, highlights: 1 }, '3 comments, 2 suggested edits, 1 highlight'],
-  ['en', { comments: 1, edits: 1, highlights: 2 }, '1 comment, 1 suggested edit, 2 highlights'],
-  ['en', { comments: 0, edits: 1, highlights: 0 }, '1 suggested edit'],
-  ['zh-CN', { comments: 3, edits: 2, highlights: 1 }, '3 条评论、2 条修改建议、1 处高亮'],
-] as const)('spells out review counts in %s (%j)', (uiLang, counts, expected) => {
-  useConfig.setState({ config: { ...config, uiLang } })
-  useWorkspace.setState({ children: { '': [
-    { rel: 'plan.md', name: 'plan.md', isDir: false, isMarkdown: true },
-  ] }, recent: [], sessions: [], badges: { 'plan.md': counts } })
-  act(() => root.render(<FilesList openSessionId={null} />))
-  const badge = host.querySelector<HTMLElement>('.ws-count')!
-  expect(badge.title).toBe(expected)
-  expect(badge.textContent).toBe(String(counts.comments + counts.edits + counts.highlights))
-})
-
 it.each(['en', 'zh-CN'] as const)('keeps settings in the document toolbar in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const onToggle = vi.fn()
@@ -95,4 +78,17 @@ it.each(['en', 'zh-CN'] as const)('keeps settings in the document toolbar in %s'
   expect(button.getAttribute('aria-pressed')).toBe('true')
   act(() => button.click())
   expect(onToggle).toHaveBeenCalledOnce()
+})
+
+it('retains outline navigation to existing-file source offsets', () => {
+  const scroller = vi.fn()
+  useDoc.setState({ scroller })
+  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }],
+    docEl: null, collapsed: false, mobileOpen: false })
+  act(() => root.render(<Tooltip.Provider><Navigator /></Tooltip.Provider>))
+  const second = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Second')!
+  act(() => second.click())
+  expect(scroller).toHaveBeenCalledWith(12, 1)
+  expect(host.querySelector('.nav-seg')).toBeNull()
+  useNav.setState({ outline: [], docEl: null })
 })

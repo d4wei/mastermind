@@ -54,4 +54,4 @@ termination, and app crashes can still lose unsaved in-memory buffers.
 buffer changes before checking all retained documents. It returns false for unresolved work,
 including a distinct comparison result or an active comparison save. The native adapter locks
 editing while awaiting this check and keeps the window open on failure. Native operating-system
-quit coverage is tracked in the [host observations](../../../tools/native-launch/results.md).
+quit coverage is tracked in the [host observations](../../../tools/desktop/results.md).

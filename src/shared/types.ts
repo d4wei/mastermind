@@ -5,41 +5,10 @@ export interface TextEdit {
   insert: string
 }
 
-export interface ServerState {
-  port: number
-  pid: number
-  version: string
-  startedAt: number
-}
-
-export interface HealthResponse {
-  ok: true
-  pid: number
-  version: string
-  startedAt: number
-}
-
-export interface CreateSessionRequest {
-  /** Absolute path of an existing file to open. */
-  path?: string
-  /** Create an untitled draft in `dir` instead of opening `path`. */
-  draft?: boolean
-  dir?: string
-}
-
-export interface CreateSessionResponse {
-  sessionId: string
-  url: string
-  /** false when an existing session for the same realpath was reused */
-  created: boolean
-  isDraft: boolean
-}
-
 export interface SessionMeta {
   sessionId: string
   path: string
   displayName: string
-  isDraft: boolean
   mtimeMs: number
 }
 
@@ -47,64 +16,6 @@ export interface FileResponse {
   content: string
   mtimeMs: number
   version: string
-}
-
-/* ---- workspace (file tree) ---- */
-
-export interface CreateWorkspaceRequest {
-  /** Absolute (or cwd-relative) path of a directory to browse. */
-  root?: string
-}
-
-export interface CreateWorkspaceResponse {
-  workspaceId: string
-  url: string
-  /** realpath of the root */
-  root: string
-  displayName: string
-}
-
-export interface WorkspaceMeta {
-  workspaceId: string
-  root: string
-  displayName: string
-}
-
-/** One entry in a single directory level of the tree (client recurses lazily). */
-export interface TreeEntry {
-  name: string
-  /** path relative to the workspace root (forward-slashed, never absolute) */
-  rel: string
-  isDir: boolean
-  isMarkdown: boolean
-}
-
-export interface TreeResponse {
-  /** the directory listed, relative to root ('' = root) */
-  dir: string
-  entries: TreeEntry[]
-}
-
-/** Lazy per-file review badge — counts are null for non-markdown or unreadable files. */
-export interface FileMeta {
-  rel: string
-  counts: ReviewCounts | null
-  mtimeMs: number
-}
-
-/** An open session whose file lives under a workspace root (drives tree dots). */
-export interface WorkspaceSessionInfo {
-  rel: string
-  sessionId: string
-  isDraft: boolean
-}
-
-export type SessionCloseReason = 'tabs-closed' | 'never-opened' | 'shutdown'
-
-export interface ReviewCounts {
-  comments: number
-  edits: number
-  highlights: number
 }
 
 /* ---- config ---- */
@@ -132,20 +43,11 @@ export interface MastermindConfig {
   uiLang: 'en' | 'zh-CN'
   /** Optional personal language code for prepared reading translations. */
   translationLanguage: string | null
-  /** app name / bundle id to open review URLs in; '' = the system default browser */
-  browser: string
   /** per-theme grain overrides; `enabled` is the legacy on/off, superseded by `intensity` */
   grain: Record<string, { enabled?: boolean; intensity?: GrainIntensity; texture?: GrainTexture }>
 }
 
-/** What the browser sees. No secrets to redact — translation is agent-only, no keys stored. */
 export type ClientConfig = MastermindConfig
-
-/** An installed, launchable browser (macOS); `id` is the `open -a <id>` app name. */
-export interface BrowserInfo {
-  id: string
-  name: string
-}
 
 export interface ThemeFontInfo {
   family: string
@@ -162,16 +64,3 @@ export interface ThemeInfo {
   /** Preview hexes for the picker swatch (theme's own bg / muted ink / accent). */
   swatch: { bg: string; ink: string; accent: string } | null
 }
-
-export type SseEvent =
-  | { event: 'ping'; data: Record<string, never> }
-  | { event: 'file-changed'; data: { mtimeMs: number } }
-  | { event: 'file-deleted'; data: Record<string, never> }
-  | { event: 'session-closed'; data: { reason: SessionCloseReason } }
-  | { event: 'config-changed'; data: Record<string, never> }
-  /** workspace → tree: a directory's listing changed (add/remove/rename) */
-  | { event: 'file-list-changed'; data: { dir: string } }
-  /** workspace → tree: one file's review badge changed (re-fetch its file-meta) */
-  | { event: 'file-badge-changed'; data: { rel: string } }
-
-export type SseEventName = SseEvent['event']

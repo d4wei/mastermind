@@ -1,9 +1,11 @@
+import { createBrowserHost } from '../src/ui/app/browserHost'
+import { installHost } from '../src/ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createTranslationStore, type TranslationSnapshot } from '../src/ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../src/shared/translation'
 let snapshot: TranslationSnapshot
-beforeEach(() => { snapshot = { sessionId: 'A', source: 'Hello world.', targetLang: 'zh-CN' } })
-afterEach(() => vi.unstubAllGlobals())
+beforeEach(() => { installHost(createBrowserHost()); snapshot = { sessionId: 'A', source: 'Hello world.', targetLang: 'zh-CN' } })
+afterEach(() => { installHost(null); vi.unstubAllGlobals() })
 async function artifact(source = snapshot.source, targetLang = 'zh-CN'): Promise<PreparedTranslation> {
   const prepared = await prepareTranslation(source)
   return { version: 1, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang,
@@ -20,7 +22,7 @@ it('loads one complete prepared artifact by GET without generating translations'
   await store.getState().toggle()
   expect(fetch).toHaveBeenCalledTimes(1)
   expect(fetch.mock.calls[0]![0]).toBe('/api/sessions/A/translation?targetLang=zh-CN')
-  expect(fetch.mock.calls[0]![1]).toBeUndefined()
+  expect(fetch.mock.calls[0]![1]).toEqual({ method: 'GET' })
   expect(store.getState().active).toBe(true)
 })
 it.each([404, 409, 500])('falls back to original after HTTP %i with no retained artifact', async (status) => {
