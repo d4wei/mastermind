@@ -14,6 +14,7 @@ import { highlight } from '../../../shared/highlight'
 import { toggleTaskEdit } from '../../../shared/markdown/tasklist'
 import type { TextEdit } from '../../../shared/types'
 import { DiamondIcon } from '../../icons'
+import { Frontmatter } from './Frontmatter'
 
 export interface RenderCtx {
   source: string
@@ -21,7 +22,6 @@ export interface RenderCtx {
   onEdit?: (edit: TextEdit) => void
   /** spanIndexes of highlights that anchor a comment thread (dotted underline). */
   anchoredHighlights?: ReadonlySet<number>
-  /** When set, paint fenced code with syntax-token spans (the user's code-color scheme). */
   highlightCode?: boolean
   /** Localized labels for the deletion-undo affordance. When present, a deletion
    *  mark becomes a tabbable button announcing that activating it removes the
@@ -29,8 +29,6 @@ export interface RenderCtx {
   markLabels?: { deletion: string; hint: string }
 }
 
-/** Props that make a deletion mark a tabbable, announced button (click/Enter to
- *  remove the suggestion) — only when the view wired resolution (ctx.markLabels). */
 function deletionProps(
   ctx: RenderCtx,
   text: string,
@@ -40,7 +38,6 @@ function deletionProps(
   return { tabIndex: 0, role: 'button', 'aria-label': `${ctx.markLabels.deletion}: ${body}. ${ctx.markLabels.hint}` }
 }
 
-/** Tokenized children for a fenced code block — plain strings for `text`, colored spans otherwise. */
 function codeChildren(value: string, lang: string | undefined): ReactNode[] {
   return highlight(value, lang).map((tok, i) =>
     tok.type === 'text' ? tok.value : (
@@ -292,11 +289,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
     case 'list':
       return renderList(node, key, ctx)
     case 'yaml':
-      return (
-        <pre key={key} className="md-code md-frontmatter">
-          <code>{node.value}</code>
-        </pre>
-      )
+      return <Frontmatter key={key} source={node.value} />
     case 'code':
       return (
         <pre key={key} className="md-code" data-lang={node.lang ?? undefined} {...posAttrs(node)}>
@@ -340,7 +333,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
     case 'thematicBreak':
       return <hr key={key} />
     case 'html':
-      // Summary fences stay invisible; raw HTML renders literally rather than executing.
+      // HTML comments carry hidden history; other raw HTML remains inert text.
       return node.value.trimStart().startsWith('<!--') ? null : (
         <pre key={key} className="md-code md-html" {...posAttrs(node)}>
           <code>{node.value}</code>
@@ -363,21 +356,10 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
   }
 }
 
-/**
- * Headings whose section gets the elevated "callout" card treatment — the
- * meta-sections of a plan (decisions made, questions still open, things to do)
- * that matter more than the surrounding prose. Matched on the heading's leading
- * words, so "Decisions (resolved in review)" or "Open questions" both qualify.
- */
 export const CALLOUT_HEADING = /^(decisions?|open\s+questions?|to-?dos?|todos?|risks?)\b/i
 
 export type CalloutKind = 'decisions' | 'questions' | 'todo' | 'risks'
 
-/**
- * Which callout family a heading names — drives the per-type icon and the
- * `md-callout--<kind>` modifier. Identity comes from iconography, not color:
- * the document body stays neutral (review marks own the only color there).
- */
 export function calloutKind(text: string): CalloutKind | null {
   const s = text.trim().toLowerCase()
   if (/^decisions?\b/.test(s)) return 'decisions'
@@ -403,9 +385,7 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
   while (i < children.length) {
     const node = children[i]!
     if (node.type === 'heading' && CALLOUT_HEADING.test(phrasingText(node.children).trim())) {
-      // Group this heading with every following block until the next heading of
-      // equal-or-shallower depth, then wrap the run in a card. The wrapper has no
-      // data-ps/data-pe, so selection/commenting still anchors to the inner blocks.
+      // Leave the wrapper unpositioned so review selections anchor to its inner blocks.
       const depth = node.depth
       const kind = calloutKind(phrasingText(node.children))
       let j = i + 1

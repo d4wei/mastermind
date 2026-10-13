@@ -14,11 +14,11 @@ export type SelError = 'empty' | 'cross-block' | 'unmapped' | 'overlaps-mark'
 export type SelResult = SelRange | { error: SelError }
 export type MultiSelResult = { ranges: SelRange[] } | { error: SelError }
 
-const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote,pre'
+const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote,pre,.md-frontmatter'
 
 function closestBlock(node: Node): HTMLElement | null {
   const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement
-  return el?.closest(BLOCK_SELECTOR) ?? null
+  return el?.closest('.md-frontmatter') ?? el?.closest(BLOCK_SELECTOR) ?? null
 }
 
 function normalizePoint(node: Node, offset: number): { node: Node; offset: number } {
@@ -186,7 +186,7 @@ function mapWithinBlock(
 ): SelResult {
   const selectedText = range.toString()
   if (selectedText.length === 0) return { error: 'empty' }
-  if (block.tagName === 'PRE') return { error: 'unmapped' }
+  if (block.tagName === 'PRE' || block.matches('.md-frontmatter')) return { error: 'unmapped' }
   const code = selectedInlineCode(range, block, source)
   if (code) return code
 
@@ -245,6 +245,7 @@ function blocksBetween(range: Range, startBlock: HTMLElement, endBlock: HTMLElem
   const root = (ca.nodeType === Node.ELEMENT_NODE ? ca : ca.parentElement) as HTMLElement | null
   if (!root) return []
   const all = Array.from(root.querySelectorAll<HTMLElement>(BLOCK_SELECTOR))
+    .filter((block) => !block.parentElement?.closest('.md-frontmatter'))
   const si = all.indexOf(startBlock)
   const ei = all.indexOf(endBlock)
   if (si === -1 || ei === -1) return []
@@ -289,7 +290,7 @@ export function blockContentRanges(
   source: string,
   spans: readonly CriticSpan[],
 ): SelRange[] {
-  if (block.tagName === 'PRE') return []
+  if (block.tagName === 'PRE' || block.closest('.md-frontmatter')) return []
   let from = Infinity
   let to = -Infinity
   for (const el of block.querySelectorAll<HTMLElement>('[data-ps]')) {

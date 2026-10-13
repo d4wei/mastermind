@@ -5,6 +5,10 @@ renderer's `data-ps`/`data-pe` offsets when text matches, otherwise an unambiguo
 the containing block. Unmappable blocks are skipped. Multi-block selections split at block and
 existing-mark boundaries; comments anchor to the first remaining range.
 
+Frontmatter properties and their raw YAML disclosure form one opaque block. Selections beginning
+there can continue into body text, but only the body portion receives review ranges. Nested raw
+source does not displace the metadata wrapper when enumerating blocks across a selection.
+
 Selections that cross complete emphasis, strong, strikethrough, link, or inline-code wrappers retain
 those wrappers' exact Markdown source, rather than comparing their syntax with plain rendered text.
 The DOM positions must match nodes from the existing Markdown parser, and each complete wrapper's

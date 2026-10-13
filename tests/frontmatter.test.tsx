@@ -8,6 +8,7 @@ import { applyTextEdits } from '../src/shared/edits'
 import { acceptEdit } from '../src/shared/critic/resolve'
 import { MarkdownView } from '../src/ui/modes/reading/Renderer'
 import { rangeToSourceRanges } from '../src/ui/modes/reading/selection'
+import { metadataProperties } from '../src/ui/modes/reading/Frontmatter'
 
 const metadata = '---\ntitle: "{>>literal<<}"\nitems:\n  - one\n  - two\n---'
 
@@ -19,6 +20,68 @@ function render(source: string): HTMLElement {
 }
 
 describe('YAML frontmatter', () => {
+  it('shows ordered scalar properties with decoded strings and exact nonstring spelling', () => {
+    const yaml = '# Keep this comment\n"标题": "方案\\n第二行"\ncount: 9007199254740993\nready: TRUE\nempty:\nnone: ~\ncode: 01'
+    const root = render(`---\n${yaml}\n---\n\nBody.`)
+    const rows = [...root.querySelectorAll('.md-property')].map((row) =>
+      [row.querySelector('dt')!.textContent, row.querySelector('dd')!.textContent])
+    expect(rows).toEqual([
+      ['标题', '方案\n第二行'], ['count', '9007199254740993'], ['ready', 'TRUE'],
+      ['empty', ''], ['none', '~'], ['code', '01'],
+    ])
+    expect(root.querySelector('details summary')!.textContent).toBe('YAML')
+    expect(root.querySelector('details code')!.textContent).toBe(yaml)
+    expect(root.querySelector('.md-frontmatter [data-ps]')).toBeNull()
+  })
+
+  it.each([
+    '', '# comment only', 'items: [one, two]', 'nested:\n  key: value',
+    'a: first\na: second', 'a: [unfinished', 'a: &name value\nb: *name',
+    '&key name: value', 'a: !custom value', 'a: !!str value',
+    '<<: value', '? [a, b]\n: value', '12: value', ': value',
+    '%YAML 1.1\n---\na: yes', '%TAG !x! tag:example.com,2026:\n---\na: value',
+    'a: one\n---\na: two', 'a: one\n...',
+  ])('falls back to exact literal YAML for unsupported metadata: %s', (yaml) => {
+    expect(metadataProperties(yaml)).toBeNull()
+  })
+
+  it('keeps oversized metadata literal instead of parsing properties', () => {
+    const yaml = 'description: ' + 'x'.repeat(64 * 1024)
+    expect(metadataProperties(yaml)).toBeNull()
+    const root = render(`---\n${yaml}\n---\n\nBody`)
+    expect(root.querySelector('dl')).toBeNull()
+    expect(root.querySelector('.md-frontmatter code')!.textContent).toBe(yaml)
+  })
+
+  it('renders block strings and HTML-looking properties as inert text', () => {
+    const root = render('---\ndescription: |\n  First line\n  Second line\nhtml: "<script>alert(1)</script>"\n---\n\nBody')
+    expect([...root.querySelectorAll('dd')].map((node) => node.textContent)).toEqual([
+      'First line\nSecond line\n', '<script>alert(1)</script>',
+    ])
+    expect(root.querySelector('script')).toBeNull()
+  })
+
+  it.each(['\n', '\r\n'])('keeps property selections outside review and body splices exact with %j', (eol) => {
+    const prefix = ['---', 'title: "{>>literal<<}"', '# keep comment', 'ready: true', '---', '', ''].join(eol)
+    const source = prefix + 'Body {++addition++}.' + eol
+    const root = render(source)
+    const metadataRange = document.createRange()
+    metadataRange.selectNodeContents(root.querySelector('dd')!)
+    expect(rangeToSourceRanges(metadataRange, source, [])).toEqual({ error: 'unmapped' })
+    const body = root.querySelector('p')!
+    const crossing = document.createRange()
+    crossing.setStart(root.querySelector('dt')!.firstChild!, 0)
+    const bodyText = document.createTreeWalker(body, NodeFilter.SHOW_TEXT).nextNode()!
+    crossing.setEnd(bodyText, 4)
+    const mapped = rangeToSourceRanges(crossing, source, [])
+    expect(mapped).toEqual({ ranges: [{ from: prefix.length, to: prefix.length + 4, text: 'Body' }] })
+    crossing.setStart(root.querySelector('details code')!.firstChild!, 0)
+    expect(rangeToSourceRanges(crossing, source, [])).toEqual(mapped)
+    const { spans } = analyzeMarkdown(source)
+    expect(spans).toHaveLength(1)
+    expect(applyTextEdits(source, [acceptEdit(source, spans[0]!)])).toBe(prefix + 'Body addition.' + eol)
+  })
+
   it.each(['\n', '\r\n'])('keeps body offsets and exact source splices with %j endings', (eol) => {
     const prefix = metadata.replaceAll('\n', eol) + eol + eol
     const source = prefix + '# Plan' + eol + eol + 'Keep {++this++}.' + eol

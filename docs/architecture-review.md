@@ -1,9 +1,9 @@
 ---
 status: living
-updated: 2026-10-11
+updated: 2026-10-13
 exit: approved changes ship with colocated contracts, or the remaining proposals are dropped
 ---
-# Architecture review and proposed ablation
+# Architecture review and migration plan
 
 Da Wei approved this implementation plan on 2026-10-10, including retaining resolved discussions
 in hidden HTML comments within the document. Binding constraints live in
@@ -65,17 +65,19 @@ lives in [the shipped skill](../.claude/skills/mastermind/SKILL.md).
 
 ### Translation without a live service
 
-The preparing agent supplies a complete fresh translation using its existing context. The app
-checks the current narrative snapshot, not the repository's Git HEAD or an inferred dependency
-list. Comments and resolved history remain in their authored language; source prose and proposed
-edits invalidate the prepared translation. Block-anchored comments preserve the exact translated
+The agent preparing the document supplies a complete fresh translation using its existing context.
+The app checks the current narrative snapshot, not the repository's Git HEAD or an inferred
+dependency list. Comments and resolved history remain in their authored language;
+source prose and proposed edits invalidate the prepared translation. Block-anchored comments
+preserve the exact translated
 selection and its language in the original file. These contracts have graduated to the sidecars
 above and the rulings in `DECISIONS.md`.
 
 The app cannot establish that the agent considered every relevant contextual dependency. Context
 selection remains the agent's responsibility; preparing again does not eliminate semantic drift.
 Repository language settings still need storage, discovery, and precedence. The current command
-requires explicit source and target languages; comfort language is an optional personal preference.
+requires explicit source and target languages; Translation language is an optional personal
+preference.
 
 ### `install-agents` / `uninstall-agents`
 
@@ -277,9 +279,9 @@ is needed. Regression cases cover byte preservation, safe escaping, active mark 
 translation exclusion, malformed records, stale actions, and undo. The external markup parser was
 also checked against the emitted archive: historical marks remain inactive.
 
-Receiving-agent guidance distinguishes active feedback from resolved history. Author-tagged agent
-replies use the self-contained [public protocol][public-protocol]. The shipped instructions use
-neutral examples and include all required review instructions. Reopening
+Guidance for agents reading feedback distinguishes active marks from resolved history. Author-tagged
+agent replies use the self-contained [public protocol][public-protocol]. The shipped instructions
+use neutral examples and include all required review instructions. Reopening
 archived threads and relocating their anchors can wait for an actual need; undo covers immediate
 accidental resolution.
 
@@ -304,33 +306,32 @@ Include the trial's cross-list insertion reproduction, author tags containing sp
 soft-line wrapping in that comparison. Preserve screenshot-only observations as such; the original
 document is unavailable. See [trial notes](fork-rationale.md#trial-notes) for evidence.
 
-For frontmatter, [Obsidian Properties](https://obsidian.md/help/properties) is a useful prior: named
-rows with values at the top, typed simple properties, and raw YAML/source mode for structures its
-property UI cannot represent. Proposal: a quiet, read-only property list for simple keys and values,
-with a source fallback for nested/unknown/invalid YAML. Keep bytes, key order, comments, and body
-offsets intact. Display changes should neither rewrite YAML nor introduce a property editor.
-The landed literal frontmatter support is the baseline; property-list display is the reviewed
-presentation direction.
+Frontmatter now displays simple metadata as read-only key/value rows with a YAML disclosure.
+Unsupported or invalid structures retain literal source. The display contract and parser choice
+live in [document metadata](../src/ui/modes/reading/frontmatter.md). Regression tests retain
+comments, source offsets, and exact body splices; this introduces no metadata editor or YAML writer.
 
 ## Planned product work
 
-- **One graphical onboarding flow:** combine setup, handle, repository-scoped language, optional
-  comfort language, and a localized demo. Prefill invocation values, then settings/Git defaults as
-  appropriate. Keep harness installation in its skill/package guidance. Preference precedence,
-  first-run persistence, and the repository-settings storage/discovery mechanism remain open.
+- **One graphical onboarding flow:** the native validation app implements Name, Interface language,
+  and optional Translation language with separate agent suggestions and explicit confirmation.
+  The [launch design](agent-launch.md) governs the interaction; native setup owns its persistence
+  contract. Keep harness installation in its skill/package guidance. Project language awaits the
+  repository-settings storage/discovery ruling. Demo guidance is not a completion requirement.
 - **One review skill:** replace separate setup/demo entry points with the normal launch flow. Blend
   the existing file-review instructions with the approved author-tagged reply and resolution
   conventions. Publish self-contained guidance suitable for every supported harness.
-- **Smart open:** the session agent has full discretion over the files needing review now. Provide
-  a deterministic operation to open its chosen paths; do not encode a Git-only or session-only
-  eligibility rule. Git is useful context and is optional. Multi-file UI details remain open.
+- **Open selected files:** the invoking agent has full discretion over the files needing review now.
+  Provide a deterministic operation to open its chosen paths; do not encode a Git-only or
+  session-only eligibility rule. Git is useful context and is optional. Multi-file UI details
+  remain open.
 - **Continuous saving:** autosave has replaced explicit hand-back.
   Optional Git commits remain a separate proposal, with file scope and timing unresolved; autosave
   should not implicitly stage or commit unrelated repository changes.
-- **Translation and repository preferences:** support repo-language-only operation and an optional
-  comfort language, with fresh translations supplied by the invoking agent. Nonblocking opening
+- **Translation and repository preferences:** support a Project language and optional personal
+  Translation language, with fresh translations supplied by the invoking agent. Nonblocking opening
   and prepared delivery have shipped. Repository settings still need storage and discovery;
-  comfort language remains a personal preference.
+  Translation language remains a personal preference.
 - **Package identity:** choose the name before distribution changes; package, executable, and config
   migration still need a ruling. A wrapper does not remove collisions with upstream automatically.
 - **Claude Code Mods:** retain as an aspiration. Anthropic's
@@ -366,7 +367,7 @@ the scope small enough to validate before beginning the wrapper or broader produ
 4. **Settle and implement the file protocol.** Review the archive proposal above alongside
    translation opening/lifetime and the minimal agent launch interface. Agent replies and dropping
    legacy compatibility are ruled. Delete/Resolve, public replies, and fresh translation
-   preparation have shipped. Exit: app and receiving agent agree on active versus historical
+   preparation have shipped. Exit: app and agents reading feedback agree on active versus historical
    feedback; translation does not accidentally depend on a removed completion loop.
 5. **Validate the selected Tauri host.** Use the reduced document service for the bounded native
    validation above, including browser preview and native macOS automation. Check the Windows/Linux
@@ -386,7 +387,7 @@ before CLI/manual review. Wrapper validation must include external edits, missin
 close/reopen, and actual platform builds, not just a framework's support list.
 
 Execution is approved. The first batch delivered document-owned buffers and save scheduling,
-version-checked file writes, the initial ablation, and the three small comment-display fixes. Tests
+version-checked file writes, obsolete-code removal, and the three small comment-display fixes. Tests
 cover the previously failing schedules; a browser smoke check exercised source autosave, clean
 external reload, author labels, soft wraps, and selected input text. The next batch added guarded
 conflict comparison and hidden resolved discussions with per-comment deletion. Fresh prepared
