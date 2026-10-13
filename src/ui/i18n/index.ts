@@ -119,6 +119,7 @@ const en = {
   reviewLangSection: 'Review & language',
   authorTag: 'Name',
   authorTagHint: 'This name appears beside your comments.',
+  authorTagInvalid: 'Use up to 64 characters without :, @, {, }, <, >, =, | or line breaks.',
   uiLanguage: 'Interface language',
   langSearchPlaceholder: 'Search languages…',
   langNoMatch: 'No matching language',
@@ -250,6 +251,7 @@ const zhCN: Record<MsgKey, string> = {
   reviewLangSection: '评审与语言',
   authorTag: '名字',
   authorTagHint: '这个名字会显示在你的评论旁。',
+  authorTagInvalid: '请填写不超过 64 个字符的名字，不含 :、@、{、}、<、>、=、| 或换行。',
   uiLanguage: '界面语言',
   langSearchPlaceholder: '搜索语言…',
   langNoMatch: '没有匹配的语言',
@@ -262,8 +264,9 @@ const zhCN: Record<MsgKey, string> = {
 
 const DICTIONARIES: Record<'en' | 'zh-CN', Record<MsgKey, string>> = { en, 'zh-CN': zhCN }
 
-export function useT(): (key: MsgKey) => string {
-  const lang = useConfig((s) => s.config?.uiLang) ?? 'en'
+export function useT(previewLanguage?: 'en' | 'zh-CN'): (key: MsgKey) => string {
+  const configuredLanguage = useConfig((s) => s.config?.uiLang)
+  const lang = previewLanguage ?? configuredLanguage ?? 'en'
   const dict = DICTIONARIES[lang] ?? en
   return (key) => dict[key] ?? en[key]
 }

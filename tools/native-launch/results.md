@@ -445,6 +445,32 @@ was locked; the attempt does not establish startup latency or isolate the cause 
 signal. Repeat with a visible, unlocked desktop. The metric is a document-layout readiness proxy,
 not physical first paint, and its tiny fixture differs from the memory workload above.
 
+### Reopening an edited conflict comparison — 2026-10-13
+
+At `d845cac`, the [installed Windows run](https://github.com/d4wei/mastermind/actions/runs/38366645519)
+retained Base, Local, Disk, and an edited Result after opening another file and repeating the
+original file's CLI open. A later external change left the Result intact and disabled saving.
+Explicit refresh enabled the reviewed save, whose bytes retained CRLF. The
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38366645747) also passed its
+installed-process checks. It does not exercise this interaction through a Linux webview.
+
+### Native initial setup — 2026-10-13
+
+The validation reviewer now offers Name, Interface language, and optional Translation language
+before revealing admitted documents. Separate agent suggestions remain transient; saved choices
+and fields already being edited take precedence. Confirmation saves the choices together, and
+failure retains a retryable form. The [setup contract](src/setup.md) owns persistence and protocol
+details; the [UI adapter](../../src/ui/native/README.md) owns confirmation and close handling.
+
+All 57 all-feature Rust tests and Clippy pass. The rebuilt macOS reviewer package passes 25 process
+checks, including setup-only startup, transient suggestions, explicit Original only, persisted
+completion, and unchanged document bytes. These process checks do not exercise GUI confirmation.
+Injected UI tests cover configuration-load ordering, quit during confirmation and reload, failure
+recovery, and composition guards. Windows installed GUI validation is pending the next CI run.
+
+The Mac remains locked, so this build has no new interactive macOS onboarding or Apple Pinyin
+result. The readiness harness now uses isolated completed preferences; no timing result is added.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,

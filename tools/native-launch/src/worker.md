@@ -1,9 +1,10 @@
 # Native blocking work
 
 `worker.rs` shares one process-lifetime concurrency gate across launcher admission, graphical
-admission, registry commands, document reads and writes, translation reads, preferences, and
-watcher registration. The capacity is an implementation constant. Callers await capacity before
-submitting a blocking worker; each worker owns its permit until its closure finishes or unwinds.
+admission, registry commands, document reads and writes, translation reads, preferences,
+watcher registration, and initial setup. The capacity is an implementation constant. Callers await
+capacity before submitting a blocking worker; each worker owns its permit until its closure
+finishes or unwinds.
 
 Cancelling an awaiting command or expiring the launcher response deadline does not release
 capacity held by a running operation. Tokio cannot abort a blocking operation after it starts. A

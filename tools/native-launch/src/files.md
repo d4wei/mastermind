@@ -53,3 +53,5 @@ its error does not imply rollback. The document store retains local text for rec
 Preference reads use the same byte limit as preference writes, checking one additional byte before
 JSON parsing. Oversized preferences are rejected without rewriting the file. Preference command
 failures keep their string response shape; document and admission errors use the structured shape.
+
+Initial setup and per-field saved choices are described in [`setup.md`](setup.md).

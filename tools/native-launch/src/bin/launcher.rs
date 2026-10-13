@@ -30,7 +30,7 @@ fn result(output: io::Result<std::process::Output>) -> (Vec<u8>, Vec<u8>, i32) {
                 return (output.stdout, output.stderr, code);
             }
             let mut diagnostics = output.stderr;
-            diagnostics.extend_from_slice(b"GUI command returned no valid opening response.\n");
+            diagnostics.extend_from_slice(b"GUI command returned no valid response.\n");
             diagnostics
         }
         Err(error) => format!("Launcher failed: {error}\n").into_bytes(),

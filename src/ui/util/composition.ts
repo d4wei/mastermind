@@ -5,8 +5,12 @@ export function useCompositionGuard() {
   const textareaRef = useCallback((element: HTMLTextAreaElement | null) => {
     if (!element) active.current = false
   }, [])
+  const inputRef = useCallback((element: HTMLInputElement | null) => {
+    if (!element) active.current = false
+  }, [])
   return {
     textareaRef,
+    inputRef,
     onCompositionStart: () => { active.current = true },
     onCompositionEnd: () => { active.current = false },
     onBlur: () => { active.current = false },

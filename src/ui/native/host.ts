@@ -43,9 +43,8 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     config,
     updateConfig(patch) {
       const write = preferenceWrite.catch(() => {}).then(async () => {
-        const next = { ...await config(), ...patch }
-        await invoke('write_preferences', { config: next })
-        return next
+        await invoke('write_preferences', { patch })
+        return config()
       })
       preferenceWrite = write
       return write

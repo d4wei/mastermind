@@ -7,12 +7,14 @@ mod opening;
 #[cfg(feature = "readiness-trace")]
 mod readiness;
 mod reviewer;
+mod setup;
 use tauri::{Emitter, Manager};
 mod host_process;
 mod termination;
 mod transport;
 mod worker;
 use admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
+use mastermind_launch_check::protocol::{Operation, SetupRequest};
 use std::{
     io,
     path::PathBuf,
@@ -46,7 +48,29 @@ async fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Result<Snap
         .map_err(|e| e.to_string())
 }
 
-fn request(args: Vec<std::ffi::OsString>) -> io::Result<Request> {
+fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
+    if args.first().is_some_and(|arg| arg == "setup") {
+        if args.len() != 3 || args[1] != "--suggest" {
+            return Err(io::Error::other(
+                "usage: mastermind-launch-check setup --suggest JSON_OBJECT",
+            ));
+        }
+        let raw = args[2]
+            .to_str()
+            .ok_or_else(|| io::Error::other("unsupported_argument_encoding"))?;
+        if raw.len() > MAX_FRAME {
+            return Err(io::Error::other("request_too_large"));
+        }
+        let setup = serde_json::from_str(raw)?;
+        let request = Operation::Setup(SetupRequest {
+            version: VERSION,
+            setup,
+        });
+        if serde_json::to_vec(&request)?.len() + 1 > MAX_FRAME {
+            return Err(io::Error::other("request_too_large"));
+        }
+        return Ok(request);
+    }
     if args.len() < 3 || args[0] != "open" || args[1] != "--" || args.len() - 2 > MAX_FILES {
         return Err(io::Error::other(
             "usage: mastermind-launch-check open -- FILE...",
@@ -69,10 +93,10 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Request> {
     if serde_json::to_vec(&request)?.len() + 1 > MAX_FRAME {
         return Err(io::Error::other("request_too_large"));
     }
-    Ok(request)
+    Ok(Operation::Open(request))
 }
 
-async fn launch(root: PathBuf, request: Request) -> io::Result<Response> {
+async fn launch(root: PathBuf, request: Operation) -> io::Result<Response> {
     let result = transport::exchange(&root, &request).await;
     match result {
         Ok(response) => return Ok(response),
@@ -180,6 +204,9 @@ fn main() {
             reviewer::write_document,
             reviewer::watch_document,
             reviewer::read_translation,
+            setup::setup_snapshot,
+            setup::protect_setup_fields,
+            setup::confirm_setup,
             reviewer::read_preferences,
             reviewer::write_preferences,
             reviewer::finish_close,
@@ -189,6 +216,8 @@ fn main() {
             readiness::report_readiness
         ])
         .setup(move |app| {
+            let setup = Arc::new(setup::Setup::new(reviewer::preference_path(app.handle())?));
+            app.manage(setup.clone());
             #[cfg(feature = "readiness-trace")]
             app.manage(Arc::new(readiness::Readiness::from_environment()?));
             app.manage(Arc::new(Mutex::new(reviewer::FileWatch::new(
@@ -199,7 +228,12 @@ fn main() {
                 app.set_menu(reviewer::menu(app.handle())?)?;
             }
             let runtime = tauri::async_runtime::handle();
-            runtime.spawn(transport::serve(listener, docs, app.handle().clone()));
+            runtime.spawn(transport::serve(
+                listener,
+                docs,
+                setup,
+                app.handle().clone(),
+            ));
             let handle = app.handle().clone();
             let delay = std::env::var("MM_LAUNCH_CHECK_UI_DELAY_MS")
                 .ok()
@@ -291,4 +325,29 @@ fn main() {
                 let _ = app.emit("close-requested", ());
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setup_cli_is_separate_from_open_and_preserves_explicit_null() {
+        let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
+        let Operation::Setup(request) = request(args(&[
+            "setup",
+            "--suggest",
+            "{\"authorTag\":\"Reader\",\"translationLanguage\":null}",
+        ]))
+        .unwrap() else {
+            panic!("expected setup request");
+        };
+        assert_eq!(
+            request.setup["translationLanguage"],
+            serde_json::Value::Null
+        );
+        assert!(super::request(args(&["open", "--name", "Reader", "--", "file.md"])).is_err());
+        assert!(super::request(args(&["setup", "--suggest", "[]"])).is_err());
+        assert!(super::request(args(&["setup", "--suggest", "{}", "extra"])).is_err());
+    }
 }

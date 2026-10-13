@@ -11,39 +11,41 @@ import { registerDocumentLifecycle } from './documentLifecycle'
 import { SessionView } from './SessionView'
 import { WorkspaceView } from './WorkspaceView'
 
-export function App({ home, native = false }: { home?: ReactNode; native?: boolean }) {
+export function App({ home, onboarding, native = false }: {
+  home?: ReactNode; onboarding?: ReactNode; native?: boolean
+}) {
   const load = useConfig((s) => s.load)
   const route = useRoute()
+  const awaitingNativeSetup = native && onboarding != null
   useEffect(() => {
-    void load()
-  }, [load])
+    if (awaitingNativeSetup) return
+    if (native) void load().catch(() => {})
+    else void load()
+  }, [load, native, awaitingNativeSetup])
 
   useEffect(() => native ? undefined : registerDocumentLifecycle(), [native])
 
   return (
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
       <ThemeEffects />
-      {route.kind === 'doc' && (
-        <AppFrame sessionId={route.sessionId}>
-          <SessionView key={route.sessionId} sessionId={route.sessionId} />
-        </AppFrame>
-      )}
-      {route.kind === 'workspace' && (
-        <AppFrame workspaceId={route.workspaceId} sessionId={route.sessionId}>
-          <WorkspaceView key={route.workspaceId} workspaceId={route.workspaceId} sessionId={route.sessionId} />
-        </AppFrame>
-      )}
-      {route.kind === 'home' && (home ?? <HomeView />)}
+      {onboarding ?? <>
+        {route.kind === 'doc' && (
+          <AppFrame sessionId={route.sessionId}>
+            <SessionView key={route.sessionId} sessionId={route.sessionId} />
+          </AppFrame>
+        )}
+        {route.kind === 'workspace' && (
+          <AppFrame workspaceId={route.workspaceId} sessionId={route.sessionId}>
+            <WorkspaceView key={route.workspaceId} workspaceId={route.workspaceId} sessionId={route.sessionId} />
+          </AppFrame>
+        )}
+        {route.kind === 'home' && (home ?? <HomeView />)}
+      </>}
       <GrainOverlay />
     </Tooltip.Provider>
   )
 }
 
-/**
- * The shared frame: the single left navigator (when a workspace is open OR the
- * current doc has an outline) + the routed content. The navigator is in-flow on
- * wide screens (content gets a left margin) and off-canvas on narrow ones.
- */
 function AppFrame({
   workspaceId = null,
   sessionId,

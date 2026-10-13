@@ -1,13 +1,13 @@
 ---
 status: living
-updated: 2026-10-12
+updated: 2026-10-13
 exit: the launch contract is ruled and implemented with colocated docs, or the proposal is dropped
 ---
 # Opening files from an agent
 
-Approved launch and onboarding behavior, with native transport and packaging still to validate.
+Approved launch and onboarding behavior, with native validation still in progress.
 Settled constraints live in [DECISIONS.md](../DECISIONS.md). This design does not change the current
-command; the proof of concept below precedes desktop integration.
+browser command; the experimental native reviewer precedes production host migration.
 
 ## Opening operation
 
@@ -116,6 +116,11 @@ rereads the Markdown when the person asks it to continue.
   across the launch boundary or produce an explicit unsupported-path error before opening.
 
 ## Onboarding assistance
+
+The native validation build implements this interaction. Its command and persistence contract lives
+in [native setup](../tools/native-launch/src/setup.md), and the GUI boundary lives in the
+[native reviewer adapter](../src/ui/native/README.md). Platform evidence remains in the
+[experiment results](../tools/native-launch/results.md).
 
 Opening files does not set names or language preferences. Remove the proposed `open --name` and
 language flags. The agent-facing interface should expose incomplete onboarding and accept optional

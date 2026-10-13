@@ -57,6 +57,9 @@ The Windows workflow builds this variant and runs its native unit, process, and 
 driver matching the installed WebView2 Runtime. It checks editing, autosave, external changes,
 conflicts, and window close. Driver and fixture files belong to the disposable test run.
 
+The reviewer presents [initial setup](src/setup.md) before the reader, retaining admitted files.
+Agent suggestions use the separate setup command; confirming the form saves personal choices.
+
 The reviewer has a diagnostic file selector, native guarded reads/writes, file invalidations,
 prepared-translation reads, and isolated experimental preferences. It starts no Node process or
 HTTP service. The shared document store still owns source edits, autosave, undo, and conflicts.
@@ -83,7 +86,9 @@ after the command-mode process. Wrapper failures emit the shared unknown-outcome
 diagnostics on stderr. The GUI command resolves paths against its cwd, rejects non-UTF-8
 paths explicitly, and emits one JSON result. Exit codes are
 0 for all admitted, 1 for file failures, 2 for malformed invocation/request, and 3 for unknown
-outcome. The prototype always reports incomplete onboarding; it implements no preferences UI.
+outcome. Opening reports the actual setup state when known; unreadable preferences and unknown
+outcomes report null. The separate setup operation supplies transient suggestions for human
+confirmation.
 
 On Unix, the host owns a filesystem lock for its lifetime. A private, owner-checked runtime
 directory holds that lock and a local socket. Only its holder may remove a stale socket.
@@ -109,8 +114,8 @@ No shell profile, current app config, or production command installation is chan
 ## Limits
 
 The reviewer build exercises native editing and conflicts, but does not complete the production
-validation matrix. Onboarding, full termination coverage, and
-interactive platform checks remain. See the results for what has actually been exercised.
+validation matrix. Full termination coverage and interactive platform checks remain. See the
+results for what has actually been exercised.
 Read checks detect some replacements and in-place changes; they are not a filesystem transaction.
 A read blocked in the OS can outlive the response deadline. The retained document map has no
 session-size limit. Those are reasons not to ship this experiment as a host implementation.

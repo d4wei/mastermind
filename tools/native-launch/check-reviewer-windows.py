@@ -137,11 +137,79 @@ def admit(paths, namespace, statuses):
     return response
 
 
-def check(session, path, namespace):
+def suggest_setup(fields, namespace):
+    process = subprocess.run([str(launcher_binary), 'setup', '--suggest', json.dumps(fields)],
+                             capture_output=True, text=True, encoding='utf-8', timeout=20,
+                             env=dict(os.environ, MM_LAUNCH_CHECK_ID=namespace))
+    assert process.returncode == 0, (process.stdout, process.stderr)
+    response = json.loads(process.stdout)
+    assert response['results'] == [] and response['error'] is None, response
+    return response
+
+
+def check_setup(session, path, namespace, preferences, initial):
+    assert initial['onboarding_needed'] is True, initial
+    until('admission retains files behind initial setup',
+          lambda: 'What should we call you?' in text(session, '.native-setup'))
+    assert not command(session, 'POST', '/elements',
+                       {'using': 'css selector', 'value': 'article.md-root, .cm-content'})
+    first = suggest_setup({'authorTag': 'Alex', 'uiLang': 'en',
+                           'translationLanguage': 'zh-CN'}, namespace)
+    assert first['pid'] == initial['pid'] and first['onboarding_needed'] is True, first
+    assert first['setup_results'] == dict.fromkeys(
+        ['authorTag', 'uiLang', 'translationLanguage'], 'accepted'), first
+    until('agent suggestions appear without saving preferences',
+          lambda: property_value(session, '.native-setup-name', 'value') == 'Alex' and
+          '简体中文' in text(session, '.native-setup .lang-trigger'))
+    assert not preferences.exists(), 'Unconfirmed suggestions wrote preferences'
+
+    replace_text(session, '.native-setup-name', 'Morgan')
+    click(session, '.native-setup-original')
+    repeated = admit([path], namespace, ['already_open'])
+    assert repeated['pid'] == initial['pid'] and repeated['onboarding_needed'] is True, repeated
+    until('repeat opening does not restart the edited setup form',
+          lambda: property_value(session, '.native-setup-name', 'value') == 'Morgan' and
+          attribute(session, '.native-setup-original', 'aria-pressed') == 'true')
+    replacement = suggest_setup({'authorTag': 'Replacement', 'uiLang': 'en',
+                                 'translationLanguage': 'zh-CN'}, namespace)
+    assert replacement['setup_results'] == {
+        'authorTag': 'ignored', 'uiLang': 'accepted', 'translationLanguage': 'ignored'}, replacement
+    assert property_value(session, '.native-setup-name', 'value') == 'Morgan'
+    assert attribute(session, '.native-setup-original', 'aria-pressed') == 'true'
+    assert not preferences.exists(), 'Opening or editing an unconfirmed form wrote preferences'
+
+    preferences.mkdir(parents=True)
+    click(session, '.native-setup button[type="submit"]')
+    until('failed setup save retains editable choices and a retry',
+          lambda: 'Could not complete setup' in text(session, '.native-setup [role="alert"]') and
+          property_value(session, '.native-setup-name', 'value') == 'Morgan' and
+          property_value(session, '.native-setup fieldset', 'disabled') is False)
+    preferences.rmdir()
+    click(session, '.native-setup button[type="submit"]')
+    until('confirmation saves choices and reveals the admitted file without reopening',
+          lambda: 'Original.' in text(session, 'article.md-root') and preferences.is_file())
+    saved = json.loads(preferences.read_text(encoding='utf-8'))
+    assert saved['onboardingCompleted'] is True, saved
+    assert saved['authorTag'] == 'Morgan' and saved['uiLang'] == 'en', saved
+    assert 'translationLanguage' in saved and saved['translationLanguage'] is None, saved
+    before = preferences.read_bytes()
+    final = suggest_setup({'authorTag': 'Later', 'uiLang': 'zh-CN',
+                           'translationLanguage': 'zh-CN'}, namespace)
+    assert final['onboarding_needed'] is False, final
+    assert final['setup_results'] == dict.fromkeys(
+        ['authorTag', 'uiLang', 'translationLanguage'], 'ignored'), final
+    reopened = admit([path], namespace, ['already_open'])
+    assert reopened['onboarding_needed'] is False, reopened
+    assert preferences.read_bytes() == before, 'Agent requests changed confirmed preferences'
+    assert path.read_bytes() == b'# reviewer\r\n\r\nOriginal.\r\n'
+
+
+def check(session, path, namespace, preferences):
     original = '# reviewer\r\n\r\nOriginal.\r\n'
     path.write_bytes(original.encode())
     initial = admit([path], namespace, ['opened'])
     pid = initial['pid']
+    check_setup(session, path, namespace, preferences, initial)
     until('installed reviewer renders the admitted Markdown',
           lambda: 'Original.' in text(session, 'article'))
     click(session, '.seg-btn[aria-label="Markdown"]')
@@ -339,7 +407,9 @@ with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
     documents.mkdir()
     path = documents / 'reviewer 中文.md'
     namespace = uuid.uuid4().hex
-    environment = dict(os.environ, MM_LAUNCH_CHECK_ID=namespace)
+    preferences = Path(directory) / 'preferences' / 'reviewer.json'
+    environment = dict(os.environ, MM_LAUNCH_CHECK_ID=namespace,
+                       MM_LAUNCH_CHECK_PREFERENCES=str(preferences))
     diagnostics = Path(__file__).with_name('check-reviewer-diagnostics')
     diagnostics.mkdir(exist_ok=True)
     log = open(diagnostics / 'tauri-driver.log', 'w+b')
@@ -355,7 +425,7 @@ with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
         session = response['sessionId'] if 'sessionId' in response else None
         if not session:
             raise AssertionError(('Missing WebDriver session ID', response))
-        check(session, path, namespace)
+        check(session, path, namespace, preferences)
     except BaseException:
         failed = True
         if session:

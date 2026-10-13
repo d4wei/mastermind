@@ -1,19 +1,19 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDownIcon } from '../icons'
 import { useT } from '../i18n'
+import { useCompositionGuard } from '../util/composition'
 import { langLabel, searchLanguages, type Language } from '../../shared/languages'
 
 interface Props {
   value: string
   emptyLabel?: string
   onChange: (next: string) => void
-  /** Accessible name for the field. */
   label: string
+  uiLang?: 'en' | 'zh-CN'
 }
 
 const norm = (s: string): string => s.trim().toLowerCase()
 
-/** Menu sizing: the height it wants, and the floor it won't shrink below. */
 const MENU_DESIRED = 300
 const MENU_MIN = 168
 const VIEWPORT_MARGIN = 8
@@ -29,14 +29,14 @@ interface MenuPos {
 }
 
 /** The fixed menu escapes panel overflow; retaining its DOM parent preserves outside-click handling. */
-export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
-  const t = useT()
+export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props) {
+  const t = useT(uiLang)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const composition = useCompositionGuard()
   const [pos, setPos] = useState<MenuPos | null>(null)
   const listId = useId()
 
@@ -47,7 +47,6 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
     (l) => norm(l.name) === norm(typed) || norm(l.native) === norm(typed) || norm(l.code) === norm(typed),
   )
   const showCustom = /^[A-Za-z][A-Za-z0-9_-]*$/.test(typed) && typed !== '' && !hasExact
-  // The flat option set the keyboard cursor walks: list rows, then the custom row.
   const optionCount = matches.length + (showCustom ? 1 : 0)
 
   useEffect(() => {
@@ -59,8 +58,6 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  // Anchor the fixed menu to the trigger, flipping up when there's more room
-  // above. Recomputes while the panel scrolls/resizes so it stays attached.
   useLayoutEffect(() => {
     if (!open) {
       setPos(null)
@@ -71,15 +68,9 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
       if (!el) return
       const r = el.getBoundingClientRect()
       const width = r.width
-      // Anchor the ribbon to the panel's left edge (fall back to the trigger if
-      // the panel can't be found) so it sits beside the whole SlideOver, not
-      // just this field.
       const panel = el.closest('.slide-over')?.getBoundingClientRect()
       const anchorLeft = panel ? panel.left : r.left
 
-      // Enough room to the left of the panel to fit the ribbon? If so, fly out
-      // there and grow toward whichever vertical direction has more space,
-      // staying aligned to the trigger row.
       if (anchorLeft - TRIGGER_GAP - width >= VIEWPORT_MARGIN) {
         const spaceUp = r.bottom - VIEWPORT_MARGIN
         const spaceDown = window.innerHeight - r.top - VIEWPORT_MARGIN
@@ -94,8 +85,6 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
         return
       }
 
-      // Narrow viewport: no room beside the panel — fall back to the classic
-      // flip-above/below-the-trigger placement.
       const below = window.innerHeight - r.bottom - VIEWPORT_MARGIN
       const above = r.top - VIEWPORT_MARGIN
       const flipUp = below < Math.min(MENU_DESIRED, MENU_MIN) && above > below
@@ -129,6 +118,10 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent): void {
+    if (composition.isComposing(e.nativeEvent)) {
+      e.stopPropagation()
+      return
+    }
     if (e.key === 'Escape') {
       e.stopPropagation() // don't let the SlideOver's Escape close the whole panel
       setOpen(false)
@@ -183,7 +176,10 @@ export function LangSelect({ value, onChange, label, emptyLabel }: Props) {
           }}
         >
           <input
-            ref={inputRef}
+            ref={composition.inputRef}
+            onCompositionStart={composition.onCompositionStart}
+            onCompositionEnd={composition.onCompositionEnd}
+            onBlur={composition.onBlur}
             type="text"
             className="settings-input lang-search"
             role="combobox"

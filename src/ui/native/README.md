@@ -24,14 +24,34 @@ behavior.
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.
 Polling never overlaps requests. The adapter also subscribes to native close requests. It locks
-editing while `store.prepareToClose()` waits for saves, then authorizes exit
+editing while pending setup confirmation and `store.prepareToClose()` finish, then authorizes exit
 only when no retained document has unsaved source, an active save, or a distinct comparison result.
-Failed saves keep the window and buffers available. `close.ts` coalesces repeated close requests and
-awaits native termination cancellation before unlocking the editor. Native lifecycle details live
+Failed confirmation or document saves keep the window available. `close.ts` coalesces close requests
+and awaits native termination cancellation before unlocking the editor. Native lifecycle details live
 beside the [termination adapter](../../../tools/native-launch/src/termination.md).
 The browser entry point retains its own unload prompt and localhost adapter.
 
+`NativeSetup.tsx` holds unconfirmed Name and language choices separately from saved configuration.
+The native host owns saved-field presence, transient suggestions, and completion; its
+[setup contract](../../../tools/native-launch/src/setup.md) defines the commands. Local edits are
+protected immediately while native protection is pending. Language preview does not save settings.
+Name validation uses the shared author parser so new comments retain their attribution.
+
+The reviewer stays unmounted until confirmation succeeds and saved configuration reloads. App-level
+configuration loading waits for that gate, avoiding an older load overwriting confirmed choices.
+File admission, opening controls, activation, and close handling continue during setup. Failed loading
+offers retry; a failed confirmation retains the form. Ordinary settings send only changed fields
+to the native host, leaving computed defaults distinct from explicit saved choices.
+
+Candidate Enter keeps its IME default while suppressing implicit form submission through the next
+task. The [HTML implicit-submission algorithm][implicit-submit] activates the default submit button;
+the guard must outlive a microtask. Injected event tests check the guard but do not establish native
+Apple Pinyin behavior.
+
 This entry point belongs to the [native validation build](../../../tools/native-launch/README.md),
-not a finished desktop shell. Onboarding, final navigation, and application identity remain outside
-it. Its open-file inventory polling is diagnostic. Native observations and remaining
+not a finished desktop shell. Final navigation and application identity remain outside it.
+Its open-file inventory polling is diagnostic. Native observations and remaining
 platform/lifecycle gaps live in [the results](../../../tools/native-launch/results.md).
+
+[implicit-submit]:
+  https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission

@@ -24,7 +24,9 @@ def check(name, condition):
 
 
 def invoke(root, files, cwd=None, extra=None):
-    env = dict(os.environ, MM_LAUNCH_CHECK_DIR=str(root), **(extra or {}))
+    env = dict(os.environ, MM_LAUNCH_CHECK_DIR=str(root),
+               MM_LAUNCH_CHECK_PREFERENCES=str(root.parent / (root.name + "-preferences.json")),
+               **(extra or {}))
     started = time.monotonic()
     run = subprocess.run([binary, 'open', '--', *map(str, files)], cwd=cwd, env=env,
                          capture_output=True, timeout=15)
@@ -32,6 +34,17 @@ def invoke(root, files, cwd=None, extra=None):
     if response['results']:
         owned_pids.add(response['pid'])
     return run.returncode, response, time.monotonic() - started
+
+
+def suggest(root, fields):
+    env = dict(os.environ, MM_LAUNCH_CHECK_DIR=str(root),
+               MM_LAUNCH_CHECK_PREFERENCES=str(root.parent / (root.name + '-preferences.json')))
+    run = subprocess.run([binary, 'setup', '--suggest', json.dumps(fields)], env=env,
+                         capture_output=True, timeout=15)
+    response = json.loads(run.stdout)
+    if response['error'] is None:
+        owned_pids.add(response['pid'])
+    return run.returncode, response
 
 
 def wire(root, payload):
@@ -74,6 +87,12 @@ try:
             (files / name).write_bytes(b'# source\r\n\r\nUnchanged bytes.\r\n')
         (files / 'alias.md').symlink_to(files / 'a.md')
         before = {p: p.read_bytes() for p in files.iterdir()}
+        setup_root = base / 'setup-only'
+        code, setup = suggest(setup_root, {'authorTag': 'Cold setup'})
+        check('setup starts a host independently of file admission', code == 0 and
+              setup['results'] == [] and setup['onboarding_needed'] is True and
+              setup['setup_results'] == {'authorTag': 'accepted'})
+        stop(setup['pid'])
         code, response, cold = invoke(root, ['a.md', '中文 notes.md', '-leading.md'], files)
         check('cold bundled executable / cwd / Unicode / spaces / leading hyphen',
               code == 0 and [r['status'] for r in response['results']] == ['opened'] * 3)
@@ -88,6 +107,29 @@ try:
               all(isinstance(result.get('message'), str) and result['message']
                   for result in response['results'][1:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
+        preferences = root.parent / (root.name + '-preferences.json')
+        code, setup = suggest(root, {'authorTag': 'Agent', 'uiLang': 'zh-CN',
+                                     'translationLanguage': None})
+        check('separate setup accepts valid suggestions without saving preferences',
+              code == 0 and setup['pid'] == pid and setup['onboarding_needed'] is True and
+              set(setup['setup_results'].values()) == {'accepted'} and not preferences.exists())
+        code, invalid_setup = suggest(root, {'authorTag': 'Agent', 'uiLang': None})
+        check('invalid setup values reject the whole request without saving',
+              code == 2 and invalid_setup['error'] == 'invalid_setup_field:uiLang' and
+              not preferences.exists())
+        preferences.write_text(json.dumps({'translationLanguage': None}), encoding='utf-8')
+        code, setup = suggest(root, {'authorTag': 'Agent', 'translationLanguage': 'zh-CN'})
+        check('saved Original only defeats a later agent suggestion', code == 0 and
+              setup['setup_results'] == {'authorTag': 'accepted', 'translationLanguage': 'ignored'})
+        preferences.write_text(json.dumps({'onboardingCompleted': True, 'authorTag': 'Confirmed',
+                                          'uiLang': 'en', 'translationLanguage': None}), encoding='utf-8')
+        code, completed, _ = invoke(root, [files / 'a.md'])
+        check('admission reports persisted setup completion', code == 0 and
+              completed['onboarding_needed'] is False)
+        code, setup = suggest(root, {'authorTag': 'Replacement'})
+        check('completed setup ignores agent suggestions', code == 0 and
+              setup['setup_results'] == {'authorTag': 'ignored'})
+
         invalid = wire(root, b'{"version":999,"paths":[]}\n')
         check('incompatible protocol rejected', invalid['error'] == 'incompatible_version')
         check('malformed request rejected', wire(root, b'not json\n')['error'] == 'invalid_request')
@@ -152,7 +194,7 @@ try:
             code, response, elapsed = invoke(stalled, [files / 'a.md'])
             thread.join()
         check('unresponsive peer reaches bounded unknown outcome',
-              code == 3 and 9 <= elapsed < 13)
+              code == 3 and response['onboarding_needed'] is None and 9 <= elapsed < 13)
         check('document bytes unchanged', all(p.read_bytes() == data for p, data in before.items()))
         print(json.dumps({'passed': results, 'cold_seconds': cold, 'warm_seconds': warm}, indent=2))
 finally:

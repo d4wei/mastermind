@@ -1,4 +1,6 @@
 import { useConfig, type ConfigPatch } from '../app/configStore'
+import { useState } from 'react'
+import { usableAuthorName } from '../../shared/author'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
 import { LangSelect } from './LangSelect'
@@ -100,6 +102,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const themes = useConfig((s) => s.themes)
   const browsers = useConfig((s) => s.browsers)
   const update = useConfig((s) => s.update)
+  const [invalidName, setInvalidName] = useState(false)
 
   const t = useT()
 
@@ -356,13 +359,17 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               spellCheck={false}
               autoComplete="off"
               autoCapitalize="off"
-              maxLength={32}
+              maxLength={64}
+              aria-invalid={invalidName}
               title={t('authorTagHint')}
               onBlur={(e) => {
-                const v = e.target.value.trim().replace(/^@/, '')
+                const v = usableAuthorName(e.target.value)
+                setInvalidName(v === null)
                 if (v && v !== config.authorTag) patch({ authorTag: v })
               }}
+              onChange={(event) => setInvalidName(usableAuthorName(event.target.value) === null)}
             />
+            {invalidName && <small role="alert">{t('authorTagInvalid')}</small>}
           </label>
           <div className="settings-row">
             <span>{t('uiLanguage')}</span>

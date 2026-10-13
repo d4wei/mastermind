@@ -21,6 +21,8 @@ each against a fresh endpoint and host. Python records its monotonic time immedi
 spawning the normal CLI, then stops when short polling observes the matching complete trace. It
 checks the normal admission reply independently: one newly opened document and the trace's host
 PID. Each host exits before the next trial; document bytes must remain unchanged.
+Each trial uses disposable preferences with completed setup, English controls, and Original only.
+This measures opening after initial setup and does not read or change personal native preferences.
 
 The metric is **launcher invocation to observed document-layout readiness after two frames**.
 It includes process spawn and loader work, native startup, admission, reviewer loading and mounting,
@@ -32,9 +34,8 @@ The instrumented release build and its enabled features must accompany reported 
 Hidden or occluded windows can throttle animation frames, and the OS may decline focus. Font or
 webview failures may prevent a signal. These produce a failed/deadline trial, never a timer-based
 readiness substitute. A later image or interactive control is not part of this plain-text fixture's
-readiness claim. Before running, keep the measurement window visible and set Read mode with
-Original only
-in native Settings. The harness does not change or enforce these preferences.
+readiness claim. Before running, keep the desktop unlocked and the measurement window visible, and
+set Read mode. The harness does not change or enforce the view mode stored by the webview.
 
 From the repository root, with both root and experiment dependencies installed, generate the
 reviewer assets and build the instrumented macOS release bundle:

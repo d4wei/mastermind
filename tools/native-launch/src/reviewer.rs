@@ -193,22 +193,32 @@ fn read_registered_translation(
     })
 }
 
-fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Some(path) = std::env::var_os("MM_LAUNCH_CHECK_PREFERENCES") {
+        let path = PathBuf::from(path);
+        if !path.is_absolute() {
+            return Err("invalid_preferences_path".into());
+        }
+        return Ok(path);
+    }
     let root = app.path().app_config_dir().map_err(|e| e.to_string())?;
     Ok(root.join("reviewer.json"))
 }
 
 #[tauri::command]
-pub async fn read_preferences(app: tauri::AppHandle) -> Result<Option<Value>, String> {
+pub async fn read_preferences(
+    setup: tauri::State<'_, Arc<crate::setup::Setup>>,
+) -> Result<Option<Value>, String> {
+    let setup = setup.inner().clone();
     crate::worker::blocking_work()
-        .run(move || read_preferences_file(preference_path(&app)?))
+        .run(move || setup.read_preferences())
         .await
         .map_err(|e| e.to_string())?
 }
 
 const MAX_PREFERENCE_BYTES: usize = 64 * 1024;
 
-fn read_preferences_file(path: PathBuf) -> Result<Option<Value>, String> {
+pub(crate) fn read_preferences_file(path: PathBuf) -> Result<Option<Value>, String> {
     let file = match fs::File::open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -227,14 +237,18 @@ fn read_preferences_file(path: PathBuf) -> Result<Option<Value>, String> {
 }
 
 #[tauri::command]
-pub async fn write_preferences(app: tauri::AppHandle, config: Value) -> Result<(), String> {
+pub async fn write_preferences(
+    setup: tauri::State<'_, Arc<crate::setup::Setup>>,
+    patch: Value,
+) -> Result<(), String> {
+    let setup = setup.inner().clone();
     crate::worker::blocking_work()
-        .run(move || write_preferences_file(preference_path(&app)?, config))
+        .run(move || setup.patch_preferences(patch))
         .await
         .map_err(|e| e.to_string())?
 }
 
-fn write_preferences_file(path: PathBuf, config: Value) -> Result<(), String> {
+pub(crate) fn write_preferences_file(path: PathBuf, config: Value) -> Result<(), String> {
     static WRITES: Mutex<()> = Mutex::new(());
     let _write = WRITES.lock().unwrap();
     let bytes = serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?;

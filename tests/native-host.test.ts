@@ -107,11 +107,11 @@ describe('native reviewer boundary', () => {
   })
 
   it('serializes preference patches so concurrent controls do not erase each other', async () => {
-    let saved: unknown = null
+    let saved: Record<string, unknown> | null = null
     const bridge: NativeBridge = {
       invoke: vi.fn(async (command, args) => {
         if (command === 'read_preferences') return saved
-        saved = args!.config
+        saved = { ...saved, ...args!.patch as Record<string, unknown> }
       }) as NativeBridge['invoke'],
       listen: vi.fn(),
     }
@@ -119,6 +119,9 @@ describe('native reviewer boundary', () => {
     expect(await host.config()).toEqual(DEFAULT_CONFIG)
     await Promise.all([host.updateConfig({ authorTag: 'Alex' }), host.updateConfig({ uiLang: 'zh-CN' })])
     expect(await host.config()).toMatchObject({ authorTag: 'Alex', uiLang: 'zh-CN' })
+    expect(saved).toEqual({ authorTag: 'Alex', uiLang: 'zh-CN' })
+    expect(bridge.invoke).toHaveBeenCalledWith('write_preferences', { patch: { authorTag: 'Alex' } })
+    expect(bridge.invoke).toHaveBeenCalledWith('write_preferences', { patch: { uiLang: 'zh-CN' } })
   })
 })
 

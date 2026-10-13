@@ -54,7 +54,8 @@ impl Documents {
         Response {
             version: VERSION,
             pid: std::process::id(),
-            onboarding_needed: true,
+            onboarding_needed: None,
+            setup_results: None,
             results,
             error: None,
         }

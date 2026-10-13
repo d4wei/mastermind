@@ -18,6 +18,7 @@ binary = str(Path(sys.argv[1]).resolve())
 gui_binary = str(Path(binary).with_name('mastermind-launch-check.exe'))
 results = []
 owned_pids = set()
+preference_root = None
 identity = subprocess.check_output([
     'powershell', '-NoProfile', '-Command',
     '[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value'
@@ -39,6 +40,17 @@ def check(name, condition):
     print(name, file=sys.stderr, flush=True)
 
 
+def suggest(identifier, fields):
+    env = dict(os.environ, MM_LAUNCH_CHECK_ID=identifier,
+               MM_LAUNCH_CHECK_PREFERENCES=str(preference_root / (identifier + '.json')))
+    run = subprocess.run([binary, 'setup', '--suggest', json.dumps(fields)], env=env,
+                         capture_output=True, timeout=15)
+    response = json.loads(run.stdout)
+    if response['error'] is None:
+        owned_pids.add(response['pid'])
+    return run.returncode, response
+
+
 def subsystem(path):
     data = Path(path).read_bytes()
     pe_offset = int.from_bytes(data[0x3c:0x40], 'little')
@@ -48,7 +60,9 @@ def subsystem(path):
 
 
 def invoke(identifier, files, cwd=None, extra=None):
-    env = dict(os.environ, MM_LAUNCH_CHECK_ID=identifier, **(extra or {}))
+    env = dict(os.environ, MM_LAUNCH_CHECK_ID=identifier,
+               MM_LAUNCH_CHECK_PREFERENCES=str(preference_root / (identifier + ".json")),
+               **(extra or {}))
     started = time.monotonic()
     process = subprocess.Popen([binary, 'open', '--', *map(str, files)], cwd=cwd, env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -165,14 +179,23 @@ def wait_window(pid):
 try:
     with tempfile.TemporaryDirectory(prefix='mm-launch-') as directory:
         files = Path(directory)
+        preference_root = files / "preferences"
+        preference_root.mkdir()
         check('installed GUI and console executable subsystems',
               subsystem(gui_binary) == 2 and subsystem(binary) == 3)
+        setup_identifier = uuid.uuid4().hex
+        code, setup = suggest(setup_identifier, {'authorTag': 'Cold setup'})
+        check('setup starts a host independently of file admission', code == 0 and
+              setup['results'] == [] and setup['onboarding_needed'] is True and
+              setup['setup_results'] == {'authorTag': 'accepted'})
+        stop(setup['pid'])
         graphical_id = uuid.uuid4().hex
         probe = subprocess.run(
             [sys.executable, str(Path(__file__).with_name('check-console-windows.py')), gui_binary],
             capture_output=True, encoding='utf-8', timeout=20,
             creationflags=subprocess.DETACHED_PROCESS,
-            env=dict(os.environ, MM_LAUNCH_CHECK_ID=graphical_id))
+            env=dict(os.environ, MM_LAUNCH_CHECK_ID=graphical_id,
+                     MM_LAUNCH_CHECK_PREFERENCES=str(preference_root / (graphical_id + ".json"))))
         assert probe.returncode == 0, (probe.stdout, probe.stderr)
         graphical = json.loads(probe.stdout)
         owned_pids.add(graphical['pid'])
@@ -183,7 +206,8 @@ try:
         empty = subprocess.run([binary], capture_output=True, timeout=20)
         check('empty console invocation returns JSON and invocation status',
               empty.returncode == 2 and
-              json.loads(empty.stdout)['error'] == 'invalid_invocation' and bool(empty.stderr))
+              json.loads(empty.stdout)['error'] == 'invalid_invocation' and
+              json.loads(empty.stdout)['onboarding_needed'] is None and bool(empty.stderr))
         missing_app = files / 'missing packaged app'
         missing_app.mkdir()
         isolated_launcher = missing_app / Path(binary).name
@@ -193,6 +217,7 @@ try:
         check('missing packaged GUI returns shared unknown-outcome JSON and status',
               failed_start.returncode == 3 and
               json.loads(failed_start.stdout)['error'] == 'outcome_unknown' and
+              json.loads(failed_start.stdout)['onboarding_needed'] is None and
               bool(failed_start.stderr))
         identifier = uuid.uuid4().hex
         originals = {}
@@ -218,6 +243,27 @@ try:
               all(isinstance(result.get('message'), str) and result['message']
                   for result in response['results'][2:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
+        preferences = preference_root / (identifier + '.json')
+        code, setup = suggest(identifier, {'authorTag': 'Agent', 'uiLang': 'zh-CN',
+                                           'translationLanguage': None})
+        check('separate setup suggestions are transient', code == 0 and setup['pid'] == pid and
+              set(setup['setup_results'].values()) == {'accepted'} and not preferences.exists())
+        code, invalid_setup = suggest(identifier, {'authorTag': 'Agent', 'uiLang': None})
+        check('invalid setup values reject the whole request', code == 2 and
+              invalid_setup['error'] == 'invalid_setup_field:uiLang' and not preferences.exists())
+        preferences.write_text(json.dumps({'translationLanguage': None}), encoding='utf-8')
+        code, setup = suggest(identifier, {'authorTag': 'Agent', 'translationLanguage': 'zh-CN'})
+        check('saved Original only defeats a later suggestion', code == 0 and
+              setup['setup_results'] == {'authorTag': 'accepted', 'translationLanguage': 'ignored'})
+        preferences.write_text(json.dumps({'onboardingCompleted': True, 'authorTag': 'Confirmed',
+                                          'uiLang': 'en', 'translationLanguage': None}), encoding='utf-8')
+        code, completed, _ = invoke(identifier, [files / 'a.md'])
+        check('admission reports persisted setup completion', code == 0 and
+              completed['onboarding_needed'] is False)
+        code, setup = suggest(identifier, {'authorTag': 'Replacement'})
+        check('completed setup ignores agent suggestions', code == 0 and
+              setup['setup_results'] == {'authorTag': 'ignored'})
+
         check('visible native host window', wait_window(pid))
         check('incompatible protocol rejected',
               wire(identifier, b'{"version":999,"paths":[]}\n')['error'] == 'incompatible_version')

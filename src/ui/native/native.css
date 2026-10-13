@@ -11,3 +11,27 @@
 
 .native-opening-errors { flex-basis: 100%; }
 .native-opening-errors ul { margin-block: calc(var(--space-unit) * 2); }
+
+.native-setup {
+  max-width: calc(var(--space-unit) * 120);
+  margin: calc(var(--space-unit) * 8) auto;
+  padding: calc(var(--space-unit) * 6);
+  color: var(--color-text);
+}
+.native-setup fieldset {
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 6);
+}
+.native-setup-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 2);
+}
+.native-setup-field small { color: var(--color-text-muted); }
+.native-setup-options {
+  display: flex;
+  gap: calc(var(--space-unit) * 3);
+}

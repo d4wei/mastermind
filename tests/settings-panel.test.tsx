@@ -100,3 +100,60 @@ it.each([
   expect(host.querySelector('.lang-trigger')?.getAttribute('aria-label')).toBe(labels.language)
   expect(host.textContent).toContain(labels.interfaceLanguage)
 })
+
+it.each(['Alex: Admin', 'Alex{Chen', 'Alex@Chen', 'a'.repeat(65)])(
+  'does not persist an unusable comment Name %j', (name) => {
+    act(() => root.render(<SettingsPanel onClose={() => {}} />))
+    const input = host.querySelector<HTMLInputElement>('input.settings-input')!
+    act(() => {
+      input.value = name
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    expect(update).not.toHaveBeenCalled()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    expect(host.querySelector('[role="alert"]')!.textContent).toContain('64')
+    act(() => {
+      input.value = ' @ 李 明 '
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })
+    expect(update).toHaveBeenCalledWith({ authorTag: '李 明' })
+    expect(input.getAttribute('aria-invalid')).toBe('false')
+  },
+)
+
+it.each(['active', 'native', 'legacy'] as const)(
+  'keeps language selection uncommitted during IME Enter: %s', (kind) => {
+    act(() => root.render(<SettingsPanel onClose={() => {}} />))
+    act(() => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
+    const input = host.querySelector<HTMLInputElement>('.lang-search')!
+    act(() => {
+      if (kind !== 'native') input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
+      if (kind === 'legacy') input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true,
+        isComposing: kind === 'native', keyCode: kind === 'legacy' ? 229 : 13 })
+      input.dispatchEvent(event)
+      expect(event.defaultPrevented).toBe(false)
+    })
+    expect(update).not.toHaveBeenCalled()
+    expect(host.querySelector('.lang-search')).toBe(input)
+    act(() => {
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    })
+    expect(update).toHaveBeenCalledOnce()
+    expect(host.querySelector('.lang-search')).toBeNull()
+  },
+)
+
+it('clears language-search composition when the input detaches without blur', () => {
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  act(() => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
+  const input = host.querySelector<HTMLInputElement>('.lang-search')!
+  act(() => input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
+  act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
+  expect(host.querySelector('.lang-search')).toBeNull()
+  act(() => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
+  act(() => host.querySelector('.lang-search')!.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })))
+  expect(update).toHaveBeenCalledOnce()
+})

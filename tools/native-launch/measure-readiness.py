@@ -52,8 +52,12 @@ def admitted_host_pid(response, launcher_pid, fixture):
 def trial(binary, fixture, root):
     nonce = uuid.uuid4().hex
     output = root / 'ready.json'
+    preferences = root / 'preferences.json'
+    preferences.write_text(json.dumps({'onboardingCompleted': True, 'authorTag': 'Readiness',
+                                      'uiLang': 'en', 'translationLanguage': None}), encoding='utf-8')
     config = {'nonce': nonce, 'target': str(fixture), 'output': str(output)}
     environment = dict(os.environ, MM_LAUNCH_CHECK_DIR=str(root / 'runtime'),
+                       MM_LAUNCH_CHECK_PREFERENCES=str(preferences),
                        MM_LAUNCH_CHECK_READY_TRACE=json.dumps(config))
     environment.pop('MM_LAUNCH_CHECK_UI_DELAY_MS', None)
     environment.pop('MM_LAUNCH_CHECK_DROP_REPLY', None)

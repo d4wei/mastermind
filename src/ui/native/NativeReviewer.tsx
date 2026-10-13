@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate } from '../app/route'
 import { useDoc } from '../app/store'
 import { useConfig } from '../app/configStore'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
+import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
 
 interface OpeningSnapshot {
   files: string[]
@@ -18,32 +19,63 @@ export function NativeReviewer() {
   const [openingErrors, setOpeningErrors] = useState<string[]>([])
   const [error, setError] = useState('')
   const [blocked, setBlocked] = useState(false)
+  const [setup, setSetup] = useState<SetupSnapshot | null>(null)
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
+  const [setupError, setSetupError] = useState('')
+  const [previewLanguage, setPreviewLanguage] = useState<SetupSnapshot['values']['uiLang']>()
+  const refreshSetup = useRef<() => Promise<void>>(async () => {})
+  const setupConfirmation = useRef<Promise<boolean> | null>(null)
   const id = useDoc((s) => s.sessionId)
-  const chinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
+  const configuredChinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
+  const chinese = setupRequired !== false && previewLanguage ? previewLanguage === 'zh-CN' : configuredChinese
   useEffect(() => {
     let disposed = false
     let activationRevision = 0
+    let setupRevision = -1
     let refreshing = false
     const refresh = async (): Promise<void> => {
       if (refreshing) return
       refreshing = true
       try {
-        const snapshot = await nativeBridge.invoke<OpeningSnapshot>('snapshot')
+        const [opening, onboarding] = await Promise.allSettled([
+          nativeBridge.invoke<OpeningSnapshot>('snapshot'),
+          nativeBridge.invoke<SetupSnapshot>('setup_snapshot', {
+            uiLangDefault: systemInterfaceLanguage(navigator.languages),
+          }),
+        ])
         if (disposed) return
-        setFiles(snapshot.files)
-        setOpeningErrors(snapshot.opening_errors)
-        if (snapshot.activation_revision > activationRevision) {
-          activationRevision = snapshot.activation_revision
-          if (snapshot.active_id !== null) navigate(`/d/${snapshot.active_id}`)
+        if (opening.status === 'fulfilled') {
+          const snapshot = opening.value
+          setFiles(snapshot.files)
+          setOpeningErrors(snapshot.opening_errors)
+          if (snapshot.activation_revision > activationRevision) {
+            activationRevision = snapshot.activation_revision
+            if (snapshot.active_id !== null) navigate(`/d/${snapshot.active_id}`)
+          }
+        } else setError(String(opening.reason))
+        if (onboarding.status === 'fulfilled') {
+          setSetupError('')
+          if (onboarding.value.revision >= setupRevision) {
+            setupRevision = onboarding.value.revision
+            setSetup(onboarding.value)
+            setSetupRequired((required) => required ?? !onboarding.value.completed)
+          }
+        } else {
+          setSetupError(String(onboarding.reason))
         }
       } catch (error) { if (!disposed) setError(String(error)) }
       finally { refreshing = false }
     }
+    refreshSetup.current = refresh
     const revalidate = (): void => { useDoc.getState().notifyDiskChange(0) }
     window.addEventListener('focus', revalidate)
     void refresh()
     const timer = setInterval(() => { void refresh() }, 500)
-    const close = createCloseHandler({ prepareToClose: () => useDoc.getState().prepareToClose() },
+    const close = createCloseHandler({ prepareToClose: async () => {
+      const confirmation = setupConfirmation.current
+      if (confirmation && !await confirmation) return false
+      return useDoc.getState().prepareToClose()
+    } },
       () => nativeBridge.invoke('finish_close'),
       (locked) => { document.getElementById('root')!.inert = locked },
       async () => {
@@ -82,8 +114,25 @@ export function NativeReviewer() {
         </button>
       </div>}
       {error && <span role="alert">{error}</span>}
+      {setupError && <span role="alert">{setupError}
+        <button type="button" onClick={() => { void refreshSetup.current() }}>
+          {chinese ? '重试加载设置' : 'Retry loading setup'}
+        </button>
+      </span>}
     </div>
-    <App native home={<div className="center-note"><h1>mastermind</h1>
+    <App native onboarding={setupRequired === false ? undefined : setup
+      ? <NativeSetup snapshot={setup} onLanguagePreview={setPreviewLanguage}
+        onConfirmationStarted={(completion) => {
+          setupConfirmation.current = completion
+          void completion.then(() => {
+            if (setupConfirmation.current === completion) setupConfirmation.current = null
+          })
+        }} onConfirmed={(confirmed) => {
+        setSetup(confirmed)
+        setSetupRequired(false)
+      }} /> : <div className="center-note" role="status">
+        {chinese ? '正在加载设置…' : 'Loading setup…'}
+      </div>} home={<div className="center-note"><h1>mastermind</h1>
       <p>{chinese ? '打开文件以开始审阅' : 'Open a file to start reviewing'}</p>
       <button type="button" onClick={chooseFiles}>{openLabel}</button></div>} />
   </>
