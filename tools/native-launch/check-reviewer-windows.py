@@ -4,6 +4,7 @@ from ctypes import wintypes
 import base64
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -171,9 +172,57 @@ def check(session, path, namespace):
     until('autosave keeps CRLF and writes multilingual source',
           lambda: path.read_bytes() == edited.replace('\n', '\r\n').encode(), 20)
 
+    append_keys = '\ue009\ue010\ue000X'
+    command(session, 'POST', f'/element/{element(session, ".cm-content")}/value',
+            {'text': append_keys, 'value': list(append_keys)})
+    appended = edited + 'X'
+    until('single source history edit reaches disk',
+          lambda: path.read_bytes() == appended.replace('\n', '\r\n').encode(), 20)
+    admit([first], namespace, ['already_open'])
+    until('source undo check switches to another document',
+          lambda: 'First successful request file.' in editor(session))
+    admit([path], namespace, ['already_open'])
+    until('source undo check restores the appended document',
+          lambda: editor(session).endswith('X'))
+    target = element(session, '.cm-content')
+    undo_keys = '\ue009z\ue000'
+    command(session, 'POST', f'/element/{target}/value',
+            {'text': undo_keys, 'value': list(undo_keys)})
+    until('source undo survives a switch away and repeat open',
+          lambda: not editor(session).endswith('X') and
+          path.read_bytes() == edited.replace('\n', '\r\n').encode(), 20)
+    redo_keys = '\ue009\ue008z\ue000'
+    command(session, 'POST', f'/element/{element(session, ".cm-content")}/value',
+            {'text': redo_keys, 'value': list(redo_keys)})
+    until('source redo restores the single edit after switching',
+          lambda: editor(session).endswith('X') and
+          path.read_bytes() == appended.replace('\n', '\r\n').encode(), 20)
+    command(session, 'POST', f'/element/{element(session, ".cm-content")}/value',
+            {'text': undo_keys, 'value': list(undo_keys)})
+    until('source history check restores the original edited bytes',
+          lambda: not editor(session).endswith('X') and
+          path.read_bytes() == edited.replace('\n', '\r\n').encode(), 20)
+
     disk = '# reviewer\r\n\r\nExternal clean edit.\r\n'
     path.write_bytes(disk.encode())
     until('clean external change reloads the editor',
+          lambda: 'External clean edit.' in editor(session), 20)
+
+    retired_parent = path.parent.with_name('documents-retired')
+    replacement_parent = path.parent.with_name('documents-replacement')
+    shutil.copytree(path.parent, replacement_parent)
+    replacement = '# reviewer\r\n\r\nReplaced parent directory.\r\n'
+    (replacement_parent / path.name).write_bytes(replacement.encode())
+    path.parent.rename(retired_parent)
+    replacement_parent.rename(path.parent)
+    until('parent-directory replacement reloads the clean source without navigation',
+          lambda: 'Replaced parent directory.' in editor(session), 20)
+    later = '# reviewer\r\n\r\nLater edit in replaced parent.\r\n'
+    path.write_bytes(later.encode())
+    until('later edits in the replaced parent remain observable without focus changes',
+          lambda: 'Later edit in replaced parent.' in editor(session), 20)
+    path.write_bytes(disk.encode())
+    until('parent replacement check restores the clean source for conflict checks',
           lambda: 'External clean edit.' in editor(session), 20)
 
     path.chmod(0o444)
@@ -245,7 +294,9 @@ def capture_diagnostics(session, path, directory):
 
 
 with tempfile.TemporaryDirectory(prefix='mm-reviewer-webdriver-') as directory:
-    path = Path(directory) / 'reviewer 中文.md'
+    documents = Path(directory) / 'documents'
+    documents.mkdir()
+    path = documents / 'reviewer 中文.md'
     namespace = uuid.uuid4().hex
     environment = dict(os.environ, MM_LAUNCH_CHECK_ID=namespace)
     diagnostics = Path(__file__).with_name('check-reviewer-diagnostics')
