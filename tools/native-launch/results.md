@@ -3,8 +3,8 @@
 The packaged macOS experiment and installed Windows experiment pass their launch checks. This
 supports continuing with Tauri. Packaged macOS checks and installed Windows WebDriver checks now
 exercise native editing, autosave, external changes, conflict recovery, and save-aware close.
-The new Windows GUI/console executable layout awaits installed-package validation. Interactive
-Windows input checks remain outstanding.
+The Windows GUI/console executable layout passes installed-package validation. Interactive Windows
+input checks remain outstanding.
 
 ## Environment and reproduction
 
@@ -91,7 +91,7 @@ There are three different questions:
   warns that production Windows GUI apps cannot write to the invoking console by default and links
   a workaround. Our installed console executable passes captured-output and exit-status tests;
   its spawned GUI child has no console. The experiment now separates the console launcher from the
-  GUI executable; the updated installed-package checks remain pending.
+  GUI executable; the updated installed-package checks pass in the run recorded below.
 - **Endpoint permissions differ by OS.** Windows named pipes have
   [access-control rules][pipe-security] that differ from Unix socket-directory permissions. Our
   implementation restricts access and checks the server's user; a unique pipe name alone would not
@@ -244,9 +244,10 @@ an explicit integration-test budget with all assertions retained. This reviewer 
 12.77 MiB, a single observation rather than a performance comparison.
 
 The Windows WebDriver script now checks first-success selection, inventory order, repeated opening,
-and retaining unsaved source across a switch away and repeat-open request. Its updated run is still
-pending. Actual drag-and-drop gestures, multi-selection in native pickers, and Windows dialogs have
-not yet been exercised. Implementation details live in [native opening](src/opening.md).
+and retaining unsaved source across a switch away and repeat-open request. Its updated run passed in
+the Windows validation recorded below. Actual drag-and-drop gestures, multi-selection in native
+pickers, and Windows dialogs have not yet been exercised. Implementation details live in
+[native opening](src/opening.md).
 
 ### macOS comments and translated review — 2026-10-12
 
@@ -274,8 +275,11 @@ probe the app for an attached console, and then open a file through the console 
 same host. A copied launcher without its GUI sibling must return structured unknown-outcome JSON
 and status 3. Existing cold/warm, concurrency, captured-output EOF, and lost-response checks now run
 through the companion. The WebDriver harness explicitly decodes Rust JSON as UTF-8, avoiding the
-Windows locale decoder's corruption of Chinese paths. These are implementation and test changes;
-their installed Windows run is pending, so console-free graphical startup is not yet an observation.
+Windows locale decoder's corruption of Chinese paths. The corrected
+[installed Windows run](https://github.com/d4wei/mastermind/actions/runs/38356505444) at `45b9612`
+passed these checks, other-user endpoint denial, and the full installed reviewer WebDriver sequence.
+Console-free graphical startup is observed on that runner; ordinary desktop installation and human
+input remain separate checks.
 
 The layout follows the documented Windows subsystem distinction. Runtime console attachment cannot
 make a GUI executable block an interactive shell. The newer detached-console manifest policy
@@ -286,9 +290,10 @@ secondary Cargo binaries; its NSIS bundler installs them beside the primary GUI 
 
 ### Linux installed package — 2026-10-12
 
-The [Ubuntu run](https://github.com/d4wei/mastermind/actions/runs/38355573893) built and installed the
+The [Ubuntu run](https://github.com/d4wei/mastermind/actions/runs/38355573893) built and installed
+the
 reviewer Debian package, passed native tests and Clippy, and passed the Unix process checks against
-the installed executable under Xvfb and D-Bus. Package inventory and process observations are retained
+the installed executable under Xvfb and D-Bus. Package inventory and process observations remain
 as workflow artifacts. This establishes installed-process behavior on that runner, not interactive
 Linux review or coverage of other distributions.
 
@@ -300,13 +305,22 @@ disk assertions checked the exact CriticMarkup and retained CRLF.
 
 CodeMirror state now survives document and mode switches when the retained source and revision
 match. Regression tests exercise real undo, redo, selection, external invalidation, and stale
-callbacks. All 421 application tests, both typechecks, and the browser build pass. Packaged editor
-history validation is pending.
+callbacks. All 421 application tests, both typechecks, and the browser build pass. In the rebuilt
+macOS bundle, automation edited file A, switched to file B, reopened A through the launcher, and
+pressed Cmd+Z. Disk assertions checked that A returned to its original CRLF bytes and
+B stayed unchanged.
 
 The first GUI/console Windows run built successfully but its console probe failed: the helper had
 its own windowless console, which caused an access-denied result when attaching to the target. The
 probe now detaches explicitly and checks a known windowless-console positive control before checking
-the GUI. Installed Windows results for this correction remain pending.
+the GUI. The corrected installed Windows run passed, including that positive control.
+
+### Parent-directory replacement — 2026-10-12
+
+In the packaged macOS reviewer, a clean open document updated after its parent directory was renamed
+away and a new directory and file were created at the original path. A subsequent edit inside the
+replacement directory also updated the view, without navigation or focus changes. This checks the
+observed macOS watcher behavior; Windows and Linux parent replacement still need their own checks.
 
 ### Production host and distribution
 
@@ -319,7 +333,8 @@ replacement and unusual filesystems remains open.
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
 installation, moved bundles, macOS installation/notarization, interactive
 Windows installation, and onboarding were not tested. Broader preference controls and translation
-refresh interactions still need verification beyond the packaged macOS checks above. Linux webview interaction
+refresh interactions still need verification beyond the packaged macOS checks above. Linux webview
+interaction
 remains outstanding. Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
 

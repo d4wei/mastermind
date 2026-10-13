@@ -38,7 +38,8 @@ no-database invariant, or the option is dropped.
 
 **Gap.** The [launch design](docs/agent-launch.md) settles admission and onboarding behavior. Native
 host integration still needs native termination validation, production file-safety checks,
-and a Windows graphical entry point without a console. Linux validation remains lower priority. The
+and broader native input checks. Windows graphical startup and Linux installed-process validation
+pass; Linux webview interaction remains lower priority. The
 [native experiment](tools/native-launch/results.md) records platform evidence and remaining gaps.
 
 **Exit:** native launch is validated and the design graduates into implementation or is revised
@@ -53,12 +54,13 @@ that does not choose a repo-settings mechanism.
 
 **Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 
-## 2026-10-10 — Package and CLI identity
+## 2026-10-10 — Package and CLI identity (updated 2026-10-12)
 
 **Open question.** This repository retains the package name `mastermind-md`, the `mastermind`
 command, and `~/.config/mastermind` configuration path from
 [Jingquank/Mastermind](https://github.com/Jingquank/Mastermind). Installing both versions creates
-collisions on all three.
+collisions on all three. Distribution identity is deliberately deferred while native validation
+continues; the experimental host names are not production choices.
 
 **Exit:** a ruling on the name, applied to `package.json`, the bin, and the config directory.
 
