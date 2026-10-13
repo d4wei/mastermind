@@ -1,3 +1,5 @@
+import type { Node as MarkdownNode, Parent } from 'unist'
+import { parseMarkdown } from '../../../shared/markdown/processor'
 import type { CriticSpan, Range as SourceRange } from '../../../shared/critic/types'
 import { codeRanges } from '../../../shared/markdown/exclusions'
 import type { TextEdit } from '../../../shared/types'
@@ -86,12 +88,86 @@ function splitsOpaqueSyntax(from: number, to: number, opaque: readonly SourceRan
     (r.start < from && from < r.end) || (r.start < to && to < r.end))
 }
 
-/**
- * One block-bounded DOM range → source offsets. Fast path through data-ps with a
- * slice-equality invariant; fallback to an unambiguous substring search within
- * the containing block; refusal otherwise. Never guesses on a mismatch. Assumes
- * the range stays inside `block` (callers split cross-block selections first).
- */
+const INLINE_FORMAT_TYPES: Record<string, string> = {
+  STRONG: 'strong', EM: 'emphasis', DEL: 'delete', A: 'link', CODE: 'inlineCode',
+}
+
+function comparePoints(first: Range, firstEnd: boolean, second: Range, secondEnd: boolean): number {
+  const a = first.cloneRange()
+  const b = second.cloneRange()
+  a.collapse(!firstEnd)
+  b.collapse(!secondEnd)
+  return a.compareBoundaryPoints(Range.START_TO_START, b)
+}
+
+function inlineText(node: MarkdownNode): string | null {
+  if (node.type === 'text' || node.type === 'inlineCode') return (node as MarkdownNode & { value: string }).value
+  if (!Object.values(INLINE_FORMAT_TYPES).includes(node.type)) return null
+  const values = (node as Parent).children.map(inlineText)
+  return values.some((value) => value === null) ? null : values.join('')
+}
+
+/** Fully selected positioned wrappers account for syntax absent from the rendered text. */
+function mapFormattedSelection(range: Range, block: HTMLElement, source: string): SelResult | null {
+  const formats = Array.from(block.querySelectorAll<HTMLElement>('strong[data-ps],em[data-ps],del[data-ps],a[data-ps],code.md-inline-code[data-ps]'))
+  if (!formats.some((element) => range.intersectsNode(element))) return null
+  const positioned = new Map<string, MarkdownNode>()
+  const visitMarkdown = (node: MarkdownNode): void => {
+    const from = node.position?.start.offset
+    const to = node.position?.end.offset
+    if (from !== undefined && to !== undefined) positioned.set(`${node.type}:${from}:${to}`, node)
+    const children = (node as Parent).children
+    if (children) children.forEach(visitMarkdown)
+  }
+  visitMarkdown(parseMarkdown(source))
+  const pieces: { from: number; to: number; rendered: string }[] = []
+  const visitDom = (node: Node): boolean => {
+    const content = block.ownerDocument.createRange()
+    content.selectNodeContents(node)
+    const start = normalizePoint(content.startContainer, content.startOffset)
+    const end = normalizePoint(content.endContainer, content.endOffset)
+    content.setStart(start.node, start.offset)
+    content.setEnd(end.node, end.offset)
+    if (comparePoints(range, false, content, true) >= 0 ||
+        comparePoints(range, true, content, false) <= 0) return true
+    if (node instanceof HTMLElement && formats.includes(node)) {
+      const complete = comparePoints(range, false, content, false) <= 0 &&
+        comparePoints(range, true, content, true) >= 0
+      if (complete) {
+        const from = Number(node.dataset.ps)
+        const to = Number(node.dataset.pe)
+        const markdown = positioned.get(`${INLINE_FORMAT_TYPES[node.tagName]}:${from}:${to}`)
+        if (!markdown || inlineText(markdown) !== node.textContent) return false
+        pieces.push({ from, to, rendered: node.textContent ?? '' })
+        return true
+      }
+      // Crossing a partial wrapper would strand its opening or closing syntax outside the mark.
+      if (node.tagName === 'CODE' || comparePoints(range, false, content, false) < 0 ||
+          comparePoints(range, true, content, true) > 0) return false
+    }
+    if (node.nodeType === Node.TEXT_NODE) {
+      const selected = content.cloneRange()
+      if (comparePoints(range, false, content, false) > 0) selected.setStart(range.startContainer, range.startOffset)
+      if (comparePoints(range, true, content, true) < 0) selected.setEnd(range.endContainer, range.endOffset)
+      const from = pointToOffset(selected.startContainer, selected.startOffset)
+      const to = pointToOffset(selected.endContainer, selected.endOffset)
+      const rendered = selected.toString()
+      if (from === null || to === null || source.slice(from, to) !== rendered) return false
+      pieces.push({ from, to, rendered })
+      return true
+    }
+    return Array.from(node.childNodes).every(visitDom)
+  }
+  if (!visitDom(block) || !pieces.length || pieces.map((piece) => piece.rendered).join('') !== range.toString()) {
+    return { error: 'unmapped' }
+  }
+  // Only AST-verified complete wrappers may bridge hidden Markdown syntax; other source gaps refuse.
+  if (pieces.some((piece, index) => index > 0 && pieces[index - 1]!.to !== piece.from)) return { error: 'unmapped' }
+  const from = pieces[0]!.from
+  const to = pieces.at(-1)!.to
+  return { from, to, text: source.slice(from, to) }
+}
+
 function mapWithinBlock(
   range: Range, block: HTMLElement, source: string, opaque: readonly SourceRange[],
 ): SelResult {
@@ -106,6 +182,11 @@ function mapWithinBlock(
 
   const valid = from !== null && to !== null && to > from && source.slice(from, to) === selectedText
   if (!valid) {
+    const formatted = mapFormattedSelection(range, block, source)
+    if (formatted) {
+      if ('error' in formatted || splitsOpaqueSyntax(formatted.from, formatted.to, opaque)) return { error: 'unmapped' }
+      return formatted
+    }
     const bps = Number(block.dataset.ps)
     const bpe = Number(block.dataset.pe)
     if (!Number.isFinite(bps) || !Number.isFinite(bpe)) return { error: 'unmapped' }

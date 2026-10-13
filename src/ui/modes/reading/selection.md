@@ -5,6 +5,19 @@ renderer's `data-ps`/`data-pe` offsets when text matches, otherwise an unambiguo
 the containing block. Unmappable blocks are skipped. Multi-block selections split at block and
 existing-mark boundaries; comments anchor to the first remaining range.
 
+Selections that cross complete emphasis, strong, strikethrough, link, or inline-code wrappers retain
+those wrappers' exact Markdown source, rather than comparing their syntax with plain rendered text.
+The DOM positions must match nodes from the existing Markdown parser, and each complete wrapper's
+rendered text must match its parsed text. Outside those wrappers, selected text maps to exact source
+slices and the slices must be contiguous: unaccounted source gaps are refused. Reference links and
+other unsupported rendered structures do not become guessed source ranges.
+
+A selection confined to text within formatting keeps its existing exact text range. A selection
+that crosses only part of a formatting wrapper is refused, so a mark cannot strand an opening or
+closing delimiter. Splitting those partial selections into several ranges is deferred. Formatted
+selections containing an existing review mark may also be refused when its hidden syntax prevents
+an exact mapping; the plain-text mark-splitting behavior remains available.
+
 A complete inline-code selection includes the source backticks in its range. CriticMarkup wraps
 that range, so the anchor and comment delimiters stay outside code. Rendered code may normalize
 padding or line breaks; the source range retains those original bytes. Partial code selections
@@ -21,3 +34,6 @@ Block actions derive a leaf block's content from its inline descendants, preserv
 syntax and excluding structural prefixes and nested blocks. They split around existing marks and
 omit whitespace-only gaps. `tests/inline-code-selection.test.tsx` exercises the real renderer,
 selection mapping, comment/deletion edits, reparsing, and exact accept/reject splices together.
+
+`tests/formatted-selection.test.tsx` checks complete and partial formatted selections against the
+real renderer, reparsing, and exact deletion acceptance/rejection, including retained CRLF.
