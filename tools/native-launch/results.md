@@ -447,7 +447,8 @@ not physical first paint, and its tiny fixture differs from the memory workload 
 
 ### Reopening an edited conflict comparison — 2026-10-13
 
-At `d845cac`, the [installed Windows run](https://github.com/d4wei/mastermind/actions/runs/38366645519)
+At `d845cac`, the
+[installed Windows run](https://github.com/d4wei/mastermind/actions/runs/38366645519)
 retained Base, Local, Disk, and an edited Result after opening another file and repeating the
 original file's CLI open. A later external change left the Result intact and disabled saving.
 Explicit refresh enabled the reviewed save, whose bytes retained CRLF. The
@@ -462,11 +463,21 @@ and fields already being edited take precedence. Confirmation saves the choices 
 failure retains a retryable form. The [setup contract](src/setup.md) owns persistence and protocol
 details; the [UI adapter](../../src/ui/native/README.md) owns confirmation and close handling.
 
-All 57 all-feature Rust tests and Clippy pass. The rebuilt macOS reviewer package passes 25 process
+All 527 application tests, both typechecks, 57 all-feature Rust tests, and Clippy pass. Browser and
+native builds pass. The rebuilt macOS reviewer package passes 25 process
 checks, including setup-only startup, transient suggestions, explicit Original only, persisted
 completion, and unchanged document bytes. These process checks do not exercise GUI confirmation.
 Injected UI tests cover configuration-load ordering, quit during confirmation and reload, failure
-recovery, and composition guards. Windows installed GUI validation is pending the next CI run.
+recovery, and composition guards.
+
+At `bcc376f`, the
+[Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38369645059)
+passed transient suggestions, human-edit protection, repeat opening during setup, a failed
+confirmation followed by retry, and revealing the admitted file without reopening. Confirmed
+choices stayed unchanged after later agent suggestions. The existing source-editing, conflict,
+shutdown, and other-user endpoint checks also passed. The
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38369644778) passed installed
+process checks; it does not exercise the setup form through a Linux webview.
 
 The Mac remains locked, so this build has no new interactive macOS onboarding or Apple Pinyin
 result. The readiness harness now uses isolated completed preferences; no timing result is added.
@@ -481,8 +492,9 @@ replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
 installation, moved bundles, macOS installation/notarization, interactive
-Windows installation, and onboarding were not tested. Broader preference controls and translation
-refresh interactions still need verification beyond the packaged macOS checks above. Linux webview
+Windows installation, and macOS GUI onboarding were not tested. Broader preference controls and
+translation refresh interactions still need verification beyond the packaged macOS checks above.
+Linux webview
 interaction
 remains outstanding. Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
