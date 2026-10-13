@@ -70,7 +70,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         const naturalTop = el ? el.getBoundingClientRect().top - docRect.top : 0
         const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd).slice(0, 80) : ''
         let key = threadKey(thread, anchorText)
-        const dup = seen.get(key) ?? 0 // disambiguate identical threads so keys stay unique
+        const dup = seen.get(key) ?? 0
         seen.set(key, dup + 1)
         if (dup) key = `${key}#${dup}`
         next.push({ key, spanIndex, naturalTop, top: naturalTop, anchorText, thread })
@@ -113,11 +113,10 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     }
 
     measure()
-    // second pass once cards have real heights
+    // Initial measurements create the cards; measure again after their DOM is committed.
     const raf = requestAnimationFrame(measure)
     window.addEventListener('resize', measure)
-    // type-metric changes (font size / line height / width sliders) move
-    // anchors without a source change — track the document's real size
+    // Font and width changes move anchors without changing source.
     const ro = new ResizeObserver(() => measure())
     ro.observe(doc)
     return () => {
@@ -173,14 +172,8 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             className={`rail-card${isActive ? ' active' : ''}`}
             style={{ top: card.top, '--enter-delay': `${Math.min(i, 5) * 55}ms` } as CSSProperties}
             onClick={() => onActivate(card.spanIndex)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
-                e.preventDefault()
-                onActivate(card.spanIndex)
-              }
-            }}
+            role="group"
+            onFocus={() => onActivate(card.spanIndex)}
           >
             {card.thread.anchor && <div className="rail-card-anchor">“{card.anchorText}”</div>}
             {card.thread.comments.map((c, i) => (

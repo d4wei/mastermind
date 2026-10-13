@@ -82,10 +82,16 @@ it('resolves the complete thread into the archive and undo restores exact bytes'
   expect(store.getState().source).toBe(source)
 })
 
-it('keyboard activation on the card does not intercept a focused Delete button', () => {
+it('keyboard focus activates the anchor without making the card a button', () => {
   render('{>>@Da Wei: note<<}')
   const button = host.querySelector<HTMLButtonElement>('.rail-delete')!
-  button.focus()
+  const card = host.querySelector<HTMLElement>('.rail-card')!
+  expect(card.getAttribute('role')).toBe('group')
+  expect(card.hasAttribute('tabindex')).toBe(false)
+  expect(host.querySelector('[role="button"] button')).toBeNull()
+  act(() => button.focus())
+  expect(activate).toHaveBeenCalledWith(0)
+  activate.mockClear()
   act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
   expect(activate).not.toHaveBeenCalled()
   click('Delete comment')
@@ -99,4 +105,48 @@ it('refuses resolution when an unterminated tail would hide the archive', () => 
   expect(store.getState().source).toBe(source)
   expect(edit).not.toHaveBeenCalled()
   expect(host.querySelector('[role="alert"]')!.textContent).toContain('unterminated')
+})
+
+it('each thread control remains focusable and activates its own anchor', () => {
+  const source = '{==first==}{>>@Da Wei: one<<} {==second==}{>>@reviewer: two<<}'
+  render(source)
+  const analysis = analyzeMarkdown(source)
+  const threads = analysis.items.filter((item) => item.type === 'thread')
+  const cards = host.querySelectorAll('.rail-card')
+  cards.forEach((card, index) => {
+    const anchor = threads[index]!.anchor!
+    const spanIndex = analysis.spans.indexOf(anchor)
+    const controls = card.querySelectorAll<HTMLButtonElement>('button')
+    expect(Array.from(controls, (control) => control.textContent)).toEqual([
+      'Delete comment', 'Reply', 'Resolve',
+    ])
+    controls.forEach((control) => {
+      expect(control.closest('[role="button"]')).toBeNull()
+      act(() => control.focus())
+      expect(document.activeElement).toBe(control)
+      expect(activate).toHaveBeenLastCalledWith(spanIndex)
+    })
+  })
+  expect(edit).not.toHaveBeenCalled()
+})
+
+it('reply textarea focus preserves activation and keyboard submission still edits the file', () => {
+  const source = '{==context==}{>>@Da Wei: question<<}'
+  render(source)
+  click('Reply')
+  const textarea = host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!
+  expect(textarea.closest('[role="button"]')).toBeNull()
+  expect(document.activeElement).toBe(textarea)
+  expect(activate).toHaveBeenLastCalledWith(0)
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    setter.call(textarea, 'Answer 中文')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(textarea.value).toBe('Answer 中文')
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'Enter', ctrlKey: true, bubbles: true,
+  })))
+  expect(store.getState().source).toBe(source + '{>>@reviewer: Answer 中文<<}')
+  expect(edit).toHaveBeenCalledTimes(1)
 })
