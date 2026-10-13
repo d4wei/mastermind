@@ -171,11 +171,13 @@ try:
         probe = subprocess.run(
             [sys.executable, str(Path(__file__).with_name('check-console-windows.py')), gui_binary],
             capture_output=True, encoding='utf-8', timeout=20,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=subprocess.DETACHED_PROCESS,
             env=dict(os.environ, MM_LAUNCH_CHECK_ID=graphical_id))
         assert probe.returncode == 0, (probe.stdout, probe.stderr)
         graphical = json.loads(probe.stdout)
         owned_pids.add(graphical['pid'])
+        check('console probe detects a known hidden-console process',
+              graphical['hidden_console_control_detected'])
         check('ordinary graphical startup has a visible window and no attached console',
               graphical['visible_window'] and not graphical['console'])
         empty = subprocess.run([binary], capture_output=True, timeout=20)

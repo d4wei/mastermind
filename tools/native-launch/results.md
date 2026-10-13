@@ -284,6 +284,30 @@ requires Windows 11 24H2 or Windows Server 2025, outside the current Server 2022
 and [Tauri's CLI guidance](https://v2.tauri.app/plugin/cli/). The pinned Tauri CLI detects enabled
 secondary Cargo binaries; its NSIS bundler installs them beside the primary GUI executable.
 
+### Linux installed package — 2026-10-12
+
+The [Ubuntu run](https://github.com/d4wei/mastermind/actions/runs/38355573893) built and installed the
+reviewer Debian package, passed native tests and Clippy, and passed the Unix process checks against
+the installed executable under Xvfb and D-Bus. Package inventory and process observations are retained
+as workflow artifacts. This establishes installed-process behavior on that runner, not interactive
+Linux review or coverage of other distributions.
+
+### Comment controls and editor history — 2026-10-12
+
+The packaged macOS accessibility tree now exposes individual comment actions and the reply input.
+The previous outer button role hid those nested controls. Desktop automation submitted a reply;
+disk assertions checked the exact CriticMarkup and retained CRLF.
+
+CodeMirror state now survives document and mode switches when the retained source and revision
+match. Regression tests exercise real undo, redo, selection, external invalidation, and stale
+callbacks. All 421 application tests, both typechecks, and the browser build pass. Packaged editor
+history validation is pending.
+
+The first GUI/console Windows run built successfully but its console probe failed: the helper had
+its own windowless console, which caused an access-denied result when attaching to the target. The
+probe now detaches explicitly and checks a known windowless-console positive control before checking
+the GUI. Installed Windows results for this correction remain pending.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
@@ -295,7 +319,7 @@ replacement and unusual filesystems remains open.
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
 installation, moved bundles, macOS installation/notarization, interactive
 Windows installation, and onboarding were not tested. Broader preference controls and translation
-refresh interactions still need verification beyond the packaged macOS checks above. Linux execution
+refresh interactions still need verification beyond the packaged macOS checks above. Linux webview interaction
 remains outstanding. Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
 
