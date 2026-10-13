@@ -13,7 +13,8 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     try { return await bridge.invoke<T>(command, args) }
     catch (error) {
       if (error && typeof error === 'object' && 'status' in error && 'error' in error) {
-        throw new ApiError(Number(error.status), String(error.error), error)
+        const message = 'message' in error ? error.message : error.error
+        throw new ApiError(Number(error.status), String(message), error)
       }
       throw error
     }

@@ -328,7 +328,8 @@ The native adapter now periodically revalidates the active document even after s
 registration; events still invalidate immediately. Fake-timer tests check silent-watch recovery and
 cleanup after delayed registration or failure. All 425 application tests and both typechecks pass.
 The [corrected Windows run](https://github.com/d4wei/mastermind/actions/runs/38358538986) at
-`ed4c156` passed both replacement and later-edit checks, then all existing conflict and close checks.
+`ed4c156` passed both replacement and later-edit checks, then the existing conflict and close
+checks.
 Its native suite passed 32 tests and Clippy. The same commit's
 [Linux package run](https://github.com/d4wei/mastermind/actions/runs/38358538970) also passed;
 Linux parent-replacement interaction remains untested.
@@ -337,7 +338,8 @@ Periodic checks now skip while the same document has a native read in flight, al
 to settle. Other documents' reads do not suppress the active document's polling, and native events
 remain immediate. Deferred-read regressions cover success, rejection, and overlapping reads. All 431
 application tests, both typechecks, and the browser build pass. The final polling guard at `d0c74cc`
-also passed its [Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38359268425)
+also passed its
+[Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38359268425)
 and [Linux package run](https://github.com/d4wei/mastermind/actions/runs/38359268430).
 
 In the rebuilt macOS package, a native picker selected two disposable Markdown files at once. The
@@ -368,7 +370,8 @@ during composition dismissed the composer and discarded its draft.
 
 The comment composers now guard their dismissal and submit shortcuts during composition, including
 WebKit's final legacy IME key event. Lifecycle regressions cover cancellation, retained drafts,
-modified Enter, ordinary shortcuts afterward, and closing/reopening without blur. All 439 application
+modified Enter, ordinary shortcuts afterward, and closing/reopening without blur. All 439
+application
 tests and both typechecks pass. The [composition sidecar](../../src/ui/util/composition.md) records
 the event contract and sources.
 
@@ -377,12 +380,56 @@ Latin text and no candidate commit. That attempt does not validate the fix with 
 Repeat the comment cancellation and submission checks with confirmed native composition before
 closing this gap; injected composition events do not substitute for that check.
 
+### Packaged footprint baseline — 2026-10-13
+
+The release reviewer at `f638221` used 125.39, 149.78, 148.64, 144.47, and 150.39 MiB of aggregate
+footprint in five fresh-process runs on the macOS environment above. The median was 148.64 MiB.
+Each run opened the same 27,683-byte document in Read mode; its hash, bundle executable hash,
+per-process samples, and source line counts are in [footprint-results.json](footprint-results.json).
+The bundle contained 13,796,696 logical bytes (13.16 MiB), measured once from the same build.
+
+The measurement used macOS `footprint` with explicit app, WebContent, GPU, and Networking PIDs.
+No matching processes existed before or after each run, so the WebKit helpers were attributable to
+this app despite their launchd parent. The tool reports a deduplicated footprint across the supplied
+processes, including compressed memory; this is not a sum of resident sizes. The first sample had a
+longer, unstandardized wait. Later samples waited at least five seconds after the document heading
+appeared in accessibility output. Background development tasks remained active.
+
+At the measured commit, the native Rust source contained 2,449 physical lines across 16 files,
+including tests, comments, and platform implementations. The TypeScript native adapter contained
+227 lines across five files. These counts describe implementation size, not maintenance cost or
+an equivalent Electron comparison.
+
+This workload does not bound multi-document memory, undo history, or large files. Cold
+open-to-readable timing remains unmeasured: launcher acknowledgment and accessibility-tool round
+trips are insufficient substitutes for a controlled rendering measurement.
+
+### Formatted selection and native file errors — 2026-10-13
+
+A packaged macOS check selected the whole paragraph ``Alpha **bravo** charlie `delta` echo.``
+in the reading view. The initial implementation hid Comment because it compared raw Markdown with
+rendered text. The updated mapping validates complete formatting wrappers against the existing
+parser and preserves their exact source. Native automation submitted the comment; disk assertions
+checked the full expected CriticMarkup and unchanged formatting and CRLF. Partial cross-wrapper
+selections remain refused, as described in
+[selection mapping](../../src/ui/modes/reading/selection.md).
+
+Native file failures now carry stable codes and readable messages. Permission and ordinary I/O
+errors retain their classifications, while missing or replaced write targets and stale versions
+still enter conflict recovery. Preference reads use the existing write-size limit. The contracts
+live in [native file I/O](src/files.md).
+
+All 457 application tests, both typechecks, browser/native builds, 38 all-feature Rust tests, and
+native Clippy pass. The rebuilt macOS package passes all 19 process checks, including stable error
+codes and messages, and rejection without changing document bytes. Updated Windows and Linux
+installed runs remain pending for this change.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
 Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
-before replacing the current app. Bound retained documents and settle
-structured file errors and command/distribution identity. Watcher coverage for parent-directory
+before replacing the current app. Bound retained documents and settle command/distribution identity.
+Watcher coverage for parent-directory
 replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH

@@ -82,6 +82,11 @@ try:
         check('warm reuse / alias deduplication / partial failure / directory rejection',
               code == 1 and response['pid'] == pid and
               [r['status'] for r in response['results']] == ['already_open', 'error', 'error'])
+        check('file failures carry stable codes and readable messages',
+              response['results'][1]['error'] == 'file_not_found' and
+              response['results'][2]['error'] == 'not_supported_file' and
+              all(isinstance(result.get('message'), str) and result['message']
+                  for result in response['results'][1:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
         invalid = wire(root, b'{"version":999,"paths":[]}\n')
         check('incompatible protocol rejected', invalid['error'] == 'incompatible_version')
@@ -91,12 +96,15 @@ try:
         fifo = files / 'pipe'
         os.mkfifo(fifo)
         code, response, _ = invoke(root, [fifo])
-        check('FIFO rejected without blocking', code == 1)
+        check('FIFO rejected without blocking', code == 1 and
+              response['results'][0]['error'] == 'not_supported_file')
         inaccessible = files / 'private'
         inaccessible.write_text('private')
         inaccessible.chmod(0)
         code, response, _ = invoke(root, [inaccessible])
-        check('unreadable file rejected', code == 1)
+        check('unreadable file rejected', code == 1 and
+              response['results'][0]['error'] == 'permission_denied' and
+              bool(response['results'][0].get('message')))
         inaccessible.chmod(0o600)
         bad = os.fsencode(files) + b'/bad-\xff.md'
         code, response, _ = invoke(root, [os.fsdecode(bad)])

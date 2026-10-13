@@ -5,6 +5,7 @@ import { installHost } from '../src/ui/app/host'
 import { ApiError, getFile, getSession, putFile } from '../src/ui/app/api'
 import { createCloseHandler } from '../src/ui/native/close'
 import { DEFAULT_CONFIG } from '../src/shared/config'
+import { createDocStore } from '../src/ui/app/store'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -28,6 +29,50 @@ describe('native reviewer boundary', () => {
     await expect(putFile('3', '文档\r\n', 'base')).rejects.toBeInstanceOf(ApiError)
     expect(invoke).toHaveBeenCalledWith('write_document', { id: '3', content: '文档\r\n', baseVersion: 'base' })
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    { status: 404, error: 'file_not_found', message: 'No such file or directory' },
+    { status: 403, error: 'permission_denied', message: 'Permission denied' },
+    { status: 409, error: 'file_changed', message: 'The file changed. Compare before saving.' },
+    { status: 500, error: 'file_io_error', message: 'The disk operation failed' },
+  ])('preserves structured recovery status and code while displaying the readable message: $error',
+    async (failure) => {
+      const invoke = vi.fn().mockRejectedValue(failure)
+      const host = createNativeHost({ invoke, listen: vi.fn() }, [])
+      await expect(host.getFile('0')).rejects.toMatchObject({
+        status: failure.status, message: failure.message, data: failure,
+      })
+      await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(ApiError)
+    })
+
+  it.each([
+    { status: 403, error: 'permission_denied', message: 'Permission denied', conflict: false },
+    { status: 500, error: 'file_io_error', message: 'Disk operation failed', conflict: false },
+    { status: 409, error: 'file_changed', message: 'Compare the current file', conflict: true },
+  ])('retains dirty text and selects the existing recovery path for $error', async (failure) => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'document_meta') return {
+        sessionId: '0', path: '/document.md', displayName: 'document.md', isDraft: false,
+      }
+      if (command === 'read_document') return { content: 'original\r\n', mtimeMs: 1, version: 'base' }
+      if (command === 'write_document') throw failure
+    }) as NativeBridge['invoke']
+    installHost(createNativeHost({ invoke, listen: vi.fn() }, []))
+    const store = createDocStore()
+    await store.getState().load('0')
+    store.getState().setSourceFromEditor('local\n')
+    expect(await store.getState().autosave()).toBe(false)
+    expect(store.getState()).toMatchObject({
+      source: 'local\n', savedSource: 'original\n', version: 'base',
+      saving: false, conflict: failure.conflict,
+    })
+    expect(invoke).toHaveBeenCalledWith('write_document', {
+      id: '0', content: 'local\r\n', baseVersion: 'base',
+    })
+    expect(store.getState().notice).toEqual(failure.conflict ? null : {
+      kind: 'error', msg: 'saveFailed',
+    })
   })
 
   it('does not leak a subscription that completes after document navigation', async () => {

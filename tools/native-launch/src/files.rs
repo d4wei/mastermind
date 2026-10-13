@@ -32,31 +32,90 @@ fn serialize_content<S: serde::Serializer>(bytes: &[u8], serializer: S) -> Resul
 pub struct FileError {
     pub status: u16,
     pub error: String,
+    pub message: String,
 }
 
 impl FileError {
-    pub fn conflict() -> Self {
+    pub fn new(status: u16, code: &str, message: impl Into<String>) -> Self {
         Self {
-            status: 409,
-            error: "file_changed".into(),
+            status,
+            error: code.into(),
+            message: message.into(),
+        }
+    }
+
+    pub fn conflict() -> Self {
+        Self::new(
+            409,
+            "file_changed",
+            "The file changed or was replaced. Compare the current file before saving.",
+        )
+    }
+
+    fn too_large() -> Self {
+        Self::new(
+            413,
+            "file_too_large",
+            "The file exceeds the supported size limit.",
+        )
+    }
+
+    fn replacement_as_conflict(self) -> Self {
+        if matches!(self.error.as_str(), "file_not_found" | "not_supported_file") {
+            Self::conflict()
+        } else {
+            self
         }
     }
 }
 
 impl From<io::Error> for FileError {
     fn from(error: io::Error) -> Self {
-        Self {
-            status: if error.kind() == io::ErrorKind::NotFound {
-                404
-            } else {
-                500
-            },
-            error: error.to_string(),
-        }
+        let (status, code) = match error.kind() {
+            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory => (404, "file_not_found"),
+            io::ErrorKind::PermissionDenied => (403, "permission_denied"),
+            _ => (500, "file_io_error"),
+        };
+        Self::new(status, code, error.to_string())
     }
 }
 
-fn open(path: &Path, write: bool) -> io::Result<File> {
+impl std::fmt::Display for FileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for FileError {}
+
+fn validate_metadata(metadata: &Metadata) -> Result<(), FileError> {
+    if metadata.file_type().is_symlink() {
+        return Err(FileError::conflict());
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(FileError::conflict());
+        }
+    }
+    if !metadata.is_file() {
+        return Err(FileError::new(
+            400,
+            "not_supported_file",
+            "The path does not refer to a regular file.",
+        ));
+    }
+    if metadata.len() > MAX_FILE_BYTES {
+        return Err(FileError::too_large());
+    }
+    Ok(())
+}
+
+fn open(path: &Path, write: bool) -> Result<File, FileError> {
+    // Reject unsupported types before opening: a pipe may block and directory opens vary by OS.
+    validate_metadata(&std::fs::symlink_metadata(path)?)?;
     let mut options = OpenOptions::new();
     options.read(true).write(write);
     #[cfg(unix)]
@@ -70,19 +129,14 @@ fn open(path: &Path, write: bool) -> io::Result<File> {
         use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
         options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
     }
-    let file = options.open(path)?;
-    let metadata = file.metadata()?;
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
-        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-            return Err(io::Error::other("file_replaced"));
+    let file = options.open(path).map_err(|error| {
+        #[cfg(unix)]
+        if error.raw_os_error() == Some(libc::ELOOP) {
+            return FileError::conflict();
         }
-    }
-    if !metadata.is_file() || metadata.len() > MAX_FILE_BYTES {
-        return Err(io::Error::other("not_supported_file"));
-    }
+        FileError::from(error)
+    })?;
+    validate_metadata(&file.metadata()?)?;
     Ok(file)
 }
 
@@ -115,15 +169,20 @@ fn stamp(file: &File, meta: &Metadata) -> io::Result<String> {
     }
 }
 
-fn finish_snapshot(file: &File, path: &Path, before: &str, bytes: Vec<u8>) -> io::Result<Snapshot> {
+fn finish_snapshot(
+    file: &File,
+    path: &Path,
+    before: &str,
+    bytes: Vec<u8>,
+) -> Result<Snapshot, FileError> {
     let after = file.metadata()?;
-    let current = open(path, false)?;
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(FileError::too_large());
+    }
+    let current = open(path, false).map_err(FileError::replacement_as_conflict)?;
     let token = stamp(file, &after)?;
-    if bytes.len() as u64 > MAX_FILE_BYTES
-        || before != token
-        || token != stamp(&current, &current.metadata()?)?
-    {
-        return Err(io::Error::other("file_changed"));
+    if before != token || token != stamp(&current, &current.metadata()?)? {
+        return Err(FileError::conflict());
     }
     Ok(Snapshot {
         mtime_ms: after
@@ -137,7 +196,7 @@ fn finish_snapshot(file: &File, path: &Path, before: &str, bytes: Vec<u8>) -> io
     })
 }
 
-fn snapshot(file: &mut File, path: &Path) -> io::Result<Snapshot> {
+fn snapshot(file: &mut File, path: &Path) -> Result<Snapshot, FileError> {
     let before = stamp(file, &file.metadata()?)?;
     file.seek(SeekFrom::Start(0))?;
     let mut bytes = Vec::new();
@@ -145,29 +204,17 @@ fn snapshot(file: &mut File, path: &Path) -> io::Result<Snapshot> {
     finish_snapshot(file, path, &before, bytes)
 }
 
-pub fn read(path: &Path) -> io::Result<Snapshot> {
+pub fn read(path: &Path) -> Result<Snapshot, FileError> {
     snapshot(&mut open(path, false)?, path)
 }
 
 // Callers serialize writes for each admitted path. Other processes do not share that lock.
 pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot, FileError> {
     if content.len() as u64 > MAX_FILE_BYTES {
-        return Err(FileError {
-            status: 413,
-            error: "file_too_large".into(),
-        });
+        return Err(FileError::too_large());
     }
-    let mut file = open(path, true).map_err(|error| {
-        if matches!(
-            error.kind(),
-            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
-        ) {
-            FileError::conflict()
-        } else {
-            error.into()
-        }
-    })?;
-    let base = snapshot(&mut file, path).map_err(|_| FileError::conflict())?;
+    let mut file = open(path, true).map_err(FileError::replacement_as_conflict)?;
+    let base = snapshot(&mut file, path).map_err(FileError::replacement_as_conflict)?;
     if base.version != base_version {
         return Err(FileError::conflict());
     }
@@ -178,7 +225,7 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
     file.seek(SeekFrom::Start(0))?;
     file.write_all(content.as_bytes())?;
     file.set_len(content.len() as u64)?;
-    let written = snapshot(&mut file, path).map_err(|_| FileError::conflict())?;
+    let written = snapshot(&mut file, path).map_err(FileError::replacement_as_conflict)?;
     if written.content() != content {
         return Err(FileError::conflict());
     }
@@ -236,6 +283,105 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn file_errors_have_stable_codes_and_readable_messages() {
+        for (kind, status, code) in [
+            (io::ErrorKind::NotFound, 404, "file_not_found"),
+            (io::ErrorKind::NotADirectory, 404, "file_not_found"),
+            (io::ErrorKind::PermissionDenied, 403, "permission_denied"),
+            (io::ErrorKind::Other, 500, "file_io_error"),
+        ] {
+            let error = FileError::from(io::Error::new(kind, "OS diagnostic"));
+            assert_eq!(
+                serde_json::to_value(&error).unwrap(),
+                serde_json::json!({
+                    "status": status, "error": code, "message": "OS diagnostic"
+                })
+            );
+            if status != 404 {
+                assert_eq!(error.replacement_as_conflict().status, status);
+            }
+        }
+    }
+
+    #[test]
+    fn read_rejects_missing_nonregular_and_oversized_files_without_mutation() {
+        let f = Fixture::new();
+        assert_eq!(
+            read(&f.0.join("missing")).unwrap_err().error,
+            "file_not_found"
+        );
+        assert_eq!(read(&f.0).unwrap_err().error, "not_supported_file");
+        let original = fs::read(f.file()).unwrap();
+        let file = File::options().write(true).open(f.file()).unwrap();
+        file.set_len(MAX_FILE_BYTES + 1).unwrap();
+        let error = read(&f.file()).unwrap_err();
+        assert_eq!(error.status, 413);
+        assert_eq!(error.error, "file_too_large");
+        assert!(!error.message.is_empty());
+        assert_eq!(file.metadata().unwrap().len(), MAX_FILE_BYTES + 1);
+        file.set_len(original.len() as u64).unwrap();
+        assert_eq!(fs::read(f.file()).unwrap(), original);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_final_symlink_replacement_is_a_conflict_and_does_not_write_its_target() {
+        use std::os::unix::fs::symlink;
+        let f = Fixture::new();
+        let base = read(&f.file()).unwrap();
+        let target = f.0.join("other.md");
+        fs::write(&target, b"other bytes").unwrap();
+        fs::remove_file(f.file()).unwrap();
+        symlink(&target, f.file()).unwrap();
+        for error in [
+            read(&f.file()).unwrap_err(),
+            write(&f.file(), "local", &base.version).unwrap_err(),
+        ] {
+            assert_eq!(error.status, 409);
+            assert_eq!(error.error, "file_changed");
+        }
+        assert_eq!(fs::read(&target).unwrap(), b"other bytes");
+        assert!(fs::symlink_metadata(f.file()).unwrap().is_symlink());
+    }
+
+    #[test]
+    fn snapshot_io_failures_are_not_conflicts() {
+        let f = Fixture::new();
+        let mut write_only = File::options().write(true).open(f.file()).unwrap();
+        let error = snapshot(&mut write_only, &f.file())
+            .unwrap_err()
+            .replacement_as_conflict();
+        assert_ne!(error.status, 409);
+        assert!(matches!(
+            error.error.as_str(),
+            "file_io_error" | "permission_denied"
+        ));
+        assert!(!error.message.is_empty());
+        assert_eq!(fs::read(f.file()).unwrap(), b"original\r\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn permission_denial_keeps_its_classification_and_original_bytes() {
+        use std::os::unix::fs::PermissionsExt;
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let f = Fixture::new();
+        let base = read(&f.file()).unwrap();
+        fs::set_permissions(f.file(), fs::Permissions::from_mode(0o000)).unwrap();
+        let read_error = read(&f.file()).unwrap_err();
+        let write_error = write(&f.file(), "local", &base.version).unwrap_err();
+        fs::set_permissions(f.file(), fs::Permissions::from_mode(0o600)).unwrap();
+        for error in [read_error, write_error] {
+            assert_eq!(error.status, 403);
+            assert_eq!(error.error, "permission_denied");
+            assert!(!error.message.is_empty());
+        }
+        assert_eq!(fs::read(f.file()).unwrap(), base.bytes);
     }
 
     #[test]
@@ -311,12 +457,18 @@ mod tests {
         let file = open(&f.file(), false).unwrap();
         let before = stamp(&file, &file.metadata().unwrap()).unwrap();
         fs::write(f.file(), b"mutated in place").unwrap();
-        assert!(finish_snapshot(&file, &f.file(), &before, b"original\r\n".to_vec()).is_err());
+        let changed =
+            finish_snapshot(&file, &f.file(), &before, b"original\r\n".to_vec()).unwrap_err();
+        assert_eq!(changed.status, 409);
+        assert_eq!(changed.error, "file_changed");
         let before = stamp(&file, &file.metadata().unwrap()).unwrap();
         let replacement = f.0.join("replacement");
         fs::write(&replacement, b"mutated in place").unwrap();
         fs::rename(replacement, f.file()).unwrap();
-        assert!(finish_snapshot(&file, &f.file(), &before, b"mutated in place".to_vec()).is_err());
+        let replaced =
+            finish_snapshot(&file, &f.file(), &before, b"mutated in place".to_vec()).unwrap_err();
+        assert_eq!(replaced.status, 409);
+        assert_eq!(replaced.error, "file_changed");
     }
 
     #[test]

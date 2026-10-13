@@ -1,0 +1,192 @@
+{
+  "source_commit": "f638221",
+  "platform": "macOS 26.6.2 arm64, Apple M1 Pro",
+  "build": "release reviewer app",
+  "fixture": {
+    "source": "docs/architecture-review.md at f638221",
+    "bytes": 27683,
+    "sha256": "f81d1cd415e5fdf88a6acf03be917bd6316fe5830152298b5a5d4a6721116654"
+  },
+  "bundle": {
+    "logical_bytes": 13796696,
+    "executable_sha256": "59428dc7f8f5dbcdaf784ce0fda966cb6f6fa745b8df51f372dd9a6df8115a1d"
+  },
+  "method": "Fresh process per run; one fixed document in Read mode; accessibility heading observed; no edits; footprint -f bytes -j OUTPUT GUI_PID GPU_PID NETWORK_PID CONTENT_PID. No matching processes before/after each run. Run 1 had an unstandardized longer wait; runs 2-5 waited at least five seconds after the ready observation. Background development tasks were active. This is not resident-only memory or a multi-document bound.",
+  "samples": [
+    {
+      "run": 1,
+      "timestamp": "2026-10-13T00:12:59.148-07:00",
+      "total_footprint_bytes": 131484648,
+      "processes": [
+        {
+          "name": "com.apple.WebKit.WebContent",
+          "pid": 21119,
+          "footprint": 79135488
+        },
+        {
+          "name": "mastermind-launch-check",
+          "pid": 21116,
+          "footprint": 28394456
+        },
+        {
+          "name": "com.apple.WebKit.GPU",
+          "pid": 21117,
+          "footprint": 17253072
+        },
+        {
+          "name": "com.apple.WebKit.Networking",
+          "pid": 21118,
+          "footprint": 6963776
+        }
+      ],
+      "all_processes_absent_after_quit": true
+    },
+    {
+      "run": 2,
+      "timestamp": "2026-10-13T00:14:30.479-07:00",
+      "total_footprint_bytes": 157060144,
+      "processes": [
+        {
+          "name": "com.apple.WebKit.WebContent",
+          "pid": 21230,
+          "footprint": 100434736
+        },
+        {
+          "name": "mastermind-launch-check",
+          "pid": 21226,
+          "footprint": 30884872
+        },
+        {
+          "name": "com.apple.WebKit.GPU",
+          "pid": 21228,
+          "footprint": 19055312
+        },
+        {
+          "name": "com.apple.WebKit.Networking",
+          "pid": 21229,
+          "footprint": 6947368
+        }
+      ],
+      "all_processes_absent_after_quit": true
+    },
+    {
+      "run": 3,
+      "timestamp": "2026-10-13T00:15:28.201-07:00",
+      "total_footprint_bytes": 155864064,
+      "processes": [
+        {
+          "name": "com.apple.WebKit.WebContent",
+          "pid": 21402,
+          "footprint": 100614960
+        },
+        {
+          "name": "mastermind-launch-check",
+          "pid": 21399,
+          "footprint": 30589912
+        },
+        {
+          "name": "com.apple.WebKit.GPU",
+          "pid": 21400,
+          "footprint": 17957584
+        },
+        {
+          "name": "com.apple.WebKit.Networking",
+          "pid": 21401,
+          "footprint": 6963752
+        }
+      ],
+      "all_processes_absent_after_quit": true
+    },
+    {
+      "run": 4,
+      "timestamp": "2026-10-13T00:16:46.504-07:00",
+      "total_footprint_bytes": 151489560,
+      "processes": [
+        {
+          "name": "com.apple.WebKit.WebContent",
+          "pid": 21573,
+          "footprint": 95306544
+        },
+        {
+          "name": "mastermind-launch-check",
+          "pid": 21564,
+          "footprint": 30622704
+        },
+        {
+          "name": "com.apple.WebKit.GPU",
+          "pid": 21571,
+          "footprint": 18809552
+        },
+        {
+          "name": "com.apple.WebKit.Networking",
+          "pid": 21572,
+          "footprint": 7012904
+        }
+      ],
+      "all_processes_absent_after_quit": true
+    },
+    {
+      "run": 5,
+      "timestamp": "2026-10-13T00:17:43.628-07:00",
+      "total_footprint_bytes": 157699144,
+      "processes": [
+        {
+          "name": "com.apple.WebKit.WebContent",
+          "pid": 21808,
+          "footprint": 100893464
+        },
+        {
+          "name": "mastermind-launch-check",
+          "pid": 21805,
+          "footprint": 31146992
+        },
+        {
+          "name": "com.apple.WebKit.GPU",
+          "pid": 21806,
+          "footprint": 19006232
+        },
+        {
+          "name": "com.apple.WebKit.Networking",
+          "pid": 21807,
+          "footprint": 6914600
+        }
+      ],
+      "all_processes_absent_after_quit": true
+    }
+  ],
+  "code_size": {
+    "rust": {
+      "files": 16,
+      "physical_lines_including_tests_and_comments": 2449,
+      "paths": [
+        "tools/native-launch/src/admission.rs",
+        "tools/native-launch/src/bin/launcher.rs",
+        "tools/native-launch/src/endpoint.rs",
+        "tools/native-launch/src/endpoint/unix.rs",
+        "tools/native-launch/src/endpoint/windows.rs",
+        "tools/native-launch/src/files.rs",
+        "tools/native-launch/src/host_process.rs",
+        "tools/native-launch/src/lib.rs",
+        "tools/native-launch/src/main.rs",
+        "tools/native-launch/src/opening.rs",
+        "tools/native-launch/src/protocol.rs",
+        "tools/native-launch/src/reviewer.rs",
+        "tools/native-launch/src/termination.rs",
+        "tools/native-launch/src/termination/macos.rs",
+        "tools/native-launch/src/transport.rs",
+        "tools/native-launch/src/worker.rs"
+      ]
+    },
+    "typescript_adapter": {
+      "files": 5,
+      "physical_lines_including_tests_and_comments": 227,
+      "paths": [
+        "src/ui/native/NativeReviewer.tsx",
+        "src/ui/native/bridge.ts",
+        "src/ui/native/close.ts",
+        "src/ui/native/host.ts",
+        "src/ui/native/main.tsx"
+      ]
+    }
+  }
+}

@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use std::{
     collections::HashSet,
     fs,
+    io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -42,10 +43,9 @@ fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
         .parse::<usize>()
         .ok()
         .and_then(|index| docs.order.get(index));
-    index.map(PathBuf::from).ok_or_else(|| FileError {
-        status: 404,
-        error: "document_not_open".into(),
-    })
+    index
+        .map(PathBuf::from)
+        .ok_or_else(|| FileError::new(404, "document_not_open", "The document is not open."))
 }
 
 #[tauri::command]
@@ -64,10 +64,7 @@ pub async fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileErr
             }))
         })
         .await
-        .map_err(|e| FileError {
-            status: 500,
-            error: e.to_string(),
-        })?
+        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
 fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
@@ -79,7 +76,7 @@ fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapsho
         }
         path
     };
-    files::read(&path).map_err(FileError::from)
+    files::read(&path)
 }
 
 #[tauri::command]
@@ -88,10 +85,7 @@ pub async fn read_document(id: String, docs: State<'_>) -> Result<Snapshot, File
     crate::worker::blocking_work()
         .run(move || read_registered_document(&docs, &id))
         .await
-        .map_err(|e| FileError {
-            status: 500,
-            error: e.to_string(),
-        })?
+        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
 fn serialized_write<T>(
@@ -120,10 +114,7 @@ pub async fn write_document(
             })
         })
         .await
-        .map_err(|e| FileError {
-            status: 500,
-            error: e.to_string(),
-        })?
+        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
 #[tauri::command]
@@ -162,10 +153,7 @@ pub async fn read_translation(
     crate::worker::blocking_work()
         .run(move || read_registered_translation(&docs, &id, &target_lang))
         .await
-        .map_err(|e| FileError {
-            status: 500,
-            error: e.to_string(),
-        })?
+        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
 fn read_registered_translation(
@@ -179,10 +167,11 @@ fn read_registered_translation(
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
-        return Err(FileError {
-            status: 400,
-            error: "invalid_language".into(),
-        });
+        return Err(FileError::new(
+            400,
+            "invalid_language",
+            "The translation language is invalid.",
+        ));
     }
     let path = admitted(&docs.lock().unwrap(), id)?;
     let artifact = path
@@ -195,9 +184,12 @@ fn read_registered_translation(
             target_lang
         ));
     let raw = files::read(&artifact)?;
-    serde_json::from_str(&raw.content()).map_err(|_| FileError {
-        status: 409,
-        error: "invalid_translation".into(),
+    serde_json::from_str(&raw.content()).map_err(|_| {
+        FileError::new(
+            409,
+            "invalid_translation",
+            "The translation artifact is not valid JSON.",
+        )
     })
 }
 
@@ -209,15 +201,29 @@ fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 #[tauri::command]
 pub async fn read_preferences(app: tauri::AppHandle) -> Result<Option<Value>, String> {
     crate::worker::blocking_work()
-        .run(move || match fs::read(preference_path(&app)?) {
-            Ok(bytes) => serde_json::from_slice(&bytes)
-                .map(Some)
-                .map_err(|e| e.to_string()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(e) => Err(e.to_string()),
-        })
+        .run(move || read_preferences_file(preference_path(&app)?))
         .await
         .map_err(|e| e.to_string())?
+}
+
+const MAX_PREFERENCE_BYTES: usize = 64 * 1024;
+
+fn read_preferences_file(path: PathBuf) -> Result<Option<Value>, String> {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+    };
+    let mut bytes = Vec::new();
+    file.take((MAX_PREFERENCE_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_PREFERENCE_BYTES {
+        return Err("preferences_too_large".into());
+    }
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -232,7 +238,7 @@ fn write_preferences_file(path: PathBuf, config: Value) -> Result<(), String> {
     static WRITES: Mutex<()> = Mutex::new(());
     let _write = WRITES.lock().unwrap();
     let bytes = serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?;
-    if !config.is_object() || bytes.len() > 64 * 1024 {
+    if !config.is_object() || bytes.len() > MAX_PREFERENCE_BYTES {
         return Err("invalid_preferences".into());
     }
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
@@ -294,6 +300,41 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 mod tests {
     use super::*;
     use crate::admission::{Request, VERSION};
+
+    #[test]
+    fn preference_reads_accept_the_limit_and_reject_larger_files_without_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "mastermind-preference-limit-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let path = root.join("reviewer.json");
+        assert!(read_preferences_file(path.clone()).unwrap().is_none());
+        fs::create_dir(&root).unwrap();
+        let at_limit = format!(
+            "{{\"value\":\"{}\"}}",
+            "x".repeat(MAX_PREFERENCE_BYTES - 12)
+        );
+        assert_eq!(at_limit.len(), MAX_PREFERENCE_BYTES);
+        fs::write(&path, &at_limit).unwrap();
+        assert_eq!(
+            read_preferences_file(path.clone()).unwrap().unwrap()["value"],
+            "x".repeat(MAX_PREFERENCE_BYTES - 12)
+        );
+        let oversized = format!("{at_limit} ");
+        fs::write(&path, &oversized).unwrap();
+        assert_eq!(
+            read_preferences_file(path.clone()).unwrap_err(),
+            "preferences_too_large"
+        );
+        assert_eq!(fs::read(&path).unwrap(), oversized.as_bytes());
+        fs::write(&path, b"invalid JSON").unwrap();
+        assert!(read_preferences_file(path.clone()).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn concurrent_preferences_writes_leave_one_complete_object() {

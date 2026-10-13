@@ -48,9 +48,10 @@ fn admit_graphical(docs: &mut Documents, paths: Vec<Result<PathBuf, String>>) {
         };
         errors.extend(response.error);
         errors.extend(response.results.into_iter().filter_map(|result| {
-            result
-                .error
-                .map(|error| format!("{}: {error}", result.path))
+            result.error.map(|code| {
+                let message = result.message.unwrap_or(code);
+                format!("{}: {message}", result.path)
+            })
         }));
     }
     docs.opening_errors = errors;

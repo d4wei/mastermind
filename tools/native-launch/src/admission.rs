@@ -1,7 +1,8 @@
+use crate::files::FileError;
 pub use mastermind_launch_check::protocol::{
     FileResult, MAX_FILES, MAX_FRAME, Request, Response, VERSION,
 };
-use std::{collections::BTreeMap, fs, io, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf};
 
 #[derive(Default)]
 pub struct Documents {
@@ -35,12 +36,14 @@ impl Documents {
                     canonical: Some(canonical),
                     status: status.into(),
                     error: None,
+                    message: None,
                 },
                 Err(error) => FileResult {
                     path,
                     canonical: None,
                     status: "error".into(),
-                    error: Some(error.to_string()),
+                    error: Some(error.error),
+                    message: Some(error.message),
                 },
             })
             .collect();
@@ -57,11 +60,17 @@ impl Documents {
         }
     }
 
-    fn open(&mut self, path: &str) -> io::Result<(String, &'static str)> {
+    fn open(&mut self, path: &str) -> Result<(String, &'static str), FileError> {
         let canonical = fs::canonicalize(path)?;
         let display = canonical
             .to_str()
-            .ok_or_else(|| io::Error::other("unsupported_path_encoding"))?
+            .ok_or_else(|| {
+                FileError::new(
+                    400,
+                    "unsupported_path_encoding",
+                    "The file path is not valid UTF-8.",
+                )
+            })?
             .to_owned();
         if self.files.contains_key(&canonical) {
             return Ok((display, "already_open"));
@@ -167,6 +176,36 @@ mod tests {
         assert_eq!(PathBuf::from(&docs.order[1]).file_name().unwrap(), "b");
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
+    }
+
+    #[test]
+    fn mixed_admission_serializes_file_error_codes_and_messages_in_order() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a"), b"original\r\n").unwrap();
+        let large = fs::File::create(fixture.0.join("large")).unwrap();
+        large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
+        let mut docs = Documents::default();
+        let response = docs.admit(fixture.request(&["missing", "a", ".", "large"]));
+        let encoded = serde_json::to_value(response).unwrap();
+        for (index, code) in [
+            (0, "file_not_found"),
+            (2, "not_supported_file"),
+            (3, "file_too_large"),
+        ] {
+            let result = &encoded["results"][index];
+            assert_eq!(result["status"], "error");
+            assert_eq!(result["error"], code);
+            assert!(!result["message"].as_str().unwrap().is_empty());
+            assert!(result["canonical"].is_null());
+        }
+        assert_eq!(encoded["results"][1]["status"], "opened");
+        assert!(encoded["results"][1].get("message").is_none());
+        assert_eq!(docs.order.len(), 1);
+        assert_eq!(docs.active_id, Some(0));
+        assert_eq!(
+            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            b"original\r\n"
+        );
     }
 
     #[test]

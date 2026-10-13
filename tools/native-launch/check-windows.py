@@ -212,6 +212,11 @@ try:
         check('cwd / case alias / warm reuse / partial failure / directory rejection',
               code == 1 and response['pid'] == pid and
               [r['status'] for r in response['results']] == ['already_open', 'already_open', 'error', 'error'])
+        check('file failures carry stable codes and readable messages',
+              response['results'][2]['error'] == 'file_not_found' and
+              response['results'][3]['error'] == 'not_supported_file' and
+              all(isinstance(result.get('message'), str) and result['message']
+                  for result in response['results'][2:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
         check('visible native host window', wait_window(pid))
         check('incompatible protocol rejected',
