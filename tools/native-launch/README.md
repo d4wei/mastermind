@@ -127,13 +127,13 @@ handle inheritance: redirecting its own standard streams alone would leave inher
 pipes open and prevent a capturing agent from receiving EOF. `CREATE_NO_WINDOW` is retained in the
 host spawn; Windows ignores it for GUI-subsystem executables. The installed Windows checks inspect
 both PE subsystems and start the GUI from a parent with no console; an attachment probe checks
-the running app. This layout awaits hosted Windows validation. The second-account test checks
-access denial, but endpoint checks do not establish
-isolation from administrators or malicious same-user processes. Windows reads compare open-handle
-volume/file IDs. See the results for native file and WebView2 reviewer coverage and remaining
-interactive checks.
-Linux retains the Unix implementation but needs native packaging and GUI tests. macOS bundles are
-local development artifacts, not signed/notarized distribution releases.
+the running app. This layout passed installed Windows checks recorded in [results](results.md).
+The second-account test checks access denial, but endpoint checks do not establish isolation from
+administrators or malicious same-user processes. Windows reads compare open-handle volume/file IDs.
+See the results for native file and WebView2 reviewer coverage and remaining interactive checks.
+Linux retains the Unix implementation. Its installed package passed process checks under Xvfb;
+Linux webview interaction remains untested, as recorded in the results. macOS bundles are local
+development artifacts, not signed/notarized distribution releases.
 
 See [results](results.md) for observed outcomes and remaining evidence gaps. The forward contract is
 [agent launch](../../docs/agent-launch.md). Delete the experiment once its useful checks and

@@ -1,0 +1,21 @@
+{
+  "source_commit": "d558466",
+  "platform": "macOS 26.6.2 arm64, Apple M1 Pro",
+  "build": "release reviewer app, readiness-trace feature",
+  "metric": "launcher_invocation_to_observed_document_layout_two_frames",
+  "binary_sha256": "4de97b441441bb87772a2dd2e6843dbd720b0574cd45a8820f40fa5877da3534",
+  "fixture_sha256": "902c49925d07d06629ad9f862e0f4592e31804ec74750fed8b5a06046f2d7ee9",
+  "fixture_bytes": 116,
+  "poll_interval_seconds": 0.005,
+  "method": "Five fresh hosts and endpoints with isolated completed preferences, Read mode, unlocked desktop, and unchanged fixture bytes. Runs outside the shell sandbox; no OS-cache clearing. Includes native command and polling latency; not physical first paint. This tiny fixture differs from the earlier memory workload.",
+  "samples_seconds": [
+    1.0530271671013907,
+    0.6662613330408931,
+    0.7127143340185285,
+    0.7028719170484692,
+    0.7037549579981714
+  ],
+  "median_seconds": 0.7037549579981714,
+  "min_seconds": 0.6662613330408931,
+  "max_seconds": 1.0530271671013907
+}

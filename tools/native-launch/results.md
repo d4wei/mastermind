@@ -497,21 +497,45 @@ passed their existing native process and interaction checks. Those runs do not a
 graphical frontmatter case;
 the new display was inspected through the browser adapter.
 
+### Visible document readiness — 2026-10-13
+
+At `d558466`, five fresh hosts on the unlocked macOS desktop produced valid readiness traces.
+The instrumented release build used `readiness-trace`, completed disposable preferences, Read mode,
+and the 116-byte public fixture. [The observations](readiness-results.json) retain the executable
+and fixture hashes and individual timings: median 0.704 seconds, range 0.666–1.053 seconds.
+The harness checked admission identity and unchanged document bytes for each trial.
+
+This measures launcher invocation through observed document layout after two frames, including
+trace delivery and polling. It is not physical first paint or a filesystem-cache-cold measurement.
+The fixture differs from the earlier memory workload; the combined performance comparison remains
+incomplete. The initial sandboxed launcher attempt timed out before admission; the recorded trials
+ran outside the shell sandbox.
+
+### macOS onboarding and frontmatter — 2026-10-13
+
+The `d558466` release reviewer was exercised on the unlocked desktop. Actual Apple Pinyin key
+input in Name committed `你好` with Space, retained the form after composition Enter, and canceled
+new marked text with Escape without losing committed text. The language search accepted `中文`,
+kept its picker open through composition Enter and Escape, and selected Simplified Chinese after
+composition completed. These IME checks ran in an empty test-app instance.
+
+A separately retained host used an admitted disposable CRLF file and isolated preferences.
+Confirmation saved Name `你好`, Chinese interface language, and Original only, then displayed the
+already admitted document without reopening it. The name in this persistence check was pasted;
+it adds no IME evidence. Preferences were absent before confirmation, and the document stayed
+byte-exact. Native inspection also covered metadata rows and the literal YAML disclosure.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
 Chinese IME composition, remaining graphical entry paths, and interactive Windows input checks
 before replacing the current app. Bound retained documents and settle command/distribution identity.
-Watcher coverage for parent-directory
-replacement and unusual filesystems remains open.
+Broader watcher coverage for parent-directory replacement and unusual filesystems remains open.
 
 App discovery was exercised through the explicit bundle path and desktop automation. Shell/PATH
-installation, moved bundles, macOS installation/notarization, interactive
-Windows installation, and macOS GUI onboarding were not tested. Broader preference controls and
-translation refresh interactions still need verification beyond the packaged macOS checks above.
-Linux webview
-interaction
-remains outstanding. Keep the current app available until the native reviewer meets the
+installation, moved bundles, macOS installation/notarization, and interactive Windows installation
+were not tested. Broader preference controls and translation refresh interactions still need
+verification beyond the packaged macOS checks above. Linux webview interaction remains outstanding. Keep the current app available until the native reviewer meets the
 [architecture checks][host-checks].
 
 [host-checks]: ../../docs/architecture-review.md#validate-the-selected-host
