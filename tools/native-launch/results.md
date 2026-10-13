@@ -427,6 +427,24 @@ codes and messages, and rejection without changing document bytes. At `245bff5`,
 [Linux package run](https://github.com/d4wei/mastermind/actions/runs/38362526828) both passed,
 including the existing Windows reviewer interaction and other-user access-denial checks.
 
+At `73327a2`, selection mapping retains the existing same-text-leaf fallback for entities and
+reuses one parsed tree per selection operation. All 460 application tests and both typechecks pass.
+The [Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38363755183) and
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38363754934) also passed.
+
+### Document-readiness instrumentation — 2026-10-13
+
+The opt-in [readiness instrument](src/readiness.md) waits for the requested original document,
+matching fixture text, visible layout, fonts, and two animation frames. Its local harness measures
+from launcher invocation until it observes the matching trace. Deterministic tests cover gate
+rejection, article replacement during rendering, one-shot reporting, and cleanup ownership.
+
+No native timing result is recorded yet. The first packaged attempt returned successful admission
+but no readiness signal before its deadline. Subsequent native automation reported that the Mac
+was locked; the attempt does not establish startup latency or isolate the cause of the missing
+signal. Repeat with a visible, unlocked desktop. The metric is a document-layout readiness proxy,
+not physical first paint, and its tiny fixture differs from the memory workload above.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,

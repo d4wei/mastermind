@@ -71,6 +71,10 @@ def attribute(session, selector, name):
     return command(session, 'GET', f'/element/{element(session, selector)}/attribute/{name}')
 
 
+def property_value(session, selector, name):
+    return command(session, 'GET', f'/element/{element(session, selector)}/property/{name}')
+
+
 def click(session, selector):
     command(session, 'POST', f'/element/{element(session, selector)}/click', {})
 
@@ -255,6 +259,43 @@ def check(session, path, namespace):
           'External competing edit.' in text(session, '.conflict-versions section:nth-child(3)'))
     result = '# reviewer\n\nMerged result 中文.\n'
     replace_text(session, '.conflict-result textarea', result)
+
+    def comparison_matches(expected_disk):
+        return (property_value(session, '.conflict-versions section:nth-child(1) pre',
+                               'textContent') == disk.replace('\r\n', '\n') and
+                property_value(session, '.conflict-versions section:nth-child(2) pre',
+                               'textContent') == local and
+                property_value(session, '.conflict-versions section:nth-child(3) pre',
+                               'textContent') == expected_disk and
+                property_value(session, '.conflict-result textarea', 'value') == result)
+
+    until('comparison stores the edited Result without writing it',
+          lambda: comparison_matches(competing) and path.read_bytes() == competing.encode())
+    switched = admit([first], namespace, ['already_open'])
+    assert switched['pid'] == pid, switched
+    until('switching away from comparison renders another retained document',
+          lambda: 'First successful request file.' in editor(session))
+    reopened = admit([path], namespace, ['already_open'])
+    assert reopened['pid'] == pid, reopened
+    until('repeat CLI open retains comparison Base Local Disk and edited Result',
+          lambda: comparison_matches(competing) and
+          'Unsaved local edit.' in editor(session) and
+          path.read_bytes() == competing.encode())
+
+    later_disk = '# reviewer\r\n\r\nLater external competing edit.\r\n'
+    path.write_bytes(later_disk.encode())
+    until('later disk change makes comparison stale while retaining edited Result',
+          lambda: comparison_matches(later_disk) and
+          'Refresh them before saving' in text(session, '.conflict-comparison [role="alert"]') and
+          property_value(session, '.conflict-actions .btn-cta', 'disabled') is True, 20)
+    click(session, '.conflict-actions .btn-cta')
+    assert path.read_bytes() == later_disk.encode(), 'Stale Save result overwrote the later disk edit'
+    assert comparison_matches(later_disk), 'Stale Save result discarded comparison state'
+    click(session, '.conflict-actions button:first-child')
+    until('explicit refresh retains edited Result and enables reviewed saving',
+          lambda: comparison_matches(later_disk) and
+          property_value(session, '.conflict-actions .btn-cta', 'disabled') is False and
+          path.read_bytes() == later_disk.encode(), 20)
     click(session, '.conflict-actions .btn-cta')
     until('reviewed merge result reaches disk with CRLF',
           lambda: path.read_bytes() == result.replace('\n', '\r\n').encode(), 20)

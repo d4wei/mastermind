@@ -4,6 +4,8 @@ mod admission;
 mod endpoint;
 mod files;
 mod opening;
+#[cfg(feature = "readiness-trace")]
+mod readiness;
 mod reviewer;
 use tauri::{Emitter, Manager};
 mod host_process;
@@ -182,9 +184,13 @@ fn main() {
             reviewer::write_preferences,
             reviewer::finish_close,
             reviewer::cancel_close,
-            termination::close_ready
+            termination::close_ready,
+            #[cfg(feature = "readiness-trace")]
+            readiness::report_readiness
         ])
         .setup(move |app| {
+            #[cfg(feature = "readiness-trace")]
+            app.manage(Arc::new(readiness::Readiness::from_environment()?));
             app.manage(Arc::new(Mutex::new(reviewer::FileWatch::new(
                 app.handle().clone(),
             )?)));
@@ -203,30 +209,37 @@ fn main() {
             runtime.spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
                 let main_handle = handle.clone();
-                let _ =
-                    handle.run_on_main_thread(move || {
-                        match tauri::WebviewWindowBuilder::new(
-                            &main_handle,
-                            "main",
-                            tauri::WebviewUrl::App(
-                                if cfg!(feature = "reviewer") {
-                                    "native.html"
-                                } else {
-                                    "index.html"
-                                }
-                                .into(),
-                            ),
-                        )
-                        .title("mastermind — native launch check")
-                        .inner_size(1100.0, 760.0)
-                        .build()
-                        {
-                            Ok(window) => {
-                                let _ = window.set_focus();
+                let _ = handle.run_on_main_thread(move || {
+                    let window_builder = tauri::WebviewWindowBuilder::new(
+                        &main_handle,
+                        "main",
+                        tauri::WebviewUrl::App(
+                            if cfg!(feature = "reviewer") {
+                                "native.html"
+                            } else {
+                                "index.html"
                             }
-                            Err(error) => eprintln!("{error}"),
+                            .into(),
+                        ),
+                    )
+                    .title("mastermind — native launch check")
+                    .inner_size(1100.0, 760.0);
+                    #[cfg(feature = "readiness-trace")]
+                    let window_builder = if let Some(script) = main_handle
+                        .state::<Arc<readiness::Readiness>>()
+                        .initialization_script()
+                    {
+                        window_builder.initialization_script(script)
+                    } else {
+                        window_builder
+                    };
+                    match window_builder.build() {
+                        Ok(window) => {
+                            let _ = window.set_focus();
                         }
-                    });
+                        Err(error) => eprintln!("{error}"),
+                    }
+                });
             });
             Ok(())
         })

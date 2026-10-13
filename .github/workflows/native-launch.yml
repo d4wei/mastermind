@@ -50,9 +50,13 @@ jobs:
           exit $LASTEXITCODE
       - name: Native unit tests and lint
         run: |
-          cargo test --release --locked --features windows-launcher
+          node --test check-readiness-script.cjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo clippy --release --locked --features windows-launcher -- -D warnings
+          python check-readiness-harness.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --release --locked --all-features
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo clippy --release --locked --all-features --all-targets -- -D warnings
           exit $LASTEXITCODE
       - name: Install and exercise the Windows package
         timeout-minutes: 5

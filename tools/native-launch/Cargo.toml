@@ -17,6 +17,7 @@ required-features = ["windows-launcher"]
 [features]
 reviewer = []
 windows-launcher = []
+readiness-trace = ["reviewer"]
 
 [build-dependencies]
 tauri-build = { version = "=2.7.2", features = [] }

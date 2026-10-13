@@ -53,8 +53,10 @@ jobs:
           npx tauri build --config tauri.reviewer.conf.json --features reviewer --bundles deb -- --locked
       - name: Native unit tests and lint
         run: |
-          cargo test --release --locked --features reviewer
-          cargo clippy --release --locked --features reviewer -- -D warnings
+          node --test check-readiness-script.cjs
+          python3 check-readiness-harness.py
+          cargo test --release --locked --all-features
+          cargo clippy --release --locked --all-features --all-targets -- -D warnings
       - name: Install the Debian package
         run: |
           packages=(target/release/bundle/deb/*.deb)

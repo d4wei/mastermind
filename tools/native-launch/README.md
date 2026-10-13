@@ -70,6 +70,9 @@ Window close and Quit await the document store's save check. The macOS
 standard Quit menu. Observed behavior and untested termination paths remain recorded in the results;
 this build must not be treated as a production-safe replacement for the browser app.
 
+The opt-in [document-layout readiness measurement](src/readiness.md) builds a separate instrumented
+reviewer variant and measures five fresh launches with a disposable public fixture.
+
 ## Boundary under test
 
 macOS and Linux use one executable with a short-lived command mode and a GUI host mode. Windows
