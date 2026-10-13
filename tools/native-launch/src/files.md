@@ -28,8 +28,9 @@ available for comparison and retry.
 
 Notify watches admitted files' parent directories, so replacement does not detach the file watch.
 Events invalidate the active document; a versioned read decides whether content changed. Read-only
-access events are ignored. Watch errors also invalidate. The UI revalidates on focus and falls back
-to periodic reads if watcher registration fails. Inactive retained documents revalidate on return;
+access events are ignored. Watch errors also invalidate. The UI revalidates on focus and periodically
+even when watch registration succeeds; failed registration uses a faster interval. Inactive retained
+documents revalidate on return;
 their saves still check versions. Network filesystem notification behavior and parent-directory
 replacement need further validation before adopting this as the production host.
 

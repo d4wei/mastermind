@@ -6,6 +6,17 @@ store's conflict handling. Prepared translations still pass through the shared T
 and source-mapping checks. Theme assets are bundled, and preferences use the experiment's native
 application config directory, separate from the existing browser app's preferences.
 
+The active document receives immediate native watcher invalidations and periodic revalidation to
+cover silent event loss or a watch left on a replaced parent directory. Healthy watcher registration
+uses a five-second interval; registration failure uses a one-second interval. Closing the document
+event source releases its listener and timer, including registrations that finish after navigation.
+Each revalidation reads and hashes the active file through the versioned native read path, even if
+its contents have not changed. This adds periodic filesystem and renderer work; it does not repair
+the underlying OS watch. The [notify watcher caveat][notify-watch] describes path replacement
+behavior.
+
+[notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
+
 `NativeReviewer.tsx` provides a native Open files action and a diagnostic open-file selector.
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.

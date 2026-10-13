@@ -129,8 +129,9 @@ it('waits for native termination cancellation before unlocking or accepting anot
 it('falls back to bounded periodic invalidation when watcher registration fails', async () => {
   vi.useFakeTimers()
   try {
+    const stop = vi.fn()
     const events = createNativeHost({ invoke: vi.fn().mockRejectedValue('watch unavailable'),
-      listen: async () => () => {} }, []).events('0')
+      listen: async () => stop }, []).events('0')
     const listener = vi.fn()
     events.addEventListener('file-changed', listener)
     await vi.advanceTimersByTimeAsync(0)
@@ -140,5 +141,76 @@ it('falls back to bounded periodic invalidation when watcher registration fails'
     events.close()
     await vi.advanceTimersByTimeAsync(1000)
     expect(listener).toHaveBeenCalledTimes(2)
+    expect(stop).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  } finally { vi.useRealTimers() }
+})
+
+it('revalidates a silent healthy watcher while native events still arrive immediately', async () => {
+  vi.useFakeTimers()
+  try {
+    let invalidate!: () => void
+    const stop = vi.fn()
+    const events = createNativeHost({ invoke: vi.fn().mockResolvedValue(undefined),
+      listen: async (_, callback) => { invalidate = callback; return stop } }, []).events('0')
+    const listener = vi.fn()
+    events.addEventListener('file-changed', listener)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(listener).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(listener).toHaveBeenCalledTimes(1)
+    invalidate()
+    expect(listener).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(listener).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(listener).toHaveBeenCalledTimes(4)
+    events.close()
+    expect(stop).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+    invalidate()
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(listener).toHaveBeenCalledTimes(4)
+  } finally { vi.useRealTimers() }
+})
+
+it.each(['resolve', 'reject'] as const)(
+  'does not start a timer when watcher registration %ss after close', async (outcome) => {
+    vi.useFakeTimers()
+    try {
+      let resolve!: () => void
+      let reject!: (reason: unknown) => void
+      const registration = new Promise<void>((done, fail) => { resolve = done; reject = fail })
+      const stop = vi.fn()
+      const invoke = vi.fn().mockReturnValue(registration)
+      const events = createNativeHost({ invoke, listen: async () => stop }, []).events('0')
+      const listener = vi.fn()
+      events.addEventListener('file-changed', listener)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(invoke).toHaveBeenCalledWith('watch_document', { id: '0' })
+      events.close()
+      if (outcome === 'resolve') resolve()
+      else reject(new Error('watch unavailable'))
+      await vi.advanceTimersByTimeAsync(10000)
+      expect(listener).not.toHaveBeenCalled()
+      expect(stop).toHaveBeenCalledOnce()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally { vi.useRealTimers() }
+  },
+)
+
+it('does not install fallback polling when subscription fails after close', async () => {
+  vi.useFakeTimers()
+  try {
+    let reject!: (reason: unknown) => void
+    const subscription = new Promise<() => void>((_, fail) => { reject = fail })
+    const events = createNativeHost({ invoke: vi.fn(), listen: () => subscription }, []).events('0')
+    const listener = vi.fn()
+    events.addEventListener('file-changed', listener)
+    events.close()
+    reject(new Error('events unavailable'))
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(listener).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
   } finally { vi.useRealTimers() }
 })

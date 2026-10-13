@@ -245,8 +245,8 @@ an explicit integration-test budget with all assertions retained. This reviewer 
 
 The Windows WebDriver script now checks first-success selection, inventory order, repeated opening,
 and retaining unsaved source across a switch away and repeat-open request. Its updated run passed in
-the Windows validation recorded below. Actual drag-and-drop gestures, multi-selection in native
-pickers, and Windows dialogs have not yet been exercised. Implementation details live in
+the Windows validation recorded below. Actual drag-and-drop gestures, Windows picker multi-selection,
+and Windows dialogs have not yet been exercised. Implementation details live in
 [native opening](src/opening.md).
 
 ### macOS comments and translated review — 2026-10-12
@@ -320,7 +320,18 @@ the GUI. The corrected installed Windows run passed, including that positive con
 In the packaged macOS reviewer, a clean open document updated after its parent directory was renamed
 away and a new directory and file were created at the original path. A subsequent edit inside the
 replacement directory also updated the view, without navigation or focus changes. This checks the
-observed macOS watcher behavior; Windows and Linux parent replacement still need their own checks.
+observed macOS watcher behavior. Windows at `d42a17e` passed native undo/redo after switching,
+but parent replacement left the clean editor stale throughout its bounded check. Diagnostics
+show replacement bytes on disk and the old source still visible, without a conflict notice.
+
+The native adapter now periodically revalidates the active document even after successful watcher
+registration; events still invalidate immediately. Fake-timer tests check silent-watch recovery and
+cleanup after delayed registration or failure. All 425 application tests and both typechecks pass.
+The updated installed Windows scenario and Linux parent-replacement interaction remain pending.
+
+In the rebuilt macOS package, a native picker selected two disposable Markdown files at once. The
+first file rendered, and a subsequent launcher request for the second returned `already_open`,
+confirming both were admitted by the picker. This does not establish drag-and-drop behavior.
 
 ### Blocking filesystem work — 2026-10-12
 
@@ -332,7 +343,8 @@ in [native blocking work](src/worker.md).
 
 All 31 local native tests and all-feature, all-target Clippy pass. New tests check cancellation,
 timeout after worker startup, panic recovery, serialized writes without the registry lock, and
-concurrent preference writes. Installed-package checks for this change are pending. The gate does
+concurrent preference writes. The rebuilt macOS reviewer passes all 18 packaged process checks.
+Windows native and process checks passed before its parent-replacement UI failure. The gate does
 not impose a filesystem deadline, bound retained documents, or isolate other requests from a stalled
 admission that holds the registry.
 

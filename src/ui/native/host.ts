@@ -45,7 +45,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
       const listeners = new Map<string, Set<(event: MessageEvent) => void>>()
       let closed = false
       let unlisten: (() => void) | undefined
-      let fallback: ReturnType<typeof setInterval> | undefined
+      let revalidation: ReturnType<typeof setInterval> | undefined
       const invalidate = (): void => {
         if (closed) return
         const event = new MessageEvent('file-changed', { data: JSON.stringify({ mtimeMs: 0 }) })
@@ -56,18 +56,20 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
         if (closed) { stop(); return }
         unlisten = stop
         await invoke('watch_document', { id })
+        if (closed) return
+        revalidation = setInterval(invalidate, 5000)
         invalidate()
       }).catch(() => {
         if (closed) return
+        revalidation = setInterval(invalidate, 1000)
         invalidate()
-        fallback = setInterval(invalidate, 1000)
       })
       return {
         addEventListener(name, listener) {
           if (!listeners.has(name)) listeners.set(name, new Set())
           listeners.get(name)!.add(listener)
         },
-        close() { closed = true; unlisten?.(); clearInterval(fallback); listeners.clear() },
+        close() { closed = true; unlisten?.(); clearInterval(revalidation); listeners.clear() },
       }
     },
   }
