@@ -1,7 +1,7 @@
 import type { Node as MarkdownNode, Parent } from 'unist'
 import { parseMarkdown } from '../../../shared/markdown/processor'
 import type { CriticSpan, Range as SourceRange } from '../../../shared/critic/types'
-import { codeRanges } from '../../../shared/markdown/exclusions'
+import { codeRanges, excludedRanges } from '../../../shared/markdown/exclusions'
 import type { TextEdit } from '../../../shared/types'
 
 export interface SelRange {
@@ -107,19 +107,31 @@ function inlineText(node: MarkdownNode): string | null {
   return values.some((value) => value === null) ? null : values.join('')
 }
 
+function lazyPositionedNodes(tree: MarkdownNode): () => Map<string, MarkdownNode> {
+  let positioned: Map<string, MarkdownNode> | undefined
+  return () => {
+    if (positioned) return positioned
+    const nodes = new Map<string, MarkdownNode>()
+    const visitMarkdown = (node: MarkdownNode): void => {
+      const from = node.position?.start.offset
+      const to = node.position?.end.offset
+      if (from !== undefined && to !== undefined) nodes.set(`${node.type}:${from}:${to}`, node)
+      const children = (node as Parent).children
+      if (children) children.forEach(visitMarkdown)
+    }
+    visitMarkdown(tree)
+    positioned = nodes
+    return positioned
+  }
+}
+
 /** Fully selected positioned wrappers account for syntax absent from the rendered text. */
-function mapFormattedSelection(range: Range, block: HTMLElement, source: string): SelResult | null {
+function mapFormattedSelection(
+  range: Range, block: HTMLElement, source: string, positionedNodes: () => Map<string, MarkdownNode>,
+): SelResult | null {
   const formats = Array.from(block.querySelectorAll<HTMLElement>('strong[data-ps],em[data-ps],del[data-ps],a[data-ps],code.md-inline-code[data-ps]'))
   if (!formats.some((element) => range.intersectsNode(element))) return null
-  const positioned = new Map<string, MarkdownNode>()
-  const visitMarkdown = (node: MarkdownNode): void => {
-    const from = node.position?.start.offset
-    const to = node.position?.end.offset
-    if (from !== undefined && to !== undefined) positioned.set(`${node.type}:${from}:${to}`, node)
-    const children = (node as Parent).children
-    if (children) children.forEach(visitMarkdown)
-  }
-  visitMarkdown(parseMarkdown(source))
+  const positioned = positionedNodes()
   const pieces: { from: number; to: number; rendered: string }[] = []
   const visitDom = (node: Node): boolean => {
     const content = block.ownerDocument.createRange()
@@ -170,6 +182,7 @@ function mapFormattedSelection(range: Range, block: HTMLElement, source: string)
 
 function mapWithinBlock(
   range: Range, block: HTMLElement, source: string, opaque: readonly SourceRange[],
+  positionedNodes: () => Map<string, MarkdownNode>,
 ): SelResult {
   const selectedText = range.toString()
   if (selectedText.length === 0) return { error: 'empty' }
@@ -182,10 +195,16 @@ function mapWithinBlock(
 
   const valid = from !== null && to !== null && to > from && source.slice(from, to) === selectedText
   if (!valid) {
-    const formatted = mapFormattedSelection(range, block, source)
+    const formatted = mapFormattedSelection(range, block, source, positionedNodes)
     if (formatted) {
-      if ('error' in formatted || splitsOpaqueSyntax(formatted.from, formatted.to, opaque)) return { error: 'unmapped' }
-      return formatted
+      if (!('error' in formatted)) {
+        if (splitsOpaqueSyntax(formatted.from, formatted.to, opaque)) return { error: 'unmapped' }
+        return formatted
+      }
+      const start = normalizePoint(range.startContainer, range.startOffset)
+      const end = normalizePoint(range.endContainer, range.endOffset)
+      // A single text leaf can use the existing substring fallback without bridging hidden syntax.
+      if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return formatted
     }
     const bps = Number(block.dataset.ps)
     const bpe = Number(block.dataset.pe)
@@ -213,7 +232,8 @@ export function rangeToSource(range: Range, source: string, spans: readonly Crit
   const endBlock = closestBlock(range.endContainer)
   if (!startBlock || startBlock !== endBlock) return { error: 'cross-block' }
 
-  const r = mapWithinBlock(range, startBlock, source, codeRanges(source))
+  const tree = parseMarkdown(source)
+  const r = mapWithinBlock(range, startBlock, source, excludedRanges(tree), lazyPositionedNodes(tree))
   if ('error' in r) return r
   if (overlapsMark(r, spans)) return { error: 'overlaps-mark' }
   return r
@@ -296,7 +316,9 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
   if (blocks.length === 0) return { error: 'unmapped' }
 
   const ranges: SelRange[] = []
-  const opaque = codeRanges(source)
+  const tree = parseMarkdown(source)
+  const opaque = excludedRanges(tree)
+  const positionedNodes = lazyPositionedNodes(tree)
   for (const block of blocks) {
     // The single-block case uses the selection as-is; spanning blocks each get a
     // fresh range clamped to the selection where it enters/leaves, block edges
@@ -309,7 +331,7 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
       if (block === endBlock) sub.setEnd(range.endContainer, range.endOffset)
     }
     if (sub.collapsed || sub.toString().trim().length === 0) continue
-    const r = mapWithinBlock(sub, block, source, opaque)
+    const r = mapWithinBlock(sub, block, source, opaque, positionedNodes)
     if ('error' in r) continue
     ranges.push(...markFreeGaps(r.from, r.to, source, spans, opaque))
   }

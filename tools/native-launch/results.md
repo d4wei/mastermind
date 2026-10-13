@@ -67,7 +67,8 @@ results; its timing samples are not a startup benchmark or comparable hardware t
 
 The window check establishes a visible window with the expected title. It does not establish
 rendered document content, Chinese input, focus behavior, native dialogs, or interactive usability.
-The experiment still has no editor, save operation, onboarding form, or production preferences.
+That initial diagnostic build had no editor, save operation, onboarding form, or production
+preferences; later reviewer builds are recorded below.
 
 ## Remaining evidence and implementation gaps
 
@@ -123,8 +124,8 @@ cross-compilation result alone would not establish runtime behavior.
 
 CI can establish repeatable behavior on its runner, but does not replace later interactive checks
 of installation, focus, Chinese input, and normal desktop use. Some permission checks need an
-explicit second-user test setup rather than the default runner identity, as used above. Linux
-execution evidence remains outstanding.
+explicit second-user test setup rather than the default runner identity, as used above. Installed
+Linux process validation now passes; its webview interaction remains untested.
 
 Prioritize Windows after macOS; retain a Linux build and smoke-test path at lower priority. This
 ordering preserves cross-platform viability without claiming that every platform is already ready.
@@ -421,8 +422,10 @@ live in [native file I/O](src/files.md).
 
 All 457 application tests, both typechecks, browser/native builds, 38 all-feature Rust tests, and
 native Clippy pass. The rebuilt macOS package passes all 19 process checks, including stable error
-codes and messages, and rejection without changing document bytes. Updated Windows and Linux
-installed runs remain pending for this change.
+codes and messages, and rejection without changing document bytes. At `245bff5`, the
+[Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38362526252) and
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38362526828) both passed,
+including the existing Windows reviewer interaction and other-user access-denial checks.
 
 ### Production host and distribution
 

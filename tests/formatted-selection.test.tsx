@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import * as processor from '../src/shared/markdown/processor'
 import { analyzeMarkdown } from '../src/shared/markdown/analyze'
 import { applyTextEdits } from '../src/shared/edits'
 import { resolveAll } from '../src/shared/critic/resolve'
@@ -93,4 +94,46 @@ it('does not nest new marks into formatted selections containing an existing rev
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
   expect(rangeToSourceRanges(range, source, spans)).toEqual({ error: 'unmapped' })
+})
+
+it('retains unique-substring mapping within one formatted text leaf containing an entity', () => {
+  const source = '**bravo &amp; charlie**'
+  const { host } = render(source)
+  const leaf = host.querySelector('strong span')!.firstChild!
+  const range = document.createRange()
+  range.setStart(leaf, 0)
+  range.setEnd(leaf, 5)
+  expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [{ from: 2, to: 7, text: 'bravo' }] })
+  expect(rangeToSource(range, source, [])).toEqual({ from: 2, to: 7, text: 'bravo' })
+})
+
+it('does not use the substring fallback across a partial wrapper containing an entity', () => {
+  const source = 'Before **bravo &amp; charlie** after.'
+  const { host } = render(source)
+  const range = document.createRange()
+  range.setStart(host.querySelector('strong span')!.firstChild!, 1)
+  range.setEnd(host.querySelector('p > span:last-child')!.firstChild!, 6)
+  expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+  expect(rangeToSource(range, source, [])).toEqual({ error: 'unmapped' })
+})
+
+it('parses once per multi-block mapping operation and does not cache across operations', () => {
+  const source = 'First **bold** paragraph.\n\nSecond *italic* paragraph.'
+  const { host } = render(source)
+  const paragraphs = host.querySelectorAll('p')
+  const range = document.createRange()
+  range.setStart(paragraphs[0]!, 0)
+  range.setEnd(paragraphs[1]!, paragraphs[1]!.childNodes.length)
+  const parse = vi.spyOn(processor, 'parseMarkdown')
+  try {
+    expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [
+      { from: 0, to: 25, text: 'First **bold** paragraph.' },
+      { from: 27, to: source.length, text: 'Second *italic* paragraph.' },
+    ] })
+    expect(parse).toHaveBeenCalledTimes(1)
+    rangeToSourceRanges(range, source, [])
+    expect(parse).toHaveBeenCalledTimes(2)
+  } finally {
+    parse.mockRestore()
+  }
 })
