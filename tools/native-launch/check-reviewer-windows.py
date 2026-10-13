@@ -191,7 +191,7 @@ def check(session, path, namespace):
     until('source undo survives a switch away and repeat open',
           lambda: not editor(session).endswith('X') and
           path.read_bytes() == edited.replace('\n', '\r\n').encode(), 20)
-    redo_keys = '\ue009\ue008z\ue000'
+    redo_keys = '\ue009y\ue000'
     command(session, 'POST', f'/element/{element(session, ".cm-content")}/value',
             {'text': redo_keys, 'value': list(redo_keys)})
     until('source redo restores the single edit after switching',
