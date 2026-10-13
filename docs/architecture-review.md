@@ -302,6 +302,26 @@ surface are simpler. Keep source splices authoritative; never save serialized re
 CodeMirror already provides the mature source-editing engine. A rich-text editor replacement is a
 separate product expansion and is not proposed here.
 
+Feasibility review, 2026-10-13: ordinary Markdown JSX could move into library components, but the
+review-specific layer remains. `SessionView.tsx` already obtains the parsed tree and review marks
+from `analyzeMarkdown`. The [react-markdown API][react-markdown-api] accepts a string and runs
+its own parse/transform/render pipeline. A direct substitution would repeat that parsing.
+A pipeline using the existing tree through lower-level unified tools is another candidate;
+it has not been tested.
+The [remark-rehype custom-node behavior][custom-nodes] requires explicit handlers for the Critic
+nodes rather than preserving their review semantics automatically.
+
+Before a full corpus comparison, a small adapter experiment should preserve text-leaf source
+positions, formatted selections, and Critic node identity using the existing selection tests.
+Remaining adapters must cover task-checkbox splices, hidden history and inert HTML, frontmatter,
+callout grouping, and syntax highlighting. Standard reference links and footnotes may improve
+reading but also change the current DOM and require selection checks. This source/API inspection
+does not establish parity, a performance result, or a net reduction in machinery. Keep the current
+renderer until an experiment establishes that benefit; no replacement dependency is adopted.
+
+[react-markdown-api]: https://github.com/remarkjs/react-markdown#api
+[custom-nodes]: https://github.com/remarkjs/remark-rehype#unknown-nodes
+
 Include the trial's cross-list insertion reproduction, author tags containing spaces, and comment
 soft-line wrapping in that comparison. Preserve screenshot-only observations as such; the original
 document is unavailable. See [trial notes](fork-rationale.md#trial-notes) for evidence.

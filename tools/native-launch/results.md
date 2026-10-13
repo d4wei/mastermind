@@ -482,6 +482,21 @@ process checks; it does not exercise the setup form through a Linux webview.
 The Mac remains locked, so this build has no new interactive macOS onboarding or Apple Pinyin
 result. The readiness harness now uses isolated completed preferences; no timing result is added.
 
+### Frontmatter properties — 2026-10-13
+
+At `df344ca`, the shared renderer shows simple metadata as read-only rows with literal YAML
+available in a disclosure. Unsupported structures retain literal rendering. Browser inspection
+covered multilingual values, multiline strings, narrow layout, and the disclosure; the sample file
+remained byte-exact. Selection regressions check that metadata stays excluded while a selection
+crossing into body text keeps its exact body range under LF and CRLF.
+
+All 550 application tests, both typechecks, browser and native frontend builds pass. The
+[Windows installed run](https://github.com/d4wei/mastermind/actions/runs/38371621982) and
+[Linux package run](https://github.com/d4wei/mastermind/actions/runs/38371621978)
+passed their existing native process and interaction checks. Those runs do not add a native
+graphical frontmatter case;
+the new display was inspected through the browser adapter.
+
 ### Production host and distribution
 
 This remains a validation host. Complete normal termination paths, broader translated-review checks,
