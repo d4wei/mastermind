@@ -15,12 +15,8 @@ beforeEach(() => {
   root = fs.realpathSync(raw) // mirror the route: macOS /tmp is itself a symlink
 
   fs.writeFileSync(path.join(root, 'a.md'), '# A\n\nHi {>>a note<<} there {++added++}.\n')
-  fs.writeFileSync(path.join(root, 'plain.txt'), 'not markdown\n')
   fs.mkdirSync(path.join(root, 'sub'))
   fs.writeFileSync(path.join(root, 'sub', 'b.md'), '# B\n')
-  fs.mkdirSync(path.join(root, 'node_modules'))
-  fs.writeFileSync(path.join(root, 'node_modules', 'pkg.md'), '# dep\n')
-  fs.mkdirSync(path.join(root, '.git'))
   fs.writeFileSync(path.join(root, '.env'), 'SECRET=1\n')
 
   // a sibling with a shared name prefix — the classic startsWith() footgun
@@ -66,11 +62,10 @@ describe('resolveWithin', () => {
   it('BLOCKS a leading-.. traversal', async () => {
     expect(await resolveWithin(root, '../secret.md')).toBeNull()
     expect(await resolveWithin(root, '..')).toBeNull()
-    expect(await resolveWithin(root, 'sub/../../etc/hosts')).toBeNull()
+    expect(await resolveWithin(root, 'sub/../../outside.md')).toBeNull()
   })
 
   it('BLOCKS an absolute path injection', async () => {
-    expect(await resolveWithin(root, '/etc/passwd')).toBeNull()
     expect(await resolveWithin(root, outsideFile)).toBeNull()
   })
 

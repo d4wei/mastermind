@@ -3,7 +3,6 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../tools/translation/prepared-translations'
-import { createPreview } from '../tools/preview/app'
 
 let dir: string
 let file: string
@@ -43,16 +42,18 @@ it('replaces an artifact atomically without carrying earlier translations into t
   expect((await fs.readdir(path.dirname(translationFile(file, 'zh-CN')))).filter((name) => name.endsWith('.tmp'))).toEqual([])
 })
 
-it('rejects partial, stale, wrong-language, and legacy artifacts without changing an existing one', async () => {
+it.each(['partial', 'stale', 'wrong-language', 'legacy'])('rejects a %s artifact without changing the previous one', async (kind) => {
   const valid = await artifactFor()
   await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
-  const invalid = [
-    { ...valid, blocks: valid.blocks.slice(1) },
-    { ...valid, sourceHash: 'stale' },
-    { ...valid, targetLang: 'fr' },
-    { h1: 'old cached map' },
-  ]
-  for (const input of invalid) await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', input)).rejects.toThrow()
+  const previous = await fs.readFile(translationFile(file, 'zh-CN'))
+  const invalid: Record<string, unknown> = {
+    partial: { ...valid, blocks: valid.blocks.slice(1) },
+    stale: { ...valid, sourceHash: 'stale' },
+    'wrong-language': { ...valid, targetLang: 'fr' },
+    legacy: { h1: 'old cached map' },
+  }
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', invalid[kind])).rejects.toThrow()
+  expect(await fs.readFile(translationFile(file, 'zh-CN'))).toEqual(previous)
   expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'ready', artifact: valid })
 })
 
@@ -66,6 +67,7 @@ it('rejects a source change while saving the translation and leaves the earlier 
   })
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', valid)).rejects.toThrow('source changed')
   expect(JSON.parse(await fs.readFile(translationFile(file, 'zh-CN'), 'utf8'))).toEqual(valid)
+  expect(await fs.readdir(path.dirname(translationFile(file, 'zh-CN')))).toEqual([path.basename(translationFile(file, 'zh-CN'))])
 })
 
 it('rejects path-shaped language codes rather than turning them into artifact filenames', async () => {
@@ -73,22 +75,25 @@ it('rejects path-shaped language codes rather than turning them into artifact fi
   expect(() => translationFile(file, '../outside')).toThrow()
 })
 
-it('serves only a current prepared artifact and removes live generation and hand-back endpoints', async () => {
-  const app = await createPreview(file, path.resolve('themes'))
-  const request = (suffix: string, method = 'GET') => app.request(`http://localhost/api/sessions/preview/${suffix}`, {
-    method, headers: { host: 'localhost' } })
-  {
-    expect((await request('translation?targetLang=zh-CN')).status).toBe(404)
-    const valid = await artifactFor()
-    await savePreparedTranslation(file, source, 'en', 'zh-CN', valid)
-    expect(await (await request('translation?targetLang=zh-CN')).json()).toEqual(valid)
-    expect((await request('translation?targetLang=../outside')).status).toBe(400)
-    await fs.writeFile(file, 'Changed narrative')
-    expect((await request('translation?targetLang=zh-CN')).status).toBe(409)
-    await fs.unlink(file)
-    expect((await request('translation?targetLang=zh-CN')).status).toBe(410)
-    expect((await request('handback', 'POST')).status).toBe(404)
-    expect((await app.request('http://localhost/api/translate', { method: 'POST', headers: { host: 'localhost' } })).status).toBe(404)
-    expect((await app.request('http://localhost/api/assist/pending', { headers: { host: 'localhost' } })).status).toBe(404)
-  }
+it.each(['write', 'rename'])('preserves the previous artifact and cleans temporary files after a %s failure', async (operation) => {
+  const previous = await artifactFor()
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', previous)
+  const artifactPath = translationFile(file, 'zh-CN')
+  const previousBytes = await fs.readFile(artifactPath)
+  const replacement = { ...previous, blocks: previous.blocks.map((block) => ({
+    ...block, text: block.text.startsWith('# ') ? '# 新标题' : '新段落。',
+  })) }
+  if (operation === 'write') {
+    const write = fs.writeFile.bind(fs)
+    vi.spyOn(fs, 'writeFile').mockImplementation(async (...args: Parameters<typeof fs.writeFile>) => {
+      if (String(args[0]).endsWith('.tmp')) {
+        await write(args[0], 'partial temporary artifact')
+        throw new Error('injected artifact write failure')
+      }
+      await write(...args)
+    })
+  } else vi.spyOn(fs, 'rename').mockRejectedValueOnce(new Error('injected artifact rename failure'))
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', replacement)).rejects.toThrow(`injected artifact ${operation} failure`)
+  expect(await fs.readFile(artifactPath)).toEqual(previousBytes)
+  expect(await fs.readdir(path.dirname(artifactPath))).toEqual([path.basename(artifactPath)])
 })

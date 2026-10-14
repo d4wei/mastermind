@@ -20,10 +20,11 @@ describe('maskSource', () => {
   })
 
   it('neutralizes sub/comment spans wholesale', () => {
-    const text = 'a {~~`tick`~>**bold**~~} b'
+    const text = 'a {~~`tick`~>**bold**~~} {>>comment **text**<<} b'
     const { masked } = maskSource(text, scan(text))
     expect(masked).not.toContain('`tick`')
     expect(masked).not.toContain('**bold**')
+    expect(masked).not.toContain('comment **text**')
     expect(masked.startsWith('a ')).toBe(true)
     expect(masked.endsWith(' b')).toBe(true)
   })
@@ -47,8 +48,11 @@ describe('maskSource', () => {
 
   it('falls back to an alternate sentinel pool on collision', () => {
     const dirty = `uses ${String.fromCharCode(0xe000)}${String.fromCharCode(0xe001)} already {++mark++}`
-    const { sentinels } = maskSource(dirty, scan(dirty))
-    expect(sentinels.neutral[0].charCodeAt(0)).toBeGreaterThanOrEqual(0xe010)
+    const { masked, sentinels } = maskSource(dirty, scan(dirty))
+    expect(masked).toContain(String.fromCharCode(0xe000) + String.fromCharCode(0xe001))
+    for (const sentinel of [...Object.values(sentinels.open), ...Object.values(sentinels.close), ...sentinels.neutral]) {
+      expect(dirty).not.toContain(sentinel)
+    }
   })
 
   it('alternates neutral chars so adjacent atoms stay distinguishable', () => {

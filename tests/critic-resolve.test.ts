@@ -69,3 +69,13 @@ describe('resolveAll', () => {
     expect(resolveAll(text, scan(text), 'reject')).toBe('bc')
   })
 })
+
+
+it.each(['\n', '\r\n'])('splices only the selected suggestion while preserving surrounding bytes (%j)', (eol) => {
+  const prefix = `# **Heading**${eol}${eol}> Before `
+  const suffix = ` after${eol}${eol}- [ ] item without a final newline`
+  const source = prefix + `{~~old${eol}> line~>new${eol}> line~~}` + suffix
+  const span = scan(source)[0]!
+  expect(applyTextEdits(source, [acceptEdit(source, span)])).toBe(prefix + `new${eol}> line` + suffix)
+  expect(applyTextEdits(source, [rejectEdit(source, span)])).toBe(prefix + `old${eol}> line` + suffix)
+})

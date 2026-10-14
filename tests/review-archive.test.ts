@@ -123,7 +123,6 @@ describe('resolved discussion archive', () => {
     const source = `{>>active<<}\n\n${tail}`
     const thread = threads(source)[0]!
     expect(() => resolveThreadEdits(source, thread)).toThrow('unterminated code or HTML block')
-    expect(source).toBe(`{>>active<<}\n\n${tail}`)
   })
 
   it('reads adjacent independently marked records and preserves diagnostic ranges', () => {

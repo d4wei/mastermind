@@ -21,23 +21,63 @@ function run(args: string[], input = ''): Promise<{ code: number | null; stdout:
     let stdout = ''; let stderr = ''
     child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
     child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
-    child.on('error', reject)
-    child.on('exit', (code) => resolve({ code, stdout, stderr }))
+    const timer = setTimeout(() => {
+      child.kill()
+      reject(new Error('translation CLI did not exit'))
+    }, 10_000)
+    child.on('error', (error) => { clearTimeout(timer); reject(error) })
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }) })
     child.stdin.end(input)
   })
 }
 
-it('requires explicit language codes and saves a complete fresh artifact', async () => {
-  expect((await run([file])).code).not.toBe(0)
-  const args = [file, '--source-lang', 'en', '--target-lang', 'zh-CN']
-  const prepared = await run(args)
+interface Plan {
+  sourceHash: string
+  blocks: Array<{ id: string; text: string; translatable: boolean }>
+  artifactPath: string
+}
+function argumentsForFile() {
+  return [file, '--source-lang', 'en', '--target-lang', 'zh-CN']
+}
+async function prepareArtifact() {
+  const prepared = await run(argumentsForFile())
   expect(prepared.code).toBe(0)
-  const plan = JSON.parse(prepared.stdout) as { sourceHash: string; blocks: Array<{ id: string; text: string; translatable: boolean }>; artifactPath: string }
+  expect(prepared.stderr).toBe('')
+  const plan = JSON.parse(prepared.stdout) as Plan
   const artifact = { version: 1, sourceHash: plan.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
-    blocks: plan.blocks.filter((b) => b.translatable).map((b) => ({ id: b.id, text: b.text })) }
-  expect((await run([...args, '--save'], JSON.stringify(artifact))).code).toBe(0)
+    blocks: plan.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id, text: block.text })) }
+  return { plan, artifact }
+}
+
+it.each([
+  ['source-lang', ['--target-lang', 'zh-CN']], ['target-lang', ['--source-lang', 'en']],
+])('requires the explicit %s option', async (missing, options) => {
+  const result = await run([file, ...options])
+  expect(result.code).toBe(1)
+  expect(result.stdout).toBe('')
+  expect(result.stderr).toContain(`--${missing}`)
+  expect(await fs.readdir(dir)).toEqual(['doc.md'])
+})
+
+it('saves a complete artifact and emits every block on the next preparation', async () => {
+  const { plan, artifact } = await prepareArtifact()
+  const saved = await run([...argumentsForFile(), '--save'], JSON.stringify(artifact))
+  expect(saved.code).toBe(0)
+  expect(saved.stderr).toBe('')
+  expect(JSON.parse(saved.stdout)).toEqual({ artifactPath: plan.artifactPath, written: artifact.blocks.length })
   expect(JSON.parse(await fs.readFile(plan.artifactPath, 'utf8'))).toEqual(artifact)
-  const fresh = await run(args)
+  const fresh = await run(argumentsForFile())
+  expect(fresh.code).toBe(0)
   expect(JSON.parse(fresh.stdout).blocks).toEqual(plan.blocks)
-  expect((await run([...args, '--save'], JSON.stringify({ ...artifact, blocks: [] }))).code).toBe(2)
+}, 15_000)
+
+it('rejects an incomplete saved artifact without changing the previous artifact', async () => {
+  const { plan, artifact } = await prepareArtifact()
+  expect((await run([...argumentsForFile(), '--save'], JSON.stringify(artifact))).code).toBe(0)
+  const previous = await fs.readFile(plan.artifactPath)
+  const rejected = await run([...argumentsForFile(), '--save'], JSON.stringify({ ...artifact, blocks: [] }))
+  expect(rejected.code).toBe(2)
+  expect(rejected.stdout).toBe('')
+  expect(rejected.stderr).toContain('complete block structure')
+  expect(await fs.readFile(plan.artifactPath)).toEqual(previous)
 }, 15_000)
