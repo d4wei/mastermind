@@ -170,7 +170,7 @@ def wait_window(pid):
                 found.append(text.value)
             return True
         user.EnumWindows(visit, 0)
-        if 'mastermind — native launch check' in found:
+        if 'mastermind' in found:
             return True
         time.sleep(0.1)
     return False

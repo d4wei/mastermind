@@ -31,7 +31,7 @@ def has_window(pid):
         text = ctypes.create_unicode_buffer(256)
         user.GetWindowTextW(handle, text, len(text))
         if (owner.value == pid and user.IsWindowVisible(handle)
-                and text.value == 'mastermind — native launch check'):
+                and text.value == 'mastermind'):
             found.append(handle)
         return True
     user.EnumWindows(visit, 0)
