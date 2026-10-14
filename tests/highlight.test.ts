@@ -1,32 +1,35 @@
 import { describe, it, expect } from 'vitest'
-import { highlight, type HlToken } from '../document/highlight'
+import { highlight } from '../ui/modes/reading/highlight'
 
-/** Concatenating token text must reproduce the input exactly — the renderer relies on this. */
-function roundtrips(code: string, lang?: string): boolean {
-  return highlight(code, lang).map((t) => t.value).join('') === code
-}
-/** Find the token type covering the first occurrence of `needle`. */
 function typeOf(code: string, needle: string, lang?: string): string | undefined {
-  let pos = 0
-  for (const t of highlight(code, lang) as HlToken[]) {
-    if (code.startsWith(needle, pos) && t.value.includes(needle)) return t.type
-    pos += t.value.length
+  const target = code.indexOf(needle)
+  if (target < 0) return undefined
+  let position = 0
+  for (const token of highlight(code, lang)) {
+    const end = position + token.value.length
+    if (position <= target && target + needle.length <= end) return token.type
+    position = end
   }
-  // fall back: scan tokens for one whose value contains the needle
-  return highlight(code, lang).find((t) => t.value.includes(needle))?.type
+  return undefined
 }
 
 describe('highlight tokenizer', () => {
-  it('round-trips arbitrary input for every language', () => {
-    const samples: Array<[string, string | undefined]> = [
-      ['const x = 1 // hi\n"str"', 'ts'],
-      ['def f():\n    return None  # done', 'python'],
-      ['git clone https://x.git && cd x # comment', 'sh'],
-      ['{ "a": 1, "b": [true, null] }', 'json'],
-      ['no lang here ()[]{}<>', undefined],
-      ['', 'js'],
-    ]
-    for (const [code, lang] of samples) expect(roundtrips(code, lang)).toBe(true)
+  it.each([
+    ['ts', 'const x = 1 // hi\n"str"'],
+    ['python', 'def f():\n    return None  # done'],
+    ['sh', 'git clone https://x.git && cd x # comment'],
+    ['json', '{ "a": 1, "b": [true, null] }'],
+    ['css', 'body { color: red; /* note */ }'],
+    ['rust', 'fn main() { return "value"; }'],
+    [undefined, 'no lang here ()[]{}<>'],
+    ['js', ''],
+    ['js', 'const text = "你好😀";\r\n// comment\r\n'],
+    ['js', '/* unfinished 你好😀'],
+    ['js', '"unfinished\\'],
+    ['python', '\'\'\'unfinished\r\n你好😀'],
+    ['sh', 'echo "你好😀"\r\nprintf $HOME'],
+  ])('preserves the exact input for %s code %j', (lang, code) => {
+    expect(highlight(code, lang).map((token) => token.value).join('')).toBe(code)
   })
 
   it('classifies JS keywords, strings, numbers, comments', () => {
@@ -43,8 +46,8 @@ describe('highlight tokenizer', () => {
     expect(toks.find((t) => t.value === 'baz')?.type).toBe('property')
   })
 
-  it('treats true/false/null as constants', () => {
-    expect(highlight('let ok = true', 'js').find((t) => t.value === 'true')?.type).toBe('constant')
+  it.each(['true', 'false', 'null'])('treats %s as a constant', (value) => {
+    expect(typeOf(`let value = ${value}`, value, 'js')).toBe('constant')
   })
 
   it('shell: first word is the command, $vars and -flags are distinct', () => {
@@ -52,12 +55,11 @@ describe('highlight tokenizer', () => {
     expect(toks.find((t) => t.value === 'npm')?.type).toBe('function')
     expect(toks.find((t) => t.value === '--silent')?.type).toBe('property')
     expect(toks.find((t) => t.value === '$HOME')?.type).toBe('constant')
-    // `run` and `build` are arguments, not commands — only `npm` is a function
     expect(toks.filter((t) => t.type === 'function').map((t) => t.value)).toEqual(['npm'])
   })
 
-  it('shell: a new command starts after a pipe or newline', () => {
-    const toks = highlight('cat f | grep x', 'sh')
+  it.each([' | ', '\n', '\r\n'])('shell: a new command starts after %j', (separator) => {
+    const toks = highlight(`cat f${separator}grep x`, 'sh')
     expect(toks.find((t) => t.value === 'cat')?.type).toBe('function')
     expect(toks.find((t) => t.value === 'grep')?.type).toBe('function')
   })
@@ -82,9 +84,14 @@ describe('highlight tokenizer', () => {
   })
 
   it('unknown language still colors strings and comments via the clike fallback', () => {
-    const toks = highlight('return "x"; /* c */', 'rust')
+    const toks = highlight('return "x"; /* c */', 'unrecognized-language')
     expect(toks.some((t) => t.type === 'string')).toBe(true)
     expect(toks.some((t) => t.type === 'comment')).toBe(true)
     expect(toks.find((t) => t.value === 'return')?.type).toBe('keyword')
   })
+})
+
+it('classifies the first occurrence rather than a later matching token', () => {
+  expect(typeOf('let value = "const"; const next = 1', 'const', 'js')).toBe('string')
+  expect(typeOf('/* target */ target()', 'target', 'js')).toBe('comment')
 })

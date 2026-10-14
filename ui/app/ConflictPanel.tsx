@@ -1,6 +1,6 @@
 import { useT } from '../i18n'
 import { SlideOver } from './SlideOver'
-import { useDoc, type createDocStore } from './store'
+import { useDoc, type createDocStore } from '../documents/store'
 import './ConflictPanel.css'
 
 interface Props {

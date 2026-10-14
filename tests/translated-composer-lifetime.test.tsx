@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
+import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { webcrypto } from 'node:crypto'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { SessionView } from '../ui/app/SessionView'
-import { useDoc } from '../ui/app/store'
+import { useDoc } from '../ui/documents/store'
 import { useConfig } from '../ui/app/configStore'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../ui/app/api', async (original) => ({ ...await original<object>(), openEvents: () => ({ addEventListener() {}, close() {} }) }))
 vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 vi.mock('../ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
   containerRef: React.RefObject<HTMLElement | null>; artifact: PreparedTranslation
@@ -20,6 +21,7 @@ const initial = useDoc.getState()
 const config = useConfig.getState()
 const source = 'Hello.'
 beforeEach(async () => {
+  installHost(fakeHost())
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.stubGlobal('crypto', webcrypto)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', source, savedSource: source, load: vi.fn().mockResolvedValue(undefined) })
@@ -44,7 +46,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   act(() => root.unmount()); host.remove(); useDoc.setState(initial); useConfig.setState(config); useTranslation.getState().reset()
-  window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals()
+  window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals(); installHost(null)
 })
 it.each(['comment', 'narrative'])('retains the composer draft through a %s update', async (kind) => {
   const changed = kind === 'comment' ? 'Hello.{>>@claude: another comment<<}' : 'Changed prose.'
@@ -52,4 +54,16 @@ it.each(['comment', 'narrative'])('retains the composer draft through a %s updat
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
   expect(useTranslation.getState().active).toBe(kind === 'comment')
   if (kind === 'narrative') expect(host.querySelector('.sel-composer [role="alert"]')).not.toBeNull()
+})
+
+it.each(['same source', 'new source'])('retains the captured passage and draft when a newer translation arrives for %s', async (revision) => {
+  const previous = useTranslation.getState().artifact!
+  const sourceHash = revision === 'new source' ? (await prepareTranslation('Changed prose.')).sourceHash : previous.sourceHash
+  const newer = { ...previous, sourceHash, blocks: previous.blocks.map((block) => ({ ...block, text: '新版译文。' })) }
+  await act(async () => useTranslation.setState({ artifact: newer }))
+  expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
+  expect(host.querySelector('.sel-composer [role="alert"]')).not.toBeNull()
+  await act(async () => host.querySelector<HTMLButtonElement>('.sel-composer .primary')!.click())
+  expect(useDoc.getState().source).toBe(source)
+  expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
 })

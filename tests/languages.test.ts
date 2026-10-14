@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findLanguage, langLabel, searchLanguages } from '../ui/settings/languages'
+import { LANGUAGES, findLanguage, langLabel, searchLanguages } from '../ui/settings/languages'
 
 describe('language resolution', () => {
   it('resolves the canonical English name', () => {
@@ -24,7 +24,7 @@ describe('language resolution', () => {
 
 describe('searchLanguages', () => {
   it('returns the full list for an empty query', () => {
-    expect(searchLanguages('').length).toBeGreaterThan(10)
+    expect(searchLanguages('')).toEqual(LANGUAGES)
   })
 
   it('matches name, endonym, and code', () => {

@@ -1,15 +1,15 @@
 # Native reviewer adapter
 
 `main.tsx` installs the native host before mounting the existing React reviewer. `host.ts` adapts
-Tauri commands to `app/host.ts`; structured native failures retain the status used by the document
-store's conflict handling. Prepared translations still pass through the shared TypeScript freshness
+Tauri commands to `app/host.ts`; failures become host-level conflict, missing, or failure results.
+The document store does not interpret native command envelopes or HTTP statuses. Prepared translations still pass through the shared TypeScript freshness
 and source-mapping checks. Theme assets are bundled, and preferences use the native application
 config directory.
 
 The active document receives immediate native watcher invalidations and periodic revalidation to
 cover silent event loss or a watch left on a replaced parent directory. Healthy watcher registration
 uses a five-second interval; registration failure uses a one-second interval. Closing the document
-event source releases its listener and timer, including registrations that finish after navigation.
+subscription releases its listener and timer, including registrations that finish after navigation.
 Periodic invalidation skips an interval while that document has native reads in flight, so a slow
 read can settle without being superseded by the timer. Reads of other documents do not pause it.
 Native watcher events still invalidate immediately. Each revalidation reads and hashes the active

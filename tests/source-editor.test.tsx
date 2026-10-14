@@ -4,17 +4,14 @@ import { EditorView } from '@codemirror/view'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { getFile, getSession, putFile } from '../ui/app/api'
-import { useDoc } from '../ui/app/store'
+import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
+import { useDoc } from '../ui/documents/store'
 import { SourceEditor } from '../ui/modes/source/SourceEditor'
 
-vi.mock('../ui/app/api', () => {
-  class ApiError extends Error {
-    constructor(public status: number, message: string) { super(message) }
-  }
-  return { ApiError, getFile: vi.fn(), getSession: vi.fn(), putFile: vi.fn(),
-    postRename: vi.fn(), postHandback: vi.fn() }
-})
+const getFile = vi.fn()
+const getSession = vi.fn()
+const putFile = vi.fn()
 
 let host: HTMLDivElement
 let root: Root
@@ -36,6 +33,7 @@ function editor(): EditorView {
 }
 
 beforeEach(async () => {
+  installHost(fakeHost({ getFile, getSession, putFile }))
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   a = `source-A-${++sequence}`
@@ -62,7 +60,7 @@ afterEach(() => {
   host.remove()
   vi.clearAllTimers()
   vi.useRealTimers()
-  vi.unstubAllGlobals()
+  vi.unstubAllGlobals(); installHost(null)
 })
 
 it('retains real CodeMirror undo and selection across A to B to A', async () => {

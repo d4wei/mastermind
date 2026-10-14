@@ -1,7 +1,7 @@
 import { DEFAULT_CONFIG } from '../settings/defaults'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
-import { ApiError } from '../app/api'
+import { HostError } from '../app/host'
 import type { ReviewerHost } from '../app/host'
 
 export interface NativeBridge {
@@ -15,7 +15,9 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     catch (error) {
       if (error && typeof error === 'object' && 'status' in error && 'error' in error) {
         const message = 'message' in error ? error.message : error.error
-        throw new ApiError(Number(error.status), String(message), error)
+        const status = Number(error.status)
+        throw new HostError(status === 409 ? 'conflict' : status === 404 || status === 410 ? 'missing' : 'failure',
+          String(message), error)
       }
       throw error
     }
@@ -50,15 +52,13 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
       return write
     },
     themes: async () => themes,
-    events(id) {
-      const listeners = new Map<string, Set<(event: MessageEvent) => void>>()
+    subscribe(id, listener) {
       let closed = false
       let unlisten: (() => void) | undefined
       let revalidation: ReturnType<typeof setInterval> | undefined
       const invalidate = (): void => {
         if (closed) return
-        const event = new MessageEvent('file-changed', { data: JSON.stringify({ mtimeMs: 0 }) })
-        listeners.get('file-changed')?.forEach((listener) => listener(event))
+        listener('changed')
       }
       const poll = (): void => { if (!pendingReads.has(id)) invalidate() }
       // Subscribe before watching, then revalidate to cover changes during registration.
@@ -74,13 +74,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
         revalidation = setInterval(poll, 1000)
         invalidate()
       })
-      return {
-        addEventListener(name, listener) {
-          if (!listeners.has(name)) listeners.set(name, new Set())
-          listeners.get(name)!.add(listener)
-        },
-        close() { closed = true; unlisten?.(); clearInterval(revalidation); listeners.clear() },
-      }
+      return () => { closed = true; unlisten?.(); clearInterval(revalidation) }
     },
   }
 }

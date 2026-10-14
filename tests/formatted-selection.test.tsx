@@ -1,20 +1,13 @@
 // @vitest-environment jsdom
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderMarkdown } from './helpers/markdown'
 import { expect, it, vi } from 'vitest'
 import * as processor from '../document/markdown/processor'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { applyTextEdits } from '../document/edits'
 import { resolveAll } from '../document/critic/resolve'
-import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { markEdits, rangeToSource, rangeToSourceRanges } from '../ui/modes/reading/selection'
 import { commentEdits, deletionWrap } from '../ui/modes/reading/marks'
 
-function render(source: string) {
-  const analysis = analyzeMarkdown(source)
-  const host = document.createElement('article')
-  host.innerHTML = renderToStaticMarkup(<MarkdownView tree={analysis.tree} ctx={{ source }} />)
-  return { host, ...analysis }
-}
 
 it.each([
   'Alpha **bravo** charlie `delta` echo.',
@@ -24,7 +17,7 @@ it.each([
   'Alpha `` padded ` code `` echo.',
 ])('maps complete formatting in a paragraph to exact source: %s', (paragraph) => {
   const source = `# Selection\r\n\r\n${paragraph}\r\n`
-  const { host, spans } = render(source)
+  const { host, spans } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
   const mapped = rangeToSourceRanges(range, source, spans)
@@ -33,7 +26,7 @@ it.each([
   if (!('ranges' in mapped)) throw new Error(mapped.error)
   expect(rangeToSource(range, source, spans)).toEqual(mapped.ranges[0])
   const commented = applyTextEdits(source, commentEdits(mapped.ranges, 'Alex', 'Review this.'))
-  const next = render(commented)
+  const next = renderMarkdown(commented)
   expect(next.items).toMatchObject([{ type: 'thread', comments: [{ author: 'Alex', body: 'Review this.' }] }])
   expect(next.host.querySelector('p')!.textContent).toBe(host.querySelector('p')!.textContent)
   const deletion = applyTextEdits(source, markEdits(mapped.ranges, deletionWrap))
@@ -45,7 +38,7 @@ it.each([
 
 it('includes complete formatting at both endpoint boundaries without broadening the selected prose', () => {
   const source = 'Before **bold** and *italic* after.'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const range = document.createRange()
   range.setStart(host.querySelector('strong span')!.firstChild!, 0)
   range.setEnd(host.querySelector('em span')!.firstChild!, 6)
@@ -56,7 +49,7 @@ it('includes complete formatting at both endpoint boundaries without broadening 
 
 it.each(['start', 'end'])('refuses a selection crossing a partial formatting wrapper at its %s', (edge) => {
   const source = 'Before **bold** after.'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const range = document.createRange()
   const bold = host.querySelector('strong span')!.firstChild!
   const first = host.querySelector('p > span')!.firstChild!
@@ -69,7 +62,7 @@ it.each(['start', 'end'])('refuses a selection crossing a partial formatting wra
 
 it('keeps selections confined to formatted text and refuses partial inline code crossing', () => {
   const source = 'Before **bravo** and `delta` after.'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const range = document.createRange()
   const bold = host.querySelector('strong span')!.firstChild!
   range.setStart(bold, 1)
@@ -82,7 +75,7 @@ it('keeps selections confined to formatted text and refuses partial inline code 
 
 it('refuses hidden syntax gaps not accounted for by complete positioned wrappers', () => {
   const source = '**bold** [reference][target] after.\n\n[target]: https://example.com'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
   expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
@@ -90,7 +83,7 @@ it('refuses hidden syntax gaps not accounted for by complete positioned wrappers
 
 it('does not nest new marks into formatted selections containing an existing review mark', () => {
   const source = 'Before **bold** {==already==}{>>note<<} after.'
-  const { host, spans } = render(source)
+  const { host, spans } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
   expect(rangeToSourceRanges(range, source, spans)).toEqual({ error: 'unmapped' })
@@ -98,7 +91,7 @@ it('does not nest new marks into formatted selections containing an existing rev
 
 it('retains unique-substring mapping within one formatted text leaf containing an entity', () => {
   const source = '**bravo &amp; charlie**'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const leaf = host.querySelector('strong span')!.firstChild!
   const range = document.createRange()
   range.setStart(leaf, 0)
@@ -109,7 +102,7 @@ it('retains unique-substring mapping within one formatted text leaf containing a
 
 it('does not use the substring fallback across a partial wrapper containing an entity', () => {
   const source = 'Before **bravo &amp; charlie** after.'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const range = document.createRange()
   range.setStart(host.querySelector('strong span')!.firstChild!, 1)
   range.setEnd(host.querySelector('p > span:last-child')!.firstChild!, 6)
@@ -119,7 +112,7 @@ it('does not use the substring fallback across a partial wrapper containing an e
 
 it('parses once per multi-block mapping operation and does not cache across operations', () => {
   const source = 'First **bold** paragraph.\n\nSecond *italic* paragraph.'
-  const { host } = render(source)
+  const { host } = renderMarkdown(source)
   const paragraphs = host.querySelectorAll('p')
   const range = document.createRange()
   range.setStart(paragraphs[0]!, 0)

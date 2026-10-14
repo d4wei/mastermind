@@ -2,17 +2,14 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ApiError, getFile, getSession, putFile } from '../ui/app/api'
+import { HostError, installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
 import { ConflictPanel } from '../ui/app/ConflictPanel'
-import { createDocStore } from '../ui/app/store'
+import { createDocStore } from '../ui/documents/store'
 
-vi.mock('../ui/app/api', () => {
-  class ApiError extends Error {
-    constructor(public status: number, message: string) { super(message) }
-  }
-  return { ApiError, getFile: vi.fn(), getSession: vi.fn(), putFile: vi.fn(),
-    postHandback: vi.fn(), postRename: vi.fn() }
-})
+const getFile = vi.fn()
+const getSession = vi.fn()
+const putFile = vi.fn()
 vi.mock('../ui/i18n', () => ({ useT: () => (key: string) => key }))
 const file = (content: string, version: string) => ({ content, version, mtimeMs: 1 })
 function deferred<T>() {
@@ -21,13 +18,14 @@ function deferred<T>() {
   return { promise, resolve }
 }
 beforeEach(() => {
+  installHost(fakeHost({ getFile, getSession, putFile }))
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.mocked(getSession).mockReset().mockResolvedValue({ displayName: 'A', path: 'A' } as never)
   vi.mocked(getFile).mockReset().mockResolvedValue(file('base', 'v1'))
   vi.mocked(putFile).mockReset().mockResolvedValue({ mtimeMs: 2, version: 'v3' })
 })
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => { installHost(null); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 async function comparison() {
   const store = createDocStore()
@@ -71,7 +69,7 @@ it('retains the edited result on close and navigation, while rejecting same-mtim
 it('refreshes disk after a rejected write and retains the draft until explicit refresh', async () => {
   const store = await comparison()
   store.getState().setConflictResult('merged')
-  vi.mocked(putFile).mockRejectedValueOnce(new ApiError(409, 'changed'))
+  vi.mocked(putFile).mockRejectedValueOnce(new HostError('conflict', 'changed'))
   vi.mocked(getFile).mockResolvedValue(file('new disk', 'v4'))
   expect(await store.getState().saveConflictResult()).toBe(false)
   expect(store.getState().conflictDraft?.result).toBe('merged')
@@ -89,7 +87,7 @@ it('preserves local and result after deletion and read failure without recreatin
   store.getState().notifyDiskChange(0, true)
   expect(await store.getState().saveConflictResult()).toBe(false)
   expect(await store.getState().useConflictDisk()).toBe(false)
-  vi.mocked(getFile).mockRejectedValueOnce(new ApiError(410, 'missing or unreadable'))
+  vi.mocked(getFile).mockRejectedValueOnce(new HostError('missing', 'missing or unreadable'))
   await store.getState().refreshConflict()
   expect(store.getState().source).toBe('local')
   expect(store.getState().conflictDraft?.result).toBe('merged')
@@ -224,7 +222,7 @@ it('keeps result edits protected by the lifecycle guard even when local equals b
 it.each(['event', 'refresh', 'use disk'])('blocks apply after production 410 during %s without claiming deletion', async (action) => {
   const store = await comparison()
   store.getState().setConflictResult('manual')
-  vi.mocked(getFile).mockRejectedValueOnce(new ApiError(410, 'missing or unreadable'))
+  vi.mocked(getFile).mockRejectedValueOnce(new HostError('missing', 'missing or unreadable'))
   if (action === 'event') {
     store.getState().notifyDiskChange(1)
     await vi.advanceTimersByTimeAsync(0)
@@ -257,7 +255,7 @@ it('ignores a stale failed read after a newer comparison refresh', async () => {
   const oldRefresh = store.getState().refreshConflict()
   vi.mocked(getFile).mockResolvedValue(file('new disk', 'v4'))
   await store.getState().refreshConflict()
-  reject(new ApiError(410, 'missing or unreadable'))
+  reject(new HostError('missing', 'missing or unreadable'))
   await oldRefresh
   expect(store.getState().conflictDraft?.diskVersion).toBe('v4')
   expect(store.getState().conflictDraft?.error).toBeNull()

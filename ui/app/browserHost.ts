@@ -1,4 +1,8 @@
-import { ApiError } from './api'
+import { HostError, type HostFailure } from './host'
+
+function failureKind(status: number): HostFailure {
+  return status === 409 ? 'conflict' : status === 404 || status === 410 ? 'missing' : 'failure'
+}
 import type { ReviewerHost } from './host'
 
 export function createBrowserHost(): ReviewerHost {
@@ -9,12 +13,12 @@ export function createBrowserHost(): ReviewerHost {
     let data: unknown
     try { data = await response.json() }
     catch (error) {
-      if (!response.ok) throw new ApiError(response.status, response.statusText)
+      if (!response.ok) throw new HostError(failureKind(response.status), response.statusText)
       throw error
     }
     if (!response.ok) {
       const message = data && typeof data === 'object' && 'error' in data ? String(data.error) : response.statusText
-      throw new ApiError(response.status, message, data)
+      throw new HostError(failureKind(response.status), message, data)
     }
     return data as T
   }
@@ -23,7 +27,13 @@ export function createBrowserHost(): ReviewerHost {
     getSession: (id) => request(session(id)),
     getFile: (id) => request(`${session(id)}/file`),
     putFile: (id, content, baseVersion) => request(`${session(id)}/file`, 'PUT', { content, baseVersion }),
-    events: (id) => new EventSource(`${session(id)}/events?role=ui`),
+    subscribe(id, listener) {
+      const events = new EventSource(`${session(id)}/events?role=ui`)
+      events.addEventListener('file-changed', () => listener('changed'))
+      events.addEventListener('file-deleted', () => listener('deleted'))
+      events.addEventListener('config-changed', () => listener('config'))
+      return () => events.close()
+    },
     translation: (id, lang) => request(`${session(id)}/translation?targetLang=${encodeURIComponent(lang)}`),
     config: () => request('/api/config'),
     updateConfig: (patch) => request('/api/config', 'PUT', patch),

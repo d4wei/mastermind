@@ -4,7 +4,7 @@ import { EditorState, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
-import { useDoc } from '../../app/store'
+import { useDoc } from '../../documents/store'
 import { scrollElementToTop } from '../../util/scroll'
 
 const CRITIC_CLASS: Record<string, string> = {

@@ -1,14 +1,4 @@
-/**
- * A tiny, dependency-free syntax tokenizer for the reading view's code blocks.
- *
- * Local-first ethos: no highlighter library, no CDN, no per-language grammar
- * downloads. This produces a flat list of typed tokens that the renderer wraps
- * in `<span class="tok tok-*">`; the actual colors come from CSS variables that
- * `ThemeProvider` sets per the user's chosen code-color scheme (see
- * `ui/theme/codeThemes.ts`). It is intentionally approximate — good enough to
- * make a shell/JS/JSON snippet read easier, not a compiler. Isomorphic /
- * browser-safe (no Node APIs) so it can live in `document/`.
- */
+/** Code coloring is approximate; concatenating token values preserves the original code text. */
 
 export type TokenType =
   | 'text'
@@ -26,19 +16,13 @@ export interface HlToken {
 }
 
 interface LangSpec {
-  /** line-comment markers, e.g. ['//', '#'] */
   line: string[]
-  /** block-comment delimiter pairs (open, close), e.g. C-style slash-star */
   block: Array<[string, string]>
-  /** single-char string delimiters */
   quotes: string[]
-  /** Python-style triple-quoted strings */
   triple: boolean
   keywords: Set<string>
   constants: Set<string>
-  /** shell mode: command detection, $vars, -flags */
   shell: boolean
-  /** JSON mode: color `"key":` as a property */
   jsonKeys: boolean
 }
 
@@ -106,8 +90,6 @@ const ID_PART = /[A-Za-z0-9_$]/
 const DIGIT = /[0-9]/
 const SEP = new Set([';', '|', '&', '(', '{', '\n', '`'])
 
-/** Tokenize `code` for the given fenced-block `lang`. Always returns text that, when
- *  concatenated in order, exactly reproduces the input. */
 export function highlight(code: string, lang?: string): HlToken[] {
   const spec = specFor(lang)
   const out: HlToken[] = []
@@ -128,7 +110,7 @@ export function highlight(code: string, lang?: string): HlToken[] {
   while (i < n) {
     const c = code[i]!
 
-    // whitespace — passthrough (don't reset shell command position on spaces/tabs)
+    // Shell command position survives indentation and argument spacing.
     if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
       if (c === '\n') cmdStart = true
       push('text', c)
@@ -136,7 +118,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // line comments
     let matched = false
     for (const m of spec.line) {
       if (startsWith(i, m)) {
@@ -150,7 +131,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
     }
     if (matched) continue
 
-    // block comments
     for (const [open, close] of spec.block) {
       if (startsWith(i, open)) {
         const end = code.indexOf(close, i + open.length)
@@ -163,7 +143,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
     }
     if (matched) continue
 
-    // triple-quoted strings (python)
     if (spec.triple && (startsWith(i, '"""') || startsWith(i, "'''"))) {
       const q = code.slice(i, i + 3)
       const end = code.indexOf(q, i + 3)
@@ -173,16 +152,15 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // strings
     if (spec.quotes.includes(c)) {
       let j = i + 1
       while (j < n) {
         if (code[j] === '\\') { j += 2; continue }
         if (code[j] === c) { j++; break }
-        if (code[j] === '\n' && c !== '`') { break } // unterminated — stop at EOL (except templates)
+        // Recover at the next line for ordinary quotes; templates may span lines.
+        if (code[j] === '\n' && c !== '`') { break }
         j++
       }
-      // JSON: a string immediately before a colon is a key, not a value
       let k = j
       while (k < n && (code[k] === ' ' || code[k] === '\t')) k++
       push(spec.jsonKeys && code[k] === ':' ? 'property' : 'string', code.slice(i, j))
@@ -190,7 +168,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // shell: $var / ${...}
     if (spec.shell && c === '$') {
       let j = i + 1
       if (code[j] === '{') {
@@ -204,7 +181,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // shell: -flag / --flag (only when not mid-identifier)
     if (spec.shell && c === '-' && (DIGIT.test(code[i + 1] ?? '') === false) && /[-A-Za-z]/.test(code[i + 1] ?? '')) {
       let j = i + 1
       while (j < n && /[A-Za-z0-9_-]/.test(code[j]!)) j++
@@ -213,7 +189,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // numbers
     if (DIGIT.test(c) || (c === '.' && DIGIT.test(code[i + 1] ?? ''))) {
       let j = i
       if (c === '0' && /[xXbBoO]/.test(code[i + 1] ?? '')) {
@@ -228,13 +203,12 @@ export function highlight(code: string, lang?: string): HlToken[] {
           while (j < n && /[0-9]/.test(code[j]!)) j++
         }
       }
-      if (/[A-Za-z%]/.test(code[j] ?? '')) { while (j < n && ID_PART.test(code[j]!)) j++ } // 10px, 5n, suffixes
+      if (/[A-Za-z%]/.test(code[j] ?? '')) { while (j < n && ID_PART.test(code[j]!)) j++ }
       push('number', code.slice(i, j))
       i = j
       continue
     }
 
-    // identifiers
     if (ID_START.test(c)) {
       let j = i + 1
       while (j < n && ID_PART.test(code[j]!)) j++
@@ -247,7 +221,7 @@ export function highlight(code: string, lang?: string): HlToken[] {
       let type: TokenType
       if (spec.keywords.has(word)) {
         type = 'keyword'
-        if (spec.shell) cmdStart = true // after `if`/`then`/`do`… a command follows
+        if (spec.shell) cmdStart = true
       } else if (spec.constants.has(word)) {
         type = 'constant'
       } else if (spec.jsonKeys && code[k] === ':') {
@@ -267,7 +241,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
       continue
     }
 
-    // any other single char (operators / punctuation) → plain text
     if (spec.shell && SEP.has(c)) cmdStart = true
     push('text', c)
     i++

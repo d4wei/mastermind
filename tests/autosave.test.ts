@@ -1,127 +1,106 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionMeta } from '../ui/app/hostTypes'
-
-// Mock the HTTP client before importing the store. The autosave paths under test
-// touch no DOM, so this runs in the default node env with fake timers.
-vi.mock('../ui/app/api', () => {
-  class ApiError extends Error {
-    constructor(
-      public status: number,
-      message: string,
-      public data?: unknown,
-    ) {
-      super(message)
-    }
-  }
-  return {
-    ApiError,
-    putFile: vi.fn(),
-    getFile: vi.fn(),
-    getSession: vi.fn(),
-  }
-})
-
-import { ApiError, getFile, putFile } from '../ui/app/api'
-import { useDoc } from '../ui/app/store'
+import { HostError, installHost } from '../ui/app/host'
+import { createDocStore } from '../ui/documents/store'
+import { fakeHost } from './helpers/host'
 
 const AUTOSAVE_MS = 600
+const getFile = vi.fn()
+const putFile = vi.fn()
+let store: ReturnType<typeof createDocStore>
 
-function seed(over: Partial<ReturnType<typeof useDoc.getState>> = {}): void {
-  useDoc.setState({
-    sessionId: 's1',
-    source: 'hello',
-    savedSource: 'hello',
-    eol: 'lf',
-    mtimeMs: 100,
-    version: 'base',
-    saving: false,
-    savingKind: null,
-    conflict: false,
-    notice: null,
-    history: [],
-    externalVersion: 0,
-    flushEditor: null,
-    meta: { displayName: 'f.md', path: '/f.md' } as unknown as SessionMeta,
-    ...over,
-  })
+async function load(content = 'hello'): Promise<void> {
+  getFile.mockResolvedValue({ content, mtimeMs: 100, version: 'base' })
+  await store.getState().load('s1')
 }
 
 describe('autosave', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers()
-    vi.mocked(putFile).mockReset().mockResolvedValue({ mtimeMs: 200, version: 'saved' })
-    vi.mocked(getFile).mockReset()
-    seed()
+    getFile.mockReset()
+    putFile.mockReset().mockResolvedValue({ mtimeMs: 200, version: 'saved' })
+    installHost(fakeHost({ getFile, putFile,
+      getSession: async (sessionId) => ({ sessionId, displayName: 'f.md', path: '/f.md', mtimeMs: 100 }),
+    }))
+    store = createDocStore()
+    await load()
   })
   afterEach(() => {
+    installHost(null)
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 
   it('debounces an edit into a single disk write after the idle delay', async () => {
-    useDoc.getState().setSource('hello world')
-    expect(putFile).not.toHaveBeenCalled() // still within the debounce window
-
+    store.getState().setSource('hello world')
+    expect(putFile).not.toHaveBeenCalled()
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(putFile).toHaveBeenCalledTimes(1)
-    expect(putFile).toHaveBeenCalledWith('s1', 'hello world', 'base')
-    expect(useDoc.getState().savedSource).toBe('hello world')
+    expect(putFile).toHaveBeenCalledExactlyOnceWith('s1', 'hello world', 'base')
+    expect(store.getState().savedSource).toBe('hello world')
   })
 
   it('coalesces a burst of edits into one write of the latest text', async () => {
-    useDoc.getState().setSource('a')
-    useDoc.getState().setSource('ab')
-    useDoc.getState().setSource('abc')
+    store.getState().setSource('a')
+    store.getState().setSource('ab')
+    store.getState().setSource('abc')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-
-    expect(putFile).toHaveBeenCalledTimes(1)
-    expect(putFile).toHaveBeenCalledWith('s1', 'abc', 'base')
+    expect(putFile).toHaveBeenCalledExactlyOnceWith('s1', 'abc', 'base')
   })
 
   it('restores the original EOL on the wire', async () => {
-    seed({ eol: 'crlf', source: 'a\nb', savedSource: 'a\nb' })
-    useDoc.getState().setSource('a\nb\nc')
+    store = createDocStore()
+    await load('a\r\nb')
+    store.getState().setSource('a\nb\nc')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).toHaveBeenCalledWith('s1', 'a\r\nb\r\nc', 'base')
   })
 
-  it('saves unedited YAML frontmatter byte-for-byte, including CRLF', async () => {
-    const source = '---\ntitle: "Plan"\nitems: [one, two]\n---\n\n# Body\n'
-    seed({ source, savedSource: '', eol: 'crlf' })
-    vi.mocked(getFile).mockResolvedValue({ content: source, mtimeMs: 100, version: 'disk' })
-    await useDoc.getState().autosave()
-    expect(putFile).toHaveBeenCalledWith('s1', source.replaceAll('\n', '\r\n'), 'base')
+  it('does not write an unedited loaded file, including CRLF frontmatter', async () => {
+    const source = '---\r\ntitle: "Plan"\r\nitems: [one, two]\r\n---\r\n\r\n# Body\r\n'
+    store = createDocStore()
+    await load(source)
+    expect(await store.getState().autosave()).toBe(true)
+    expect(putFile).not.toHaveBeenCalled()
+    expect(store.getState().source).toBe(source.replaceAll('\r\n', '\n'))
+  })
+
+  it('retains exact CRLF frontmatter while saving a body edit', async () => {
+    const prefix = '---\r\ntitle: "Plan"\r\nitems: [one, two]\r\n---\r\n\r\n'
+    store = createDocStore()
+    await load(prefix + '# Body\r\n')
+    store.getState().setSource(store.getState().source + 'Accepted edit\n')
+    await store.getState().autosave()
+    expect(putFile).toHaveBeenCalledWith('s1', prefix + '# Body\r\nAccepted edit\r\n', 'base')
   })
 
   it('does not schedule writes while a disk conflict is unresolved', async () => {
-    seed({ conflict: true })
-    useDoc.getState().setSource('edit during conflict')
+    await store.getState().openConflict()
+    store.getState().setSource('edit during conflict')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).not.toHaveBeenCalled()
   })
 
-  it('a failed write is never silent — it raises the saveFailed notice', async () => {
-    vi.mocked(putFile).mockRejectedValue(new Error('network down'))
-    useDoc.getState().setSource('doomed edit')
+  it('a failed write raises the saveFailed notice and retains dirty source', async () => {
+    putFile.mockRejectedValue(new Error('disk unavailable'))
+    store.getState().setSource('accepted edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-
-    expect(useDoc.getState().notice).toEqual({ kind: 'error', msg: 'saveFailed' })
+    expect(store.getState().notice).toEqual({ kind: 'error', msg: 'saveFailed' })
+    expect(store.getState().savedSource).toBe('hello')
+    expect(store.getState().source).toBe('accepted edit')
   })
 
-  it('a 409 raises the conflict flag instead of a generic error', async () => {
-    vi.mocked(putFile).mockRejectedValue(new ApiError(409, 'file changed on disk'))
-    useDoc.getState().setSource('racing edit')
+  it('a host conflict raises the conflict flag instead of a generic error', async () => {
+    putFile.mockRejectedValue(new HostError('conflict', 'file changed on disk'))
+    store.getState().setSource('racing edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-
-    expect(useDoc.getState().conflict).toBe(true)
-    expect(useDoc.getState().notice).toBeNull()
+    expect(store.getState().conflict).toBe(true)
+    expect(store.getState().notice).toBeNull()
   })
 
   it('retains the exact accepted buffer after saving', async () => {
-    vi.mocked(putFile).mockResolvedValue({ mtimeMs: 250, content: 'REWRITTEN\n' } as never)
-    useDoc.getState().setSource('hello world')
+    putFile.mockResolvedValue({ mtimeMs: 250, version: 'saved', content: 'REWRITTEN\n' })
+    store.getState().setSource('hello world')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-
-    expect(useDoc.getState().source).toBe('hello world')
-    expect(useDoc.getState().savedSource).toBe('hello world')
+    expect(store.getState().source).toBe('hello world')
+    expect(store.getState().savedSource).toBe('hello world')
   })
 })

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from '../ui/desktop/NativeSetup'
@@ -24,13 +25,10 @@ beforeEach(() => {
   mocks.invoke.mockReset().mockResolvedValue(snapshot({}, true))
   mocks.load.mockReset().mockResolvedValue(undefined)
   mocks.confirmed.mockReset()
-  host = document.createElement('div')
-  document.body.append(host)
-  root = createRoot(host)
+  ;({ host, root } = createReactHost())
 })
 afterEach(() => {
-  act(() => root.unmount())
-  host.remove()
+  removeReactHost(root, host)
   vi.unstubAllGlobals()
 })
 const mount = async (state = snapshot()) => {
@@ -38,8 +36,7 @@ const mount = async (state = snapshot()) => {
 }
 function editName(value: string) {
   const input = host.querySelector<HTMLInputElement>('[name="authorTag"]')!
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value)
-  input.dispatchEvent(new Event('input', { bubbles: true }))
+  inputValue(input, value)
 }
 const submit = () => host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
 

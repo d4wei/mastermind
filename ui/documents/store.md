@@ -2,12 +2,17 @@
 
 `createDocStore` retains an in-memory record for every visited session. Each record owns its
 normalized source, saved base, original line endings, opaque disk version, review undo history,
-write state, and autosave timer. The Zustand state exposes the active record; editor callbacks
+write promise and status, autosave timer, disk-read generation, and pending invalidation.
+The registry and active document ID are separate from the Zustand view. Record operations publish
+the active projection explicitly; view subscriptions never copy state back into the registry.
+The Zustand state exposes the active record; editor callbacks
 are valid only for the document and external-buffer revision where they registered.
 
 Navigation flushes the departing editor before loading another session. Retained documents are
 revalidated on return. Failed navigation leaves the departing record available. Load requests
-and disk reads carry generations; write boundaries invalidate older disk reads. Save responses
+and disk reads carry generations; explicit reload also guards the captured local revision,
+including edits that return to the same text. Write boundaries invalidate older disk reads. Save
+responses
 update their originating record even after navigation, and a successful save schedules another
 write if the buffer changed during the request.
 
@@ -27,7 +32,7 @@ An explicit refresh updates the comparison snapshots while preserving Result. Ed
 during that refresh still invalidate its captured Local revision.
 
 Save result requires both the captured Local revision and the displayed Disk token to remain
-current. The write sends that exact token to the server. A conflict response refreshes the latest
+current. The write sends that exact token to the host. A conflict response refreshes the latest
 Disk for comparison while preserving the stale draft; the user must explicitly refresh before
 retrying against a different version. Successful completion changes only its originating document.
 If local edits arrived during the write, they remain in the buffer and saving stays paused rather
@@ -40,7 +45,8 @@ invalidates the comparison's apply token while retaining its text. An unavailabl
 missing or unreadable; only a deletion event establishes the missing-file notice. Repeated reads
 and refreshes share generation guards, and write boundaries invalidate older reads.
 
-`ConflictPanel.tsx` presents the persistent viewport notice and the shared SlideOver comparison
+[`ConflictPanel.tsx`](../app/ConflictPanel.tsx) presents the persistent viewport notice and the shared
+SlideOver comparison
 shell. Result is a manual text merge; no automatic merge or normalized Markdown serialization is
 involved. Ordinary writes and accepted Result restore the appropriate original line endings.
 

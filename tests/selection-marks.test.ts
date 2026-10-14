@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { markEdits, type SelRange } from '../ui/modes/reading/selection'
+import { commentEdits } from '../ui/modes/reading/marks'
 import { applyTextEdits } from '../document/edits'
 import { scan, group } from '../document/critic/scanner'
 
-// Pure (no DOM) coverage of the cross-block apply path: given the per-block
-// SelRanges the DOM mapping produces, the marks built by markEdits + applyTextEdits
-// must be valid CriticMarkup that the scanner parses back to the intended marks.
-// This guards the round-trip invariant the resolve/scanner tests protect.
-
-// "First paragraph.\n\nSecond paragraph."  — two blocks, blank line between.
 const SOURCE = 'First paragraph.\n\nSecond paragraph.'
 // A realistic cross-block selection: from "paragraph." in block 0 through
 // "Second paragraph" in block 1 (block 0: start→end, block 1: start→end point).
@@ -32,28 +27,25 @@ describe('markEdits — cross-block marks round-trip', () => {
     expect(scan(out).filter((s) => s.kind === 'del')).toHaveLength(2)
   })
 
-  it('attaches a comment to the first block only; later blocks stay bare highlights', () => {
+  it('attaches a comment to the first block and leaves later source unchanged', () => {
     const out = applyTextEdits(
       SOURCE,
-      markEdits(CROSS, (s, i) => (i === 0 ? `{==${s}==}{>>@kd: needs detail<<}` : `{==${s}==}`)),
+      commentEdits(CROSS, 'Alex', 'needs detail'),
     )
     const items = group(scan(out), out)
     const threads = items.filter((it) => it.type === 'thread')
     const bareHighlights = items.filter((it) => it.type === 'highlight')
     expect(threads).toHaveLength(1)
-    expect(bareHighlights).toHaveLength(1)
+    expect(bareHighlights).toHaveLength(0)
+    expect(out).toBe('First {==paragraph.==}{>>@Alex: needs detail<<}\n\nSecond paragraph.')
     expect(threads[0]).toMatchObject({ type: 'thread' })
     if (threads[0]?.type === 'thread') {
       expect(threads[0].comments[0]?.body).toContain('needs detail')
-      expect(threads[0].comments[0]?.author).toBe('kd')
+      expect(threads[0].comments[0]?.author).toBe('Alex')
     }
   })
 
-  it('produces non-overlapping edits (applyTextEdits never throws)', () => {
-    expect(() => applyTextEdits(SOURCE, markEdits(CROSS, (s) => `{==${s}==}`))).not.toThrow()
-  })
-
-  it('single range behaves exactly like the old single-block path', () => {
+  it('preserves text outside a single range', () => {
     const one: SelRange[] = [{ from: 6, to: 15, text: 'paragraph' }]
     expect(applyTextEdits(SOURCE, markEdits(one, (s) => `{==${s}==}`))).toBe('First {==paragraph==}.\n\nSecond paragraph.')
   })

@@ -8,6 +8,8 @@ export type ConfigPatch = Partial<Omit<ClientConfig, 'version'>>
 interface ConfigState {
   config: ClientConfig | null
   themes: ThemeInfo[]
+  saveFailed: boolean
+  clearFailure(): void
   load(): Promise<void>
   update(patch: ConfigPatch): Promise<void>
 }
@@ -15,6 +17,8 @@ interface ConfigState {
 export const useConfig = create<ConfigState>((set, get) => ({
   config: null,
   themes: [],
+  saveFailed: false,
+  clearFailure() { set({ saveFailed: false }) },
 
   async load() {
     const [config, themes] = await Promise.all([
@@ -26,6 +30,7 @@ export const useConfig = create<ConfigState>((set, get) => ({
 
   async update(patch) {
     const host = requireReviewerHost()
+    set({ saveFailed: false })
     const current = get().config
     if (current) {
       set({ config: { ...current, ...patch } as ClientConfig })
@@ -37,8 +42,7 @@ export const useConfig = create<ConfigState>((set, get) => ({
       await get()
         .load()
         .catch(() => {})
-      const { useDoc } = await import('./store')
-      useDoc.getState().setNotice({ kind: 'error', msg: 'configSaveFailed' })
+      set({ saveFailed: true })
     }
   },
 }))

@@ -28,3 +28,7 @@ document, translation fingerprint, and target, so annotation-only revalidation r
 A translation-input mismatch preserves the draft with a stale-selection warning and refuses
 submission; toggling back to original, changing language, or navigating closes that translated
 composer.
+
+An open translated comment captures its artifact and exact selected passage. A newer artifact
+retains the draft but disables submission against the old selection; it never silently rebinds the
+comment to different translated text.

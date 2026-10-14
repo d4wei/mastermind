@@ -4,7 +4,7 @@ import { Tip } from './Tip'
 import { useT } from '../i18n'
 import { scrollToOffset } from '../util/scroll'
 import { useNav } from './navStore'
-import { useDoc } from './store'
+import { useDoc } from '../documents/store'
 
 /** Selects the off-canvas navigator when the viewport is narrow. */
 export function useIsNarrow(): boolean {

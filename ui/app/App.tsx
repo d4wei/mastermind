@@ -7,13 +7,20 @@ import { useConfig } from './configStore'
 import { Navigator, useIsNarrow } from './Navigator'
 import { useNav } from './navStore'
 import { useRoute } from './route'
-import { registerDocumentLifecycle } from './documentLifecycle'
+import { registerDocumentLifecycle } from '../documents/documentLifecycle'
 import { SessionView } from './SessionView'
 
 export function App({ home, onboarding, native = false }: {
   home?: ReactNode; onboarding?: ReactNode; native?: boolean
 }) {
   const load = useConfig((s) => s.load)
+  const saveFailed = useConfig((s) => s.saveFailed)
+  const t = useT()
+  useEffect(() => {
+    if (!saveFailed) return
+    const timer = setTimeout(() => useConfig.getState().clearFailure(), 8000)
+    return () => clearTimeout(timer)
+  }, [saveFailed])
   const route = useRoute()
   const awaitingNativeSetup = native && onboarding != null
   useEffect(() => {
@@ -35,6 +42,7 @@ export function App({ home, onboarding, native = false }: {
         )}
         {route.kind === 'home' && (home ?? <HomeView />)}
       </>}
+      {saveFailed && <div className="toast toast-error" role="alert">{t('configSaveFailed')}</div>}
       <GrainOverlay />
     </Tooltip.Provider>
   )

@@ -15,9 +15,9 @@ import { SlotLabel } from '../util/SlotLabel'
 import { useT } from '../i18n'
 import { useTranslation } from '../translate/translationStore'
 import { TranslatedSelection } from '../translate/TranslatedSelection'
-import { openEvents } from './api'
+import { requireReviewerHost } from './host'
 import { useConfig } from './configStore'
-import { useDoc, type ViewMode } from './store'
+import { useDoc, type ViewMode } from '../documents/store'
 import { parseResolvedThreads } from '../../document/review-archive'
 import { ResolvedThreads } from '../review/ResolvedThreads'
 import { ConflictPanel } from './ConflictPanel'
@@ -59,32 +59,27 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const [railOpen, setRailOpen] = useState(!narrow)
   useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
   const closeRail = useCallback(() => setRailOpen(false), [])
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [findOpen, setFindOpen] = useState(false)
-  const [resolvedOpen, setResolvedOpen] = useState(false)
-  useEffect(() => { if (narrow && findOpen) setRailOpen(false) }, [narrow, findOpen])
+  const [panel, setPanel] = useState<'settings' | 'find' | 'resolved' | null>(null)
   const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
-  // Transient panels share one overlay home; opening one closes the others.
-  const toggleSettings = useCallback(() => {
-    setSettingsOpen((v) => {
-      if (!v) {
-        setFindOpen(false)
-        setResolvedOpen(false)
-        if (narrow) setRailOpen(false)
-        useDoc.getState().closeConflict()
-      }
-      return !v
-    })
+  const togglePanel = useCallback((next: 'settings' | 'find' | 'resolved') => {
+    useDoc.getState().closeConflict()
+    if (narrow) setRailOpen(false)
+    setPanel((current) => current === next ? null : next)
   }, [narrow])
   useEffect(() => {
     if (comparisonOpen) {
       if (narrow) setRailOpen(false)
-      setSettingsOpen(false)
-      setFindOpen(false)
-      setResolvedOpen(false)
+      setPanel(null)
     }
   }, [comparisonOpen, narrow])
-  const closeSettings = useCallback(() => setSettingsOpen(false), [])
+  const closePanel = useCallback(() => setPanel(null), [])
+  const openRail = useCallback(() => {
+    if (narrow) {
+      setPanel(null)
+      useDoc.getState().closeConflict()
+    }
+    setRailOpen(true)
+  }, [narrow])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
   const translationLanguage = useConfig((s) => s.config?.translationLanguage) ?? null
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
@@ -114,18 +109,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     if (status !== 'ready') return
-    const es = openEvents(sessionId)
-    es.addEventListener('file-changed', (e) => {
-      const { mtimeMs } = JSON.parse((e as MessageEvent).data) as { mtimeMs: number }
-      if (useDoc.getState().sessionId === sessionId) useDoc.getState().notifyDiskChange(mtimeMs)
+    return requireReviewerHost().subscribe(sessionId, (event) => {
+      if (event === 'config') { void useConfig.getState().load(); return }
+      if (useDoc.getState().sessionId === sessionId) {
+        useDoc.getState().notifyDiskChange(0, event === 'deleted')
+      }
     })
-    es.addEventListener('file-deleted', () => {
-      if (useDoc.getState().sessionId === sessionId) useDoc.getState().notifyDiskChange(0, true)
-    })
-    es.addEventListener('config-changed', () => {
-      void useConfig.getState().load()
-    })
-    return () => es.close()
   }, [sessionId, status])
 
   const showTranslated = mode === 'reading' && transActive
@@ -187,11 +176,9 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     return ticks
   }, [analysis])
 
-  // global shortcuts: ⌘S (swallow), ⌘E (toggle view), ⌘F (find), ⌘Z (undo)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // ⌘S is a no-op now — the buffer autosaves. Swallow it so the browser's
-      // "save page" dialog never appears.
+      // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         return
@@ -202,16 +189,11 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         s.setMode(MODE_CYCLE[s.mode])
         return
       }
-      // ⌘F opens the mark-aware find bar (reading mode, marks present); a second
-      // ⌘F while it's open closes it, leaving native find for the next press
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
         const s = useDoc.getState()
         if (s.mode === 'reading') {
           e.preventDefault()
-          setFindOpen((v) => {
-            if (!v) { setSettingsOpen(false); setResolvedOpen(false); useDoc.getState().closeConflict() }
-            return !v
-          })
+          togglePanel('find')
         }
         return
       }
@@ -226,7 +208,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [togglePanel])
 
   // Remove a suggested deletion the user placed: rejecting a `del` keeps the
   // original text (unwraps the `{--…--}`). Reuses the live source/analysis.
@@ -253,11 +235,11 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
           setActiveSpan((prev) => (prev === idx ? null : idx))
-          setRailOpen(true)
+          openRail()
         }
       }
     },
-    [undoDeletion],
+    [undoDeletion, openRail],
   )
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -274,11 +256,11 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
           setActiveSpan((prev) => (prev === idx ? null : idx))
-          setRailOpen(true)
+          openRail()
         }
       }
     },
-    [undoDeletion],
+    [undoDeletion, openRail],
   )
 
   const activeCardSpan = useMemo(() => {
@@ -339,23 +321,15 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   return (
     <>
       <TopBar
-        settings={{ open: settingsOpen, onToggle: toggleSettings }}
-        resolved={{ count: resolvedCount, open: resolvedOpen, onToggle: () => {
-          setResolvedOpen((value) => !value)
-          setSettingsOpen(false)
-          if (narrow) setRailOpen(false)
-          setFindOpen(false)
-          useDoc.getState().closeConflict()
-        } }}
+        settings={{ open: panel === 'settings', onToggle: () => togglePanel('settings') }}
+        resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
         railOpen={railOpen}
         // Both controls stay mounted so the bar morphs between layouts; their
         // applicability (not their presence) is what changes per view.
         onToggleRail={() => {
           setRailOpen((v) => !v)
           if (narrow) {
-            setSettingsOpen(false)
-            setResolvedOpen(false)
-            setFindOpen(false)
+            setPanel(null)
             useDoc.getState().closeConflict()
           }
         }}
@@ -367,17 +341,17 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           onToggle: () => void useTranslation.getState().toggle(),
         } : undefined}
       />
-      {settingsOpen && (
+      {panel === 'settings' && (
         <Suspense fallback={null}>
-          <SettingsPanel onClose={closeSettings} />
+          <SettingsPanel onClose={closePanel} />
         </Suspense>
       )}
-      {findOpen && mode === 'reading' && !showTranslated && analysis && (
+      {panel === 'find' && mode === 'reading' && !showTranslated && analysis && (
         <Suspense fallback={null}>
-          <FindBar analysis={analysis} source={source} docRef={articleRef} onClose={() => setFindOpen(false)} />
+          <FindBar analysis={analysis} source={source} docRef={articleRef} onClose={closePanel} />
         </Suspense>
       )}
-      {resolvedOpen && <ResolvedThreads source={source} onClose={() => setResolvedOpen(false)} />}
+      {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
       <ConflictPanel />
       {translation.error && <div className="banner" role="status"><span className="banner-text">
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
@@ -435,7 +409,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       </div>
       {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
         translation.targetLang === translationLanguage && (
-        <TranslatedSelection key={`${sessionId}:${composerArtifact.sourceHash}:${translationLanguage}`}
+        <TranslatedSelection key={`${sessionId}:${translationLanguage}`}
           containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
           stale={translation.error === 'stale'} />
       )}

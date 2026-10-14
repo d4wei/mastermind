@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
-import { useDoc } from '../ui/app/store'
+import { useDoc } from '../ui/documents/store'
 import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
@@ -14,15 +16,13 @@ vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edi
   return <div data-testid="rail" />
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../ui/app/api', async (importOriginal) => ({ ...await importOriginal<object>(),
-  openEvents: () => ({ addEventListener() {}, close() {} }),
-}))
 vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 let host: HTMLDivElement
 let root: Root
 const initial = useDoc.getState()
 
 beforeEach(() => {
+  installHost(fakeHost())
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
@@ -34,7 +34,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   act(() => root.unmount()); host.remove(); useDoc.setState(initial)
-  vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals()
+  vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); installHost(null)
 })
 function render(source: string) {
   useDoc.setState({ source, savedSource: source })
@@ -97,9 +97,16 @@ it('opens narrow-screen comments in a dismissible panel without reserving a side
   expect(host.querySelector('[role="dialog"]')).toBeNull()
 })
 
-it('opens the comment panel from a narrow-screen document marker', () => {
+it.each(['pointer', 'keyboard'])('opens comments exclusively from a narrow-screen marker using %s', (input) => {
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
   render('{>>@Alex: a note<<}')
-  act(() => host.querySelector<HTMLElement>('.critic-comment-marker')!.click())
+  act(() => host.querySelector<HTMLButtonElement>('.topbar-resolved')!.click())
+  expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Resolved discussions (0)')
+  const marker = host.querySelector<HTMLElement>('.critic-comment-marker')!
+  act(() => {
+    if (input === 'pointer') marker.click()
+    else marker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+  expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
   expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Comments')
 })

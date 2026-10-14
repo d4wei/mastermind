@@ -456,7 +456,7 @@ the implementation, and keep unresolved product choices in [DIRECTION.md][direct
 [marks]: ../document/critic/types.ts
 [labels]: ../ui/i18n/index.ts
 [archive]: ../document/review-archive.md
-[store]: ../ui/app/store.md
+[store]: ../ui/documents/store.md
 [files]: ../desktop/src/files.md
 [sessions]: ../desktop/src/admission.rs
 [fonts]: ../ui/theme/fontRegistry.ts

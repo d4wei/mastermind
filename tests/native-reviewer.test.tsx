@@ -12,7 +12,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../ui/app/store', () => ({ useDoc: Object.assign(() => null, {
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => null, {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
     prepareToClose: mocks.prepareToClose }),
 }) }))

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { matchPreparedTranslation, type PreparedTranslation } from '../../document/translation'
-import { ApiError, getPreparedTranslation } from '../app/api'
-import { useDoc } from '../app/store'
+import { HostError, requireReviewerHost } from '../app/host'
+import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 
 export interface TranslationSnapshot { sessionId: string | null; source: string; targetLang: string | null }
@@ -59,13 +59,13 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
       const token = ++generation
       set({ ...snapshot, active: false, loading: true, artifact: null, error: null })
       try {
-        const raw = await getPreparedTranslation(snapshot.sessionId, snapshot.targetLang)
+        const raw = await requireReviewerHost().translation(snapshot.sessionId, snapshot.targetLang)
         await validate(raw, token, snapshot)
       } catch (error) {
         if (token !== generation || !sameIdentity(snapshot)) return
         set({ ...current(), active: false, loading: false, artifact: null,
-          error: error instanceof ApiError && error.status === 404 ? 'missing'
-            : error instanceof ApiError && error.status === 409 ? 'stale' : 'unavailable' })
+          error: error instanceof HostError && error.kind === 'missing' ? 'missing'
+            : error instanceof HostError && error.kind === 'conflict' ? 'stale' : 'unavailable' })
       }
     },
     reset() {

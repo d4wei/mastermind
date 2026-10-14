@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
-import { useDoc } from '../app/store'
+import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
@@ -13,7 +13,7 @@ interface Props {
   authorTag: string
   stale?: boolean
 }
-interface Selection { blockId: string; quote: string; top: number; left: number }
+interface Selection { artifact: PreparedTranslation; blockId: string; quote: string; top: number; left: number }
 export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
@@ -39,7 +39,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const quote = selected.toString()
       if (!quote.trim()) { setSelection(null); return }
       const rect = range.getBoundingClientRect()
-      setSelection({ blockId: first.dataset.transBlockId!, quote, top: rect.top, left: rect.left })
+      setSelection({ artifact, blockId: first.dataset.transBlockId!, quote, top: rect.top, left: rect.left })
       setError(false)
     }
     document.addEventListener('selectionchange', change)
@@ -48,22 +48,23 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const close = () => { setSelection(null); setComposing(false); setBody(''); setError(false) }
   const submit = async () => {
     if (!selection || !body.trim() || busy.current) return
+    const capturedArtifact = selection.artifact
     busy.current = true
     setSubmitting(true)
     try {
       const current = useDoc.getState()
       const translated = useTranslation.getState()
-      if (current.sessionId !== sessionId || !translated.active || translated.artifact !== artifact ||
-        translated.targetLang !== artifact.targetLang || useConfig.getState().config?.translationLanguage !== artifact.targetLang ||
-        !(await matchPreparedTranslation(current.source, artifact))) {
+      if (current.sessionId !== sessionId || !translated.active || translated.artifact !== capturedArtifact ||
+        translated.targetLang !== capturedArtifact.targetLang || useConfig.getState().config?.translationLanguage !== capturedArtifact.targetLang ||
+        !(await matchPreparedTranslation(current.source, capturedArtifact))) {
         setError(true); return
       }
       const edit = await translatedCommentEdit(current.source, { blockId: selection.blockId,
-        sourceHash: artifact.sourceHash, quote: selection.quote, language: artifact.targetLang, author: authorTag, body })
+        sourceHash: capturedArtifact.sourceHash, quote: selection.quote, language: capturedArtifact.targetLang, author: authorTag, body })
       const latest = useDoc.getState()
       if (!edit || latest.sessionId !== sessionId || latest.source !== current.source ||
-        useTranslation.getState().artifact !== artifact || !useTranslation.getState().active ||
-        useConfig.getState().config?.translationLanguage !== artifact.targetLang) { setError(true); return }
+        useTranslation.getState().artifact !== capturedArtifact || !useTranslation.getState().active ||
+        useConfig.getState().config?.translationLanguage !== capturedArtifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])
       window.getSelection()?.removeAllRanges()
       close()
@@ -83,7 +84,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
             if (event.key === 'Escape') close()
             event.stopPropagation()
           }} />
-        {(error || stale) && <div role="alert">{t('translatedCommentStale')}</div>}
+        {(error || stale || selection.artifact !== artifact) && <div role="alert">{t('translatedCommentStale')}</div>}
         <div className="sel-composer-actions">
           <button type="button" onClick={close}>{t('cancel')}</button>
           <button type="button" className="primary" disabled={!body.trim() || submitting}

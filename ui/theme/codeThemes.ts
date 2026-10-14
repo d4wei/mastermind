@@ -16,7 +16,7 @@
  * `text` falls through to the base `--color-text`.
  */
 
-import type { HlToken } from '../../document/highlight'
+import type { HlToken } from '../modes/reading/highlight'
 
 export type ColorTok = Exclude<HlToken['type'], 'text'>
 export const COLOR_TOKS: ColorTok[] = ['comment', 'keyword', 'string', 'number', 'function', 'property', 'constant']

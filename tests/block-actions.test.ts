@@ -33,10 +33,7 @@ describe('blockContentRanges (the BlockActions whole-block path)', () => {
     expect(blockContentRanges(root.querySelector('li')!, src, [])).toEqual([{ from: 2, to: 10, text: 'Item one' }])
   })
 
-  // The regression: with inline formatting the rendered text ("Para with bold inside.")
-  // differs from the source slice ("Para with **bold** inside."), which broke the old
-  // selectNodeContents→rangeToSourceRanges path (it returned unmapped → silent no-op).
-  it('spans inline markup like **bold** (the silent-no-op bug)', () => {
+  it('retains inline formatting in the complete source span', () => {
     const src = 'Para with **bold** inside.'
     const root = build(
       '<p data-ps="0" data-pe="26">' +

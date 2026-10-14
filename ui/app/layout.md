@@ -14,6 +14,11 @@ content column. The panel starts closed and opens from the comments control or a
 Cards flow vertically inside it. Wide layouts retain document-aligned cards. Settings, resolved
 history, conflict comparison, and narrow comments share the overlay area.
 
+`SessionView` owns settings, find, and resolved history as one transient panel choice. Opening
+comparison closes that choice; closing comparison preserves the document-owned draft. On narrow
+layouts, opening another panel closes comments. Settings-save feedback belongs to application
+preferences and can appear without an active document.
+
 Settings and history panels fit within the viewport width and scroll their bodies when needed.
 Conflict notices remain fixed below the controls; comparison appears below the notice. Find controls
 wrap to fit narrow widths. Long source/code lines can still scroll within their own content areas.

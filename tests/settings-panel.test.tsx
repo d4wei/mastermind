@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Root } from 'react-dom/client'
+import { createReactHost, removeReactHost } from './helpers/dom'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ClientConfig } from '../ui/settings/types'
 import { useConfig } from '../ui/app/configStore'
 import { SettingsPanel } from '../ui/settings/SettingsPanel'
@@ -25,13 +26,10 @@ beforeEach(() => {
     themes: [],
     update,
   })
-  host = document.createElement('div')
-  document.body.append(host)
-  root = createRoot(host)
+  ;({ host, root } = createReactHost())
 })
 afterEach(() => {
-  act(() => root.unmount())
-  host.remove()
+  removeReactHost(root, host)
   useConfig.setState(initialState)
   vi.unstubAllGlobals()
 })

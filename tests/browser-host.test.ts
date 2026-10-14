@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createBrowserHost } from '../ui/app/browserHost'
-import { ApiError } from '../ui/app/api'
+import { HostError } from '../ui/app/host'
 
 afterEach(() => vi.unstubAllGlobals())
 it('sends versioned accepted source through the development host adapter', async () => {
@@ -16,16 +16,33 @@ it('retains structured conflict responses for the document store', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409,
     json: async () => ({ error: 'changed', version: 'disk' }) }))
   await expect(createBrowserHost().putFile('preview', 'accepted', 'base')).rejects.toMatchObject({
-    status: 409, data: { error: 'changed', version: 'disk' },
-  } satisfies Partial<ApiError>)
+    kind: 'conflict', data: { error: 'changed', version: 'disk' },
+  } satisfies Partial<HostError>)
 })
-it('reports non-JSON host failures as status-bearing API errors', async () => {
+it('reports non-JSON host failures as structured host failures', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable',
     json: async () => { throw new SyntaxError('invalid JSON') } }))
-  await expect(createBrowserHost().getFile('preview')).rejects.toMatchObject({ status: 503, message: 'Unavailable' })
+  await expect(createBrowserHost().getFile('preview')).rejects.toMatchObject({ kind: 'failure', message: 'Unavailable' })
 })
 it('propagates malformed successful responses', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true,
     json: async () => { throw new SyntaxError('invalid JSON') } }))
   await expect(createBrowserHost().getFile('preview')).rejects.toThrow('invalid JSON')
+})
+
+it('adapts SSE names to invalidations and closes the connection', () => {
+  const listeners = new Map<string, () => void>()
+  const close = vi.fn()
+  vi.stubGlobal('EventSource', class {
+    addEventListener(name: string, listener: () => void) { listeners.set(name, listener) }
+    close = close
+  })
+  const listener = vi.fn()
+  const unsubscribe = createBrowserHost().subscribe('preview', listener)
+  listeners.get('file-changed')!()
+  listeners.get('file-deleted')!()
+  listeners.get('config-changed')!()
+  expect(listener.mock.calls).toEqual([['changed'], ['deleted'], ['config']])
+  unsubscribe()
+  expect(close).toHaveBeenCalledOnce()
 })

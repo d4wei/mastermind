@@ -3,7 +3,7 @@ import { ToggleGroup } from 'radix-ui'
 import { useT } from '../i18n'
 import { ChatIcon, CodeIcon, EyeIcon, GearIcon, LanguageIcon } from '../icons'
 import { SlotLabel } from '../util/SlotLabel'
-import { useDoc, type ViewMode } from './store'
+import { useDoc, type ViewMode } from '../documents/store'
 
 interface TopBarProps {
   settings?: { open: boolean; onToggle: () => void }

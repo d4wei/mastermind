@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, useRef } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { BlockActions } from '../ui/modes/reading/BlockActions'
@@ -19,13 +20,10 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   edit.mockReset()
-  host = document.createElement('div')
-  document.body.append(host)
-  root = createRoot(host)
+  ;({ host, root } = createReactHost())
 })
 afterEach(() => {
-  act(() => root.unmount())
-  host.remove()
+  removeReactHost(root, host)
   window.getSelection()?.removeAllRanges()
   vi.clearAllTimers()
   vi.useRealTimers()
@@ -48,8 +46,7 @@ async function compose(block: boolean) {
   }
   const textarea = host.querySelector('textarea')!
   act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Existing draft')
-    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    inputValue(textarea, 'Existing draft')
   })
   return textarea
 }

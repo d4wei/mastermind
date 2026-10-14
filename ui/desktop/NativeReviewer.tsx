@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate } from '../app/route'
-import { useDoc } from '../app/store'
+import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createNativeHost, type NativeBridge } from '../ui/desktop/host'
-import { installHost } from '../ui/app/host'
-import { ApiError, getFile, getSession, putFile } from '../ui/app/api'
+import { installHost, HostError, requireReviewerHost } from '../ui/app/host'
 import { createCloseHandler } from '../ui/desktop/close'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
-import { createDocStore } from '../ui/app/store'
+import { createDocStore } from '../ui/documents/store'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -23,10 +22,10 @@ describe('native reviewer boundary', () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
     installHost(createNativeHost({ invoke, listen: vi.fn() }, []))
-    await expect(getSession('3')).resolves.toEqual({ id: '3' })
-    await expect(getFile('3')).resolves.toEqual({ id: '3' })
-    await expect(putFile('3', '文档\r\n', 'base')).rejects.toMatchObject({ status: 409 })
-    await expect(putFile('3', '文档\r\n', 'base')).rejects.toBeInstanceOf(ApiError)
+    await expect(requireReviewerHost().getSession('3')).resolves.toEqual({ id: '3' })
+    await expect(requireReviewerHost().getFile('3')).resolves.toEqual({ id: '3' })
+    await expect(requireReviewerHost().putFile('3', '文档\r\n', 'base')).rejects.toMatchObject({ kind: 'conflict' })
+    await expect(requireReviewerHost().putFile('3', '文档\r\n', 'base')).rejects.toBeInstanceOf(HostError)
     expect(invoke).toHaveBeenCalledWith('write_document', { id: '3', content: '文档\r\n', baseVersion: 'base' })
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -41,9 +40,9 @@ describe('native reviewer boundary', () => {
       const invoke = vi.fn().mockRejectedValue(failure)
       const host = createNativeHost({ invoke, listen: vi.fn() }, [])
       await expect(host.getFile('0')).rejects.toMatchObject({
-        status: failure.status, message: failure.message, data: failure,
+        kind: failure.status === 409 ? 'conflict' : failure.status === 404 ? 'missing' : 'failure', message: failure.message, data: failure,
       })
-      await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(ApiError)
+      await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(HostError)
     })
 
   it.each([
@@ -80,8 +79,9 @@ describe('native reviewer boundary', () => {
     const stop = vi.fn()
     const invoke = vi.fn()
     const host = createNativeHost({ invoke, listen: () => subscribed.promise }, [])
-    const events = host.events('0')
-    events.close()
+    const listener = vi.fn()
+    const unsubscribe = host.subscribe('0', listener)
+    unsubscribe()
     subscribed.resolve(stop)
     await subscribed.promise
     expect(stop).toHaveBeenCalledOnce()
@@ -94,14 +94,13 @@ describe('native reviewer boundary', () => {
       invoke: vi.fn().mockResolvedValue(undefined),
       listen: async (_, handler) => { invalidate = handler; return vi.fn<() => void>() },
     }
-    const events = createNativeHost(bridge, []).events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = createNativeHost(bridge, []).subscribe('0', listener)
     await vi.waitFor(() => expect(listener).toHaveBeenCalledOnce())
     expect(bridge.invoke).toHaveBeenCalledWith('watch_document', { id: '0' })
     invalidate()
     expect(listener).toHaveBeenCalledTimes(2)
-    events.close()
+    unsubscribe()
     invalidate()
     expect(listener).toHaveBeenCalledTimes(2)
   })
@@ -178,15 +177,14 @@ it('falls back to bounded periodic invalidation when watcher registration fails'
   vi.useFakeTimers()
   try {
     const stop = vi.fn()
-    const events = createNativeHost({ invoke: vi.fn().mockRejectedValue('watch unavailable'),
-      listen: async () => stop }, []).events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = createNativeHost({ invoke: vi.fn().mockRejectedValue('watch unavailable'),
+      listen: async () => stop }, []).subscribe('0', listener)
     await vi.advanceTimersByTimeAsync(0)
     expect(listener).toHaveBeenCalledOnce()
     await vi.advanceTimersByTimeAsync(1000)
     expect(listener).toHaveBeenCalledTimes(2)
-    events.close()
+    unsubscribe()
     await vi.advanceTimersByTimeAsync(1000)
     expect(listener).toHaveBeenCalledTimes(2)
     expect(stop).toHaveBeenCalledOnce()
@@ -199,10 +197,9 @@ it('revalidates a silent healthy watcher while native events still arrive immedi
   try {
     let invalidate!: () => void
     const stop = vi.fn()
-    const events = createNativeHost({ invoke: vi.fn().mockResolvedValue(undefined),
-      listen: async (_, callback) => { invalidate = callback; return stop } }, []).events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = createNativeHost({ invoke: vi.fn().mockResolvedValue(undefined),
+      listen: async (_, callback) => { invalidate = callback; return stop } }, []).subscribe('0', listener)
     await vi.advanceTimersByTimeAsync(0)
     expect(listener).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(4999)
@@ -213,7 +210,7 @@ it('revalidates a silent healthy watcher while native events still arrive immedi
     expect(listener).toHaveBeenCalledTimes(3)
     await vi.advanceTimersByTimeAsync(5000)
     expect(listener).toHaveBeenCalledTimes(4)
-    events.close()
+    unsubscribe()
     expect(stop).toHaveBeenCalledOnce()
     expect(vi.getTimerCount()).toBe(0)
     invalidate()
@@ -231,12 +228,11 @@ it.each(['resolve', 'reject'] as const)(
       const registration = new Promise<void>((done, fail) => { resolve = done; reject = fail })
       const stop = vi.fn()
       const invoke = vi.fn().mockReturnValue(registration)
-      const events = createNativeHost({ invoke, listen: async () => stop }, []).events('0')
       const listener = vi.fn()
-      events.addEventListener('file-changed', listener)
+      const unsubscribe = createNativeHost({ invoke, listen: async () => stop }, []).subscribe('0', listener)
       await vi.advanceTimersByTimeAsync(0)
       expect(invoke).toHaveBeenCalledWith('watch_document', { id: '0' })
-      events.close()
+      unsubscribe()
       if (outcome === 'resolve') resolve()
       else reject(new Error('watch unavailable'))
       await vi.advanceTimersByTimeAsync(10000)
@@ -252,10 +248,9 @@ it('does not install fallback polling when subscription fails after close', asyn
   try {
     let reject!: (reason: unknown) => void
     const subscription = new Promise<() => void>((_, fail) => { reject = fail })
-    const events = createNativeHost({ invoke: vi.fn(), listen: () => subscription }, []).events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
-    events.close()
+    const unsubscribe = createNativeHost({ invoke: vi.fn(), listen: () => subscription }, []).subscribe('0', listener)
+    unsubscribe()
     reject(new Error('events unavailable'))
     await vi.advanceTimersByTimeAsync(10000)
     expect(listener).not.toHaveBeenCalled()
@@ -284,9 +279,8 @@ it.each([
       invalidate = callback
       return () => {}
     } }, [])
-    const events = host.events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = host.subscribe('0', listener)
     await vi.advanceTimersByTimeAsync(0)
     expect(listener).toHaveBeenCalledOnce()
     const pendingRead = host.getFile('0').catch((error: unknown) => error)
@@ -299,7 +293,7 @@ it.each([
     await pendingRead
     await vi.advanceTimersByTimeAsync(interval)
     expect(listener).toHaveBeenCalledTimes(3)
-    events.close()
+    unsubscribe()
     expect(vi.getTimerCount()).toBe(0)
   } finally { vi.useRealTimers() }
 })
@@ -311,16 +305,15 @@ it('another document read does not suppress the active document backstop', async
     const invoke = vi.fn((command: string) => command === 'read_document'
       ? read.promise : Promise.resolve()) as NativeBridge['invoke']
     const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
-    const events = host.events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = host.subscribe('0', listener)
     await vi.advanceTimersByTimeAsync(0)
     const pendingRead = host.getFile('1')
     await vi.advanceTimersByTimeAsync(5000)
     expect(listener).toHaveBeenCalledTimes(2)
     read.resolve()
     await pendingRead
-    events.close()
+    unsubscribe()
   } finally { vi.useRealTimers() }
 })
 
@@ -331,9 +324,8 @@ it('waits for all concurrent reads of one document before periodic invalidation 
     const second = deferred<void>()
     const invoke = vi.fn().mockResolvedValue(undefined)
     const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
-    const events = host.events('0')
     const listener = vi.fn()
-    events.addEventListener('file-changed', listener)
+    const unsubscribe = host.subscribe('0', listener)
     await vi.advanceTimersByTimeAsync(0)
     invoke.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     const firstRead = host.getFile('0')
@@ -346,6 +338,6 @@ it('waits for all concurrent reads of one document before periodic invalidation 
     await secondRead
     await vi.advanceTimersByTimeAsync(5000)
     expect(listener).toHaveBeenCalledTimes(2)
-    events.close()
+    unsubscribe()
   } finally { vi.useRealTimers() }
 })

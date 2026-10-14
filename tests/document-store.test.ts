@@ -1,35 +1,38 @@
-import { createBrowserHost } from '../ui/app/browserHost'
-import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
+import type { FileResponse } from '../ui/app/hostTypes'
+import { HostError, installHost } from '../ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createDocStore } from '../ui/app/store'
+import { createDocStore } from '../ui/documents/store'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((r) => { resolve = r })
   return { promise, resolve }
 }
-const response = (data: unknown, status = 200) => ({ ok: status < 400, status, json: async () => data }) as Response
-let writes: Array<{ id: string; content: string; baseVersion: string; pending: ReturnType<typeof deferred<Response>> }>
+const response = (data: unknown, status = 200): unknown => status < 400 ? data
+  : new HostError(status === 409 ? 'conflict' : status === 404 || status === 410 ? 'missing' : 'failure', 'Test host failure')
+function unwrap<T>(value: unknown): T { if (value instanceof Error) throw value; return value as T }
+let writes: Array<{ id: string; content: string; baseVersion: string; pending: ReturnType<typeof deferred<unknown>> }>
 let disks: Map<string, unknown>
-let reads: Map<string, ReturnType<typeof deferred<Response>>>
+let reads: Map<string, ReturnType<typeof deferred<unknown>>>
 beforeEach(() => {
-  installHost(createBrowserHost())
   vi.useFakeTimers()
   writes = []
   disks = new Map()
   reads = new Map()
-  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-    const id = url.split('/')[3]!
-    if (init?.method === 'PUT') {
-      const pending = deferred<Response>()
-      writes.push({ id, ...JSON.parse(init.body as string), pending })
-      return pending.promise.then(async (res) => {
-        if (res.ok) disks.set(id, { ...await res.json(), content: JSON.parse(init.body as string).content })
-        return res
-      })
-    }
-    if (url.endsWith('/file')) return reads.get(id)?.promise ?? response(disks.get(id) ?? { content: id, mtimeMs: 1, version: `${id}-1` })
-    return response({ sessionId: id, displayName: id, path: id })
+  installHost(fakeHost({
+    async putFile(id, content, baseVersion) {
+      const pending = deferred<unknown>()
+      writes.push({ id, content, baseVersion, pending })
+      const saved = unwrap<{ mtimeMs: number; version: string }>(await pending.promise)
+      disks.set(id, { ...saved, content })
+      return saved
+    },
+    async getFile(id) {
+      return unwrap<FileResponse>(await (reads.get(id)?.promise ?? disks.get(id)
+        ?? { content: id, mtimeMs: 1, version: `${id}-1` }))
+    },
+    async getSession(id) { return { sessionId: id, displayName: id, path: id, mtimeMs: 1 } },
   }))
 })
 afterEach(() => { installHost(null); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -57,8 +60,8 @@ it('ignores reversed load completion', async () => {
   const tab = { title: '' }
   vi.stubGlobal('document', tab)
   const store = createDocStore()
-  const a = deferred<Response>()
-  const b = deferred<Response>()
+  const a = deferred<unknown>()
+  const b = deferred<unknown>()
   reads.set('A', a); reads.set('B', b)
   const first = store.getState().load('A')
   const second = store.getState().load('B')
@@ -91,7 +94,7 @@ it('retains failed writes and failed navigation for recovery', async () => {
   const store = createDocStore()
   await store.getState().load('A')
   store.getState().setSource('local')
-  const b = deferred<Response>(); reads.set('B', b)
+  const b = deferred<unknown>(); reads.set('B', b)
   const load = store.getState().load('B')
   b.resolve(response({ error: 'gone' }, 404))
   await load
@@ -123,13 +126,13 @@ it('does not run a departing editor flusher against another document', async () 
 it('reloads clean external changes and retains all versions when dirty', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  const disk = deferred<Response>(); reads.set('A', disk)
+  const disk = deferred<unknown>(); reads.set('A', disk)
   store.getState().notifyDiskChange(2)
   disk.resolve(response({ content: 'external', mtimeMs: 2, version: 'A-2' }))
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState().source).toBe('external')
   store.getState().setSource('local')
-  const newer = deferred<Response>(); reads.set('A', newer)
+  const newer = deferred<unknown>(); reads.set('A', newer)
   store.getState().notifyDiskChange(3)
   newer.resolve(response({ content: 'disk', mtimeMs: 3, version: 'A-3' }))
   await vi.advanceTimersByTimeAsync(0)
@@ -144,12 +147,25 @@ it('reloads clean external changes and retains all versions when dirty', async (
 it('does not let a delayed reload replace edits made while reading disk', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  const disk = deferred<Response>(); reads.set('A', disk)
+  const disk = deferred<unknown>(); reads.set('A', disk)
   const reload = store.getState().reloadFromDisk()
   store.getState().setSource('local')
   disk.resolve(response({ content: 'disk', mtimeMs: 2, version: 'A-2' }))
   await reload
   expect(store.getState().source).toBe('local')
+})
+
+it('rejects a delayed reload after local edits return to the captured source', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  const disk = deferred<unknown>(); reads.set('A', disk)
+  const reload = store.getState().reloadFromDisk()
+  store.getState().setSourceFromEditor('temporary edit')
+  store.getState().setSourceFromEditor('A')
+  disk.resolve(response({ content: 'disk', mtimeMs: 2, version: 'A-2' }))
+  await reload
+  expect(store.getState().source).toBe('A')
+  expect(store.getState().version).toBe('A-1')
 })
 
 it.each(['changed', 'deleted', 'unreadable'] as const)(
@@ -161,7 +177,7 @@ it.each(['changed', 'deleted', 'unreadable'] as const)(
     writes[0]!.pending.resolve(response({ error: 'read only' }, 500))
     await save
     expect(store.getState().notice?.msg).toBe('saveFailed')
-    const disk = deferred<Response>()
+    const disk = deferred<unknown>()
     reads.set('A', disk)
     store.getState().notifyDiskChange(2, event === 'deleted')
     disk.resolve(event === 'unreadable' ? response({ error: 'unavailable' }, 500)
@@ -193,9 +209,9 @@ it('revalidates retained documents and captures inactive external changes', asyn
 it('ignores reversed disk reads and reconciles changes received during a save', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  const first = deferred<Response>(); reads.set('A', first)
+  const first = deferred<unknown>(); reads.set('A', first)
   store.getState().notifyDiskChange(2)
-  const second = deferred<Response>(); reads.set('A', second)
+  const second = deferred<unknown>(); reads.set('A', second)
   store.getState().notifyDiskChange(3)
   second.resolve(response({ content: 'newest', mtimeMs: 3, version: 'A-3' }))
   await vi.advanceTimersByTimeAsync(0)
@@ -205,7 +221,7 @@ it('ignores reversed disk reads and reconciles changes received during a save', 
   store.getState().setSource('local')
   await vi.advanceTimersByTimeAsync(600)
   store.getState().notifyDiskChange(5)
-  const disk = deferred<Response>(); reads.set('A', disk)
+  const disk = deferred<unknown>(); reads.set('A', disk)
   writes[0]!.pending.resolve(response({ mtimeMs: 4, version: 'A-4' }))
   await vi.advanceTimersByTimeAsync(0)
   disk.resolve(response({ content: 'external after save', mtimeMs: 5, version: 'A-5' }))
@@ -230,7 +246,7 @@ it('tracks and flushes retained dirty documents for browser lifecycle checks', a
 it('invalidates an external read overtaken by a successful write', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  const stale = deferred<Response>(); reads.set('A', stale)
+  const stale = deferred<unknown>(); reads.set('A', stale)
   store.getState().notifyDiskChange(2)
   store.getState().setSource('local')
   const save = store.getState().autosave()
@@ -244,7 +260,7 @@ it('invalidates an external read overtaken by a successful write', async () => {
 })
 
 it('cancels browser unload when an inactive document has pending edits', async () => {
-  const { registerDocumentLifecycle } = await import('../ui/app/documentLifecycle')
+  const { registerDocumentLifecycle } = await import('../ui/documents/documentLifecycle')
   const windowTarget = new EventTarget()
   const documentTarget = new EventTarget()
   vi.stubGlobal('window', windowTarget)

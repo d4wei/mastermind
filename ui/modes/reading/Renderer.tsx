@@ -10,7 +10,7 @@ import type {
 } from 'mdast'
 import { Fragment, type ReactNode, createElement } from 'react'
 import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../../../document/markdown/critic-mdast'
-import { highlight } from '../../../document/highlight'
+import { highlight } from './highlight'
 import { toggleTaskEdit } from '../../../document/markdown/tasklist'
 import type { TextEdit } from '../../../document/types'
 import { DiamondIcon } from '../../icons'

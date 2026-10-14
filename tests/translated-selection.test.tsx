@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act, useRef } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
+import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { webcrypto } from 'node:crypto'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { TranslatedSelection } from '../ui/translate/TranslatedSelection'
 import { useTranslation } from '../ui/translate/translationStore'
 import { useConfig } from '../ui/app/configStore'
-import { useDoc } from '../ui/app/store'
+import { useDoc } from '../ui/documents/store'
 import { prepareTranslation, parseTranslatedComment, type PreparedTranslation } from '../document/translation'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { CommentBody } from '../ui/review/CommentBody'
@@ -32,11 +33,11 @@ beforeEach(async () => {
   useConfig.setState({ config: { ...initialConfig.config!, translationLanguage: 'zh-CN' } })
   useDoc.setState({ ...initial, sessionId: 'A', source, savedSource: source, queueAutosave: vi.fn() })
   useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', active: true, artifact, error: null })
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host)
+  ;({ host, root } = createReactHost())
   act(() => root.render(<Harness />))
 })
 afterEach(() => {
-  act(() => root.unmount()); host.remove(); useDoc.setState(initial); useConfig.setState(initialConfig); useTranslation.getState().reset()
+  removeReactHost(root, host); useDoc.setState(initial); useConfig.setState(initialConfig); useTranslation.getState().reset()
   window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals()
 })
 function select(crossBlock = false) {
@@ -54,8 +55,7 @@ function compose() {
   act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
   const input = host.querySelector('textarea')!
   act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'My authored note {++literal++}\nline two')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
+    inputValue(input, 'My authored note {++literal++}\nline two')
   })
   return host.querySelector<HTMLButtonElement>('.primary')!
 }
@@ -95,7 +95,8 @@ it.each(['navigation', 'narrative', 'target'])('rejects a composer captured befo
     if (change === 'target') useConfig.setState({ config: { ...useConfig.getState().config!, translationLanguage: 'ja' } })
   })
   const before = useDoc.getState().source
-  await act(async () => { submit.click(); await new Promise((resolve) => setTimeout(resolve, 30)) })
+  act(() => submit.click())
+  await vi.waitFor(() => expect(host.querySelector('[role="alert"]')).not.toBeNull())
   expect(useDoc.getState().source).toBe(before)
   expect(host.querySelector('[role="alert"]')).not.toBeNull()
 })
