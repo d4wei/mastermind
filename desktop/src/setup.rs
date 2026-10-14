@@ -1,4 +1,4 @@
-use crate::reviewer::{read_preferences_file, write_preferences_file};
+use crate::preferences::{read_preferences_file, write_preferences_file};
 use mastermind_launch_check::protocol::{Response, SetupRequest, VERSION};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -379,6 +379,29 @@ impl Setup {
         state.revision += 1;
         Ok(())
     }
+}
+
+#[tauri::command]
+pub async fn read_preferences(
+    setup: tauri::State<'_, Arc<Setup>>,
+) -> Result<Option<Value>, String> {
+    let setup = setup.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || setup.read_preferences())
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn write_preferences(
+    setup: tauri::State<'_, Arc<Setup>>,
+    patch: Value,
+) -> Result<(), String> {
+    let setup = setup.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || setup.patch_preferences(patch))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

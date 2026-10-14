@@ -1,6 +1,6 @@
 # Native document I/O
 
-`files.rs` owns bounded, versioned reads and guarded writes. `reviewer.rs` accepts document IDs
+`files.rs` owns bounded, versioned reads and guarded writes. `document_io.rs` accepts document IDs
 from the admitted path registry; webview commands cannot name an arbitrary write destination.
 Admission canonicalizes paths, so an opened symlink and its target share one document. The first
 webview read receives the admitted snapshot even if the path changed or disappeared after opening
@@ -48,9 +48,5 @@ Writes treat missing paths, paths replaced by unsupported types, and changed ver
 `file_changed` conflicts. Other read, metadata, and write errors preserve their classification,
 including failures during post-write verification. A failed write can have modified disk bytes;
 its error does not imply rollback. The document store retains local text for recovery.
-
-Preference reads use the same byte limit as preference writes, checking one additional byte before
-JSON parsing. Oversized preferences are rejected without rewriting the file. Preference command
-failures keep their string response shape; document and admission errors use the structured shape.
 
 Initial setup and per-field saved choices are described in [`setup.md`](setup.md).

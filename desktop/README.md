@@ -24,9 +24,15 @@ executable `mastermind-launch-check`, and Windows companion `mastermind-launch-c
 provisional until distribution identity is settled. Builds here are not signed or notarized
 releases.
 
+`main.rs` assembles the native states and command handlers. `launcher.rs` handles command parsing
+and local transport startup; `opening.rs` owns the admitted-document snapshot; `document_io.rs`
+serves admitted document operations and watches; `lifecycle.rs` creates the window and dispatches
+menus, close requests, and application events. Setup uses preference persistence directly.
+
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),
-[opening](src/opening.md), [setup](src/setup.md), [worker execution](src/worker.md), and
+[opening](src/opening.md), [setup](src/setup.md), [preferences](src/preferences.md),
+[worker execution](src/worker.md), and
 [termination](src/termination.md). The [UI adapter](../ui/desktop/README.md) connects these
 commands to the document store.
 

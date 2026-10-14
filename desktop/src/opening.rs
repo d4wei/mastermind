@@ -6,6 +6,33 @@ use std::{
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
+#[derive(serde::Serialize)]
+pub struct Snapshot {
+    pid: u32,
+    files: Vec<String>,
+    activation_revision: u64,
+    active_id: Option<usize>,
+    opening_errors: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Result<Snapshot, String> {
+    let state = state.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || {
+            let docs = state.lock().unwrap();
+            Snapshot {
+                pid: std::process::id(),
+                files: docs.order.clone(),
+                activation_revision: docs.activation_revision,
+                active_id: docs.active_id,
+                opening_errors: docs.opening_errors.clone(),
+            }
+        })
+        .await
+        .map_err(|e| e.to_string())
+}
+
 pub fn focus(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();

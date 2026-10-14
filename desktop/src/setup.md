@@ -38,7 +38,7 @@ an explicitly saved null translation remains present. Ordinary `write_preference
 only patched fields into the saved object. It cannot change completion. Reads do not persist merged
 defaults. Commands share the setup mutex and the existing blocking-work gate; no filesystem work or
 Git lookup runs on the event loop. Preference byte bounds and the atomic writer remain in
-[`reviewer.rs`](reviewer.rs).
+[`preferences.rs`](preferences.rs).
 
 Name is trimmed and an initial @ removed, matching Settings. Its allowed characters and UTF-16
 length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces and
