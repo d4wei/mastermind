@@ -558,6 +558,15 @@ in the editor. Its foreground process stopped on interruption. Markdown corpus f
 unchanged. Windows and Linux workflow paths were migrated; prior platform evidence elsewhere in
 this file remains dated and is not a substitute for checking the new revision.
 
+### Adoption platform rerun — 2026-10-13
+
+At `b8ad13b`, [Windows package validation][adoption-windows] and
+[Linux package validation][adoption-linux] passed. The first Windows adoption run had retained the
+old diagnostic window title in two startup probes. Correcting that expectation allowed the visible
+window and console checks to run against the adopted app; no product behavior changed. The Windows
+run also passed installed-reviewer WebDriver checks and cross-user endpoint denial. These runs do
+not close the interactive and distribution gaps listed below.
+
 ### Remaining hardening and distribution checks
 
 Tauri is adopted as the application host. These remaining checks bound release claims; they do not
@@ -591,3 +600,6 @@ require keeping a second browser product or continuing the old feature plan.
 [reviewer-windows-run]: https://github.com/d4wei/mastermind/actions/runs/38213282288
 
 [windows-interaction-run]: https://github.com/d4wei/mastermind/actions/runs/38216953199
+
+[adoption-windows]: https://github.com/d4wei/mastermind/actions/runs/38520545718
+[adoption-linux]: https://github.com/d4wei/mastermind/actions/runs/38520545595
