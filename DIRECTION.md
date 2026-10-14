@@ -26,15 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-13 — Simplify the adopted application architecture
-
-**Open question.** Runtime retirement left unclear source boundaries and overlapping ownership.
-The [architecture review](docs/architecture-simplification.md) proposes a responsibility-based
-layout and simplification sequence before a comprehensive test audit. Review precedes refactoring.
-
-**Exit:** the accepted changes land and contracts graduate beside their code, or the proposal is
-revised or dropped.
-
 ## 2026-10-10 — Restoring app sessions is deferred
 
 **Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible

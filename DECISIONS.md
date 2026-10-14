@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-13 — Source roots follow application responsibilities
+
+**Ruled.** Use `ui/` for the interface, `document/` for isomorphic document semantics, and
+`desktop/` for the native Cargo package, retaining its conventional inner `src/`. Place development
+utilities beside their consumers. Audit test failure modes before refactoring and retain regression
+coverage until equivalent replacements work. Maintain theme CSS directly; retire the one-off
+palette generator.
+
+**Beat:** runtime-named source roots, parallel editable palette definitions, and reducing test counts
+without checking which failures they detect.
+
 ## 2026-10-13 — Adopt Tauri and consolidate before further product work
 
 **Ruled.** The validated Tauri host becomes the application. Promote its implementation and retire

@@ -1,7 +1,5 @@
 [data-theme='nacht'] {
-  /* Mint (dark, spring green — Dracula-based).
-     v0.4: Radix-rigor 12-step OKLCH scales (anchored to the v0.3 Swiss values),
-     with semantic tokens mapped onto the steps. Marks stay hand-tuned. */
+  /* Mint (dark, spring green — Dracula-based). */
 
   /* ---- Layer 1: raw scales (values differ per theme) ---- */
   --gray-1: oklch(0.288 0.022 277.509);
@@ -51,7 +49,7 @@
   --color-invert-text-muted: rgba(20, 20, 20, 0.62);
   --color-invert-border: rgba(20, 20, 20, 0.14);
 
-  /* ---- Layer 3: review / mark semantics (hand-tuned, de-conflicted from accent) ---- */
+  /* Review colors remain independent of the interface accent. */
   --review-insert-text: #4fc76e;
   --review-insert-bg: rgba(79, 199, 110, 0.16);
   --review-insert-border: #4fc76e;

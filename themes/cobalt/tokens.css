@@ -1,7 +1,5 @@
 [data-theme='cobalt'] {
-  /* Cobalt (light, electric blue).
-     v0.4: Radix-rigor 12-step OKLCH scales (anchored to the v0.3 Swiss values),
-     with semantic tokens mapped onto the steps. Marks stay hand-tuned. */
+  /* Cobalt (light, electric blue). */
 
   /* ---- Layer 1: raw scales (values differ per theme) ---- */
   --gray-1: oklch(0.991 0.003 106.447);
@@ -51,7 +49,7 @@
   --color-invert-text-muted: rgba(244, 244, 241, 0.66);
   --color-invert-border: rgba(244, 244, 241, 0.16);
 
-  /* ---- Layer 3: review / mark semantics (hand-tuned, de-conflicted from accent) ---- */
+  /* Review colors remain independent of the interface accent. */
   --review-insert-text: #1b7a35;
   --review-insert-bg: rgba(27, 122, 53, 0.1);
   --review-insert-border: #1b7a35;

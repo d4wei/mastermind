@@ -11,8 +11,7 @@ product runtime; it did not establish that the remaining implementation is minim
 
 This proposal covers repository layout, source responsibilities, development tools, and the order
 of a subsequent test audit. It preserves the current review experience and file protocol. The
-structural changes below await review. Removing the inherited marketing site was explicitly
-approved and is handled separately.
+structural changes below were approved on 2026-10-13. The inherited marketing site has been removed.
 
 ## Findings from the current implementation
 
@@ -188,7 +187,7 @@ cleanup.
 2. Audit the tests against the accepted architecture before changing the state model. Identify
    distinct safety coverage and candidates for consolidation. Retain regression checks until their
    replacement is working; do not combine a behavior refactor with deleting its existing coverage.
-3. Remove the one-off palette generator if this recommendation is accepted. The inherited site
+3. Remove the one-off palette generator as approved. The inherited site
    removal can land independently because it is already approved.
 4. Relocate source and tools without changing behavior. Keep contracts beside their modules and
    update every build, launch, test, and CI path. Verify a clean-checkout build and packaged launch.
@@ -225,7 +224,7 @@ selection test, and a native input check are not interchangeable. Retain malform
 line-ending preservation, stale-write rejection, failed-save recovery, IME composition, and
 cross-platform file behavior unless an equivalent check is demonstrably taking over.
 
-## Review requested
+## Approved scope
 
 - Adopt `ui/`, `document/`, and `desktop/` as the source roots, retaining Cargo's `desktop/src/`.
 - Retire the palette generator and keep maintained theme CSS as the authority.

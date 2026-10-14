@@ -1,7 +1,5 @@
 [data-theme='sepia'] {
-  /* Swiss International — Sepia (warm paper, ochre).
-     v0.4: Radix-rigor 12-step OKLCH scales (anchored to the v0.3 Swiss values),
-     with semantic tokens mapped onto the steps. Marks stay hand-tuned. */
+  /* Swiss International — Sepia (warm paper, ochre). */
 
   /* ---- Layer 1: raw scales (values differ per theme) ---- */
   --gray-1: oklch(0.944 0.017 88.001);
@@ -51,7 +49,7 @@
   --color-invert-text-muted: rgba(244, 239, 228, 0.66);
   --color-invert-border: rgba(244, 239, 228, 0.16);
 
-  /* ---- Layer 3: review / mark semantics (hand-tuned, de-conflicted from accent) ---- */
+  /* Review colors remain independent of the interface accent. */
   --review-insert-text: #2c7a3f;
   --review-insert-bg: rgba(44, 122, 63, 0.12);
   --review-insert-border: #2c7a3f;
