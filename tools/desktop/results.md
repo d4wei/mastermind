@@ -539,8 +539,8 @@ splice in the disposable source file, with CRLF and all other bytes preserved.
 
 ### Adoption consolidation — 2026-10-13
 
-The native host now lives in `desktop/` and builds the reviewer by default. The macOS bundle and
-window are named `mastermind`; distribution identifiers remain provisional. Desktop checks live in
+At `1d14dea`, the native host was promoted to the application package (then `src-tauri/`) and built
+the reviewer by default. The macOS bundle and window were named `mastermind`; distribution identifiers remain provisional. Desktop checks live in
 `tools/desktop/`. The repository launcher opens the native app. Browser development uses a separate
 foreground preview, and translation preparation remains a standalone Node utility.
 
@@ -566,6 +566,26 @@ old diagnostic window title in two startup probes. Correcting that expectation a
 window and console checks to run against the adopted app; no product behavior changed. The Windows
 run also passed installed-reviewer WebDriver checks and cross-user endpoint denial. These runs do
 not close the interactive and distribution gaps listed below.
+
+### Architecture consolidation — 2026-10-14
+
+At `feb21a2`, the responsibility-based roots, native module split, document records, structured host
+boundary, and repeated-analysis cleanup passed the application suite and both TypeScript
+configurations: 534 cases in 50 files. The count includes independently named test scenarios and
+stronger failure assertions; fixture Markdown bytes were unchanged. All 57 release Rust tests,
+formatting, Clippy with warnings denied, four readiness-script cases, and two readiness-harness
+cases passed. Browser assets, translation tooling, and the ordinary macOS bundle built successfully.
+
+The packaged macOS launcher passed all disposable process checks. A separate native UI check opened
+two files, saved a multilingual edit with CRLF intact, switched away and back, undid the edit using
+retained editor history, resolved a discussion, and displayed its retained archive. Disk inspection
+confirmed the undo and in-file resolved record with CRLF preserved. The app quit normally after
+saving; the check used disposable preferences and documents.
+
+[Windows package validation][cleanup-windows] and [Linux package validation][cleanup-linux] checked
+fresh source checkouts at the same revision. Windows exercised its installer, launcher, cross-user
+endpoint denial, and installed-reviewer WebDriver cases; Linux installed and exercised its Debian
+package. These results cover the refactor and do not close the remaining hardening list below.
 
 ### Remaining hardening and distribution checks
 
@@ -603,3 +623,6 @@ require keeping a second browser product or continuing the old feature plan.
 
 [adoption-windows]: https://github.com/d4wei/mastermind/actions/runs/38520545718
 [adoption-linux]: https://github.com/d4wei/mastermind/actions/runs/38520545595
+
+[cleanup-windows]: https://github.com/d4wei/mastermind/actions/runs/38525345222
+[cleanup-linux]: https://github.com/d4wei/mastermind/actions/runs/38525345109

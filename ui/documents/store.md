@@ -45,7 +45,7 @@ invalidates the comparison's apply token while retaining its text. An unavailabl
 missing or unreadable; only a deletion event establishes the missing-file notice. Repeated reads
 and refreshes share generation guards, and write boundaries invalidate older reads.
 
-[`ConflictPanel.tsx`](../app/ConflictPanel.tsx) presents the persistent viewport notice and the shared
+[`ConflictPanel.tsx`](../app/ConflictPanel.tsx) presents the persistent viewport notice and shared
 SlideOver comparison
 shell. Result is a manual text merge; no automatic merge or normalized Markdown serialization is
 involved. Ordinary writes and accepted Result restore the appropriate original line endings.

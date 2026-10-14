@@ -18,3 +18,6 @@ and explicit browser preview provide separate implementations of file access.
 - [`tools/translation/`](../tools/translation/prepared-translations.md) prepares and stores
   translation artifacts for the invoking agent. The preview reuses its artifact reader.
 - [`tools/desktop/`](../tools/desktop/README.md) builds and checks native packages.
+
+[Regression checks](../tests/README.md) explains the boundaries between pure document tests, DOM
+interactions, host adapters, filesystem implementations, and packaged desktop checks.
