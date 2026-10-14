@@ -1,8 +1,9 @@
-import { scanMarkdown } from './markdown/scan'
+import { scanMarkdown, scanMarkdownTree } from './markdown/scan'
 import { segmentBlocks } from './blocks'
 import { parseAuthor } from './critic/scanner'
 import { applyTextEdits } from './edits'
-import { codeRanges } from './markdown/exclusions'
+import { excludedRanges } from './markdown/exclusions'
+import { parseMarkdown } from './markdown/processor'
 import { parseResolvedThreads } from './review-archive'
 import type { TextEdit } from './types'
 
@@ -76,8 +77,9 @@ export async function prepareTranslation(source: string): Promise<TranslationPro
 }
 
 function suggestionStructure(text: string): string[] | null {
-  const excluded = codeRanges(text)
-  const spans = scanMarkdown(text)
+  const tree = parseMarkdown(text)
+  const excluded = excludedRanges(tree)
+  const spans = scanMarkdownTree(text, tree)
   if (spans.some((span) => span.kind === 'comment' || span.kind === 'highlight')) return null
   const tokens = [...text.matchAll(/\{(?:\+\+|--|~~|==|>>)|(?:\+\+|--|~~|==|<<)\}/g)]
     .filter((token) => !excluded.some((range) => token.index! >= range.start && token.index! < range.end))

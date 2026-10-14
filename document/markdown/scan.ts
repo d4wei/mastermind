@@ -1,3 +1,4 @@
+import type { Root } from 'mdast'
 import type { Node, Parent } from 'unist'
 import { scan } from '../critic/scanner'
 import type { CriticSpan, Range } from '../critic/types'
@@ -8,7 +9,11 @@ const TEXT_BLOCKS = new Set(['paragraph', 'heading', 'tableCell'])
 
 /** Keep review actions inside the same Markdown text block as their delimiters. */
 export function scanMarkdown(text: string): CriticSpan[] {
-  const tree = parseMarkdown(text)
+  return scanMarkdownTree(text, parseMarkdown(text))
+}
+
+/** The tree must be the plain Markdown parse of this exact source, never the masked reading tree. */
+export function scanMarkdownTree(text: string, tree: Root): CriticSpan[] {
   const blocks: Range[] = []
   const visit = (node: Node): void => {
     const start = node.position?.start.offset

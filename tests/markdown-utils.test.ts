@@ -65,16 +65,13 @@ describe('task list toggling', () => {
     const starts = itemStarts(doc)
     const edit = toggleTaskEdit(doc, starts[0]!)
     const next = applyTextEdits(doc, [edit!])
-    expect(next).toContain('- [x] first')
-    expect(next).toContain('- [x] second')
+    expect(next).toBe(doc.replace('- [ ] first', '- [x] first'))
   })
 
   it('toggles checked → unchecked without touching others', () => {
     const starts = itemStarts(doc)
     const edit = toggleTaskEdit(doc, starts[1]!)
     const next = applyTextEdits(doc, [edit!])
-    expect(next).toContain('- [ ] second')
-    expect(next).toContain('- [ ] first')
-    expect(next).toContain('- [ ] nested')
+    expect(next).toBe(doc.replace('- [x] second', '- [ ] second'))
   })
 })

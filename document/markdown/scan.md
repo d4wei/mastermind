@@ -7,7 +7,9 @@ belong to the same paragraph; crossing list items, headings, or cells is unsuppo
 
 Unsupported spans remain literal source and do not enter review actions, counts, source highlighting,
 or translation's annotation removal. The reading transform and document analysis use the same span
-list. Accepting or rejecting valid neighboring suggestions leaves unsupported source bytes intact.
+list, produced once for each reading analysis and carried through the current file's parse and
+transform. `scanMarkdownTree` accepts the plain tree of the exact source being scanned; the masked
+reading tree is unsuitable for exclusions or review boundaries. Accepting or rejecting valid neighboring suggestions leaves unsupported source bytes intact.
 Split a proposed edit into separate marks for each text block to make it reviewable.
 
 The raw scanner in `../critic/scanner.ts` only recognizes delimiter syntax. Use it for isolated

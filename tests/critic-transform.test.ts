@@ -1,6 +1,10 @@
 import type { Parent } from 'mdast'
 import type { Node } from 'unist'
 import { describe, expect, it } from 'vitest'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import { remarkCritic } from '../document/markdown/remark-critic'
+import type { CriticSpan } from '../document/critic/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../document/markdown/critic-mdast'
 
@@ -140,4 +144,34 @@ describe('criticTransform via analyzeMarkdown', () => {
     expect(items).toHaveLength(0)
     expect(collect(tree, 'heading')).toHaveLength(1)
   })
+})
+
+it('keeps each analysis tied to its exact source across marked and plain calls', () => {
+  const firstSource = '> {++first\r\n> continuation++}'
+  const first = analyzeMarkdown(firstSource)
+  const plain = analyzeMarkdown('# Plain\n\nBody.')
+  const lastSource = 'Last {--removed--}.'
+  const last = analyzeMarkdown(lastSource)
+  expect(plain.spans).toEqual([])
+  expect(plain.items).toEqual([])
+  expect(first.spans.map((span) => firstSource.slice(span.start, span.end)))
+    .toEqual(['{++first\r\n> continuation++}'])
+  expect(last.spans.map((span) => lastSource.slice(span.start, span.end))).toEqual(['{--removed--}'])
+  expect(textOf(collect(first.tree, 'criticInsert')[0]!)).toBe('first\r\ncontinuation')
+  expect(collect(first.tree, 'criticDelete')).toEqual([])
+  expect(collect(last.tree, 'criticInsert')).toEqual([])
+})
+
+it('transforms interleaved parser calls using their own file state', () => {
+  const processor = unified().use(remarkParse).use(remarkCritic).freeze()
+  const first = { value: 'First {++addition++}.', data: { criticSpans: [] as CriticSpan[] } }
+  const second = { value: 'Second {--deletion--}.', data: { criticSpans: [] as CriticSpan[] } }
+  const firstTree = processor.parse(first)
+  const secondTree = processor.parse(second)
+  processor.runSync(firstTree, first)
+  processor.runSync(secondTree, second)
+  expect(textOf(collect(firstTree, 'criticInsert')[0]!)).toBe('addition')
+  expect(textOf(collect(secondTree, 'criticDelete')[0]!)).toBe('deletion')
+  expect(first.data.criticSpans.map((span) => first.value.slice(span.start, span.end))).toEqual(['{++addition++}'])
+  expect(second.data.criticSpans.map((span) => second.value.slice(span.start, span.end))).toEqual(['{--deletion--}'])
 })

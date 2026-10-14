@@ -13,8 +13,12 @@ interface CriticState {
   sentinels: Sentinels | null
 }
 
-/** parse/run are synchronous and back-to-back; frozen processors cannot store this state in data(). */
-const STATE = new WeakMap<object, CriticState>()
+declare module 'vfile' {
+  interface DataMap {
+    criticState?: CriticState
+    criticSpans?: CriticSpan[]
+  }
+}
 
 /**
  * Mask CriticMarkup before GFM parsing, retaining original source positions,
@@ -30,7 +34,8 @@ export function remarkCritic(this: Processor): Transformer<Root> {
     self.parser = (doc: string, file: VFile): Node => {
       const spans = scanMarkdown(doc)
       const state: CriticState = { original: doc, spans, sentinels: null }
-      STATE.set(self, state)
+      file.data.criticState = state
+      file.data.criticSpans = spans
       if (spans.length > 0) {
         const { masked, sentinels } = maskSource(doc, spans)
         state.sentinels = sentinels
@@ -40,8 +45,8 @@ export function remarkCritic(this: Processor): Transformer<Root> {
     }
   }
 
-  return (tree) => {
-    const state = STATE.get(self)
+  return (tree, file) => {
+    const state = file.data.criticState
     if (state && state.spans.length > 0 && state.sentinels) {
       criticTransform(tree, state.original, state.spans, state.sentinels)
     }
