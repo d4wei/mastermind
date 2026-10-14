@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { maskSource, pickSentinels } from '../src/shared/critic/mask'
-import { scan } from '../src/shared/critic/scanner'
+import { maskSource, pickSentinels } from '../document/critic/mask'
+import { scan } from '../document/critic/scanner'
 
 describe('maskSource', () => {
   it('preserves length exactly', () => {

@@ -38,7 +38,7 @@ distribution identity remain separate from adopting the native application.
 
 - [README](../README.md): installation and current usage.
 - [Review protocol](../.claude/skills/mastermind/reference/review-protocol.md): in-file feedback.
-- [Implementation map](../src/README.md): source modules and their contracts.
+- [Implementation map](source-map.md): source modules and their contracts.
 - [Decisions](../DECISIONS.md): settled constraints.
 - [Native validation](../tools/desktop/results.md) and [direction](../DIRECTION.md): release gaps
   and

@@ -2,12 +2,12 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { DEFAULT_CONFIG } from '../src/shared/config'
-import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from '../src/ui/native/NativeSetup'
+import { DEFAULT_CONFIG } from '../ui/settings/defaults'
+import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from '../ui/desktop/NativeSetup'
 
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), load: vi.fn(), confirmed: vi.fn() }))
-vi.mock('../src/ui/native/bridge', () => ({ nativeBridge: { invoke: mocks.invoke } }))
-vi.mock('../src/ui/app/configStore', () => ({ useConfig: Object.assign(
+vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: { invoke: mocks.invoke } }))
+vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(
   (selector: (state: unknown) => unknown) => selector({ config: DEFAULT_CONFIG }),
   { getState: () => ({ load: mocks.load }) },
 ) }))

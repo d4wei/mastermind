@@ -444,23 +444,23 @@ not require renaming every `version`, `source`, or other identifier whose local 
 This reference governs naming across features. Keep feature behavior and storage contracts beside
 the implementation, and keep unresolved product choices in [DIRECTION.md][direction].
 
-[preferences]: ../src-tauri/src/setup.md
-[settings]: ../src/ui/settings/SettingsPanel.tsx
-[translation]: ../src/shared/translation.md
+[preferences]: ../desktop/src/setup.md
+[settings]: ../ui/settings/SettingsPanel.tsx
+[translation]: ../document/translation.md
 [decisions]: ../DECISIONS.md
 [direction]: ../DIRECTION.md
-[toolbar]: ../src/ui/app/TopBar.tsx
-[prepared]: ../src/node/prepared-translations.md
-[view]: ../src/ui/translate/README.md
+[toolbar]: ../ui/app/TopBar.tsx
+[prepared]: ../tools/translation/prepared-translations.md
+[view]: ../ui/translate/README.md
 [protocol]: ../.claude/skills/mastermind/reference/review-protocol.md
-[marks]: ../src/shared/critic/types.ts
-[labels]: ../src/ui/i18n/index.ts
-[archive]: ../src/shared/review-archive.md
-[store]: ../src/ui/app/store.md
-[files]: ../src-tauri/src/files.md
-[sessions]: ../src-tauri/src/admission.rs
-[fonts]: ../src/shared/fonts.ts
-[colors]: ../src/shared/codeThemes.ts
+[marks]: ../document/critic/types.ts
+[labels]: ../ui/i18n/index.ts
+[archive]: ../document/review-archive.md
+[store]: ../ui/app/store.md
+[files]: ../desktop/src/files.md
+[sessions]: ../desktop/src/admission.rs
+[fonts]: ../ui/theme/fontRegistry.ts
+[colors]: ../ui/theme/codeThemes.ts
 [themes]: ../themes/README.md
 [syntax-highlighting]: https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide
 [obsidian-width]: https://obsidian.md/help/settings

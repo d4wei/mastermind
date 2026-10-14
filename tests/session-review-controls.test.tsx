@@ -2,22 +2,22 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
-import { useDoc } from '../src/ui/app/store'
-import type { TextEdit } from '../src/shared/types'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import { resolveThreadEdits, deleteCommentEdits } from '../src/shared/review-archive'
-import { SessionView } from '../src/ui/app/SessionView'
+import { useDoc } from '../ui/app/store'
+import type { TextEdit } from '../document/types'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
+import { SessionView } from '../ui/app/SessionView'
 
 const rail = vi.hoisted(() => ({ onEdit: null as null | ((edits: TextEdit[]) => void) }))
-vi.mock('../src/ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edits: TextEdit[]) => void }) => {
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edits: TextEdit[]) => void }) => {
   rail.onEdit = props.onEdit
   return <div data-testid="rail" />
 } }))
-vi.mock('../src/ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../src/ui/app/api', async (importOriginal) => ({ ...await importOriginal<object>(),
+vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
+vi.mock('../ui/app/api', async (importOriginal) => ({ ...await importOriginal<object>(),
   openEvents: () => ({ addEventListener() {}, close() {} }),
 }))
-vi.mock('../src/ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
+vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 let host: HTMLDivElement
 let root: Root
 const initial = useDoc.getState()

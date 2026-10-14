@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { scrollElementToTop } from '../src/ui/util/scroll'
+import { scrollElementToTop } from '../ui/util/scroll'
 
 afterEach(() => {
   document.body.replaceChildren()

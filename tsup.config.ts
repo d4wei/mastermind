@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  entry: { 'translation-cli': 'src/node/translation-cli.ts' },
+  entry: { 'translation-cli': 'tools/translation/translation-cli.ts' },
   outDir: 'dist/node',
   format: ['esm'],
   platform: 'node',

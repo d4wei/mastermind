@@ -3,15 +3,15 @@ import { Tooltip } from 'radix-ui'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { ClientConfig } from '../src/shared/types'
-import { useConfig } from '../src/ui/app/configStore'
-import { ConflictPanel } from '../src/ui/app/ConflictPanel'
-import { createDocStore, useDoc } from '../src/ui/app/store'
-import { Navigator } from '../src/ui/app/Navigator'
-import { useNav } from '../src/ui/app/navStore'
-import { TopBar } from '../src/ui/app/TopBar'
+import type { ClientConfig } from '../ui/settings/types'
+import { useConfig } from '../ui/app/configStore'
+import { ConflictPanel } from '../ui/app/ConflictPanel'
+import { createDocStore, useDoc } from '../ui/app/store'
+import { Navigator } from '../ui/app/Navigator'
+import { useNav } from '../ui/app/navStore'
+import { TopBar } from '../ui/app/TopBar'
 
-vi.mock('../src/ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
+vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 const initialConfig = useConfig.getState()
 const initialDoc = useDoc.getState()
 const config: ClientConfig = {

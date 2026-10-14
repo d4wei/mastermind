@@ -1,7 +1,7 @@
-import { createBrowserHost } from '../src/ui/app/browserHost'
-import { installHost } from '../src/ui/app/host'
+import { createBrowserHost } from '../ui/app/browserHost'
+import { installHost } from '../ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createDocStore } from '../src/ui/app/store'
+import { createDocStore } from '../ui/app/store'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -244,7 +244,7 @@ it('invalidates an external read overtaken by a successful write', async () => {
 })
 
 it('cancels browser unload when an inactive document has pending edits', async () => {
-  const { registerDocumentLifecycle } = await import('../src/ui/app/documentLifecycle')
+  const { registerDocumentLifecycle } = await import('../ui/app/documentLifecycle')
   const windowTarget = new EventTarget()
   const documentTarget = new EventTarget()
   vi.stubGlobal('window', windowTarget)

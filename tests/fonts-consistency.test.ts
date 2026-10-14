@@ -9,7 +9,7 @@ import {
   monoById,
   DEFAULT_FONT_PRESET,
   DEFAULT_MONO,
-} from '../src/ui/theme/fonts'
+} from '../ui/theme/fonts'
 
 describe('font registry', () => {
   const families = new Set(FONT_FACES.map((f) => f.family))

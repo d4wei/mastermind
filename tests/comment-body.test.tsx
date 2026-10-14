@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
-import { CommentBody } from '../src/ui/review/CommentBody'
+import { CommentBody } from '../ui/review/CommentBody'
 
 it.each([
   ['one\ntwo', 'one two'],

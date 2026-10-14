@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { createBrowserHost } from '../src/ui/app/browserHost'
-import { ApiError } from '../src/ui/app/api'
+import { createBrowserHost } from '../ui/app/browserHost'
+import { ApiError } from '../ui/app/api'
 
 afterEach(() => vi.unstubAllGlobals())
 it('sends versioned accepted source through the development host adapter', async () => {

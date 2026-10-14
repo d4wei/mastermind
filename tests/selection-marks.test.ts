@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { markEdits, type SelRange } from '../src/ui/modes/reading/selection'
-import { applyTextEdits } from '../src/shared/edits'
-import { scan, group } from '../src/shared/critic/scanner'
+import { markEdits, type SelRange } from '../ui/modes/reading/selection'
+import { applyTextEdits } from '../document/edits'
+import { scan, group } from '../document/critic/scanner'
 
 // Pure (no DOM) coverage of the cross-block apply path: given the per-block
 // SelRanges the DOM mapping produces, the marks built by markEdits + applyTextEdits

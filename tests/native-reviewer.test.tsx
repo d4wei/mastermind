@@ -2,24 +2,24 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { NativeReviewer } from '../src/ui/native/NativeReviewer'
+import { NativeReviewer } from '../ui/desktop/NativeReviewer'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
   listen: vi.fn(), prepareToClose: vi.fn(),
 }))
-vi.mock('../src/ui/native/bridge', () => ({ nativeBridge: {
+vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
-vi.mock('../src/ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../src/ui/app/store', () => ({ useDoc: Object.assign(() => null, {
+vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
+vi.mock('../ui/app/store', () => ({ useDoc: Object.assign(() => null, {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
     prepareToClose: mocks.prepareToClose }),
 }) }))
-vi.mock('../src/ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
+vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
   getState: () => ({ load: mocks.load }),
 }) }))
-vi.mock('../src/ui/app/App', () => ({ App: ({ home, onboarding }: { home: React.ReactNode; onboarding?: React.ReactNode }) => onboarding ?? home }))
+vi.mock('../ui/app/App', () => ({ App: ({ home, onboarding }: { home: React.ReactNode; onboarding?: React.ReactNode }) => onboarding ?? home }))
 
 let host: HTMLDivElement
 let root: Root

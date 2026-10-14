@@ -75,7 +75,7 @@ preferences; later reviewer builds are recorded below.
 ### Windows support: implementation gaps, not a failed framework test
 
 The initial Windows refusal came from our experiment's own guard, not a failed Tauri test.
-The current [Windows endpoint](../../src-tauri/src/endpoint/windows.rs) implements named-pipe
+The current [Windows endpoint](../../desktop/src/endpoint/windows.rs) implements named-pipe
 ownership and access
 checks, exercised in the hosted run above. The launcher transport uses Interprocess separately from
 Tauri's webview bridge.
@@ -177,7 +177,7 @@ WebView2, Chinese input, or interactive conflict/quit behavior.
 
 ### AppKit termination — 2026-10-12
 
-The [termination adapter](../../src-tauri/src/termination.md) implements AppKit's asynchronous
+The [termination adapter](../../desktop/src/termination.md) implements AppKit's asynchronous
 termination callback
 without replacing the framework delegate. The real standard Quit menu now uses this callback.
 Packaged macOS checks exercised:
@@ -250,7 +250,7 @@ The Windows WebDriver script now checks first-success selection, inventory order
 and retaining unsaved source across a switch away and repeat-open request. Its updated run passed in
 the Windows validation recorded below. File-drop gestures, Windows picker multi-selection, and
 Windows dialogs have not yet been exercised. Implementation details live in
-[native opening](../../src-tauri/src/opening.md).
+[native opening](../../desktop/src/opening.md).
 
 ### macOS comments and translated review — 2026-10-12
 
@@ -355,7 +355,7 @@ Native commands and launcher admission now share a bounded worker gate. A worker
 until completion even when its awaiting command is cancelled or its response deadline expires.
 Registry commands also run off the event loop, document writes release the registry before disk I/O,
 and preferences writes serialize access to their temporary file. The contract and limitations live
-in [native blocking work](../../src-tauri/src/worker.md).
+in [native blocking work](../../desktop/src/worker.md).
 
 All 31 local native tests and all-feature, all-target Clippy pass. New tests check cancellation,
 timeout after worker startup, panic recovery, serialized writes without the registry lock, and
@@ -375,7 +375,7 @@ The comment composers now guard their dismissal and submit shortcuts during comp
 WebKit's final legacy IME key event. Lifecycle regressions cover cancellation, retained drafts,
 modified Enter, ordinary shortcuts afterward, and closing/reopening without blur. All 439
 application
-tests and both typechecks pass. The [composition sidecar](../../src/ui/util/composition.md) records
+tests and both typechecks pass. The [composition sidecar](../../ui/util/composition.md) records
 the event contract and sources.
 
 The native retest could not re-establish Pinyin composition: input-source shortcuts yielded plain
@@ -415,12 +415,12 @@ rendered text. The updated mapping validates complete formatting wrappers agains
 parser and preserves their exact source. Native automation submitted the comment; disk assertions
 checked the full expected CriticMarkup and unchanged formatting and CRLF. Partial cross-wrapper
 selections remain refused, as described in
-[selection mapping](../../src/ui/modes/reading/selection.md).
+[selection mapping](../../ui/modes/reading/selection.md).
 
 Native file failures now carry stable codes and readable messages. Permission and ordinary I/O
 errors retain their classifications, while missing or replaced write targets and stale versions
 still enter conflict recovery. Preference reads use the existing write-size limit. The contracts
-live in [native file I/O](../../src-tauri/src/files.md).
+live in [native file I/O](../../desktop/src/files.md).
 
 All 457 application tests, both typechecks, browser/native builds, 38 all-feature Rust tests, and
 native Clippy pass. The rebuilt macOS package passes all 19 process checks, including stable error
@@ -436,7 +436,7 @@ The [Windows installed run](https://github.com/d4wei/mastermind/actions/runs/383
 
 ### Document-readiness instrumentation — 2026-10-13
 
-The opt-in [readiness instrument](../../src-tauri/src/readiness.md) waits for the requested
+The opt-in [readiness instrument](../../desktop/src/readiness.md) waits for the requested
 original document,
 matching fixture text, visible layout, fonts, and two animation frames. Its local harness measures
 from launcher invocation until it observes the matching trace. Deterministic tests cover gate
@@ -463,9 +463,9 @@ installed-process checks. It does not exercise this interaction through a Linux 
 The validation reviewer now offers Name, Interface language, and optional Translation language
 before revealing admitted documents. Separate agent suggestions remain transient; saved choices
 and fields already being edited take precedence. Confirmation saves the choices together, and
-failure retains a retryable form. The [setup contract](../../src-tauri/src/setup.md) owns
+failure retains a retryable form. The [setup contract](../../desktop/src/setup.md) owns
 persistence and protocol
-details; the [UI adapter](../../src/ui/native/README.md) owns confirmation and close handling.
+details; the [UI adapter](../../ui/desktop/README.md) owns confirmation and close handling.
 
 All 527 application tests, both typechecks, 57 all-feature Rust tests, and Clippy pass. Browser and
 native builds pass. The rebuilt macOS reviewer package passes 25 process
@@ -539,7 +539,7 @@ splice in the disposable source file, with CRLF and all other bytes preserved.
 
 ### Adoption consolidation — 2026-10-13
 
-The native host now lives in `src-tauri/` and builds the reviewer by default. The macOS bundle and
+The native host now lives in `desktop/` and builds the reviewer by default. The macOS bundle and
 window are named `mastermind`; distribution identifiers remain provisional. Desktop checks live in
 `tools/desktop/`. The repository launcher opens the native app. Browser development uses a separate
 foreground preview, and translation preparation remains a standalone Node utility.

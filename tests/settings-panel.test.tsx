@@ -2,9 +2,9 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ClientConfig } from '../src/shared/types'
-import { useConfig } from '../src/ui/app/configStore'
-import { SettingsPanel } from '../src/ui/settings/SettingsPanel'
+import type { ClientConfig } from '../ui/settings/types'
+import { useConfig } from '../ui/app/configStore'
+import { SettingsPanel } from '../ui/settings/SettingsPanel'
 
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,

@@ -2,18 +2,18 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { ApiError, getFile, getSession, putFile } from '../src/ui/app/api'
-import { ConflictPanel } from '../src/ui/app/ConflictPanel'
-import { createDocStore } from '../src/ui/app/store'
+import { ApiError, getFile, getSession, putFile } from '../ui/app/api'
+import { ConflictPanel } from '../ui/app/ConflictPanel'
+import { createDocStore } from '../ui/app/store'
 
-vi.mock('../src/ui/app/api', () => {
+vi.mock('../ui/app/api', () => {
   class ApiError extends Error {
     constructor(public status: number, message: string) { super(message) }
   }
   return { ApiError, getFile: vi.fn(), getSession: vi.fn(), putFile: vi.fn(),
     postHandback: vi.fn(), postRename: vi.fn() }
 })
-vi.mock('../src/ui/i18n', () => ({ useT: () => (key: string) => key }))
+vi.mock('../ui/i18n', () => ({ useT: () => (key: string) => key }))
 const file = (content: string, version: string) => ({ content, version, mtimeMs: 1 })
 function deferred<T>() {
   let resolve!: (value: T) => void

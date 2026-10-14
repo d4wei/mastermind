@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 import { describe, expect, it } from 'vitest'
-import { rangeToSourceRanges } from '../src/ui/modes/reading/selection'
+import { rangeToSourceRanges } from '../ui/modes/reading/selection'
 
 // Mirrors the renderer's output: each block carries data-ps/data-pe and wraps its
 // text in a span with matching data-ps/data-pe, so pointToOffset's length-equality

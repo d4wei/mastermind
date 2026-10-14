@@ -6,7 +6,7 @@ import { expect, it } from 'vitest'
 
 it('keeps settings chrome nonselectable while preserving editable and document text', () => {
   const style = document.createElement('style')
-  style.textContent = fs.readFileSync(path.join(__dirname, '../src/ui/app/app.css'), 'utf8')
+  style.textContent = fs.readFileSync(path.join(__dirname, '../ui/app/app.css'), 'utf8')
   document.head.append(style)
   const host = document.createElement('div')
   host.innerHTML = `

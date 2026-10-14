@@ -4,15 +4,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src-tauri/**'
-      - '!src-tauri/**/*.md'
+      - 'desktop/**'
+      - '!desktop/**/*.md'
       - 'tools/desktop/**'
       - '!tools/desktop/*.md'
       - '!tools/desktop/check-results*.json'
       - '.github/workflows/native-linux.yml'
-      - 'src/ui/**'
-      - 'src/shared/**'
-      - 'src/node/**'
+      - 'ui/**'
+      - 'document/**'
+      - 'tools/translation/**'
+      - 'tools/preview/**'
       - 'themes/**'
       - 'package-lock.json'
 permissions:
@@ -43,7 +44,7 @@ jobs:
           rustup default 1.98.0
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
         with:
-          workspaces: src-tauri
+          workspaces: desktop
           cache-on-failure: true
       - name: Build the reviewer frontend
         working-directory: .
@@ -58,11 +59,11 @@ jobs:
         run: |
           node --test check-readiness-script.cjs
           python3 check-readiness-harness.py
-          cargo test --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features
-          cargo clippy --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
+          cargo test --manifest-path ../../desktop/Cargo.toml --release --locked --all-features
+          cargo clippy --manifest-path ../../desktop/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
       - name: Install the Debian package
         run: |
-          packages=(../../src-tauri/target/release/bundle/deb/*.deb)
+          packages=(../../desktop/target/release/bundle/deb/*.deb)
           test "${#packages[@]}" -eq 1
           test -f "${packages[0]}"
           sudo apt-get install -y "./${packages[0]}"
@@ -89,5 +90,5 @@ jobs:
             tools/desktop/installed-package-linux.txt
             tools/desktop/check-results-linux.json
             tools/desktop/check-process-linux.log
-            src-tauri/target/release/bundle/deb/*.deb
+            desktop/target/release/bundle/deb/*.deb
           if-no-files-found: warn

@@ -36,7 +36,7 @@ it.skipIf(process.platform === 'win32')('forwards open/setup arguments and waits
     await fs.mkdir(path.join(dir, 'bin'))
     const wrapper = path.join(dir, 'bin/mastermind.mjs')
     await fs.copyFile('bin/mastermind.js', wrapper)
-    const native = path.join(dir, 'src-tauri/target/debug/mastermind-launch-check')
+    const native = path.join(dir, 'desktop/target/debug/mastermind-launch-check')
     await fs.mkdir(path.dirname(native), { recursive: true })
     await fs.writeFile(native, `#!${process.execPath}\nsetTimeout(() => { console.log(JSON.stringify(process.argv.slice(2))); process.exit(7) }, 30)\n`, { mode: 0o755 })
     for (const args of [['open', '--', 'a file.md'], ['setup', '--suggest', '{"theme":"grid"}']]) {
@@ -73,7 +73,7 @@ it.skipIf(process.platform !== 'darwin')('prefers the macOS bundle executable ov
     for (const [location, label] of [
       ['release/bundle/macos/mastermind.app/Contents/MacOS', 'bundle'], ['debug', 'debug'],
     ]) {
-      const binary = path.join(dir, 'src-tauri/target', location!, 'mastermind-launch-check')
+      const binary = path.join(dir, 'desktop/target', location!, 'mastermind-launch-check')
       await fs.mkdir(path.dirname(binary), { recursive: true })
       await fs.writeFile(binary, `#!${process.execPath}\nconsole.log('${label}')\n`, { mode: 0o755 })
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { highlight, type HlToken } from '../src/shared/highlight'
+import { highlight, type HlToken } from '../document/highlight'
 
 /** Concatenating token text must reproduce the input exactly — the renderer relies on this. */
 function roundtrips(code: string, lang?: string): boolean {

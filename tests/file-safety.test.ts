@@ -2,8 +2,8 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readSessionFile, writeSessionFile } from '../src/node/files'
-import type { FileTarget } from '../src/node/files'
+import { readSessionFile, writeSessionFile } from '../tools/preview/files'
+import type { FileTarget } from '../tools/preview/files'
 
 let dir: string
 let file: string

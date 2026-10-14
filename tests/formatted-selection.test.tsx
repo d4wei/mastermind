@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, it, vi } from 'vitest'
-import * as processor from '../src/shared/markdown/processor'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import { applyTextEdits } from '../src/shared/edits'
-import { resolveAll } from '../src/shared/critic/resolve'
-import { MarkdownView } from '../src/ui/modes/reading/Renderer'
-import { markEdits, rangeToSource, rangeToSourceRanges } from '../src/ui/modes/reading/selection'
-import { commentEdits, deletionWrap } from '../src/ui/modes/reading/marks'
+import * as processor from '../document/markdown/processor'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { applyTextEdits } from '../document/edits'
+import { resolveAll } from '../document/critic/resolve'
+import { MarkdownView } from '../ui/modes/reading/Renderer'
+import { markEdits, rangeToSource, rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { commentEdits, deletionWrap } from '../ui/modes/reading/marks'
 
 function render(source: string) {
   const analysis = analyzeMarkdown(source)

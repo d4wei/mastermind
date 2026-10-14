@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { usableAuthorName } from '../src/shared/author'
+import { usableAuthorName } from '../document/author'
 
 it.each([
   ['李 明', '李 明'], [' Alex Chen ', 'Alex Chen'], ['\ufeff @ Alex \ufeff', 'Alex'], ['\u0085Alex\u0085', '\u0085Alex\u0085'], [' @ 李 明 ', '李 明'],

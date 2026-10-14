@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../src/node/prepared-translations'
+import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../tools/translation/prepared-translations'
 import { createPreview } from '../tools/preview/app'
 
 let dir: string

@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import { parseMarkdown } from '../src/shared/markdown/processor'
-import { segmentBlocks } from '../src/shared/blocks'
-import { applyTextEdits } from '../src/shared/edits'
-import { acceptEdit } from '../src/shared/critic/resolve'
-import { MarkdownView } from '../src/ui/modes/reading/Renderer'
-import { rangeToSourceRanges } from '../src/ui/modes/reading/selection'
-import { metadataProperties } from '../src/ui/modes/reading/Frontmatter'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { parseMarkdown } from '../document/markdown/processor'
+import { segmentBlocks } from '../document/blocks'
+import { applyTextEdits } from '../document/edits'
+import { acceptEdit } from '../document/critic/resolve'
+import { MarkdownView } from '../ui/modes/reading/Renderer'
+import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { metadataProperties } from '../ui/modes/reading/Frontmatter'
 
 const metadata = '---\ntitle: "{>>literal<<}"\nitems:\n  - one\n  - two\n---'
 

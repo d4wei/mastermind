@@ -16,7 +16,7 @@ afterEach(async () => {
 })
 function run(args: string[], input = ''): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', path.resolve('src/node/translation-cli.ts'), ...args], {
+    const child = spawn(process.execPath, ['--import', 'tsx', path.resolve('tools/translation/translation-cli.ts'), ...args], {
       env: { ...process.env, MASTERMIND_CONFIG_DIR: dir }, stdio: ['pipe', 'pipe', 'pipe'] })
     let stdout = ''; let stderr = ''
     child.stdout.on('data', (chunk) => { stdout += chunk.toString() })

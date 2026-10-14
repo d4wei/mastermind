@@ -2,10 +2,10 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
-import { ResolvedThreads } from '../src/ui/review/ResolvedThreads'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import { resolveThreadEdits } from '../src/shared/review-archive'
-import { applyTextEdits } from '../src/shared/edits'
+import { ResolvedThreads } from '../ui/review/ResolvedThreads'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { resolveThreadEdits } from '../document/review-archive'
+import { applyTextEdits } from '../document/edits'
 
 let host: HTMLDivElement
 let root: Root

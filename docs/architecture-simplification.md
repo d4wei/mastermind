@@ -45,7 +45,7 @@ lockfile. Keep the original project's attribution and MIT notice in the applicat
 
 ### Source layout describes technology inconsistently
 
-`src-tauri/` identifies a tool, `src/node/` identifies a runtime, and `src/shared/` identifies its
+`desktop/` identifies a tool, `tools/translation/` identifies a runtime, and `document/` identifies its
 consumers. None names a single product responsibility. Rust's inner `src/` has a different role:
 it is the conventional source directory inside one Cargo package.
 

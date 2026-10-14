@@ -10,13 +10,14 @@
     ]
   },
   "include": [
-    "src/node",
-    "src/shared",
+    "document",
     "tests",
     "tools/preview",
     "tools/desktop/build-reviewer.mts",
     "tsup.config.ts",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "tools/translation",
+    "themes/discovery.ts"
   ]
 }

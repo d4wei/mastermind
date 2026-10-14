@@ -2,18 +2,18 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it, vi } from 'vitest'
-import { App } from '../src/ui/app/App'
+import { App } from '../ui/app/App'
 
 const mocks = vi.hoisted(() => ({ load: vi.fn().mockResolvedValue(undefined), home: false }))
-vi.mock('../src/ui/app/configStore', () => ({ useConfig: (selector: (state: unknown) => unknown) =>
+vi.mock('../ui/app/configStore', () => ({ useConfig: (selector: (state: unknown) => unknown) =>
   selector({ load: mocks.load }) }))
-vi.mock('../src/ui/app/route', () => ({ useRoute: () => mocks.home ? { kind: 'home' } : { kind: 'doc', sessionId: '4' } }))
-vi.mock('../src/ui/app/navStore', () => ({ useNav: (selector: (state: unknown) => unknown) =>
+vi.mock('../ui/app/route', () => ({ useRoute: () => mocks.home ? { kind: 'home' } : { kind: 'doc', sessionId: '4' } }))
+vi.mock('../ui/app/navStore', () => ({ useNav: (selector: (state: unknown) => unknown) =>
   selector({ outline: [], collapsed: false }) }))
-vi.mock('../src/ui/app/Navigator', () => ({ Navigator: () => null, useIsNarrow: () => false }))
-vi.mock('../src/ui/app/SessionView', () => ({ SessionView: () => <article>Retained document</article> }))
-vi.mock('../src/ui/app/documentLifecycle', () => ({ registerDocumentLifecycle: () => () => {} }))
-vi.mock('../src/ui/theme/ThemeProvider', () => ({ ThemeEffects: () => null, GrainOverlay: () => null }))
+vi.mock('../ui/app/Navigator', () => ({ Navigator: () => null, useIsNarrow: () => false }))
+vi.mock('../ui/app/SessionView', () => ({ SessionView: () => <article>Retained document</article> }))
+vi.mock('../ui/app/documentLifecycle', () => ({ registerDocumentLifecycle: () => () => {} }))
+vi.mock('../ui/theme/ThemeProvider', () => ({ ThemeEffects: () => null, GrainOverlay: () => null }))
 
 beforeEach(() => { mocks.home = false; mocks.load.mockReset().mockResolvedValue(undefined) })
 

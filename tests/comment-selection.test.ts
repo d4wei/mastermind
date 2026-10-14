@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 
 it('uses contrasting inverted tokens for composer selection and retains native input ranges', () => {
   const style = document.createElement('style')
-  style.textContent = readFileSync(path.join(__dirname, '../src/ui/app/app.css'), 'utf8')
+  style.textContent = readFileSync(path.join(__dirname, '../ui/app/app.css'), 'utf8')
   document.head.append(style)
   const host = document.createElement('div')
   host.className = 'sel-composer'

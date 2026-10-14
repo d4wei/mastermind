@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { getFile } from '../src/ui/app/api'
-import { installHost } from '../src/ui/app/host'
-import { useConfig } from '../src/ui/app/configStore'
+import { getFile } from '../ui/app/api'
+import { installHost } from '../ui/app/host'
+import { useConfig } from '../ui/app/configStore'
 
 afterEach(() => { installHost(null); vi.unstubAllGlobals() })
 it('requires an installed host instead of falling back to HTTP', async () => {

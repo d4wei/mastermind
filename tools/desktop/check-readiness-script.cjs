@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const test = require('node:test');
-const script = fs.readFileSync(`${__dirname}/../../src-tauri/src/readiness.js`, 'utf8');
+const script = fs.readFileSync(`${__dirname}/../../desktop/src/readiness.js`, 'utf8');
 
 function harness(initial = {}) {
   const config = { nonce: 'nonce', target: '/fixture.md', heading: 'Heading', body: 'Body' };
@@ -31,7 +31,7 @@ function harness(initial = {}) {
   const window = { __TAURI__: { core: { invoke: async (...args) => { calls.push(args); } } } };
   window.top = window;
   vm.runInNewContext(script, {
-    readinessConfig: config, window, document, location: { pathname: '/native.html' },
+    readinessConfig: config, window, document, location: { pathname: '/desktop.html' },
     requestAnimationFrame: (callback) => frames.push(callback),
     MutationObserver: class {
       constructor(callback) { observe = callback; }

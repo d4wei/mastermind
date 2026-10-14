@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextEdits } from '../src/shared/edits'
-import { acceptEdit, rejectEdit, resolveAll } from '../src/shared/critic/resolve'
-import { scan } from '../src/shared/critic/scanner'
+import { applyTextEdits } from '../document/edits'
+import { acceptEdit, rejectEdit, resolveAll } from '../document/critic/resolve'
+import { scan } from '../document/critic/scanner'
 
 function accept(text: string): string {
   const spans = scan(text)

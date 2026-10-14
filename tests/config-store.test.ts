@@ -1,7 +1,7 @@
-import { createBrowserHost } from '../src/ui/app/browserHost'
-import { installHost } from '../src/ui/app/host'
+import { createBrowserHost } from '../ui/app/browserHost'
+import { installHost } from '../ui/app/host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useConfig } from '../src/ui/app/configStore'
+import { useConfig } from '../ui/app/configStore'
 
 function mockFetch(routes: Record<string, unknown>) {
   return vi.fn((url: string) => {

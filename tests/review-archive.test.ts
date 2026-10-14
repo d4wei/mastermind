@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { segmentBlocks } from '../src/shared/blocks'
-import { group, reviewCounts, scan } from '../src/shared/critic/scanner'
-import { applyTextEdits } from '../src/shared/edits'
-import { codeRanges } from '../src/shared/markdown/exclusions'
-import { deleteCommentEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread } from '../src/shared/review-archive'
+import { segmentBlocks } from '../document/blocks'
+import { group, reviewCounts, scan } from '../document/critic/scanner'
+import { applyTextEdits } from '../document/edits'
+import { codeRanges } from '../document/markdown/exclusions'
+import { deleteCommentEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread } from '../document/review-archive'
 
 function threads(source: string): ReviewThread[] {
   return group(scan(source, codeRanges(source)), source).filter((item): item is ReviewThread => item.type === 'thread')

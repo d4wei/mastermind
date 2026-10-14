@@ -4,15 +4,16 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src-tauri/**'
-      - '!src-tauri/**/*.md'
+      - 'desktop/**'
+      - '!desktop/**/*.md'
       - 'tools/desktop/**'
       - '!tools/desktop/*.md'
       - '!tools/desktop/check-results*.json'
       - '.github/workflows/native-windows.yml'
-      - 'src/ui/**'
-      - 'src/shared/**'
-      - 'src/node/**'
+      - 'ui/**'
+      - 'document/**'
+      - 'tools/translation/**'
+      - 'tools/preview/**'
       - 'themes/**'
       - 'package-lock.json'
 permissions:
@@ -36,7 +37,7 @@ jobs:
           rustup default 1.98.0
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
         with:
-          workspaces: src-tauri
+          workspaces: desktop
           cache-on-failure: true
       - name: Build the reviewer frontend
         working-directory: .
@@ -57,14 +58,14 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           python check-readiness-harness.py
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo test --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features
+          cargo test --manifest-path ../../desktop/Cargo.toml --release --locked --all-features
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cargo clippy --manifest-path ../../src-tauri/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
+          cargo clippy --manifest-path ../../desktop/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
           exit $LASTEXITCODE
       - name: Install and exercise the Windows package
         timeout-minutes: 5
         run: |
-          $installer = Get-ChildItem ../../src-tauri/target/release/bundle/nsis/*.exe | Select-Object -First 1
+          $installer = Get-ChildItem ../../desktop/target/release/bundle/nsis/*.exe | Select-Object -First 1
           $destination = Join-Path $env:RUNNER_TEMP 'mastermind-launch-installed'
           $install = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$destination") -PassThru
           if (-not $install.WaitForExit(120000)) { $install.Kill(); throw 'Installer timed out' }
@@ -118,5 +119,5 @@ jobs:
           path: |
             tools/desktop/check-results-windows.json
             tools/desktop/check-reviewer-diagnostics/**
-            src-tauri/target/release/bundle/nsis/*.exe
+            desktop/target/release/bundle/nsis/*.exe
           if-no-files-found: warn

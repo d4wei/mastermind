@@ -1,8 +1,8 @@
-import { createBrowserHost } from '../src/ui/app/browserHost'
-import { installHost } from '../src/ui/app/host'
+import { createBrowserHost } from '../ui/app/browserHost'
+import { installHost } from '../ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { createTranslationStore, type TranslationSnapshot } from '../src/ui/translate/translationStore'
-import { prepareTranslation, type PreparedTranslation } from '../src/shared/translation'
+import { createTranslationStore, type TranslationSnapshot } from '../ui/translate/translationStore'
+import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 let snapshot: TranslationSnapshot
 beforeEach(() => { installHost(createBrowserHost()); snapshot = { sessionId: 'A', source: 'Hello world.', targetLang: 'zh-CN' } })
 afterEach(() => { installHost(null); vi.unstubAllGlobals() })

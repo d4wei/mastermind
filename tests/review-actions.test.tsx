@@ -3,11 +3,11 @@
 import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
-import type { TextEdit } from '../src/shared/types'
-import { createDocStore } from '../src/ui/app/store'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import { parseResolvedThreads } from '../src/shared/review-archive'
-import { CommentRail } from '../src/ui/review/CommentRail'
+import type { TextEdit } from '../document/types'
+import { createDocStore } from '../ui/app/store'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { parseResolvedThreads } from '../document/review-archive'
+import { CommentRail } from '../ui/review/CommentRail'
 
 let host: HTMLDivElement
 let root: Root

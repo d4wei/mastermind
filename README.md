@@ -24,13 +24,13 @@ npm run desktop:build
 node bin/mastermind.js open -- plan.md
 ```
 
-The macOS build creates `src-tauri/target/release/bundle/macos/mastermind.app`. Open files through
+The macOS build creates `desktop/target/release/bundle/macos/mastermind.app`. Open files through
 the app's native picker or the repository launcher. The first launch asks for your Name, Interface
 language, and optional Translation language. Files opened during setup remain available afterward.
 
 Public packaging and installed command identity remain undecided; the npm project is private and
 the native identifier remains provisional. Platform build commands live in
-[the desktop host](src-tauri/README.md). The [bundled skill](.claude/skills/mastermind/SKILL.md) and
+[the desktop host](desktop/README.md). The [bundled skill](.claude/skills/mastermind/SKILL.md) and
 [agent setup](assets/agent/README.md) describe invoking the source checkout.
 
 ## Review
@@ -45,7 +45,7 @@ tail, visible through Resolved. `Cmd+Z` undoes review actions.
 
 A clean buffer reloads external changes automatically. A dirty buffer keeps local edits and the
 disk version, pauses saving, and offers an explicit comparison with an editable result. The
-[native file contract](src-tauri/src/files.md) describes concurrency and filesystem limits.
+[native file contract](desktop/src/files.md) describes concurrency and filesystem limits.
 Closing the app waits for saves; failures retain recoverable text and block the close.
 
 ## Optional translated reading
@@ -91,7 +91,7 @@ npm run desktop:build                    # native macOS app
 The [browser preview](tools/preview/README.md) is explicit development tooling. It opens only the
 file selected at startup and keeps its settings in memory. Stop it with Ctrl-C.
 
-The implementation map is in [src/README.md](src/README.md). Theme tokens are defined in
+The implementation map is in [the source map](docs/source-map.md). Theme tokens are defined in
 [themes/README.md](themes/README.md), and accepted English and Chinese labels are in
 [Product terminology](docs/terminology.md). Use a disposable copy of
 [the manual review document](tests/manual/review-interactions.md) for visual checks.

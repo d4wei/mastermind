@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createNativeHost, type NativeBridge } from '../src/ui/native/host'
-import { installHost } from '../src/ui/app/host'
-import { ApiError, getFile, getSession, putFile } from '../src/ui/app/api'
-import { createCloseHandler } from '../src/ui/native/close'
-import { DEFAULT_CONFIG } from '../src/shared/config'
-import { createDocStore } from '../src/ui/app/store'
+import { createNativeHost, type NativeBridge } from '../ui/desktop/host'
+import { installHost } from '../ui/app/host'
+import { ApiError, getFile, getSession, putFile } from '../ui/app/api'
+import { createCloseHandler } from '../ui/desktop/close'
+import { DEFAULT_CONFIG } from '../ui/settings/defaults'
+import { createDocStore } from '../ui/app/store'
 
 function deferred<T>() {
   let resolve!: (value: T) => void

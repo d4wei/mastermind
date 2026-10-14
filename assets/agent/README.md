@@ -37,4 +37,4 @@ and public protocol are maintained with the bundled skill:
 A translation artifact is a disposable reading aid. Feedback, including quoted passages selected
 from translations, belongs in the original Markdown file. Clean buffers reload external changes;
 dirty buffers retain both versions and pause saving for explicit comparison. The file-write limits
-are documented in the source checkout at `src-tauri/src/files.md`.
+are documented in the source checkout at `desktop/src/files.md`.

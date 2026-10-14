@@ -1,8 +1,8 @@
 import type { Parent } from 'mdast'
 import type { Node } from 'unist'
 import { describe, expect, it } from 'vitest'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
-import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../src/shared/markdown/critic-mdast'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../document/markdown/critic-mdast'
 
 function collect(tree: Node, type: string): Node[] {
   const out: Node[] = []

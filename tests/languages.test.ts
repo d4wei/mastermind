@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { findLanguage, langLabel, searchLanguages } from '../src/shared/languages'
+import { findLanguage, langLabel, searchLanguages } from '../ui/settings/languages'
 
 describe('language resolution', () => {
   it('resolves the canonical English name', () => {

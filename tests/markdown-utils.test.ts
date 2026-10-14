@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextEdits } from '../src/shared/edits'
-import { detectEol, normalizeToLf, restoreEol } from '../src/shared/eol'
-import { parseMarkdown } from '../src/shared/markdown/processor'
-import { taskMarkerAt, toggleTaskEdit } from '../src/shared/markdown/tasklist'
+import { applyTextEdits } from '../document/edits'
+import { detectEol, normalizeToLf, restoreEol } from '../document/eol'
+import { parseMarkdown } from '../document/markdown/processor'
+import { taskMarkerAt, toggleTaskEdit } from '../document/markdown/tasklist'
 
 describe('eol', () => {
   it('detects lf', () => {

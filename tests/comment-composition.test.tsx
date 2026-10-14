@@ -2,8 +2,8 @@
 import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { SelectionToolbar } from '../src/ui/modes/reading/SelectionToolbar'
-import { BlockActions } from '../src/ui/modes/reading/BlockActions'
+import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { BlockActions } from '../ui/modes/reading/BlockActions'
 
 let host: HTMLDivElement
 let root: Root

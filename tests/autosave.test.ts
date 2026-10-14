@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SessionMeta } from '../src/shared/types'
+import type { SessionMeta } from '../ui/app/hostTypes'
 
 // Mock the HTTP client before importing the store. The autosave paths under test
 // touch no DOM, so this runs in the default node env with fake timers.
-vi.mock('../src/ui/app/api', () => {
+vi.mock('../ui/app/api', () => {
   class ApiError extends Error {
     constructor(
       public status: number,
@@ -21,8 +21,8 @@ vi.mock('../src/ui/app/api', () => {
   }
 })
 
-import { ApiError, getFile, putFile } from '../src/ui/app/api'
-import { useDoc } from '../src/ui/app/store'
+import { ApiError, getFile, putFile } from '../ui/app/api'
+import { useDoc } from '../ui/app/store'
 
 const AUTOSAVE_MS = 600
 

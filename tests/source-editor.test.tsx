@@ -4,11 +4,11 @@ import { EditorView } from '@codemirror/view'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { getFile, getSession, putFile } from '../src/ui/app/api'
-import { useDoc } from '../src/ui/app/store'
-import { SourceEditor } from '../src/ui/modes/source/SourceEditor'
+import { getFile, getSession, putFile } from '../ui/app/api'
+import { useDoc } from '../ui/app/store'
+import { SourceEditor } from '../ui/modes/source/SourceEditor'
 
-vi.mock('../src/ui/app/api', () => {
+vi.mock('../ui/app/api', () => {
   class ApiError extends Error {
     constructor(public status: number, message: string) { super(message) }
   }

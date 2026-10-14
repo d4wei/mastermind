@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { group, parseAuthor, reviewCounts, scan } from '../src/shared/critic/scanner'
-import type { CriticSpan } from '../src/shared/critic/types'
-import { codeRanges } from '../src/shared/markdown/exclusions'
+import { group, parseAuthor, reviewCounts, scan } from '../document/critic/scanner'
+import type { CriticSpan } from '../document/critic/types'
+import { codeRanges } from '../document/markdown/exclusions'
 
 function scanWithCode(text: string): CriticSpan[] {
   return scan(text, codeRanges(text))

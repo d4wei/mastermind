@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { resolveAll } from '../src/shared/critic/resolve'
-import { analyzeMarkdown } from '../src/shared/markdown/analyze'
+import { resolveAll } from '../document/critic/resolve'
+import { analyzeMarkdown } from '../document/markdown/analyze'
 
 it.each(['\n', '\r\n'])('leaves cross-list insertions literal and untouched (%j)', (eol) => {
   const unsupported = ['- first {++;', '- second item++}'].join(eol)

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 import { describe, expect, it } from 'vitest'
-import { blockContentRanges } from '../src/ui/modes/reading/selection'
-import { commentEdits, deletionWrap, sanitizeComment } from '../src/ui/modes/reading/marks'
+import { blockContentRanges } from '../ui/modes/reading/selection'
+import { commentEdits, deletionWrap, sanitizeComment } from '../ui/modes/reading/marks'
 
 // Mirrors the renderer: a block carries data-ps/data-pe for its whole node, and
 // its inline text is wrapped in spans whose data-ps/data-pe start AFTER the markdown

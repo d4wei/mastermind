@@ -23,10 +23,10 @@ if (args[0] === 'translate-blocks') {
 } else {
   const name = process.platform === 'win32' ? 'mastermind-launch-console.exe' : 'mastermind-launch-check'
   const candidates = process.platform === 'darwin'
-    ? [path.join(root, 'src-tauri', 'target', 'release', 'bundle', 'macos', 'mastermind.app', 'Contents', 'MacOS', name)]
-    : [path.join(root, 'src-tauri', 'target', 'release', name)]
+    ? [path.join(root, 'desktop', 'target', 'release', 'bundle', 'macos', 'mastermind.app', 'Contents', 'MacOS', name)]
+    : [path.join(root, 'desktop', 'target', 'release', name)]
   // A debug build is the deliberate source-checkout fallback when no release bundle exists.
-  candidates.push(path.join(root, 'src-tauri', 'target', 'debug', name))
+  candidates.push(path.join(root, 'desktop', 'target', 'debug', name))
   command = candidates.find(existsSync)
   if (!command) {
     console.error('mastermind: native build missing. Run `npm run desktop:build` in the mastermind repo.')

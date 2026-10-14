@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { group, scan } from '../src/shared/critic/scanner'
-import { applyTextEdits } from '../src/shared/edits'
-import { codeRanges } from '../src/shared/markdown/exclusions'
-import { resolveThreadEdits } from '../src/shared/review-archive'
-import { matchPreparedTranslation, parseTranslatedComment, prepareTranslation, translatedCommentEdit, type PreparedTranslation } from '../src/shared/translation'
+import { group, scan } from '../document/critic/scanner'
+import { applyTextEdits } from '../document/edits'
+import { codeRanges } from '../document/markdown/exclusions'
+import { resolveThreadEdits } from '../document/review-archive'
+import { matchPreparedTranslation, parseTranslatedComment, prepareTranslation, translatedCommentEdit, type PreparedTranslation } from '../document/translation'
 
 async function artifact(source: string): Promise<PreparedTranslation> {
   const projection = await prepareTranslation(source)

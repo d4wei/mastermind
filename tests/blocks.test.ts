@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { segmentBlocks } from '../src/shared/blocks'
+import { segmentBlocks } from '../document/blocks'
 
 const DOC = [
   '# Title',

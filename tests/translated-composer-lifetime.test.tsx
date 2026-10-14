@@ -3,15 +3,15 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { webcrypto } from 'node:crypto'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
-import { SessionView } from '../src/ui/app/SessionView'
-import { useDoc } from '../src/ui/app/store'
-import { useConfig } from '../src/ui/app/configStore'
-import { useTranslation } from '../src/ui/translate/translationStore'
-import { prepareTranslation, type PreparedTranslation } from '../src/shared/translation'
-vi.mock('../src/ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../src/ui/app/api', async (original) => ({ ...await original<object>(), openEvents: () => ({ addEventListener() {}, close() {} }) }))
-vi.mock('../src/ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
-vi.mock('../src/ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
+import { SessionView } from '../ui/app/SessionView'
+import { useDoc } from '../ui/app/store'
+import { useConfig } from '../ui/app/configStore'
+import { useTranslation } from '../ui/translate/translationStore'
+import { prepareTranslation, type PreparedTranslation } from '../document/translation'
+vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
+vi.mock('../ui/app/api', async (original) => ({ ...await original<object>(), openEvents: () => ({ addEventListener() {}, close() {} }) }))
+vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
+vi.mock('../ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
   containerRef: React.RefObject<HTMLElement | null>; artifact: PreparedTranslation
 }) => <article ref={containerRef}><div data-trans-block-id={artifact.blocks[0]!.id}>{artifact.blocks[0]!.text}</div></article> }))
 let host: HTMLDivElement

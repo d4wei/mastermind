@@ -2,11 +2,11 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { DEFAULT_CONFIG } from '../../src/shared/config'
-import { readSessionFile, writeSessionFile } from '../../src/node/files'
-import { readPreparedTranslation, validLanguageCode } from '../../src/node/prepared-translations'
+import { DEFAULT_CONFIG } from '../../ui/settings/defaults'
+import { readSessionFile, writeSessionFile } from './files'
+import { readPreparedTranslation, validLanguageCode } from '../translation/prepared-translations'
 import { serveFile } from './static'
-import { scanThemes } from '../../src/node/themes'
+import { scanThemes } from '../../themes/discovery'
 
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
