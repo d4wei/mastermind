@@ -42,7 +42,8 @@ with Original only inside its choices, in both Settings and onboarding.
 **Ruled.** Use a square Open files action and horizontal file pills at the top left, with the active
 file's full path in the native title. Keep the Read/Markdown toggle standalone. Place Settings and
 Resolved in a top-right overflow menu. Use a compact heading outline with an active-section
-indicator and a list revealed by hover, click, or keyboard focus.
+indicator and a list revealed by hover, click, or keyboard focus. In both views, square-ended bars
+encode heading depth through length and approximate section size through subtle thickness changes.
 
 **Beat:** a file dropdown, the centered control capsule, and a persistently expanded outline.
 

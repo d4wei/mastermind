@@ -5,6 +5,7 @@ export interface OutlineItem {
   depth: number
   text: string
   offset: number
+  sectionLength: number
 }
 
 function headingText(node: Heading): string {
@@ -19,9 +20,8 @@ function headingText(node: Heading): string {
   return s
 }
 
-/** Top-level headings with their source offsets — for the document outline nav. */
 export function extractOutline(tree: Root): OutlineItem[] {
-  const out: OutlineItem[] = []
+  const out: Omit<OutlineItem, 'sectionLength'>[] = []
   for (const node of tree.children) {
     if (node.type === 'heading') {
       const offset = node.position?.start?.offset
@@ -29,5 +29,8 @@ export function extractOutline(tree: Root): OutlineItem[] {
       out.push({ depth: node.depth, text: headingText(node), offset })
     }
   }
-  return out
+  return out.map((item, index) => ({
+    ...item,
+    sectionLength: Math.max(0, (out[index + 1]?.offset ?? tree.position?.end?.offset ?? item.offset) - item.offset),
+  }))
 }

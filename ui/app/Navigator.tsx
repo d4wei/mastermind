@@ -94,6 +94,11 @@ export function Navigator() {
 
   if (items.length < 2) return null
   const minDepth = Math.min(...items.map((item) => item.depth))
+  const maxSectionLength = Math.max(1, ...items.map((item) => item.sectionLength))
+  const barStyle = (item: typeof items[number]): CSSProperties => ({
+    '--heading-depth': item.depth - minDepth,
+    '--section-weight': Math.sqrt(item.sectionLength / maxSectionLength),
+  } as CSSProperties)
   const active = items.find((item) => item.offset === activeOffset) ?? items[0]!
   const go = (offset: number, index: number): void => {
     if (docEl) scrollToOffset({ current: docEl }, offset)
@@ -114,14 +119,14 @@ export function Navigator() {
       onClick={() => setOpen(true)} style={{ '--heading-count': items.length } as CSSProperties}>
       {items.map((item) => <span key={item.offset} aria-hidden="true"
         className={`outline-tick${item.offset === active.offset ? ' active' : ''}`}
-        style={{ '--heading-depth': item.depth - minDepth } as CSSProperties} />)}
+        style={barStyle(item)} />)}
     </button>
     {open && <div className="outline-popover" id="heading-list">
       <ul className="nav-outline">
         {items.map((item, index) => <li key={item.offset}>
           <button type="button" onClick={() => go(item.offset, index)} title={item.text}
             aria-current={item.offset === active.offset ? 'location' : undefined}
-            style={{ '--heading-depth': item.depth - minDepth } as CSSProperties}>
+            style={barStyle(item)}>
             <span className="outline-list-tick" aria-hidden="true" />{item.text}
           </button>
         </li>)}

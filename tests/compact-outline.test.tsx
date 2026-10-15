@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Navigator } from '../ui/app/Navigator'
 import { useNav } from '../ui/app/navStore'
+import { extractOutline } from '../ui/modes/reading/outline'
+import { parseMarkdown } from '../document/markdown/processor'
 
 let host: HTMLDivElement
 let root: Root
@@ -11,7 +13,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
-  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }], docEl: null })
+  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0, sectionLength: 12 }, { depth: 2, text: 'Second', offset: 12, sectionLength: 40 }], docEl: null })
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -50,4 +52,22 @@ it('tracks the active heading as the document scrolls', () => {
   act(() => window.dispatchEvent(new Event('scroll')))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(host.querySelectorAll('.outline-tick.active')).toHaveLength(1)
+})
+
+it('shares depth and section-size indicators across compact and expanded outlines', () => {
+  const source = Array.from({ length: 6 }, (_, index) =>
+    `${'#'.repeat(index + 1)} Level ${index + 1}\n\n${'text '.repeat((index + 1) ** 2)}\n\n`).join('')
+  useNav.setState({ outline: extractOutline(parseMarkdown(source)), docEl: null })
+  act(() => root.render(<Navigator />))
+  const ticks = Array.from(host.querySelectorAll<HTMLElement>('.outline-tick'))
+  expect(ticks.map((tick) => tick.style.getPropertyValue('--heading-depth'))).toEqual(['0', '1', '2', '3', '4', '5'])
+  const weights = ticks.map((tick) => Number(tick.style.getPropertyValue('--section-weight')))
+  expect(weights[0]).toBeGreaterThan(0)
+  expect(weights.at(-1)).toBe(1)
+  for (let index = 1; index < weights.length; index++) expect(weights[index]).toBeGreaterThan(weights[index - 1]!)
+  act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
+  const buttons = Array.from(host.querySelectorAll<HTMLButtonElement>('.nav-outline button'))
+  expect(buttons.map((button) => button.style.cssText)).toEqual(ticks.map((tick) => tick.style.cssText))
+  act(() => buttons[5]!.click())
+  expect(host.querySelector<HTMLElement>('.outline-tick.active')!.style.getPropertyValue('--heading-depth')).toBe('5')
 })

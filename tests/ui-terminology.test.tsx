@@ -84,7 +84,7 @@ it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (
 it('retains outline navigation to existing-file source offsets', () => {
   const scroller = vi.fn()
   useDoc.setState({ scroller })
-  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }],
+  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0, sectionLength: 12 }, { depth: 2, text: 'Second', offset: 12, sectionLength: 40 }],
     docEl: null })
   act(() => root.render(<Tooltip.Provider><Navigator /></Tooltip.Provider>))
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
