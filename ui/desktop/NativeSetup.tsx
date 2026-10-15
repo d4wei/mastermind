@@ -143,14 +143,8 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
         <div className="native-setup-field" data-setup-field="translationLanguage"
           onInput={() => protect('translationLanguage')}>
           <span>{chinese ? '译文语言' : 'Translation language'}</span>
-          <button type="button" className="btn-ghost native-setup-original" name="translationLanguage" value=""
-            aria-pressed={values.translationLanguage === null}
-            onClick={() => {
-              protect('translationLanguage')
-              setValues((current) => ({ ...current, translationLanguage: null }))
-            }}>{chinese ? '仅原文' : 'Original only'}</button>
-          <LangSelect label={chinese ? '译文语言' : 'Translation language'} value={values.translationLanguage ?? ''}
-            emptyLabel={chinese ? '仅原文' : 'Original only'} uiLang={values.uiLang}
+          <LangSelect label={t('translationLanguage')} value={values.translationLanguage}
+            uiLang={values.uiLang}
             onChange={(translationLanguage) => {
               protect('translationLanguage')
               setValues((current) => ({ ...current, translationLanguage }))

@@ -25,7 +25,7 @@ node bin/mastermind.js open -- plan.md
 ```
 
 The macOS build creates `desktop/target/release/bundle/macos/mastermind.app`. Open files through
-the app's native picker or the repository launcher. The first launch asks for your Name, Interface
+the app's native picker or the repository launcher. The first launch asks for your name, Interface
 language, and optional Translation language. Files opened during setup remain available afterward.
 
 Public packaging and installed command identity remain undecided; the npm project is private and

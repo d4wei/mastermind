@@ -87,9 +87,11 @@ it('retains local edits against suggestions while protection IPC is pending', as
 
 it('retains an explicit Original only edit when later suggestions arrive', async () => {
   await mount(snapshot({ translationLanguage: 'fr' }))
-  await act(async () => host.querySelector<HTMLButtonElement>('.native-setup-original')!.click())
+  await act(async () => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
+  await act(async () => host.querySelector('[role="option"]')!.dispatchEvent(
+    new MouseEvent('mousedown', { bubbles: true })))
   await mount(snapshot({ translationLanguage: 'zh-CN' }))
-  expect(host.querySelector('.native-setup-original')!.getAttribute('aria-pressed')).toBe('true')
+  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
   await act(async () => submit())
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: {
     authorTag: 'Alex', uiLang: 'en', translationLanguage: null,
@@ -173,7 +175,7 @@ it('renders saved setup choices including explicit Original only without changin
   await mount(saved)
   expect(host.querySelector<HTMLInputElement>('[name="authorTag"]')!.value).toBe('Saved reader')
   expect(host.querySelector('[name="uiLang"][value="zh-CN"]')!.getAttribute('aria-pressed')).toBe('true')
-  expect(host.querySelector('.native-setup-original')!.getAttribute('aria-pressed')).toBe('true')
+  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
   expect(mocks.invoke).not.toHaveBeenCalled()
   await act(async () => submit())
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: saved.values })
@@ -211,7 +213,7 @@ it.each(['active', 'native', 'legacy'] as const)('keeps language search and setu
     submit()
   })
   expect(host.querySelector('.lang-search')).toBe(input)
-  expect(host.querySelector('.native-setup-original')!.getAttribute('aria-pressed')).toBe('true')
+  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
   if (kind !== 'native') {
     expect(mocks.invoke).toHaveBeenCalledWith('protect_setup_fields', { fields: ['translationLanguage'] })
@@ -231,7 +233,7 @@ it('protects translation on composition start before input or protection IPC com
   act(() => input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
   expect(mocks.invoke).toHaveBeenCalledWith('protect_setup_fields', { fields: ['translationLanguage'] })
   await mount(snapshot({ translationLanguage: 'fr' }))
-  expect(host.querySelector('.native-setup-original')!.getAttribute('aria-pressed')).toBe('true')
+  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
   await act(async () => release())
 })
 

@@ -2,12 +2,11 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { ChevronDownIcon } from '../icons'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
-import { langLabel, searchLanguages, type Language } from './languages'
+import { langLabel, searchLanguages } from './languages'
 
 interface Props {
-  value: string
-  emptyLabel?: string
-  onChange: (next: string) => void
+  value: string | null
+  onChange: (next: string | null) => void
   label: string
   uiLang?: 'en' | 'zh-CN'
 }
@@ -29,7 +28,7 @@ interface MenuPos {
 }
 
 /** The fixed menu escapes panel overflow; retaining its DOM parent preserves outside-click handling. */
-export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props) {
+export function LangSelect({ value, onChange, label, uiLang }: Props) {
   const t = useT(uiLang)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -40,14 +39,23 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
   const [pos, setPos] = useState<MenuPos | null>(null)
   const listId = useId()
 
-  const current = value ? langLabel(value) : { name: emptyLabel ?? value, custom: false }
+  const current = value ? langLabel(value) : { name: t('translationOff'), custom: false }
   const matches = searchLanguages(query)
   const typed = query.trim()
   const hasExact = matches.some(
     (l) => norm(l.name) === norm(typed) || norm(l.native) === norm(typed) || norm(l.code) === norm(typed),
   )
   const showCustom = /^[A-Za-z][A-Za-z0-9_-]*$/.test(typed) && typed !== '' && !hasExact
-  const optionCount = matches.length + (showCustom ? 1 : 0)
+  const options: { code: string | null; name: string; native?: string; custom?: boolean }[] = [
+    ...(norm(t('translationOff')).includes(norm(typed)) ? [{ code: null, name: t('translationOff') }] : []),
+    ...matches,
+    ...(showCustom ? [{ code: typed, name: `${t('langUseCustom')} “${typed}”`, custom: true }] : []),
+  ]
+  const optionCount = options.length
+
+  useEffect(() => {
+    if (open) document.getElementById(`${listId}-${active}`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [open, pos, active, listId])
 
   useEffect(() => {
     if (!open) return
@@ -104,16 +112,20 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
     }
   }, [open])
 
-  function commit(next: string): void {
-    const v = next.trim()
-    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(v)) onChange(v)
+  function dismiss(): void {
     setOpen(false)
+    triggerRef.current?.focus()
+  }
+
+  function commit(next: string | null): void {
+    onChange(next)
+    dismiss()
     setQuery('')
   }
 
   function openMenu(): void {
     setQuery('')
-    setActive(0)
+    setActive(searchLanguages('').findIndex((language) => norm(language.code) === norm(value ?? '')) + 1)
     setOpen(true)
   }
 
@@ -124,25 +136,26 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
     }
     if (e.key === 'Escape') {
       e.stopPropagation() // don't let the SlideOver's Escape close the whole panel
-      setOpen(false)
+      e.preventDefault()
+      dismiss()
       return
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActive((i) => Math.min(i + 1, optionCount - 1))
+      setActive((i) => Math.max(0, Math.min(i + 1, optionCount - 1)))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActive((i) => Math.max(i - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const pick = matches[active]
+      const pick = options[active]
       if (pick) commit(pick.code)
-      else if (showCustom) commit(typed)
     }
   }
 
   return (
-    <div className="lang-select" ref={rootRef}>
+    <div className="lang-select" ref={rootRef}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
       <button
         ref={triggerRef}
         type="button"
@@ -151,6 +164,12 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
         aria-expanded={open}
         aria-label={label}
         onClick={() => (open ? setOpen(false) : openMenu())}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            openMenu()
+          }
+        }}
       >
         <span className="lang-trigger-text">
           {!current.custom && current.native && current.native !== current.name && (
@@ -184,6 +203,8 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
             className="settings-input lang-search"
             role="combobox"
             aria-controls={listId}
+            aria-label={t('langSearchPlaceholder')}
+            aria-activedescendant={options[active] ? `${listId}-${active}` : undefined}
             aria-expanded
             aria-autocomplete="list"
             placeholder={t('langSearchPlaceholder')}
@@ -196,37 +217,24 @@ export function LangSelect({ value, onChange, label, emptyLabel, uiLang }: Props
             onKeyDown={onKeyDown}
           />
           <ul className="lang-list" id={listId} role="listbox" aria-label={label}>
-            {matches.map((l: Language, i) => (
+            {options.map((option, i) => (
               <li
-                key={l.code}
+                key={option.code === null ? 'original' : `language-${option.code}`}
+                id={`${listId}-${i}`}
                 role="option"
-                aria-selected={norm(l.name) === norm(value) || norm(l.code) === norm(value)}
-                className={`lang-option${i === active ? ' active' : ''}`}
+                aria-selected={i === active}
+                className={`lang-option${i === active ? ' active' : ''}${option.custom ? ' lang-option-custom' : ''}`}
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => {
-                  e.preventDefault() // keep focus on the search input
-                  commit(l.code)
+                  e.preventDefault() // Select before blur dismisses the popup.
+                  commit(option.code)
                 }}
               >
-                <span className="lang-native">{l.native}</span>
-                <span className="lang-name">{l.name}</span>
+                {option.native && option.native !== option.name && <span className="lang-native">{option.native}</span>}
+                <span className="lang-name">{option.name}</span>
               </li>
             ))}
-            {showCustom && (
-              <li
-                role="option"
-                aria-selected={false}
-                className={`lang-option lang-option-custom${active === matches.length ? ' active' : ''}`}
-                onMouseEnter={() => setActive(matches.length)}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  commit(typed)
-                }}
-              >
-                {t('langUseCustom')} “{typed}”
-              </li>
-            )}
-            {matches.length === 0 && !showCustom && <li className="lang-empty">{t('langNoMatch')}</li>}
+            {optionCount === 0 && <li className="lang-empty">{t('langNoMatch')}</li>}
           </ul>
         </div>
       )}

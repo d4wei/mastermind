@@ -16,7 +16,7 @@ or data being discussed. Names must stand on their own without the development c
 | UI language | Interface language | 界面语言 |
 | Repo language | Project language | 项目语言 |
 | Source, as an editor mode | Markdown | Markdown |
-| Author tag, in Settings | Name | 名字 |
+| Author tag, Name, in Settings | Your name | 你的名字 |
 | Prepared translation, in notices | Translation | 译文 |
 | Edits, as a review search filter | Suggested edits | 修改建议 |
 | Original thread, in resolved history | Discussion | 讨论 |
@@ -161,11 +161,11 @@ Evidence: [author defaults][preferences] and [public protocol][protocol].
 This Settings field supplies the name shown beside comments and written into their `@name:`
 signatures in Markdown. It does not name a comment or require an account.
 
-Use **Name / 名字** in Settings. During onboarding ask **What should we call you? / 怎么称呼你？**
+Use **Your name / 你的名字** in Settings. During onboarding ask **What should we call you? / 怎么称呼你？**
 Use the helper **This name appears beside your comments. / 这个名字会显示在你的评论旁。**
 A person may enter a name or nickname; the wording does not request a legal name or unique username.
 
-Example: “Name: Alex.” A comment is attributed to Alex and stored with `@Alex:`.
+Example: “Your name: Alex.” A comment is attributed to Alex and stored with `@Alex:`.
 Keep **author tag** in protocol documentation and `authorTag` in code: there it names actual syntax.
 A signature records attribution, not an authenticated identity.
 

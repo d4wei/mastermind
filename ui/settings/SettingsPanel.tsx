@@ -111,8 +111,55 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const activeTheme = themes.find((th) => th.id === config.theme)
 
   return (
-    <SlideOver title={t('settings')} onClose={onClose} ignoreSelector=".topbar-settings">
+    <SlideOver title={t('settings')} onClose={onClose} ignoreSelector=".reader-menu">
       <div className="settings-body">
+        <section>
+          <h4>{t('generalSection')}</h4>
+          <label className="settings-row">
+            <span>{t('authorTag')}</span>
+            <input
+              type="text"
+              className="settings-input"
+              defaultValue={config.authorTag}
+              spellCheck={false}
+              autoComplete="off"
+              autoCapitalize="off"
+              maxLength={64}
+              aria-invalid={invalidName}
+              title={t('authorTagHint')}
+              onBlur={(e) => {
+                const v = usableAuthorName(e.target.value)
+                setInvalidName(v === null)
+                if (v && v !== config.authorTag) patch({ authorTag: v })
+              }}
+              onChange={(event) => setInvalidName(usableAuthorName(event.target.value) === null)}
+            />
+            {invalidName && <small role="alert">{t('authorTagInvalid')}</small>}
+          </label>
+          <div className="settings-row">
+            <span>{t('uiLanguage')}</span>
+            {/* Interface languages are bundled; translation targets accept arbitrary language codes. */}
+            <div className="settings-theme-row">
+              {(['en', 'zh-CN'] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={`theme-chip${config.uiLang === code ? ' active' : ''}`}
+                  aria-pressed={config.uiLang === code}
+                  onClick={() => patch({ uiLang: code })}
+                >
+                  {code === 'en' ? 'English' : '简体中文'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="settings-row">
+            <span title={t('translationLanguageHint')}>{t('translationLanguage')}</span>
+            <LangSelect label={t('translationLanguage')} value={config.translationLanguage}
+              onChange={(translationLanguage) => patch({ translationLanguage })} />
+          </div>
+        </section>
+
         <section>
           <h4>{t('appearanceSection')}</h4>
           <div className="settings-row">
@@ -219,40 +266,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           <div className="settings-row">
-            <span>{t('codeFont')}</span>
-            <div className="settings-theme-row">
-              {MONO_FONTS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`theme-chip${config.monoFont === m.id ? ' active' : ''}`}
-                  aria-pressed={config.monoFont === m.id}
-                  style={{ fontFamily: monoStack(m) }}
-                  onClick={() => patch({ monoFont: m.id })}
-                >
-                  {m.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="settings-row">
-            <span>{t('codeColor')}</span>
-            <div className="settings-theme-row">
-              {CODE_THEMES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`theme-chip code-chip${config.codeTheme === c.id ? ' active' : ''}`}
-                  aria-pressed={config.codeTheme === c.id}
-                  onClick={() => patch({ codeTheme: c.id })}
-                >
-                  <CodeSwatch theme={c} appearance={activeTheme?.appearance ?? 'light'} />
-                  {CODE_COLOR_LABEL[c.id] ? t(CODE_COLOR_LABEL[c.id]!) : c.name}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="settings-row">
             <span>
               {t('fontSize')} <span className="settings-val">{config.fontSize}px</span>
             </span>
@@ -311,52 +324,39 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </section>
 
         <section>
-          <h4>{t('reviewLangSection')}</h4>
-          <label className="settings-row">
-            <span>{t('authorTag')}</span>
-            <input
-              type="text"
-              className="settings-input"
-              defaultValue={config.authorTag}
-              spellCheck={false}
-              autoComplete="off"
-              autoCapitalize="off"
-              maxLength={64}
-              aria-invalid={invalidName}
-              title={t('authorTagHint')}
-              onBlur={(e) => {
-                const v = usableAuthorName(e.target.value)
-                setInvalidName(v === null)
-                if (v && v !== config.authorTag) patch({ authorTag: v })
-              }}
-              onChange={(event) => setInvalidName(usableAuthorName(event.target.value) === null)}
-            />
-            {invalidName && <small role="alert">{t('authorTagInvalid')}</small>}
-          </label>
+          <h4>{t('codeSection')}</h4>
           <div className="settings-row">
-            <span>{t('uiLanguage')}</span>
-            {/* Interface languages are bundled; translation targets accept arbitrary language codes. */}
+            <span>{t('codeFont')}</span>
             <div className="settings-theme-row">
-              {(['en', 'zh-CN'] as const).map((code) => (
+              {MONO_FONTS.map((m) => (
                 <button
-                  key={code}
+                  key={m.id}
                   type="button"
-                  className={`theme-chip${config.uiLang === code ? ' active' : ''}`}
-                  aria-pressed={config.uiLang === code}
-                  onClick={() => patch({ uiLang: code })}
+                  className={`theme-chip${config.monoFont === m.id ? ' active' : ''}`}
+                  aria-pressed={config.monoFont === m.id}
+                  style={{ fontFamily: monoStack(m) }}
+                  onClick={() => patch({ monoFont: m.id })}
                 >
-                  {code === 'en' ? 'English' : '简体中文'}
+                  {m.name}
                 </button>
               ))}
             </div>
           </div>
           <div className="settings-row">
-            <span title={t('translationLanguageHint')}>{t('translationLanguage')}</span>
-            <div className="settings-translation-language">
-              <button type="button" className="btn-ghost" aria-pressed={config.translationLanguage === null}
-                onClick={() => patch({ translationLanguage: null })}>{t('translationOff')}</button>
-              <LangSelect label={t('translationLanguage')} value={config.translationLanguage ?? ''} emptyLabel={t('translationOff')}
-                onChange={(translationLanguage) => patch({ translationLanguage })} />
+            <span>{t('codeColor')}</span>
+            <div className="settings-theme-row">
+              {CODE_THEMES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`theme-chip code-chip${config.codeTheme === c.id ? ' active' : ''}`}
+                  aria-pressed={config.codeTheme === c.id}
+                  onClick={() => patch({ codeTheme: c.id })}
+                >
+                  <CodeSwatch theme={c} appearance={activeTheme?.appearance ?? 'light'} />
+                  {CODE_COLOR_LABEL[c.id] ? t(CODE_COLOR_LABEL[c.id]!) : c.name}
+                </button>
+              ))}
             </div>
           </div>
         </section>

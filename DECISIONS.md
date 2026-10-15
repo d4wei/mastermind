@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-14 — Clarify personal settings and translation selection
+
+**Ruled.** Label the comment-author preference Your name / 你的名字 in Settings. Keep the onboarding
+question What should we call you? / 怎么称呼你？. Use one searchable Translation language picker,
+with Original only inside its choices, in both Settings and onboarding.
+
+**Beat:** the ambiguous Name label and separate, duplicated Original only controls.
+
 ## 2026-10-14 — Keep reader controls at the window edges
 
 **Ruled.** Use a square Open files action and horizontal file pills at the top left, with the active

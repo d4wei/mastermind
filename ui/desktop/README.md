@@ -34,11 +34,12 @@ live
 beside the [termination adapter](../../desktop/src/termination.md).
 The browser entry point retains its own unload prompt and localhost adapter.
 
-`NativeSetup.tsx` holds unconfirmed Name and language choices separately from saved configuration.
+`NativeSetup.tsx` holds unconfirmed name and language choices separately from saved configuration.
 The native host owns saved-field presence, transient suggestions, and completion; its
 [setup contract](../../desktop/src/setup.md) defines the commands. Local edits are
 protected immediately while native protection is pending. Language preview does not save settings.
-Name validation uses the shared author parser so new comments retain their attribution.
+Name validation uses the shared author parser so new comments retain their attribution. Translation
+language uses the same searchable picker as Settings, including its Original only choice.
 
 The reviewer stays unmounted until confirmation succeeds and saved configuration reloads. App-level
 configuration loading waits for that gate, avoiding an older load overwriting confirmed choices.

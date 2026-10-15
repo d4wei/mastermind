@@ -1240,11 +1240,6 @@ mark.critic-hl.critic-anchor:hover {
   width: 100%;
 }
 
-.settings-translation-language {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--space-unit) * 1.5);
-}
 .lang-select {
   position: relative;
 }
