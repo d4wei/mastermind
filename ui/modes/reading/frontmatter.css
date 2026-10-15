@@ -1,21 +1,20 @@
 .md-properties {
-  border-block: 1px solid var(--color-border);
+  display: grid;
+  grid-template-columns: fit-content(30%) minmax(0, 1fr);
+  column-gap: calc(var(--space-unit) * 3);
+  border-bottom: 1px solid var(--color-border);
   margin: calc(var(--space-unit) * 4) 0;
   padding-block: calc(var(--space-unit) * 2);
   font-size: var(--font-size-sm);
 }
 .md-property {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
-  gap: calc(var(--space-unit) * 4);
+  display: contents;
+}
+.md-property dt,
+.md-property dd {
   padding-block: var(--space-unit);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 .md-property dt { color: var(--color-text-muted); }
 .md-property dd { margin: 0; }
-.md-metadata-source summary {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}

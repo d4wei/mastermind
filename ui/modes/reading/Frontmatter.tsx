@@ -39,6 +39,5 @@ export function Frontmatter({ source }: { source: string }) {
         <dt>{name}</dt><dd>{value}</dd>
       </div>)}
     </dl>
-    <details className="md-metadata-source"><summary>YAML</summary>{raw}</details>
   </div>
 }

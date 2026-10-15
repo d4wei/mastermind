@@ -5,7 +5,7 @@ renderer's `data-ps`/`data-pe` offsets when text matches, otherwise an unambiguo
 the containing block. Unmappable blocks are skipped. Multi-block selections split at block and
 existing-mark boundaries; comments anchor to the first remaining range.
 
-Frontmatter properties and their raw YAML disclosure form one opaque block. Selections beginning
+Frontmatter properties or their literal fallback form one opaque block. Selections beginning
 there can continue into body text, but only the body portion receives review ranges. Nested raw
 source does not displace the metadata wrapper when enumerating blocks across a selection.
 

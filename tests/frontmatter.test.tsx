@@ -29,8 +29,8 @@ describe('YAML frontmatter', () => {
       ['标题', '方案\n第二行'], ['count', '9007199254740993'], ['ready', 'TRUE'],
       ['empty', ''], ['none', '~'], ['code', '01'],
     ])
-    expect(root.querySelector('details summary')!.textContent).toBe('YAML')
-    expect(root.querySelector('details code')!.textContent).toBe(yaml)
+    expect(root.querySelector('.md-frontmatter details')).toBeNull()
+    expect(root.querySelector('.md-frontmatter pre')).toBeNull()
     expect(root.querySelector('.md-frontmatter [data-ps]')).toBeNull()
   })
 
@@ -75,8 +75,6 @@ describe('YAML frontmatter', () => {
     crossing.setEnd(bodyText, 4)
     const mapped = rangeToSourceRanges(crossing, source, [])
     expect(mapped).toEqual({ ranges: [{ from: prefix.length, to: prefix.length + 4, text: 'Body' }] })
-    crossing.setStart(root.querySelector('details code')!.firstChild!, 0)
-    expect(rangeToSourceRanges(crossing, source, [])).toEqual(mapped)
     const { spans } = analyzeMarkdown(source)
     expect(spans).toHaveLength(1)
     expect(applyTextEdits(source, [acceptEdit(source, spans[0]!)])).toBe(prefix + 'Body addition.' + eol)

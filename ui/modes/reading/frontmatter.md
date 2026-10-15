@@ -7,15 +7,16 @@ the document into a JavaScript object. No aliases are expanded, and no YAML is s
 
 Rows retain pair order. String keys and values use decoded text; other scalars retain their source
 spelling so large integers, null forms, and numeric notation are not coerced for display. React
-escapes every value. A YAML disclosure retains the literal source, including comments. These rows
-are a reading aid, not a metadata editor; Markdown mode remains the editing surface.
+escapes every value. The shared key column fits its contents within a width cap, leaving a compact
+gap before values. Only the bottom edge has a divider. Markdown mode exposes the original source,
+including YAML comments; property rows have no separate source disclosure.
 
 Non-mappings, empty mappings, nested structures, nonstring or empty keys, merge keys, anchors, tags,
 explicit directives, parse errors, and warnings fall back to literal YAML. Large metadata also
 stays literal to bound additional parsing work on the render path. The limit belongs to the
 constant in `Frontmatter.tsx`; it does not limit opening, editing, or saving the file.
 
-Neither properties nor their source disclosure receive source-position attributes. They remain
+Neither properties nor literal fallbacks receive source-position attributes. They remain
 outside inline review selection, while body nodes retain their original offsets. Source bytes,
 line endings, translation context, and CriticMarkup exclusion still come from the shared Markdown
 parser. `tests/frontmatter.test.tsx` checks display fallbacks, inert HTML, selection exclusion, and
