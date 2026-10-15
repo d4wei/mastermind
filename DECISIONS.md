@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-14 — Use the block-letter M on Grid orange-red as the app icon
+
+**Ruled.** Preserve the original two-row capital M, its horizontal gap, and light-shade texture in
+the application icon. Use Grid's orange-red background. Keep the editable SVG beside native exports
+in `desktop/icons/`.
+
+**Beat:** lowercase variants that evoked a fast-food brand and simplified marks that lost the
+character art's texture.
+
 ## 2026-10-13 — Source roots follow application responsibilities
 
 **Ruled.** Use `ui/` for the interface, `document/` for isomorphic document semantics, and
