@@ -6,6 +6,9 @@ The document store does not interpret native command envelopes or HTTP statuses.
 and source-mapping checks. Theme assets are bundled, and preferences use the native application
 config directory.
 
+The optional host background operation connects loaded theme colors to the native
+background surface. Its [theme adapter](../theme/background.md) owns conversion and load timing.
+
 The active document receives immediate native watcher invalidations and periodic revalidation to
 cover silent event loss or a watch left on a replaced parent directory. Healthy watcher registration
 uses a five-second interval; registration failure uses a one-second interval. Closing the document

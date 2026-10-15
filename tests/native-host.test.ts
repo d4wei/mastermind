@@ -14,6 +14,13 @@ function deferred<T>() {
 afterEach(() => { installHost(null); vi.unstubAllGlobals() })
 
 describe('native reviewer boundary', () => {
+  it('passes theme background channels to the native appearance command', async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined)
+    const host = createNativeHost({ invoke, listen: vi.fn() }, [])
+    await host.setBackgroundColor!([40, 42, 54, 255])
+    expect(invoke).toHaveBeenCalledWith('set_background_color', { color: [40, 42, 54, 255] })
+  })
+
   it('uses native commands without issuing HTTP requests and retains conflict errors', async () => {
     const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
       if (command === 'write_document') throw { status: 409, error: 'file_changed' }

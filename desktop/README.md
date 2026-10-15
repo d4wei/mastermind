@@ -28,6 +28,8 @@ releases.
 and local transport startup; `opening.rs` owns the admitted-document snapshot; `document_io.rs`
 serves admitted document operations and watches; `lifecycle.rs` creates the window and dispatches
 menus, close requests, and application events. Setup uses preference persistence directly.
+`appearance.rs` applies the rendered theme's background to native background surfaces;
+the [theme adapter](../ui/theme/background.md) owns its color source and synchronization timing.
 
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),

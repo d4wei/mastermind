@@ -1,6 +1,7 @@
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 mod admission;
+mod appearance;
 mod document_io;
 mod endpoint;
 mod files;
@@ -62,6 +63,7 @@ fn main() {
         .manage(docs.clone())
         .manage(lifecycle::CloseGate::default())
         .invoke_handler(tauri::generate_handler![
+            appearance::set_background_color,
             opening::snapshot,
             opening::choose_files,
             opening::dismiss_opening_errors,

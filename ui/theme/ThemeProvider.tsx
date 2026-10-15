@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { syncHostBackground } from './background'
 import { useConfig } from '../app/configStore'
 import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
@@ -15,8 +16,7 @@ export function ThemeEffects() {
   const themeId = config?.theme ?? 'grid'
   const theme = themes.find((t) => t.id === themeId) ?? themes[0]
 
-  // tokens.css swap + data-theme attribute, with a crossfade veil that hides the
-  // brief flash while the new tokens.css <link> parses (the old sheet lingers).
+  // Keep the previous background visible while the replacement stylesheet loads.
   useEffect(() => {
     const id = theme?.id ?? themeId
     const root = document.documentElement
@@ -30,14 +30,18 @@ export function ThemeEffects() {
       link.rel = 'stylesheet'
       document.head.appendChild(link)
     }
-    if (prev === id && link.href.endsWith(href)) return // unchanged
+    if (prev === id && link.href.endsWith(href)) {
+      if (link.sheet) syncHostBackground()
+      else link.addEventListener('load', syncHostBackground, { once: true })
+      return () => link?.removeEventListener('load', syncHostBackground)
+    }
 
     const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
     let veil: HTMLDivElement | null = null
     if (!firstLoad && prev && prev !== id && !reduce) {
       veil = document.createElement('div')
       veil.className = 'theme-veil'
-      veil.style.background = getComputedStyle(document.body).backgroundColor // the OLD theme's bg
+      veil.style.background = getComputedStyle(document.body).backgroundColor
       document.body.appendChild(veil)
     }
     root.dataset.theme = id
@@ -55,10 +59,16 @@ export function ThemeEffects() {
         }),
       )
     }
-    link.onload = reveal
+    const loaded = (): void => { syncHostBackground(); reveal() }
+    link.onload = loaded
     if (!link.href.endsWith(href)) link.href = href
-    else reveal()
-    if (veil) setTimeout(reveal, 220) // fallback if onload doesn't fire (cached sheet)
+    else if (link.sheet) loaded()
+    const fallback = veil ? setTimeout(reveal, 220) : undefined
+    return () => {
+      clearTimeout(fallback)
+      if (link.onload === loaded) link.onload = null
+      veil?.remove()
+    }
   }, [theme?.id, themeId])
 
   // Declare local font faces independently of the selected theme.
