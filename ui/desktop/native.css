@@ -45,6 +45,10 @@
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
   font-size: var(--font-size-sm);
 }
+.native-file-pill:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
 .native-file-pill.active {
   background: var(--color-selection);
   color: var(--color-text);

@@ -95,9 +95,15 @@ and Chinese interface labels, a translation language configured, and light and d
 - Document controls remain at the top right, with Settings and Resolved in the overflow menu. In
   the native app, the square Open button and file pills stay at the top left. Long filenames clip,
   pills scroll horizontally, and the active file's full path appears in the native window title.
+  Hover an inactive file pill: its background and text respond while the active pill stays distinct.
 - The compact outline shows heading ticks and the current section. Hover, click, or focus opens the
   heading list; Escape closes it and returns keyboard focus to the trigger. Scroll the document and
   check that the current-section indicator follows it.
+- With headings from H1 through H6, bars have uniform thickness and square ends. Inactive bars
+  shorten at each depth; the active bar is always longest. In the popup, bars share a left edge
+  while labels retain their indentation. Changing sections does not shift the labels.
+- Frontmatter property rows have only a bottom divider, with breathing room before the document
+  body. Literal YAML fallbacks retain their code-block spacing.
 - The first heading starts below the controls. Scrolling and choosing an outline heading keep both
   the target heading and the controls visible. Repeat in Markdown mode.
 - At narrow widths, comments start closed. The comments button or a document comment marker opens

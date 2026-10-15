@@ -43,7 +43,8 @@ with Original only inside its choices, in both Settings and onboarding.
 file's full path in the native title. Keep the Read/Markdown toggle standalone. Place Settings and
 Resolved in a top-right overflow menu. Use a compact heading outline with an active-section
 indicator and a list revealed by hover, click, or keyboard focus. In both views, square-ended bars
-encode heading depth through length and approximate section size through subtle thickness changes.
+use uniform thickness. Inactive bars shorten with heading depth; the active section has the longest
+bar. Popup bars share a left edge while heading labels retain their indentation.
 
 **Beat:** a file dropdown, the centered control capsule, and a persistently expanded outline.
 

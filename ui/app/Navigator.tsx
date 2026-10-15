@@ -94,10 +94,8 @@ export function Navigator() {
 
   if (items.length < 2) return null
   const minDepth = Math.min(...items.map((item) => item.depth))
-  const maxSectionLength = Math.max(1, ...items.map((item) => item.sectionLength))
   const barStyle = (item: typeof items[number]): CSSProperties => ({
     '--heading-depth': item.depth - minDepth,
-    '--section-weight': Math.sqrt(item.sectionLength / maxSectionLength),
   } as CSSProperties)
   const active = items.find((item) => item.offset === activeOffset) ?? items[0]!
   const go = (offset: number, index: number): void => {
@@ -127,7 +125,8 @@ export function Navigator() {
           <button type="button" onClick={() => go(item.offset, index)} title={item.text}
             aria-current={item.offset === active.offset ? 'location' : undefined}
             style={barStyle(item)}>
-            <span className="outline-list-tick" aria-hidden="true" />{item.text}
+            <span className="outline-list-tick" aria-hidden="true" />
+            <span className="outline-label">{item.text}</span>
           </button>
         </li>)}
       </ul>

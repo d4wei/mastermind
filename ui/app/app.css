@@ -1819,12 +1819,16 @@ input[type='checkbox'] {
 .outline-list-tick {
   display: block;
   flex: none;
-  width: calc(var(--space-unit) * (5 - var(--heading-depth) * .75));
-  height: calc(var(--space-unit) * (.25 + var(--section-weight) * .5));
+  width: calc(var(--space-unit) * (4 - var(--heading-depth) * .5));
+  height: calc(var(--space-unit) * .5);
   border-radius: 0;
   background: var(--color-text-faint);
 }
-.outline-tick.active { background: var(--color-accent); }
+.outline-tick.active,
+.nav-outline button[aria-current] .outline-list-tick {
+  width: calc(var(--space-unit) * 5);
+  background: var(--color-accent);
+}
 .outline-popover {
   position: absolute;
   top: 0;
@@ -1839,13 +1843,13 @@ input[type='checkbox'] {
 .nav-outline { list-style: none; margin: 0; padding: var(--space-unit); font-size: var(--font-size-sm); }
 .nav-outline li { margin: 0; }
 .nav-outline button {
-  display: flex;
+  display: grid;
+  grid-template-columns: calc(var(--space-unit) * 5) minmax(0, 1fr);
   align-items: center;
   gap: calc(var(--space-unit) * 3);
   width: 100%;
   min-height: calc(var(--space-unit) * 7);
   padding: var(--space-unit) calc(var(--space-unit) * 2);
-  padding-left: calc(var(--space-unit) * (2 + var(--heading-depth) * 2));
   text-align: left;
   border: none;
   border-radius: var(--radius-xs);
@@ -1854,7 +1858,10 @@ input[type='checkbox'] {
   font-size: inherit;
 }
 .nav-outline button[aria-current] { background: var(--color-selection); color: var(--color-text); }
-.nav-outline button[aria-current] .outline-list-tick { background: var(--color-accent); }
+.outline-label {
+  padding-left: calc(var(--space-unit) * var(--heading-depth) * 2);
+  overflow-wrap: anywhere;
+}
 .nav-outline button:hover { color: var(--color-text); background: var(--color-selection); }
 
 /* Coarse pointers need larger targets for the compact controls. */

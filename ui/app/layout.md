@@ -11,11 +11,10 @@ panels clear that space. Outline navigation also accounts for the current toolba
 styles omit controls and their reserved space. Keeping controls at the top avoids browser hosts
 that overlay an input near the bottom of the viewport.
 
-`Navigator` shows a compact heading-tick strip with the current section highlighted. Bar length
-decreases at every heading depth; thickness uses a square-root scale of source length between
-consecutive headings, including the final section through document end. This is a stable size
-estimate, independent of rendered height. Both outline surfaces share square-ended bar geometry;
-active state changes color without overriding depth or size. Hover, focus,
+`Navigator` shows a compact heading-tick strip with the current section highlighted. Inactive bars
+shorten at every heading depth; the active section always has the longest bar. Both outline surfaces
+use uniform thickness and square ends. The popup aligns bars in a fixed left column and indents only
+heading labels, so changing the active section does not shift the text. Hover, focus,
 or a click opens its scrollable heading list without moving the document. Escape, outside clicks,
 and leaving the unfocused control dismiss the list. Selecting a heading scrolls to its source
 position and closes the list. Reading mode follows document scroll position; Markdown mode uses
