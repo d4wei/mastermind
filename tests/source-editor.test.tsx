@@ -6,6 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
+import { useNav } from '../ui/app/navStore'
 import { useDoc } from '../ui/documents/store'
 import { SourceEditor } from '../ui/modes/source/SourceEditor'
 
@@ -60,6 +61,7 @@ afterEach(() => {
   host.remove()
   vi.clearAllTimers()
   vi.useRealTimers()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals(); installHost(null)
 })
 
@@ -130,4 +132,26 @@ it('invalidates retained history even when external edits return to the same sou
   expect(editor().state.doc.toString()).toBe('alpha edited')
   act(() => { expect(undo(editor())).toBe(false) })
   expect(useDoc.getState().source).toBe('alpha edited')
+})
+
+it('navigates through editor geometry without requiring an off-screen line in the DOM', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addListener: vi.fn(), removeListener: vi.fn() }))
+  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(5000)
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800)
+  act(() => useDoc.getState().adoptDiskContent('# First\r\n\r\n## Second\r\n', 4, 'headings'))
+  const view = editor()
+  const offset = view.state.doc.toString().indexOf('## Second')
+  vi.spyOn(view, 'documentTop', 'get').mockReturnValue(100)
+  const lineBlockAt = vi.spyOn(view, 'lineBlockAt').mockReturnValue({ top: 900 } as ReturnType<EditorView['lineBlockAt']>)
+  const domAtPos = vi.spyOn(view, 'domAtPos').mockImplementation(() => { throw new Error('Line is not rendered') })
+  expect(useNav.getState().sourceHeadingTop?.(offset)).toBe(1000)
+  act(() => useDoc.getState().scroller!(offset, 1))
+  expect(lineBlockAt).toHaveBeenCalledWith(offset)
+  expect(view.state.selection.main.anchor).toBe(offset)
+  expect(domAtPos).not.toHaveBeenCalled()
+  expect(scrollTo).toHaveBeenCalledWith(0, 976)
+  act(() => useDoc.getState().setMode('reading'))
+  expect(useNav.getState().sourceHeadingTop).toBeNull()
+  expect(useDoc.getState().scroller).toBeNull()
 })

@@ -5,7 +5,8 @@ import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type Vi
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { useDoc } from '../../documents/store'
-import { scrollElementToTop } from '../../util/scroll'
+import { scrollPositionToTop } from '../../util/scroll'
+import { useNav } from '../../app/navStore'
 
 const CRITIC_CLASS: Record<string, string> = {
   ins: 'cm-critic cm-critic-ins',
@@ -104,12 +105,14 @@ export function SourceEditor() {
     }
     useDoc.getState().registerFlusher(flush)
     const registeredFlusher = useDoc.getState().flushEditor
+    const editorPosition = (offset: number): number => Math.min(Math.max(offset, 0), view.state.doc.length)
+    const sourceHeadingTop = (offset: number): number =>
+      view.documentTop + view.lineBlockAt(editorPosition(offset)).top
+    useNav.setState({ sourceHeadingTop })
     useDoc.getState().registerScroller((offset) => {
-      const pos = Math.min(Math.max(offset, 0), view.state.doc.length)
+      const pos = editorPosition(offset)
       view.dispatch({ selection: { anchor: pos } })
-      const node = view.domAtPos(pos).node
-      const line = (node.nodeType === 1 ? (node as Element) : node.parentElement)?.closest('.cm-line') ?? null
-      scrollElementToTop(line)
+      scrollPositionToTop(sourceHeadingTop(pos))
     })
 
     const registeredScroller = useDoc.getState().scroller
@@ -118,6 +121,7 @@ export function SourceEditor() {
       retainedStates.set(sessionId, { state: view.state, revision })
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
+      if (useNav.getState().sourceHeadingTop === sourceHeadingTop) useNav.setState({ sourceHeadingTop: null })
       view.destroy()
     }
   }, [sessionId, externalVersion])

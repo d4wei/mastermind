@@ -17,9 +17,10 @@ use uniform thickness and square ends. The popup aligns bars in a fixed left col
 heading labels, so changing the active section does not shift the text. Hover, focus,
 or a click opens its scrollable heading list without moving the document. Escape, outside clicks,
 and leaving the unfocused control dismiss the list. Selecting a heading scrolls to its source
-position and closes the list. Reading mode follows document scroll position; Markdown mode uses
-its registered source scroller. The outline shares only headings and the article element through
-`navStore`; expansion is transient component state.
+position and closes the list. Both modes follow document scroll position. Reading mode measures rendered headings; Markdown mode
+uses CodeMirror line geometry, including off-screen headings, and its registered source scroller.
+`navStore` shares headings, the reading article, and the mounted editor's measurement callback;
+expansion is transient component state.
 
 At the narrow breakpoint, comments use the shared dismissible panel instead of a second content
 column. The panel starts closed and opens from the comments control or a document mark. Cards flow

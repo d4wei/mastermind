@@ -134,19 +134,13 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     return set
   }, [analysis])
 
-  // The heading outline drives the left navigator in both modes (so its
-  // collapse/expand state persists across Read/Markdown). Reading reuses its
-  // critic-aware tree; Markdown mode parses the source directly.
+  // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
     [analysis, status, source],
   )
-  // Publish the outline + (in reading mode) the article element to the shared
-  // navigator, which lives outside SessionView. docEl is null in source mode —
-  // there the navigator scrolls via the registered editor scroller instead of
-  // the article's data-ps offsets.
   useEffect(() => {
-    useNav.getState().publish(outline, articleRef.current)
+    useNav.getState().publish(outline, mode === 'reading' ? articleRef.current : null)
   }, [outline, mode, externalVersion])
   // Clear only on real unmount, so switching modes never blanks the outline
   // (which would briefly unmount the navigator and reset its transient state).

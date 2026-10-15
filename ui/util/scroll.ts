@@ -4,10 +4,8 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-// The page (documentElement) is the scroll container in every mode. We animate
-// it ourselves with rAF instead of relying on `scrollIntoView`/`scrollTo` with
-// `behavior: 'smooth'`, which some browsers/environments treat as a no-op (the
-// scroll silently never happens). Honors reduced-motion with an instant jump.
+// All review modes scroll the page. A shared animation keeps review and outline navigation
+// consistent and lets a new navigation cancel the previous one.
 let scrollRaf = 0
 function smoothScrollWindowTo(top: number): void {
   if (scrollRaf) {
@@ -45,17 +43,14 @@ export function scrollToElement(el: Element | null): Element | null {
   return el
 }
 
-/**
- * Scroll a matched element near the top of the viewport. Used by the outline
- * navigator so the clicked heading lands inside the scroll-spy's "active" zone
- * (the top of the page) — otherwise centering it would leave a different
- * heading marked active.
- */
+/** Align a viewport position with the outline's reading line below the controls. */
+export function scrollPositionToTop(top: number, offsetTop = 24): void {
+  const controlsBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0
+  smoothScrollWindowTo(window.scrollY + top - offsetTop - controlsBottom)
+}
+
 export function scrollElementToTop(el: Element | null, offsetTop = 24): Element | null {
-  if (el) {
-    const controlsBottom = document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 0
-    smoothScrollWindowTo(window.scrollY + el.getBoundingClientRect().top - offsetTop - controlsBottom)
-  }
+  if (el) scrollPositionToTop(el.getBoundingClientRect().top, offsetTop)
   return el
 }
 

@@ -24,6 +24,7 @@ export function Navigator() {
   const t = useT()
   const items = useNav((s) => s.outline)
   const docEl = useNav((s) => s.docEl)
+  const sourceHeadingTop = useNav((s) => s.sourceHeadingTop)
   const [open, setOpen] = useState(false)
   const [activeOffset, setActiveOffset] = useState<number | null>(null)
   const container = useRef<HTMLElement>(null)
@@ -31,10 +32,11 @@ export function Navigator() {
 
   useEffect(() => { setActiveOffset(items[0]?.offset ?? null) }, [items])
   useEffect(() => {
-    if (!docEl) return
-    const heads = items
-      .map((it) => ({ offset: it.offset, el: docEl.querySelector(`[data-ps="${it.offset}"]`) as HTMLElement | null }))
-      .filter((h): h is { offset: number; el: HTMLElement } => h.el !== null)
+    const heads = items.flatMap((item) => {
+      if (!docEl) return sourceHeadingTop ? [{ offset: item.offset, top: () => sourceHeadingTop(item.offset) }] : []
+      const element = docEl.querySelector<HTMLElement>(`[data-ps="${item.offset}"]`)
+      return element ? [{ offset: item.offset, top: () => element.getBoundingClientRect().top }] : []
+    })
     if (heads.length === 0) return
 
     let raf = 0
@@ -43,7 +45,7 @@ export function Navigator() {
       const y = window.scrollY
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight
       const line = (document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 72) + 24
-      const at = heads.map((h) => y + h.el.getBoundingClientRect().top - line)
+      const at = heads.map((h) => y + h.top() - line)
       // Spread headings that cannot reach the reading line across the remaining scroll.
       const firstUnreachable = at.findIndex((v) => v > maxScroll)
       if (maxScroll > 0 && firstUnreachable > 0) {
@@ -72,7 +74,7 @@ export function Navigator() {
       window.removeEventListener('resize', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [items, docEl])
+  }, [items, docEl, sourceHeadingTop])
 
   useEffect(() => {
     if (!open) return

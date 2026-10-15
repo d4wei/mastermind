@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
-  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }], docEl: null })
+  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }], docEl: null, sourceHeadingTop: null })
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -21,7 +21,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
-  useNav.setState({ outline: [], docEl: null })
+  useNav.setState({ outline: [], docEl: null, sourceHeadingTop: null })
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -57,7 +57,7 @@ it('tracks the active heading as the document scrolls', () => {
 it('keeps all heading depths and moves the active indicator in both outlines', () => {
   const source = Array.from({ length: 6 }, (_, index) =>
     `${'#'.repeat(index + 1)} Level ${index + 1}\n\nSection text.\n\n`).join('')
-  useNav.setState({ outline: extractOutline(parseMarkdown(source)), docEl: null })
+  useNav.setState({ outline: extractOutline(parseMarkdown(source)), docEl: null, sourceHeadingTop: null })
   act(() => root.render(<Navigator />))
   const ticks = Array.from(host.querySelectorAll<HTMLElement>('.outline-tick'))
   expect(ticks.map((tick) => tick.style.getPropertyValue('--heading-depth'))).toEqual(['0', '1', '2', '3', '4', '5'])
@@ -72,4 +72,19 @@ it('keeps all heading depths and moves the active indicator in both outlines', (
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
   expect(host.querySelector('.nav-outline button[aria-current]')?.textContent).toBe('Level 6')
   expect(host.querySelectorAll('.nav-outline button[aria-current]')).toHaveLength(1)
+})
+
+it('tracks Markdown headings from editor geometry without rendered heading elements', () => {
+  let scroll = 0
+  vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scroll)
+  vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
+  useNav.setState({ sourceHeadingTop: (offset) => (offset === 0 ? 100 : 600) - scroll })
+  act(() => root.render(<Navigator />))
+  expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
+  scroll = 700
+  act(() => window.dispatchEvent(new Event('scroll')))
+  expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
+  expect(host.querySelectorAll('.outline-tick.active')).toHaveLength(1)
+  act(() => useNav.setState({ sourceHeadingTop: null }))
+  act(() => window.dispatchEvent(new Event('scroll')))
 })

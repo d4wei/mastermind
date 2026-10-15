@@ -106,6 +106,9 @@ and Chinese interface labels, a translation language configured, and light and d
   body. Literal YAML fallbacks retain their code-block spacing.
 - The first heading starts below the controls. Scrolling and choosing an outline heading keep both
   the target heading and the controls visible. Repeat in Markdown mode.
+  In a long Markdown document, select an outline heading far outside the current editor viewport,
+  then scroll by hand. Navigation reaches the source heading and the active bar follows scrolling.
+  Switch back to reading view and check that tracking still follows the displayed headings.
 - At narrow widths, comments start closed. The comments button or a document comment marker opens
   the panel; Close and Escape dismiss it. The document does not reserve an off-screen rail.
 - Open settings, resolved history, comments, and Find. Panels fit the viewport and scroll inside;
