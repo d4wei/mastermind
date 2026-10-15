@@ -26,6 +26,16 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-14 — Native file picker latency
+
+**Deferral.** macOS panel creation and sheet presentation dominate the observed delay. Retaining
+the panel reduced a repeat-open trace from about 460 ms to 285 ms but did not improve first open.
+The pinned dialog library does not expose reuse; avoid adding a separate macOS picker for now.
+Measurements and the experiment are in [picker latency](desktop/picker-latency.md).
+
+**Exit:** a library-supported optimization or an approved native implementation improves measured
+latency without changing file admission, or the remaining delay is accepted.
+
 ## 2026-10-10 — Restoring app sessions is deferred
 
 **Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible

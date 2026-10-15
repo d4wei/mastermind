@@ -4,7 +4,7 @@ import { Tooltip } from 'radix-ui'
 import { useT } from '../i18n'
 import { GrainOverlay, ThemeEffects } from '../theme/ThemeProvider'
 import { useConfig } from './configStore'
-import { Navigator, useIsNarrow } from './Navigator'
+import { Navigator } from './Navigator'
 import { useNav } from './navStore'
 import { useRoute } from './route'
 import { registerDocumentLifecycle } from '../documents/documentLifecycle'
@@ -54,14 +54,11 @@ function AppFrame({
   children: ReactNode
 }) {
   const outlineCount = useNav((s) => s.outline.length)
-  const collapsed = useNav((s) => s.collapsed)
-  const narrow = useIsNarrow()
   const navPresent = outlineCount >= 2
-  const withNav = navPresent && !narrow && !collapsed
   return (
     <>
       {navPresent && <Navigator />}
-      <div className={`app-content${withNav ? ' with-nav' : ''}`}>{children}</div>
+      <div className="app-content">{children}</div>
     </>
   )
 }

@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-14 — Keep reader controls at the window edges
+
+**Ruled.** Use a square Open files action and horizontal file pills at the top left, with the active
+file's full path in the native title. Keep the Read/Markdown toggle standalone. Place Settings and
+Resolved in a top-right overflow menu. Use a compact heading outline with an active-section
+indicator and a list revealed by hover, click, or keyboard focus.
+
+**Beat:** a file dropdown, the centered control capsule, and a persistently expanded outline.
+
 ## 2026-10-14 — Use the block-letter M on Grid orange-red as the app icon
 
 **Ruled.** Preserve the original two-row capital M, its horizontal gap, and light-shade texture in

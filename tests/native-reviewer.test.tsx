@@ -6,13 +6,13 @@ import { NativeReviewer } from '../ui/desktop/NativeReviewer'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
-  listen: vi.fn(), prepareToClose: vi.fn(),
+  listen: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => null, {
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => mocks.id, {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
     prepareToClose: mocks.prepareToClose }),
 }) }))
@@ -36,6 +36,7 @@ const other = (command: string) => command === 'setup_snapshot' ? setup() : unde
 beforeEach(() => {
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  mocks.id = null
   mocks.chinese = false
   mocks.navigate.mockReset()
   mocks.load.mockReset().mockResolvedValue(undefined)
@@ -57,7 +58,7 @@ afterEach(() => {
 const mount = async () => { await act(async () => root.render(<NativeReviewer />)) }
 const poll = async () => { await act(async () => vi.advanceTimersByTimeAsync(500)) }
 const button = (label: string) => Array.from(host.querySelectorAll('button'))
-  .find((item) => item.textContent === label)!
+  .find((item) => item.textContent === label || item.getAttribute('aria-label') === label)!
 
 it('activates only newer requests, including reopening an existing file', async () => {
   await mount()
@@ -66,9 +67,7 @@ it('activates only newer requests, including reopening an existing file', async 
   await poll()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/0')
   act(() => {
-    const select = host.querySelector('select')!
-    select.value = '1'
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    button('second.md').click()
   })
   await poll()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
@@ -95,7 +94,7 @@ it.each([[false, 'Open files…'], [true, '打开文件…']] as const)(
   'opens the native dialog from the bar and home with language %s', async (chinese, label) => {
     mocks.chinese = chinese
     await mount()
-    const buttons = Array.from(host.querySelectorAll('button')).filter((item) => item.textContent === label)
+    const buttons = Array.from(host.querySelectorAll('button')).filter((item) => item.textContent === label || item.getAttribute('aria-label') === label)
     expect(buttons).toHaveLength(2)
     await act(async () => { buttons[0]!.click(); buttons[1]!.click() })
     expect(mocks.invoke.mock.calls.filter(([command]) => command === 'choose_files')).toHaveLength(2)
@@ -251,3 +250,15 @@ it.each(['success', 'write failure', 'reload failure'] as const)(
     }
   },
 )
+
+
+it('updates the native title and selected pill when the active document changes', async () => {
+  mocks.id = '0'
+  await mount()
+  expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('first.md')
+  expect(mocks.invoke).toHaveBeenCalledWith('plugin:window|set_title', { value: 'mastermind - /first.md' })
+  mocks.id = '1'
+  await mount()
+  expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('second.md')
+  expect(mocks.invoke).toHaveBeenLastCalledWith('plugin:window|set_title', { value: 'mastermind - /second.md' })
+})

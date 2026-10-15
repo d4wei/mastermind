@@ -3,6 +3,8 @@ import { App } from '../app/App'
 import { navigate } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
+import { FileIcon } from '../icons'
+import { fileLabels } from './file-labels'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
@@ -26,6 +28,17 @@ export function NativeReviewer() {
   const refreshSetup = useRef<() => Promise<void>>(async () => {})
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
   const id = useDoc((s) => s.sessionId)
+  const pills = useRef<HTMLElement>(null)
+  const activePath = id === null ? undefined : files[Number(id)]
+  useEffect(() => {
+    pills.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [activePath])
+  useEffect(() => {
+    void nativeBridge.invoke<void>('plugin:window|set_title', {
+      value: activePath ? `mastermind - ${activePath}` : 'mastermind',
+    }).catch((error) => setError(String(error)))
+  }, [activePath])
+  const labels = fileLabels(files)
   const configuredChinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
   const chinese = setupRequired !== false && previewLanguage ? previewLanguage === 'zh-CN' : configuredChinese
   useEffect(() => {
@@ -99,12 +112,14 @@ export function NativeReviewer() {
   const openLabel = chinese ? '打开文件…' : 'Open files…'
   return <>
     <div className="native-documents">
-      <button type="button" onClick={chooseFiles}>{openLabel}</button>
-      <select aria-label={chinese ? '打开的文件' : 'Open files'} value={id ?? ''}
-        onChange={(event) => navigate(`/d/${event.target.value}`)}>
-        <option value="" disabled>{chinese ? '打开文件以开始审阅' : 'Open a file to start reviewing'}</option>
-        {files.map((file, index) => <option key={file} value={index}>{file}</option>)}
-      </select>
+      <button type="button" className="native-open" onClick={chooseFiles}
+        aria-label={openLabel} title={openLabel}><FileIcon /></button>
+      <nav ref={pills} className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
+        {files.map((file, index) => <button key={file} type="button"
+          className={`native-file-pill${id === String(index) ? ' active' : ''}`}
+          aria-current={id === String(index) ? 'page' : undefined}
+          title={file} onClick={() => navigate(`/d/${index}`)}>{labels[index]}</button>)}
+      </nav>
       {blocked && useDoc.getState().hasPendingWrites() && <span role="alert">{chinese ? '尚有未保存的更改。请检查打开的文件后重试。' :
         'Changes remain unsaved. Check the open files before quitting again.'}</span>}
       {openingErrors.length > 0 && <div className="native-opening-errors" role="alert">

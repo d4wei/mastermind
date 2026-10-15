@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react'
-import { ChevronLeftIcon, OutlineIcon } from '../icons'
-import { Tip } from './Tip'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
 import { scrollToOffset } from '../util/scroll'
 import { useNav } from './navStore'
 import { useDoc } from '../documents/store'
 
-/** Selects the off-canvas navigator when the viewport is narrow. */
+/** Shared breakpoint for document panels. */
 export function useIsNarrow(): boolean {
   const [narrow, setNarrow] = useState(
     () => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 900px)').matches,
@@ -24,88 +22,14 @@ export function useIsNarrow(): boolean {
 
 export function Navigator() {
   const t = useT()
-  const outline = useNav((s) => s.outline)
-  const collapsed = useNav((s) => s.collapsed)
-  const mobileOpen = useNav((s) => s.mobileOpen)
-  const narrow = useIsNarrow()
-
-  const panelOpen = narrow ? mobileOpen : !collapsed
-
-  // Escape closes the off-canvas navigator (narrow only); focus returns to the
-  // reveal button on the next render since it reappears when closed.
-  useEffect(() => {
-    if (!(narrow && mobileOpen)) return
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') useNav.getState().setMobileOpen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [narrow, mobileOpen])
-
-  const reveal = (): void => {
-    if (narrow) useNav.getState().setMobileOpen(true)
-    else useNav.getState().setCollapsed(false)
-  }
-  const hide = (): void => {
-    if (narrow) useNav.getState().setMobileOpen(false)
-    else useNav.getState().setCollapsed(true)
-  }
-
-  return (
-    <>
-      {!panelOpen && (
-        <Tip label={t('showOutline')}>
-          <button
-            type="button"
-            className="nav-reveal"
-            aria-label={t('showOutline')}
-            aria-expanded={false}
-            onClick={reveal}
-          >
-            <OutlineIcon />
-          </button>
-        </Tip>
-      )}
-      {narrow && mobileOpen && <div className="nav-scrim" onClick={hide} aria-hidden />}
-      <aside
-        className={`navigator${panelOpen ? '' : ' off'}`}
-        aria-label={t('outline')}
-        role={narrow && mobileOpen ? 'dialog' : undefined}
-        aria-modal={narrow && mobileOpen ? true : undefined}
-      >
-        <div className="nav-head">
-          <span className="nav-title">
-            {t('outline')}
-          </span>
-          <Tip label={t('hideOutline')}>
-            <button type="button" className="btn-ghost nav-collapse" aria-label={t('hideOutline')} onClick={hide}>
-              <ChevronLeftIcon />
-            </button>
-          </Tip>
-        </div>
-
-        <div className="nav-body"><OutlineList /></div>
-      </aside>
-    </>
-  )
-}
-
-/** The current document's heading outline with scroll-spy (reads navStore). */
-function OutlineList() {
   const items = useNav((s) => s.outline)
   const docEl = useNav((s) => s.docEl)
+  const [open, setOpen] = useState(false)
   const [activeOffset, setActiveOffset] = useState<number | null>(null)
+  const container = useRef<HTMLElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
 
-  // Scroll-spy driven by scroll POSITION (not IntersectionObserver) so it's
-  // deterministic and monotonic — the indicator only ever steps one section at
-  // a time, never flickers. The active heading is the last one whose top has
-  // scrolled above a reading line near the top of the viewport.
-  //
-  // The catch: the final sections live in the last viewport-height of the page,
-  // which can never scroll up to that line (the page bottoms out first), so
-  // they'd never become active. We fix that by spreading the unreachable tail's
-  // activation points across the remaining scroll — each tail heading still gets
-  // its moment, and the last one activates exactly when the page hits the bottom.
+  useEffect(() => { setActiveOffset(items[0]?.offset ?? null) }, [items])
   useEffect(() => {
     if (!docEl) return
     const heads = items
@@ -118,16 +42,9 @@ function OutlineList() {
       raf = 0
       const y = window.scrollY
       const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-      // Reading line near the top: a heading is "current" once it scrolls to
-      // here. Kept small so the FIRST heading stays current at the top (a larger
-      // line would already sit below it) — the unreachable TAIL is handled by the
-      // redistribution below, not by pushing this line down.
-      const line = 96
-      // scrollY at which each heading would reach the reading line. `y + top` is
-      // the heading's absolute document offset, so these are stable across frames.
+      const line = (document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 72) + 24
       const at = heads.map((h) => y + h.el.getBoundingClientRect().top - line)
-      // Redistribute the tail that can't reach the line (its activation point is
-      // past the page's max scroll) into the final stretch of scroll.
+      // Spread headings that cannot reach the reading line across the remaining scroll.
       const firstUnreachable = at.findIndex((v) => v > maxScroll)
       if (maxScroll > 0 && firstUnreachable > 0) {
         const base = at[firstUnreachable - 1]!
@@ -157,30 +74,58 @@ function OutlineList() {
     }
   }, [items, docEl])
 
-  if (items.length < 2) return null
-  const minDepth = Math.min(...items.map((i) => i.depth))
+  useEffect(() => {
+    if (!open) return
+    const outside = (event: PointerEvent): void => {
+      if (!container.current?.contains(event.target as Node)) setOpen(false)
+    }
+    const escape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      if (container.current?.contains(document.activeElement)) trigger.current?.focus()
+      setOpen(false)
+    }
+    window.addEventListener('pointerdown', outside)
+    window.addEventListener('keydown', escape)
+    return () => {
+      window.removeEventListener('pointerdown', outside)
+      window.removeEventListener('keydown', escape)
+    }
+  }, [open])
 
-  // Reading scrolls to article source offsets; Markdown mode delegates to the
-  // editor's registered scroller. The active item follows scroll position so
-  // clicking a heading does not race the scroll animation.
+  if (items.length < 2) return null
+  const minDepth = Math.min(...items.map((item) => item.depth))
+  const active = items.find((item) => item.offset === activeOffset) ?? items[0]!
   const go = (offset: number, index: number): void => {
     if (docEl) scrollToOffset({ current: docEl }, offset)
-    else useDoc.getState().scroller?.(offset, index)
+    else {
+      useDoc.getState().scroller?.(offset, index)
+      setActiveOffset(offset)
+    }
+    trigger.current?.focus()
+    setOpen(false)
   }
 
-  return (
-    <ul className="nav-outline">
-      {items.map((it, i) => (
-        <li
-          key={it.offset}
-          style={{ paddingLeft: `${(it.depth - minDepth) * 12}px` }}
-          className={activeOffset === it.offset ? 'active' : undefined}
-        >
-          <button type="button" onClick={() => go(it.offset, i)} title={it.text}>
-            {it.text}
+  return <nav className="compact-outline" ref={container} aria-label={t('outline')}
+    onPointerEnter={(event) => { if (event.pointerType !== 'touch') setOpen(true) }}
+    onPointerLeave={() => { if (!container.current?.contains(document.activeElement)) setOpen(false) }}
+    onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
+    <button type="button" ref={trigger} className="outline-progress" aria-label={`${t('showOutline')}: ${active.text}`}
+      aria-expanded={open} aria-controls="heading-list" onFocus={() => setOpen(true)}
+      onClick={() => setOpen(true)} style={{ '--heading-count': items.length } as CSSProperties}>
+      {items.map((item) => <span key={item.offset} aria-hidden="true"
+        className={`outline-tick${item.offset === active.offset ? ' active' : ''}`}
+        style={{ '--heading-depth': item.depth - minDepth } as CSSProperties} />)}
+    </button>
+    {open && <div className="outline-popover" id="heading-list">
+      <ul className="nav-outline">
+        {items.map((item, index) => <li key={item.offset}>
+          <button type="button" onClick={() => go(item.offset, index)} title={item.text}
+            aria-current={item.offset === active.offset ? 'location' : undefined}
+            style={{ '--heading-depth': item.depth - minDepth } as CSSProperties}>
+            <span className="outline-list-tick" aria-hidden="true" />{item.text}
           </button>
-        </li>
-      ))}
-    </ul>
-  )
+        </li>)}
+      </ul>
+    </div>}
+  </nav>
 }

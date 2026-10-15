@@ -324,8 +324,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         settings={{ open: panel === 'settings', onToggle: () => togglePanel('settings') }}
         resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
         railOpen={railOpen}
-        // Both controls stay mounted so the bar morphs between layouts; their
-        // applicability (not their presence) is what changes per view.
         onToggleRail={() => {
           setRailOpen((v) => !v)
           if (narrow) {

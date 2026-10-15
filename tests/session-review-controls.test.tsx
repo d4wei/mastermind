@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { openReaderMenu, readerMenuItem } from './helpers/reader-menu'
 import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
 import { act } from 'react'
@@ -44,9 +45,10 @@ function render(source: string) {
 it.each(['plain body', '{>>live note<<}', '<!-- mastermind:resolved-thread v99\nunknown\n-->'])(
   'keeps Resolved reachable for %j', (source) => {
     render(source)
-    const button = host.querySelector<HTMLButtonElement>('.topbar-resolved')!
+    openReaderMenu(host)
+    const button = readerMenuItem('Resolved (0)')
     expect(button.textContent).toBe('Resolved (0)')
-    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-disabled')).not.toBe('true')
     act(() => button.click())
     expect(host.querySelector('[role="dialog"]')!.getAttribute('aria-label')).toBe('Resolved discussions (0)')
   },
@@ -69,7 +71,8 @@ it.each(['resolve', 'delete'])('ignores stale double %s and callbacks captured b
 
 it('keeps resolved discussions and comparison mutually exclusive', () => {
   render('body')
-  const resolved = host.querySelector<HTMLButtonElement>('.topbar-resolved')!
+  openReaderMenu(host)
+  const resolved = readerMenuItem('Resolved (0)')
   act(() => resolved.click())
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
   act(() => useDoc.setState({ conflictDraft: {
@@ -78,7 +81,8 @@ it('keeps resolved discussions and comparison mutually exclusive', () => {
     result: 'body', refreshing: false, error: null,
   } }))
   expect(host.querySelector('[role="dialog"]')).toBeNull()
-  act(() => resolved.click())
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (0)').click())
   expect(useDoc.getState().conflictDraft!.open).toBe(false)
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 })
@@ -100,7 +104,8 @@ it('opens narrow-screen comments in a dismissible panel without reserving a side
 it.each(['pointer', 'keyboard'])('opens comments exclusively from a narrow-screen marker using %s', (input) => {
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
   render('{>>@Alex: a note<<}')
-  act(() => host.querySelector<HTMLButtonElement>('.topbar-resolved')!.click())
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (0)').click())
   expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Resolved discussions (0)')
   const marker = host.querySelector<HTMLElement>('.critic-comment-marker')!
   act(() => {

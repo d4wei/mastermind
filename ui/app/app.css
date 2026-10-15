@@ -132,61 +132,40 @@ body {
 
 /* ---------- top bar ---------- */
 
-/* Leave room for the separate navigator control at the left edge. */
 .topbar {
   position: fixed;
-  left: calc(var(--bar-gap) + var(--space-unit) * 11);
   right: var(--bar-gap);
   top: var(--bar-gap);
-  width: fit-content;
-  max-width: calc(100% - var(--bar-gap) * 2 - var(--space-unit) * 11);
-  margin-inline: auto;
   z-index: var(--z-topbar);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  gap: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.16 * var(--shadow-strength)));
+  gap: var(--space-unit);
+  background: var(--color-bg);
 }
 .app-content:has(.topbar) {
   padding-top: var(--bar-clear);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .topbar {
-    transition: padding var(--dur-slow) var(--ease-out);
-  }
+.reader-menu {
+  z-index: var(--z-overlay);
+  min-width: calc(var(--space-unit) * 44);
+  padding: var(--space-unit);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
 }
-
-.topbar-lead {
+.reader-menu-item {
   display: flex;
   align-items: center;
-  gap: calc(var(--space-unit) * 2.5);
-  min-width: 0;
-  flex: 1 1 auto;
-  max-width: 100%;
+  gap: calc(var(--space-unit) * 2);
+  padding: calc(var(--space-unit) * 2);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
 }
-
-/* hairline between the icon-only view toggle and the filename */
-.topbar-divider {
-  width: 1px;
-  align-self: stretch;
-  margin-block: calc(var(--space-unit) * 1);
-  background: var(--color-border);
-  flex-shrink: 0;
-}
-
-.topbar-filename {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: calc(var(--space-unit) * 50);
+.reader-menu-item[data-highlighted] {
+  outline: none;
+  background: var(--color-selection);
 }
 
 /* slot-text rolling labels (SlotLabel): the lib makes the container an
@@ -201,86 +180,13 @@ body {
   white-space: normal; /* notices can wrap; let the roll line break naturally */
 }
 
-.topbar-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 100%;
-  /* No flex gap: spacing rides on each collapsible control's trailing margin so a
-     collapsed control leaves no orphaned gap. See .topbar-collapsible. */
-}
-
-/* The bar's two optional controls (reading-language toggle, comment toggle)
-   collapse with a morph rather than unmounting: as a control animates its width
-   to zero, the max-content pill shrinks and re-centers frame-by-frame. Its
-   trailing margin carries the spacing before the next control, so collapsing it
-   removes both the control and its gap. */
-.topbar-collapsible {
-  margin-inline-end: calc(var(--space-unit) * 2);
-  max-width: calc(var(--space-unit) * 16); /* generous cap; natural width is smaller */
-  overflow: hidden;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .topbar-collapsible {
-    transition:
-      max-width var(--dur-slow) var(--ease-out),
-      margin-inline-end var(--dur-slow) var(--ease-out),
-      padding var(--dur-slow) var(--ease-out),
-      border-width var(--dur-slow) var(--ease-out),
-      opacity var(--dur-base) var(--ease-out),
-      transform var(--dur-base) var(--ease-out);
-  }
-}
-.topbar-collapsible.is-collapsed {
-  max-width: 0;
-  min-width: 0; /* defeat the coarse-pointer min so it can fully collapse */
-  margin-inline-end: 0;
-  padding-inline: 0;
-  border-width: 0; /* border-box would otherwise leave a 2px sliver at width 0 */
-  opacity: 0;
-  transform: scale(0.82);
-  pointer-events: none;
-}
-.topbar .seg {
-  flex-shrink: 0;
-  background: var(--color-bg-elevated);
-}
-/* the view toggle is icon-only in the bar — square targets, no text label */
-.topbar .seg-btn {
-  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
-}
-
-.topbar-trans {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: calc(var(--space-unit) * 1.5); /* square: icon-only toggle */
-}
-.topbar-trans:hover:not(:disabled) {
-  color: var(--color-text);
-}
-.topbar-trans.active {
-  color: var(--color-accent-dim);
-  border-color: var(--color-accent-dim);
-}
-/* gentle pulse while a translation is in flight (icon-only, no text label) */
-@media (prefers-reduced-motion: no-preference) {
-  .topbar-trans.loading {
-    animation: agent-pulse 1.4s ease-in-out infinite;
-  }
-}
-
-/* topbar tool icons (comments / settings) — ghost buttons that show an icon only */
 .topbar-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: calc(var(--space-unit) * 1.5);
+  width: calc(var(--space-unit) * 9);
+  height: calc(var(--space-unit) * 9);
+  padding: calc(var(--space-unit) * 2);
   color: var(--color-text-muted);
 }
 .topbar-icon-btn:hover:not(:disabled) {
@@ -1896,153 +1802,74 @@ input[type='checkbox'] {
   display: none;
 }
 
-/* ---------- left navigator (file tree + outline) ---------- */
-:root {
-  --nav-w: 260px;
-}
-/* The navigator floats ON TOP of the page (position: fixed) and no longer pushes
-   the content aside — so there is no margin to manage or animate. */
-.app-content.with-nav {
-  margin-left: 0;
-}
-
-.navigator {
+/* ---------- compact document outline ---------- */
+.compact-outline {
   position: fixed;
-  inset: var(--bar-clear) auto var(--bar-gap) 0;
-  width: var(--nav-w);
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg-elevated);
-  border-right: 1px solid var(--color-border);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
-  box-shadow: 8px 0 32px rgb(0 0 0 / calc(0.12 * var(--shadow-strength)));
+  top: calc(var(--bar-clear) + var(--space-unit) * 8);
+  left: var(--bar-gap);
   z-index: var(--z-nav);
-  overflow: hidden;
-  transition:
-    transform var(--dur-base) var(--ease-standard),
-    box-shadow var(--dur-base) var(--ease-standard);
 }
-.navigator.off {
-  transform: translateX(-105%); /* clears the right-side shadow off-screen when hidden */
-  box-shadow: none;
-}
-
-.nav-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2) calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
-  border-bottom: 1px solid var(--color-border);
-}
-.nav-title {
-  font-family: var(--font-display);
-  font-weight: var(--weight-medium);
-  font-size: var(--font-size-xs);
-  letter-spacing: var(--ls-heading);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--color-text);
-}
-.nav-collapse {
-  flex: none;
-  /* ≥24px square so it clears the WCAG 2.5.8 minimum target size on every pointer. */
-  min-width: calc(var(--space-unit) * 6);
-  min-height: calc(var(--space-unit) * 6);
-  padding: calc(var(--space-unit) * 1);
-}
-.nav-body {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.nav-outline {
-  list-style: none;
-  margin: 0;
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2) calc(var(--space-unit) * 6);
-  border: 0;
-  font-size: var(--font-size-sm);
-}
-.nav-outline li {
-  margin: 0;
-}
-.nav-outline li button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-left: 2px solid transparent;
-  color: var(--color-text-muted);
-  padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  line-height: var(--lh-snug);
-  cursor: pointer;
-}
-.nav-outline li button:hover {
-  color: var(--color-text);
-}
-.nav-outline li.active button {
-  color: var(--color-text);
-  border-left-color: var(--color-accent);
-}
-
-.nav-reveal {
-  /* Pinned to the top-left of the page; stays there while the page scrolls. */
-  position: fixed;
-  left: calc(var(--space-unit) * 3);
-  top: calc(var(--space-unit) * 3);
-  z-index: var(--z-nav);
-  width: 32px;
-  height: 32px;
+.outline-progress {
+  width: calc(var(--space-unit) * 9);
+  height: min(calc(var(--heading-count) * var(--space-unit) * 2 + var(--space-unit) * 4), 55vh);
   display: grid;
-  place-items: center;
+  grid-template-rows: repeat(var(--heading-count), minmax(0, 1fr));
+  align-items: center;
+  padding: calc(var(--space-unit) * 2);
+  border: none;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+.outline-tick {
+  display: block;
+  width: max(var(--space-unit), calc(var(--space-unit) * (4 - var(--heading-depth) * .5)));
+  height: calc(var(--space-unit) * .5);
+  background: var(--color-text-faint);
+}
+.outline-tick.active { background: var(--color-accent); width: calc(var(--space-unit) * 5); }
+.outline-popover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: min(calc(var(--space-unit) * 80), calc(100vw - var(--bar-gap) * 2));
+  max-height: calc(100vh - var(--bar-clear) - var(--space-unit) * 12);
+  overflow-y: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-elevated);
+}
+.nav-outline { list-style: none; margin: 0; padding: var(--space-unit); font-size: var(--font-size-sm); }
+.nav-outline li { margin: 0; }
+.nav-outline button {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 3);
+  width: 100%;
+  min-height: calc(var(--space-unit) * 7);
+  padding: var(--space-unit) calc(var(--space-unit) * 2);
+  padding-left: calc(var(--space-unit) * (2 + var(--heading-depth) * 2));
+  text-align: left;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
   color: var(--color-text-muted);
-  cursor: pointer;
+  font-size: inherit;
 }
-.nav-reveal:hover {
-  color: var(--color-text);
+.outline-list-tick {
+  flex: none;
+  width: calc(var(--space-unit) * 4);
+  height: calc(var(--space-unit) * .5);
+  background: var(--color-text-faint);
 }
-.nav-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-overlay);
-  background: rgba(0, 0, 0, 0.32);
-}
+.nav-outline button[aria-current] { background: var(--color-selection); color: var(--color-text); }
+.nav-outline button[aria-current] .outline-list-tick { background: var(--color-accent); }
+.nav-outline button:hover { color: var(--color-text); background: var(--color-selection); }
 
-/* narrow: navigator becomes an off-canvas overlay; content is always full width */
-@media (max-width: 900px) {
-  .app-content.with-nav {
-    margin-left: 0;
-  }
-  .navigator {
-    z-index: calc(var(--z-overlay) + 1);
-    box-shadow: 0 0 40px rgb(0 0 0 / calc(0.25 * var(--shadow-strength)));
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .navigator,
-  .app-content {
-    transition: none;
-  }
-}
-
-/* Touch / stylus (coarse pointer): grow the compact icon controls to a
-   comfortable ~44px target. Desktop (fine pointer) keeps its dense sizing. */
+/* Coarse pointers need larger targets for the compact controls. */
 @media (pointer: coarse) {
-  .nav-reveal,
-  .nav-collapse,
+  .outline-progress,
   .topbar-icon-btn,
-  .topbar-trans,
-  .topbar-settings {
+  .native-open {
     min-width: calc(var(--space-unit) * 11);
     min-height: calc(var(--space-unit) * 11);
   }
@@ -2063,9 +1890,7 @@ input[type='checkbox'] {
   .slide-over,
   .sel-toolbar,
   .block-actions,
-  .navigator,
-  .nav-reveal,
-  .nav-scrim,
+  .compact-outline,
   .grain-overlay {
     display: none !important;
   }
@@ -2074,10 +1899,6 @@ input[type='checkbox'] {
     padding-top: 0;
   }
 
-  /* the navigator is chrome — print the document edge-to-edge */
-  .app-content.with-nav {
-    margin-left: 0 !important;
-  }
 
   /* reviewer-grade: ink on white, light review palette regardless of theme */
   [data-theme] {

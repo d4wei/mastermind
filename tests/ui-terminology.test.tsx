@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { openReaderMenu, readerMenuItem } from './helpers/reader-menu'
 import { Tooltip } from 'radix-ui'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -69,13 +70,13 @@ it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLan
   expect(setMode).toHaveBeenCalledWith('source')
 })
 
-it.each(['en', 'zh-CN'] as const)('keeps settings in the document toolbar in %s', (uiLang) => {
+it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const onToggle = vi.fn()
   act(() => root.render(<TopBar settings={{ open: true, onToggle }} />))
   const label = uiLang === 'en' ? 'Settings' : '设置'
-  const button = host.querySelector<HTMLButtonElement>(`header [aria-label="${label}"]`)!
-  expect(button.getAttribute('aria-pressed')).toBe('true')
+  openReaderMenu(host)
+  const button = readerMenuItem(label)
   act(() => button.click())
   expect(onToggle).toHaveBeenCalledOnce()
 })
@@ -84,8 +85,9 @@ it('retains outline navigation to existing-file source offsets', () => {
   const scroller = vi.fn()
   useDoc.setState({ scroller })
   useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }],
-    docEl: null, collapsed: false, mobileOpen: false })
+    docEl: null })
   act(() => root.render(<Tooltip.Provider><Navigator /></Tooltip.Provider>))
+  act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
   const second = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Second')!
   act(() => second.click())
   expect(scroller).toHaveBeenCalledWith(12, 1)

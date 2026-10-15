@@ -20,7 +20,9 @@ behavior.
 
 [notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
 
-`NativeReviewer.tsx` provides a native Open files action and a open-file selector.
+`NativeReviewer.tsx` provides the square Open files action and horizontally scrolling file pills.
+`file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
+full path appears in the native window title; the adapter uses Tauri's scoped window-title command.
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.
 Polling never overlaps requests. The adapter also subscribes to native close requests. It locks

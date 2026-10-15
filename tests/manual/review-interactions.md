@@ -92,8 +92,12 @@ example for selection checks that include the end of a literal block.
 Use a disposable copy with a long filename. Check widths of 320, 768, and 1440 pixels with English
 and Chinese interface labels, a translation language configured, and light and dark themes.
 
-- Document controls remain at the top, with no overlap among active buttons or the navigator toggle.
-  Narrow controls wrap, the filename clips, and settings remains reachable.
+- Document controls remain at the top right, with Settings and Resolved in the overflow menu. In
+  the native app, the square Open button and file pills stay at the top left. Long filenames clip,
+  pills scroll horizontally, and the active file's full path appears in the native window title.
+- The compact outline shows heading ticks and the current section. Hover, click, or focus opens the
+  heading list; Escape closes it and returns keyboard focus to the trigger. Scroll the document and
+  check that the current-section indicator follows it.
 - The first heading starts below the controls. Scrolling and choosing an outline heading keep both
   the target heading and the controls visible. Repeat in Markdown mode.
 - At narrow widths, comments start closed. The comments button or a document comment marker opens
