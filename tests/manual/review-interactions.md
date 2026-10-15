@@ -115,3 +115,5 @@ and Chinese interface labels, a translation language configured, and light and d
   Find wraps. In a disposable conflict test, the fixed notice and comparison clear the toolbar.
 - In the embedded browser, the host's bottom input does not cover document controls. Return any
   viewport override to its normal size after checking.
+- In the native app, overscroll the top and bottom in light and dark themes, then change themes
+  and repeat. The revealed surface matches the current page background in both reading modes.
