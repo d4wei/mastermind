@@ -6,7 +6,10 @@
 
 - Surfaces: `--color-bg #FCFCFA` (off-white paper), `--color-bg-elevated #F2F2EF` (chrome: top bar, navigator, panels — a hair cooler than paper), hairline `--color-border #E2E1DB`.
 - Text: `--color-text #141414`, muted `#66665F` (AA at 11px metadata), faint `#9A968C` (**decorative/placeholders only** — below AA for text).
-- Accent family (**chrome only** — CTA / active / focus, never document ink): `--color-accent #E5241B` (Swiss red), text-safe `--color-accent-dim #C01A12` (AA on bg), wash `--color-accent-surface`, CTA = red pill with white ink. Per theme: Nacht = electric blue, Sepia = ochre (ink-pill CTA).
+- Accent family (**chrome only** — CTA / active / focus, never document ink):
+  `--color-accent #E5241B` (Swiss red), text-safe `--color-accent-dim #C01A12` (AA on bg),
+  wash `--color-accent-surface`, CTA = red button with white ink. Per theme: Nacht = electric blue,
+  Sepia = ochre with an ink-colored CTA.
 - `--focus-ring`: ink on light themes, the accent on Nacht. `--color-selection`: neutral ink wash — selected text must not read as an insertion.
 - Inversion family (the dark-band device — the selection toolbar): `--color-invert-bg #141414` etc. (light themes invert to dark; Nacht inverts to light).
 - Review semantics: `--review-insert-*` (green), `--review-delete-*` (brick, kept browner than the accent red), `--review-highlight-*` (gold), `--review-comment-anchor` (blue dotted underline; **violet on Nacht** so it doesn't collide with the blue accent), `--review-comment-active-bg`. Marks are the only color in the document; the accent stays in the chrome.
@@ -26,7 +29,14 @@
 
 ## Shape & layout
 
-- Radius (generous on purpose — the interface should feel friendly, not clinical): `--radius-xs` 4px (inline marks, code, checkboxes), `--radius-md` 12px (cards, banners, inputs, menus), `--radius-lg` 20px (large floating panels: slide-over, modal, proposals, the navigator's right edge), `--radius-full` for pills (the CTA, ghost buttons, the segmented control) and circular elements.
+- Corner sizes live in every theme's `tokens.css` and stay the same across palettes:
+  - `--radius-xs`: inline marks, inline code, checkboxes, and compact inset actions or rows.
+  - `--radius-md`: buttons, inputs, file tabs, theme choices, and tooltips.
+  - `--radius-lg`: cards, code blocks, callouts, menus, banners, and floating panels.
+  - `--radius-full`: scrollbar thumbs; outline and review-position ticks keep square ends.
+- Controls use rounded rectangles. A control does not become a pill merely because it is a primary
+  action or a segmented choice. Nested segmented buttons use the smaller inset radius.
+- The native operating system owns window corners and traffic lights.
 - Reading measure: `--content-max-width` 46rem (~736px), centered. Right margin rail for comment cards.
 - Spacing scale: 4px base, steps ×1,2,3,4,6,8,12,16,24.
 
@@ -36,9 +46,10 @@
 
 ## Component treatments
 
-- Document controls: elevated surface with a hairline border and filename in mono sm.
-  Responsive placement and panel behavior live in [the layout contract](../ui/app/layout.md).
-- Secondary/ghost buttons + view-mode toggle: pill shape, muted ink, sentence case; the active segment gains text color + elevated fill. Each mode segment carries a glyph (eye / pencil / code).
+- Document controls: compact icon buttons alongside the file tabs. Responsive placement and panel
+  behavior live in [the layout contract](../ui/app/layout.md).
+- Secondary buttons and segmented choices use muted ink and sentence case. Active segments gain
+  text color and elevated fill. The view-mode button shows the icon for the mode it opens.
 - Selection toolbar: the dark band device miniaturized (invert-bg surface, invert-text ink).
 - Focus ring: 2px `--focus-ring`, offset 2px — ink on the light themes, the accent on Nacht.
 - Optional film-grain overlay (SVG feTurbulence, desaturated): per-theme base opacity (~0.12 on Grid) scaled by a user **intensity** (off / low / medium / high) × **texture** (fine / soft / coarse). Off by default on every theme.

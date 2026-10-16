@@ -7,9 +7,11 @@ the document into a JavaScript object. No aliases are expanded, and no YAML is s
 
 Rows retain pair order. String keys and values use decoded text; other scalars retain their source
 spelling so large integers, null forms, and numeric notation are not coerced for display. React
-escapes every value. The shared key column fits its contents within a width cap, leaving a compact
-gap before values. Only the bottom edge has a divider. Markdown mode exposes the original source,
-including YAML comments; property rows have no separate source disclosure.
+escapes every value. The shared key column fits its contents within a width cap, leaving a clear
+gap before values. Properties and literal YAML share the document column's top inset without
+adding a top margin. Only the bottom edge has a divider, with space separating it from the body.
+Markdown mode exposes the original source, including YAML comments; property rows have no separate
+source disclosure.
 
 Non-mappings, empty mappings, nested structures, nonstring or empty keys, merge keys, anchors, tags,
 explicit directives, parse errors, and warnings fall back to literal YAML. Large metadata also

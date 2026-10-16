@@ -10,7 +10,7 @@
   gap: calc(var(--space-unit) * 3);
   padding: calc(var(--space-unit) * 3);
   border: thin solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -45,7 +45,7 @@
   width: 100%;
   padding: calc(var(--space-unit) * 3);
   border: thin solid var(--color-border);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-mono);

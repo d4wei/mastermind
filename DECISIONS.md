@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Corner treatments follow component roles across themes
+
+**Ruled.** Use one corner scale across palettes: small for inline and inset elements, medium for
+controls, and large for cards and panels. Keep position ticks square and native window geometry
+system-owned. The design system assigns roles; theme tokens own the values.
+
+**Beat:** independently rounded buttons, inputs, cards, and panels without a shared hierarchy.
+
 ## 2026-10-15 — Keep document scrolling separate from application controls
 
 **Ruled.** Scroll the document and its wide comment rail inside a bounded viewport. Keep application

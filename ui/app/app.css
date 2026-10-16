@@ -25,7 +25,7 @@
   --z-toast: 70; /* toasts */
   --z-grain: 100; /* film-grain overlay — always on top */
 
-  /* ---- Typography (theme-invariant; per-theme tokens.css carries only color) ---- */
+  /* ---- Typography ---- */
   --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
   --font-body: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
@@ -49,10 +49,6 @@
   --weight-bold: 800; /* display headings */
 
   /* ---- Shape & layout (theme-invariant) ---- */
-  --radius-xs: 4px; /* inline marks, code, checkboxes */
-  --radius-md: 12px; /* cards, banners, inputs, menus — the friendlier baseline */
-  --radius-lg: 20px; /* large floating panels: slide-over, modal, proposals, nav */
-  --radius-full: 9999px; /* pills: CTA, ghost buttons, the segmented control */
   --content-max-width: 46rem; /* per-user overridable */
   --space-unit: 4px;
 
@@ -168,7 +164,7 @@ body {
   padding: var(--space-unit);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: var(--color-text);
   font-size: var(--font-size-sm);
 }
@@ -233,7 +229,7 @@ button:disabled {
   background: var(--color-cta-bg);
   color: var(--color-cta-text);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   font-weight: var(--weight-medium);
   font-size: var(--font-size-sm);
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
@@ -253,7 +249,7 @@ button:disabled {
   background: transparent;
   color: var(--color-text-muted);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2.5);
 }
@@ -272,7 +268,7 @@ button:disabled {
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
 }
 
 .seg-btn {
@@ -283,7 +279,7 @@ button:disabled {
   white-space: nowrap;
   background: transparent;
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xs);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2.5);
@@ -314,7 +310,7 @@ button:disabled {
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   font-size: var(--font-size-sm);
 }
 
@@ -364,7 +360,7 @@ button:disabled {
   width: 300px;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 3);
   font-size: var(--font-size-sm);
   transition:
@@ -444,7 +440,7 @@ button:disabled {
   font-size: var(--font-size-sm);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   padding: calc(var(--space-unit) * 1.5);
   color: var(--color-text);
 }
@@ -458,7 +454,7 @@ button:disabled {
   gap: 2px;
   background: var(--color-invert-bg);
   color: var(--color-invert-text);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 1);
   box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.18 * var(--shadow-strength)));
 }
@@ -498,7 +494,7 @@ button:disabled {
   font-size: var(--font-size-sm);
   background: var(--color-invert-bg-elevated);
   border: 1px solid var(--color-invert-border);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   color: var(--color-invert-text);
   padding: calc(var(--space-unit) * 1.5);
 }
@@ -607,7 +603,7 @@ button:disabled {
   font-size: var(--font-size-sm);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 3) calc(var(--space-unit) * 4);
   overflow-x: auto;
   line-height: 1.55;
@@ -903,7 +899,7 @@ mark.critic-hl.critic-anchor:hover {
   z-index: var(--z-toast);
   background: var(--color-invert-bg);
   color: var(--color-cta-text);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 4);
   font-size: var(--font-size-sm);
   box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.2 * var(--shadow-strength)));
@@ -940,7 +936,7 @@ mark.critic-hl.critic-anchor:hover {
   overflow: hidden; /* clip the inner scroll area to the rounded corners — scrollbar lives in the body, not on the rounded edge */
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg); /* uniform on all four corners — reads as a floating card, not a drawer */
+  border-radius: var(--radius-lg);
   box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.14 * var(--shadow-strength)));
   transform-origin: top right;
   animation: slide-over-in var(--dur-base) var(--ease-out);
@@ -1086,7 +1082,7 @@ mark.critic-hl.critic-anchor:hover {
   letter-spacing: var(--ls-caps);
   text-transform: uppercase;
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   box-shadow: 0 2px 10px rgb(0 0 0 / calc(0.18 * var(--shadow-strength)));
   user-select: none;
 }
@@ -1126,9 +1122,7 @@ mark.critic-hl.critic-anchor:hover {
   font-size: var(--font-size-sm);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  /* Horizontal inset matches the chips and clears the pill's rounded ends so the
-     value never hugs the corner. */
+  border-radius: var(--radius-md);
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 3);
   color: var(--color-text);
   width: 100%;
@@ -1186,7 +1180,7 @@ mark.critic-hl.critic-anchor:hover {
   padding: calc(var(--space-unit) * 1.5);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 .lang-list {
   list-style: none;
@@ -1285,7 +1279,7 @@ input[type='checkbox'] {
   display: inline-block;
   background: var(--color-invert-bg);
   color: var(--color-invert-text);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 3);
   font-size: var(--font-size-sm);
 }
@@ -1356,7 +1350,7 @@ input[type='checkbox'] {
   right: 2px;
   width: 7px;
   height: 2px;
-  border-radius: 1px;
+  border-radius: 0;
   transform: translateY(-1px);
 }
 
@@ -1700,7 +1694,7 @@ input[type='checkbox'] {
   max-height: calc(100vh - var(--bar-clear) - var(--space-unit) * 12);
   overflow-y: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
 }
 .nav-outline { list-style: none; margin: 0; padding: var(--space-unit); font-size: var(--font-size-sm); }

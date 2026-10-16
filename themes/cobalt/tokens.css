@@ -1,4 +1,9 @@
 [data-theme='cobalt'] {
+  --radius-xs: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
   /* Cobalt (light, electric blue). */
 
   /* ---- Layer 1: raw scales (values differ per theme) ---- */

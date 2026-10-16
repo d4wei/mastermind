@@ -69,7 +69,7 @@
   height: calc(var(--space-unit) * 6);
   padding: 0;
   margin-right: var(--space-unit);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
 }
 .native-file-close:hover { background: var(--color-selection); color: var(--color-text); }
 .native-file-pill:hover {

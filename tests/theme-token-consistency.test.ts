@@ -12,6 +12,7 @@ const tokens = new Map(themes.map((id) => {
 
 // These semantic families are consumed by the interface regardless of palette choice.
 const required = [
+  '--radius-xs', '--radius-md', '--radius-lg', '--radius-full',
   '--color-bg', '--color-bg-elevated', '--color-text', '--color-text-muted', '--color-text-faint',
   '--color-border', '--color-accent', '--color-accent-dim', '--color-accent-surface',
   '--color-on-accent', '--color-cta-bg', '--color-cta-text', '--color-border-hover', '--color-selection', '--focus-ring', '--color-invert-bg',
@@ -30,4 +31,14 @@ describe('theme token contract', () => {
     for (const name of required) expect(names.has(name), `${id}: ${name}`).toBe(true)
     expect([...names].sort()).toEqual([...tokens.get('grid')!].sort())
   })
+})
+
+it('uses defined corner tokens throughout the interface styles', () => {
+  const root = fileURLToPath(new URL('../ui', import.meta.url))
+  for (const name of readdirSync(root, { recursive: true }).filter((name) => String(name).endsWith('.css'))) {
+    const css = readFileSync(path.join(root, String(name)), 'utf8')
+    for (const match of css.matchAll(/var\((--radius-[a-z]+)\)/g)) {
+      expect(tokens.get('grid')!.has(match[1]!), `${name}: ${match[1]}`).toBe(true)
+    }
+  }
 })

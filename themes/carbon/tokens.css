@@ -1,4 +1,9 @@
 [data-theme='carbon'] {
+  --radius-xs: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
   /* Carbon (near-black, steel blue-gray). */
 
   /* ---- Layer 1: raw scales (values differ per theme) ---- */
