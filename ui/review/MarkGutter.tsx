@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { scrollToSpan } from '../util/scroll'
+import { documentViewport, scrollToSpan } from '../util/scroll'
 
 export interface MarkTick {
   spanIndex: number
@@ -24,12 +24,6 @@ const KIND_CLASS: Record<MarkTick['kind'], string> = {
   comment: 'tick-comment',
 }
 
-/**
- * A thin scroll-track minimap: one tick per review item at its vertical
- * position, plus a viewport thumb. Positions come from the DOM (the same
- * [data-span-index] elements the walker/rail use), measured on a debounced
- * ResizeObserver — never on raw scroll. The thumb moves via transform only.
- */
 export function MarkGutter({ docRef, marks, version }: Props) {
   const [ticks, setTicks] = useState<PlacedTick[]>([])
   const thumbRef = useRef<HTMLDivElement>(null)
@@ -38,17 +32,18 @@ export function MarkGutter({ docRef, marks, version }: Props) {
   const measure = useCallback(() => {
     const doc = docRef.current
     if (!doc) return
-    const articleTop = doc.getBoundingClientRect().top + window.scrollY
+    const viewport = documentViewport()
+    const articleTop = doc.getBoundingClientRect().top - viewport.top + viewport.scrollTop
     const articleHeight = doc.offsetHeight || 1
     metrics.current = { articleTop, articleHeight }
     const placed: PlacedTick[] = []
     for (const m of marks) {
       const el = doc.querySelector(`[data-span-index="${m.spanIndex}"]`)
       if (!el) continue
-      const top = el.getBoundingClientRect().top + window.scrollY - articleTop
+      const top = el.getBoundingClientRect().top - doc.getBoundingClientRect().top
       placed.push({ ...m, fraction: Math.min(1, Math.max(0, top / articleHeight)) })
     }
-    // cluster ticks within ~0.6% so a dense doc draws tens, not thousands
+    // Coalesce nearby marks to keep dense documents legible.
     placed.sort((a, b) => a.fraction - b.fraction)
     const clustered: PlacedTick[] = []
     for (const tk of placed) {
@@ -58,7 +53,6 @@ export function MarkGutter({ docRef, marks, version }: Props) {
     setTicks(clustered)
   }, [docRef, marks])
 
-  // measure on mount, when marks/version change, and on size changes (debounced)
   useEffect(() => {
     let raf = 0
     const schedule = (): void => {
@@ -76,20 +70,21 @@ export function MarkGutter({ docRef, marks, version }: Props) {
     }
   }, [measure, version])
 
-  // the thumb tracks scroll cheaply (transform only, no re-render)
   useEffect(() => {
     const onScroll = (): void => {
       const thumb = thumbRef.current
       if (!thumb) return
       const { articleTop, articleHeight } = metrics.current
-      const topFrac = Math.max(0, (window.scrollY - articleTop) / articleHeight)
-      const heightFrac = Math.min(1, window.innerHeight / articleHeight)
+      const viewport = documentViewport()
+      const topFrac = Math.max(0, (viewport.scrollTop - articleTop) / articleHeight)
+      const heightFrac = Math.min(1, viewport.height / articleHeight)
       thumb.style.transform = `translateY(${topFrac * 100}%)`
       thumb.style.height = `${heightFrac * 100}%`
     }
     onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const scrollTarget = documentViewport().target
+    scrollTarget.addEventListener('scroll', onScroll, { passive: true })
+    return () => scrollTarget.removeEventListener('scroll', onScroll)
   }, [ticks])
 
   if (ticks.length === 0) return null
@@ -99,7 +94,6 @@ export function MarkGutter({ docRef, marks, version }: Props) {
       className="mark-gutter"
       aria-hidden
       onClick={(e) => {
-        // jump to the nearest tick by click position
         const rect = e.currentTarget.getBoundingClientRect()
         const f = (e.clientY - rect.top) / rect.height
         let nearest = ticks[0]!

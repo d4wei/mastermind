@@ -74,7 +74,7 @@ pub fn create_window(app: &tauri::AppHandle) {
             let window_builder = window_builder
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
                 .hidden_title(true)
-                .traffic_light_position(tauri::LogicalPosition::new(16.0, 32.0));
+                .traffic_light_position(tauri::LogicalPosition::new(16.0, 25.0));
             #[cfg(feature = "readiness-trace")]
             let window_builder = if let Some(script) = main_handle
                 .state::<std::sync::Arc<crate::readiness::Readiness>>()

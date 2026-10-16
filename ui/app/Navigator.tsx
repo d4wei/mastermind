@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
-import { scrollToOffset } from '../util/scroll'
+import { documentViewport, readingLine, scrollToOffset } from '../util/scroll'
 import { useNav } from './navStore'
 import { useDoc } from '../documents/store'
 
@@ -42,9 +42,8 @@ export function Navigator() {
     let raf = 0
     const update = (): void => {
       raf = 0
-      const y = window.scrollY
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-      const line = (document.querySelector('.topbar')?.getBoundingClientRect().bottom ?? 72) + 24
+      const { scrollTop: y, maxScroll } = documentViewport()
+      const line = readingLine() + 24
       const at = heads.map((h) => y + h.top() - line)
       // Spread headings that cannot reach the reading line across the remaining scroll.
       const firstUnreachable = at.findIndex((v) => v > maxScroll)
@@ -67,10 +66,11 @@ export function Navigator() {
       if (!raf) raf = requestAnimationFrame(update)
     }
     update()
-    window.addEventListener('scroll', onScroll, { passive: true })
+    const scrollTarget = documentViewport().target
+    scrollTarget.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
     return () => {
-      window.removeEventListener('scroll', onScroll)
+      scrollTarget.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }

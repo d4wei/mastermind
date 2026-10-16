@@ -18,5 +18,6 @@ source-editor undo stack. The cache has the same app lifetime as retained docume
 
 Outline navigation uses CodeMirror's line-block geometry rather than requiring a rendered DOM line.
 The mounted view publishes a heading-position callback for scroll tracking and clears it on unmount.
-Source offsets already use the document store's LF-normalized buffer. Both modes align navigation
-targets below the document controls through the shared scrolling utility.
+Source offsets already use the document store's LF-normalized buffer. Navigation dispatches
+CodeMirror's scroll effect so it can remeasure virtualized lines before aligning the target in
+the document scroller, below the fixed controls.

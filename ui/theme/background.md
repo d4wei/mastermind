@@ -10,9 +10,10 @@ parser or palette. Browser hosts omit the optional `ReviewerHost.setBackgroundCo
 The native adapter sends the resulting RGBA bytes to `desktop/src/appearance.rs`.
 
 On macOS, the command calls WKWebView's public [`setUnderPageBackgroundColor:`][under-page] on the
-UI thread. The title bar keeps its system appearance. A selector check preserves startup on older
-macOS versions without that API; their under-page background remains system-managed. Other desktop
-platforms use Tauri's window and webview background setters. No scroll behavior is disabled.
+UI thread. The macOS title bar overlays the themed file toolbar. A selector check preserves startup
+on older macOS versions without that API; their under-page background remains system-managed.
+Other desktop platforms use Tauri's window and webview background setters. The bounded document
+scroller keeps elastic movement inside the reading surface; see [document layout](../app/layout.md).
 
 Tests cover stylesheet timing, theme changes, startup synchronization, and the host payload.
 The canvas conversion and elastic-scroll appearance require native visual checks; jsdom cannot

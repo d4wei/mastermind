@@ -88,3 +88,25 @@ it('tracks Markdown headings from editor geometry without rendered heading eleme
   act(() => useNav.setState({ sourceHeadingTop: null }))
   act(() => window.dispatchEvent(new Event('scroll')))
 })
+
+it('tracks element scrolling while the window stays stationary', () => {
+  const viewport = document.createElement('div')
+  viewport.className = 'document-scroll'
+  viewport.getBoundingClientRect = () => ({ top: 46 }) as DOMRect
+  Object.defineProperties(viewport, { clientHeight: { value: 700 }, scrollHeight: { value: 2000 } })
+  document.body.append(viewport)
+  const article = document.createElement('article')
+  article.innerHTML = '<h1 data-ps="0">First</h1><h2 data-ps="12">Second</h2>'
+  viewport.append(article)
+  article.querySelectorAll('h1,h2').forEach((element, index) => {
+    element.getBoundingClientRect = () => ({ top: 46 + index * 500 - viewport.scrollTop }) as DOMRect
+  })
+  useNav.setState({ docEl: article })
+  act(() => root.render(<Navigator />))
+  expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
+  viewport.scrollTop = 600
+  act(() => viewport.dispatchEvent(new Event('scroll')))
+  expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
+  expect(window.scrollY).toBe(0)
+  viewport.remove()
+})

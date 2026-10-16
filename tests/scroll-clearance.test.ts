@@ -24,3 +24,41 @@ it.each([0, 60, 120])('keeps outline targets below %ipx of document controls', (
   scrollElementToTop(heading)
   expect(scrollTo).toHaveBeenCalledWith(0, 600 - height - 24)
 })
+
+it('scrolls the bounded document viewport without moving the window', async () => {
+  const { scrollToElement } = await import('../ui/util/scroll')
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  const pageScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  const viewport = document.createElement('div')
+  viewport.className = 'document-scroll'
+  viewport.scrollTop = 300
+  Object.defineProperties(viewport, { clientHeight: { value: 700 }, scrollHeight: { value: 3000 } })
+  viewport.getBoundingClientRect = () => ({ top: 46 }) as DOMRect
+  viewport.scrollTo = vi.fn()
+  const heading = document.createElement('h2')
+  heading.getBoundingClientRect = () => ({ top: 500, height: 40 }) as DOMRect
+  viewport.append(heading)
+  document.body.append(viewport)
+  scrollElementToTop(heading)
+  expect(viewport.scrollTo).toHaveBeenLastCalledWith(0, 730)
+  scrollToElement(heading)
+  expect(viewport.scrollTo).toHaveBeenLastCalledWith(0, 424)
+  expect(pageScroll).not.toHaveBeenCalled()
+})
+
+it('clamps review navigation at the container bounds', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }))
+  const viewport = document.createElement('div')
+  viewport.className = 'document-scroll'
+  Object.defineProperties(viewport, { clientHeight: { value: 700 }, scrollHeight: { value: 1000 } })
+  viewport.scrollTo = vi.fn()
+  const heading = document.createElement('h2')
+  viewport.append(heading)
+  document.body.append(viewport)
+  heading.getBoundingClientRect = () => ({ top: 2000 }) as DOMRect
+  scrollElementToTop(heading)
+  expect(viewport.scrollTo).toHaveBeenLastCalledWith(0, 300)
+  heading.getBoundingClientRect = () => ({ top: -100 }) as DOMRect
+  scrollElementToTop(heading)
+  expect(viewport.scrollTo).toHaveBeenLastCalledWith(0, 0)
+})

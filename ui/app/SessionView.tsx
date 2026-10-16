@@ -5,7 +5,6 @@ import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
-import { BlockActions } from '../modes/reading/BlockActions'
 import { CommentRail } from '../review/CommentRail'
 import { useNav } from './navStore'
 import { MarkGutter, type MarkTick } from '../review/MarkGutter'
@@ -348,57 +347,60 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       {translation.error && <div className="banner" role="status"><span className="banner-text">
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </span></div>}
-      <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
-        <div className="doc-column">
-          {showTranslated && (
-            <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-              {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedRef} />}
-            </Suspense>
-          )}
-          {mode === 'reading' && !showTranslated && analysis && (
-            <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}>
-              <MarkdownView
-                tree={analysis.tree}
-                ctx={{
-                  source,
-                  onEdit: (edit) => applyEdits([edit]),
-                  anchoredHighlights,
-                  highlightCode,
-                  markLabels: {
-                    deletion: t('markDeletion'),
-                    hint: t('undoDeletion'),
-                  },
-                }}
-              />
-              {commentFootnotes.length > 0 && (
-                <section className="print-footnotes">
-                  <h2>{t('comments')}</h2>
-                  <ol>
-                    {commentFootnotes.map((c, i) => (
-                      <li key={i}>
-                        {c.author && <span className="pf-author">@{c.author}: </span>}
-                        {c.body}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
-            </article>
-          )}
-          {mode === 'source' && (
-            <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-              <SourceEditor key={`s${externalVersion}`} />
-            </Suspense>
-          )}
-        </div>
-        {showRail && analysis && !showTranslated && (narrow ? (
-          <div className="comments-panel">
-            <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments">
-              {commentRail}
-            </SlideOver>
+      <div className="document-scroll">
+        <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
+          <div className="doc-column">
+            {showTranslated && (
+              <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
+                {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedRef} />}
+              </Suspense>
+            )}
+            {mode === 'reading' && !showTranslated && analysis && (
+              <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}>
+                <MarkdownView
+                  tree={analysis.tree}
+                  ctx={{
+                    source,
+                    onEdit: (edit) => applyEdits([edit]),
+                    anchoredHighlights,
+                    highlightCode,
+                    markLabels: {
+                      deletion: t('markDeletion'),
+                      hint: t('undoDeletion'),
+                    },
+                  }}
+                />
+                {commentFootnotes.length > 0 && (
+                  <section className="print-footnotes">
+                    <h2>{t('comments')}</h2>
+                    <ol>
+                      {commentFootnotes.map((c, i) => (
+                        <li key={i}>
+                          {c.author && <span className="pf-author">@{c.author}: </span>}
+                          {c.body}
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                )}
+              </article>
+            )}
+            {mode === 'source' && (
+              <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
+                <SourceEditor key={`s${externalVersion}`} />
+              </Suspense>
+            )}
           </div>
-        ) : commentRail)}
+          {showRail && analysis && !showTranslated && !narrow && commentRail}
+        </div>
       </div>
+      {showRail && analysis && !showTranslated && narrow && (
+        <div className="comments-panel">
+          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments">
+            {commentRail}
+          </SlideOver>
+        </div>
+      )}
       {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
         translation.targetLang === translationLanguage && (
         <TranslatedSelection key={`${sessionId}:${translationLanguage}`}
@@ -408,13 +410,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       {mode === 'reading' && !showTranslated && analysis && (
         <>
           <SelectionToolbar
-            containerRef={articleRef}
-            source={source}
-            spans={analysis.spans}
-            authorTag={authorTag}
-            onEdit={applyEdits}
-          />
-          <BlockActions
             containerRef={articleRef}
             source={source}
             spans={analysis.spans}

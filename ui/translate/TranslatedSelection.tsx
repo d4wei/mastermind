@@ -4,6 +4,7 @@ import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
+import { documentViewport } from '../util/scroll'
 import { useTranslation } from './translationStore'
 
 interface Props {
@@ -42,8 +43,13 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       setSelection({ artifact, blockId: first.dataset.transBlockId!, quote, top: rect.top, left: rect.left })
       setError(false)
     }
+    const scrollTarget = documentViewport().target
     document.addEventListener('selectionchange', change)
-    return () => document.removeEventListener('selectionchange', change)
+    scrollTarget.addEventListener('scroll', change, { passive: true })
+    return () => {
+      document.removeEventListener('selectionchange', change)
+      scrollTarget.removeEventListener('scroll', change)
+    }
   }, [containerRef, artifact])
   const close = () => { setSelection(null); setComposing(false); setBody(''); setError(false) }
   const submit = async () => {

@@ -6,6 +6,7 @@ import { ChatIcon, StrikethroughIcon } from '../../icons'
 import { usePresence } from '../../util/presence'
 import { useCompositionGuard } from '../../util/composition'
 import { rangeToSourceRanges, markEdits, type SelRange } from './selection'
+import { documentViewport } from '../../util/scroll'
 import { commentEdits, deletionWrap } from './marks'
 
 const EXIT_MS = 120
@@ -89,13 +90,14 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
         setActive((prev) => (prev ? { ...prev, rect: { top: rect.top, left: rect.left, width: rect.width } } : prev))
       })
     }
+    const scrollTarget = documentViewport().target
     if (active) {
       window.addEventListener('keydown', onKey)
-      window.addEventListener('scroll', onScroll, { passive: true })
+      scrollTarget.addEventListener('scroll', onScroll, { passive: true })
     }
     return () => {
       window.removeEventListener('keydown', onKey)
-      window.removeEventListener('scroll', onScroll)
+      scrollTarget.removeEventListener('scroll', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [active])

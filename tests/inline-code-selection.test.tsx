@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { applyTextEdits } from '../document/edits'
 import { resolveAll } from '../document/critic/resolve'
-import { blockContentRanges, markEdits, rangeToSource, rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { markEdits, rangeToSource, rangeToSourceRanges } from '../ui/modes/reading/selection'
 import { commentEdits, deletionWrap } from '../ui/modes/reading/marks'
 
 
@@ -63,13 +63,14 @@ describe('reviewing inline code', () => {
     const { host } = renderMarkdown(source)
     const range = select(host.querySelector('code')!.firstChild!)
     expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
-    expect(blockContentRanges(host.querySelector('pre')!, source, [])).toEqual([])
   })
 
-  it('retains block comments around code and does not nest marks around an existing anchor', () => {
+  it('retains selected comments around code and does not nest marks around an existing anchor', () => {
     const source = '`command`'
     const { host } = renderMarkdown(source)
-    const ranges = blockContentRanges(host.querySelector('p')!, source, [])
+    const mapped = rangeToSourceRanges(select(host.querySelector('code')!.firstChild!), source, [])
+    if (!('ranges' in mapped)) throw new Error(mapped.error)
+    const ranges = mapped.ranges
     const updated = applyTextEdits(source, commentEdits(ranges, 'Alex', 'Review this.'))
     const next = renderMarkdown(updated)
     expect(next.spans).toHaveLength(2)

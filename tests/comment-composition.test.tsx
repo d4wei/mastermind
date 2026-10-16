@@ -4,16 +4,14 @@ import type { Root } from 'react-dom/client'
 import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
-import { BlockActions } from '../ui/modes/reading/BlockActions'
 
 let host: HTMLDivElement
 let root: Root
 const edit = vi.fn()
-function Harness({ block }: { block: boolean }) {
+function Harness() {
   const containerRef = useRef<HTMLElement>(null)
-  const Component = block ? BlockActions : SelectionToolbar
-  return <><article ref={containerRef}><p><span data-ps="0" data-pe="7">Passage</span></p></article>
-    <Component containerRef={containerRef} source="Passage" spans={[]} authorTag="reviewer" onEdit={edit} /></>
+  return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe="7">Passage</span></p></article></div>
+    <SelectionToolbar containerRef={containerRef} source="Passage" spans={[]} authorTag="reviewer" onEdit={edit} /></>
 }
 beforeEach(() => {
   vi.useFakeTimers()
@@ -29,21 +27,15 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
-async function compose(block: boolean) {
-  act(() => root.render(<Harness block={block} />))
-  if (block) {
-    act(() => host.querySelector('p')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })))
-    act(() => host.querySelector<HTMLButtonElement>('.block-trigger')!.click())
-    act(() => host.querySelector<HTMLButtonElement>('.block-menu button')!.click())
-  } else {
-    const range = document.createRange()
-    range.selectNodeContents(host.querySelector('span')!)
-    range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 40 } as DOMRect)
-    window.getSelection()!.addRange(range)
-    act(() => document.dispatchEvent(new Event('selectionchange')))
-    await act(async () => vi.advanceTimersByTimeAsync(120))
-    act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
-  }
+async function compose() {
+  act(() => root.render(<Harness />))
+  const range = document.createRange()
+  range.selectNodeContents(host.querySelector('span')!)
+  range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 40 } as DOMRect)
+  window.getSelection()!.addRange(range)
+  act(() => document.dispatchEvent(new Event('selectionchange')))
+  await act(async () => vi.advanceTimersByTimeAsync(120))
+  act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
   const textarea = host.querySelector('textarea')!
   act(() => {
     inputValue(textarea, 'Existing draft')
@@ -51,8 +43,8 @@ async function compose(block: boolean) {
   return textarea
 }
 
-it.each([false, true])('keeps a %s block composer draft while IME Escape cancels marked text', async (block) => {
-  const textarea = await compose(block)
+it('keeps a selection composer draft while IME Escape cancels marked text', async () => {
+  const textarea = await compose()
   act(() => {
     textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -65,8 +57,8 @@ it.each([false, true])('keeps a %s block composer draft while IME Escape cancels
   expect(host.querySelector('textarea')).toBeNull()
 })
 
-it.each([false, true])('does not submit %s block composer during IME or its final legacy key', async (block) => {
-  const textarea = await compose(block)
+it('does not submit a selection composer during IME or its final legacy key', async () => {
+  const textarea = await compose()
   act(() => {
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true,
       isComposing: true, bubbles: true }))
@@ -83,21 +75,27 @@ it.each([false, true])('does not submit %s block composer during IME or its fina
   expect(edit).toHaveBeenCalledOnce()
 })
 
-it.each([false, true])('resets IME state when a %s block composer is removed without blur', async (block) => {
-  const textarea = await compose(block)
+it('resets IME state when a selection composer is removed without blur', async () => {
+  const textarea = await compose()
   act(() => textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
   const cancel = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!
   act(() => cancel.click())
   expect(host.querySelector('textarea')).toBeNull()
-  if (block) {
-    act(() => host.querySelector('p')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })))
-    act(() => host.querySelector<HTMLButtonElement>('.block-trigger')!.click())
-    act(() => host.querySelector<HTMLButtonElement>('.block-menu button')!.click())
-  } else {
-    act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
-  }
+  act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
   const reopened = host.querySelector('textarea')!
   act(() => reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(host.querySelector('textarea')).toBeNull()
   expect(edit).not.toHaveBeenCalled()
+})
+
+it('repositions the selection controls when the document container scrolls', async () => {
+  await compose()
+  const toolbar = host.querySelector<HTMLElement>('.sel-toolbar')!
+  const initialTop = toolbar.style.top
+  window.getSelection()!.getRangeAt(0).getBoundingClientRect = () =>
+    ({ top: 300, left: 100, width: 40 } as DOMRect)
+  act(() => host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll')))
+  await act(async () => vi.advanceTimersByTimeAsync(32))
+  expect(toolbar.style.top).not.toBe(initialTop)
+  expect(host.querySelector('textarea')!.value).toBe('Existing draft')
 })

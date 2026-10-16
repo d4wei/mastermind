@@ -5,7 +5,6 @@ import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type Vi
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { useDoc } from '../../documents/store'
-import { scrollPositionToTop } from '../../util/scroll'
 import { useNav } from '../../app/navStore'
 
 const CRITIC_CLASS: Record<string, string> = {
@@ -116,8 +115,9 @@ export function SourceEditor() {
     useNav.setState({ sourceHeadingTop })
     useDoc.getState().registerScroller((offset) => {
       const pos = editorPosition(offset)
-      view.dispatch({ selection: { anchor: pos } })
-      scrollPositionToTop(sourceHeadingTop(pos))
+      // CodeMirror remeasures virtualized lines before scrolling its ancestor viewport.
+      view.dispatch({ selection: { anchor: pos },
+        effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 24 }) })
     })
 
     const registeredScroller = useDoc.getState().scroller

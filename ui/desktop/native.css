@@ -1,6 +1,6 @@
+:root:has(.native-documents) { --bar-gap: calc(var(--space-unit) * 2); }
 .native-documents {
-  position: sticky;
-  top: 0;
+  flex: none;
   z-index: var(--z-topbar);
   display: flex;
   flex-wrap: wrap;
@@ -16,13 +16,17 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: calc(var(--space-unit) * 9);
-  height: calc(var(--space-unit) * 9);
+  width: calc(var(--space-unit) * 7.5);
+  height: calc(var(--space-unit) * 7.5);
   padding: 0;
   background: var(--color-bg-elevated);
   color: var(--color-text);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+.native-documents ~ .app-content .topbar-icon-btn {
+  width: calc(var(--space-unit) * 7.5);
+  height: calc(var(--space-unit) * 7.5);
 }
 .native-open:hover { border-color: var(--color-border-hover); }
 .native-file-pills {
@@ -54,14 +58,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
+  height: calc(var(--space-unit) * 7.5);
+  padding: 0 calc(var(--space-unit) * 2.5);
 }
 .native-file-close {
   display: grid;
   place-items: center;
   flex: none;
-  width: calc(var(--space-unit) * 7);
-  height: calc(var(--space-unit) * 7);
+  width: calc(var(--space-unit) * 6);
+  height: calc(var(--space-unit) * 6);
   padding: 0;
   margin-right: var(--space-unit);
   border-radius: var(--radius-sm);
@@ -82,6 +87,8 @@
 .native-opening-errors ul { margin-block: calc(var(--space-unit) * 2); }
 
 .native-setup {
+  overflow: auto;
+  min-height: 0;
   max-width: calc(var(--space-unit) * 120);
   margin: calc(var(--space-unit) * 8) auto;
   padding: calc(var(--space-unit) * 6);

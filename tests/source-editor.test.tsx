@@ -135,10 +135,7 @@ it('invalidates retained history even when external edits return to the same sou
 })
 
 it('navigates through editor geometry without requiring an off-screen line in the DOM', () => {
-  vi.stubGlobal('matchMedia', () => ({ matches: true, addListener: vi.fn(), removeListener: vi.fn() }))
-  const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
-  vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(5000)
-  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800)
+  const scrollIntoView = vi.spyOn(EditorView, 'scrollIntoView')
   act(() => useDoc.getState().adoptDiskContent('# First\r\n\r\n## Second\r\n', 4, 'headings'))
   const view = editor()
   const offset = view.state.doc.toString().indexOf('## Second')
@@ -150,7 +147,7 @@ it('navigates through editor geometry without requiring an off-screen line in th
   expect(lineBlockAt).toHaveBeenCalledWith(offset)
   expect(view.state.selection.main.anchor).toBe(offset)
   expect(domAtPos).not.toHaveBeenCalled()
-  expect(scrollTo).toHaveBeenCalledWith(0, 976)
+  expect(scrollIntoView).toHaveBeenCalledWith(offset, { y: 'start', yMargin: 24 })
   act(() => useDoc.getState().setMode('reading'))
   expect(useNav.getState().sourceHeadingTop).toBeNull()
   expect(useDoc.getState().scroller).toBeNull()

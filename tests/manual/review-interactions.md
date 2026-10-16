@@ -30,12 +30,12 @@ reading view for the selection checks.
    permission, then make another edit to retry. A disk version conflict instead opens the conflict
    controls; check that separately from a denied or unreachable save.
 6. **Native file toolbar:** on macOS, traffic lights share the file toolbar without a separate
-   title strip. Drag empty toolbar space to move the window; Open, file pills, close buttons, and
-   document controls should remain clickable. Open three disposable files, close the middle active
-   file, then a background file, then the last file. Check neighbor selection and the empty opening
-   screen. Reopen a closed file and check that its disk contents remain unchanged. Repeat after a
-   local edit, a save failure, and a distinct comparison Result; unsaved work must keep its file
-   open.
+   title strip, with balanced top and left insets. Drag empty toolbar space to move the window;
+   Open, file pills, close buttons, and document controls should remain clickable. Open three
+   disposable files, close the middle active file, then a background file, then the last file.
+   Check neighbor selection and the empty opening screen. Reopen a closed file and check that its
+   disk contents remain unchanged. Repeat after a local edit, a save failure, and a distinct
+   comparison Result; unsaved work must keep its file open.
 
 ## Selection paragraphs
 
@@ -124,3 +124,6 @@ and Chinese interface labels, a translation language configured, and light and d
   viewport override to its normal size after checking.
 - In the native app, overscroll the top and bottom in light and dark themes, then change themes
   and repeat. The revealed surface matches the current page background in both reading modes.
+  File controls, outline, and open overlay panels stay fixed throughout scrolling and overscroll.
+- Hover paragraphs and move along their right edges: no section action menu should appear.
+  Select text instead and check that Comment and Suggest deletion remain available.

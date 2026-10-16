@@ -1,7 +1,7 @@
 import type { Node as MarkdownNode, Parent } from 'unist'
 import { parseMarkdown } from '../../../document/markdown/processor'
 import type { CriticSpan, Range as SourceRange } from '../../../document/critic/types'
-import { codeRanges, excludedRanges } from '../../../document/markdown/exclusions'
+import { excludedRanges } from '../../../document/markdown/exclusions'
 import type { TextEdit } from '../../../document/types'
 
 export interface SelRange {
@@ -280,28 +280,6 @@ function markFreeGaps(
   }
   if (cursor < to) push(cursor, to)
   return out
-}
-
-const NESTED_CONTAINER = `${BLOCK_SELECTOR},ul,ol`
-
-/** Block actions retain inline syntax while excluding nested block content. */
-export function blockContentRanges(
-  block: HTMLElement,
-  source: string,
-  spans: readonly CriticSpan[],
-): SelRange[] {
-  if (block.tagName === 'PRE' || block.closest('.md-frontmatter')) return []
-  let from = Infinity
-  let to = -Infinity
-  for (const el of block.querySelectorAll<HTMLElement>('[data-ps]')) {
-    if (el.closest(NESTED_CONTAINER) !== block) continue
-    const ps = Number(el.dataset.ps)
-    const pe = Number(el.dataset.pe)
-    if (Number.isFinite(ps)) from = Math.min(from, ps)
-    if (Number.isFinite(pe)) to = Math.max(to, pe)
-  }
-  if (from === Infinity || to <= from) return []
-  return markFreeGaps(from, to, source, spans, codeRanges(source))
 }
 
 /** Unmappable blocks are skipped; markable blocks in the same selection remain available. */

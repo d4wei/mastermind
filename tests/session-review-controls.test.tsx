@@ -96,6 +96,7 @@ it('opens narrow-screen comments in a dismissible panel without reserving a side
   expect(host.querySelector('.doc-shell')?.classList.contains('with-rail')).toBe(false)
   const panel = host.querySelector('[role="dialog"]')!
   expect(panel.getAttribute('aria-label')).toBe('Comments')
+  expect(panel.closest('.document-scroll')).toBeNull()
   expect(panel.querySelector('[data-testid="rail"]')).not.toBeNull()
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   expect(host.querySelector('[role="dialog"]')).toBeNull()
@@ -114,4 +115,18 @@ it.each(['pointer', 'keyboard'])('opens comments exclusively from a narrow-scree
   })
   expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
   expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Comments')
+})
+
+it('scrolls the article and wide comment rail together, with controls and panels outside', () => {
+  render('# Heading\n\nText {>>@Alex: note<<}')
+  const viewport = host.querySelector('.document-scroll')!
+  expect(viewport.querySelector('article')).not.toBeNull()
+  expect(viewport.querySelector('[data-testid="rail"]')).not.toBeNull()
+  expect(viewport.querySelector('.topbar')).toBeNull()
+  act(() => host.querySelector('article p')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })))
+  expect(host.querySelector('.block-actions')).toBeNull()
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (0)').click())
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+  expect(viewport.querySelector('[role="dialog"]')).toBeNull()
 })

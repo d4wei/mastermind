@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Keep document scrolling separate from application controls
+
+**Ruled.** Scroll the document and its wide comment rail inside a bounded viewport. Keep application
+controls and overlay panels outside that surface. Review actions start from selected text; remove
+the section hover menu because it duplicates selection actions and makes pointer movement fragile.
+
+**Beat:** page-level scrolling that carries controls during overscroll, and whole-block hover actions.
+
 ## 2026-10-15 — Integrate macOS window controls into the file toolbar
 
 **Ruled.** Remove the separate macOS title strip and retain native traffic lights in the file

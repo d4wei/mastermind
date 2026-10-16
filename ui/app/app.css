@@ -20,7 +20,7 @@
   --z-nav: 30; /* left navigator / file tree + its reveal button */
   --z-topbar: 40; /* fixed document controls */
   --z-panel: 50; /* slide-overs: settings, find */
-  --z-popover: 60; /* selection toolbar, hover actions, proposal card */
+  --z-popover: 60; /* selection toolbar, proposal card */
   --z-overlay: 65; /* off-canvas scrim for nav/rail at narrow widths */
   --z-toast: 70; /* toasts */
   --z-grain: 100; /* film-grain overlay — always on top */
@@ -74,11 +74,28 @@ body {
   margin: 0;
   padding: 0;
   background: var(--color-bg);
+  height: 100%;
+  overflow: hidden;
 }
 
-/* Native anchor scrolling clears the fixed document controls. */
-html {
-  scroll-padding-top: var(--bar-clear);
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.document-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-top: calc(var(--space-unit) * 6);
 }
 
 body {
@@ -513,129 +530,6 @@ button:disabled {
 }
 
 .sel-composer-actions button:disabled {
-  opacity: 0.4;
-}
-
-/* ---------- block hover actions ---------- */
-
-/* a bare positioned wrapper: the ⋯ trigger sits at top-left; the menu / composer
-   hang below it (absolute, right-aligned) so they grow leftward over the text. */
-.block-actions {
-  position: fixed;
-  z-index: var(--z-popover);
-}
-
-/* quiet ghost trigger — a faint ⋯ in the right gutter that firms up on hover */
-.block-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.block-trigger:hover,
-.block-trigger[aria-expanded='true'] {
-  color: var(--color-text);
-  background: var(--color-bg-elevated);
-}
-
-/* Elevated menus retain the page surface beneath the inverted selection toolbar. */
-.block-menu,
-.block-compose {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: calc(var(--space-unit) * 1);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.18 * var(--shadow-strength)));
-}
-
-/* near the viewport bottom, hang the dropdown above the trigger instead */
-.block-actions.flip-up .block-menu,
-.block-actions.flip-up .block-compose {
-  top: auto;
-  bottom: 100%;
-  margin-top: 0;
-  margin-bottom: calc(var(--space-unit) * 1);
-}
-
-.block-menu {
-  display: flex;
-  flex-direction: column;
-  padding: calc(var(--space-unit) * 1);
-  min-width: 168px;
-}
-
-.block-menu > button {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space-unit) * 2);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-xs);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
-  white-space: nowrap;
-  text-align: left;
-  cursor: pointer;
-}
-
-.block-menu > button:hover {
-  background: var(--color-accent-surface);
-  color: var(--color-text);
-}
-
-/* light comment composer, consistent with the menu */
-.block-compose {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--space-unit) * 1.5);
-  padding: calc(var(--space-unit) * 2);
-  width: 280px;
-}
-
-.block-compose textarea {
-  width: 100%;
-  resize: none;
-  font-family: var(--font-body);
-  font-size: var(--font-size-sm);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  color: var(--color-text);
-  padding: calc(var(--space-unit) * 1.5);
-}
-
-.block-compose-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: calc(var(--space-unit) * 1);
-}
-
-.block-compose-actions button {
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-xs);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
-  cursor: pointer;
-}
-
-.block-compose-actions button.primary {
-  color: var(--color-accent-dim);
-}
-
-.block-compose-actions button:disabled {
   opacity: 0.4;
 }
 
@@ -1610,18 +1504,7 @@ input[type='checkbox'] {
   color: var(--color-text);
 }
 
-/* ---------- motion (Phase N) — meaningful moments only, reduced-motion aware ---------- */
-@keyframes mm-pop-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-/* the comment toolbar gets a livelier rise-and-settle than the plain pop */
+/* ---------- motion ---------- */
 @keyframes mm-toolbar-in {
   from {
     opacity: 0;
@@ -1687,19 +1570,6 @@ input[type='checkbox'] {
 .toast {
   animation: mm-toast-in var(--dur-base) var(--ease-out);
 }
-.block-actions {
-  animation: mm-pop-in var(--dur-fast) var(--ease-out);
-}
-/* the dropdown / composer pops in when the ⋯ is clicked (parent stays mounted) */
-.block-menu,
-.block-compose {
-  transform-origin: top right;
-  animation: mm-pop-in var(--dur-fast) var(--ease-out);
-}
-.block-actions.flip-up .block-menu,
-.block-actions.flip-up .block-compose {
-  transform-origin: bottom right;
-}
 /* the comment toolbar rises out of the selection it's anchored above */
 .sel-toolbar {
   transform-origin: center bottom;
@@ -1740,7 +1610,6 @@ input[type='checkbox'] {
     background-color var(--dur-fast) ease,
     transform var(--dur-fast) var(--ease-standard);
 }
-.block-menu > button,
 .sel-toolbar > button {
   transition:
     background var(--dur-fast) var(--ease-standard),
@@ -1748,7 +1617,6 @@ input[type='checkbox'] {
     transform var(--dur-fast) var(--ease-standard);
 }
 .btn-cta:active:not(:disabled),
-.block-menu > button:active,
 .sel-toolbar > button:active {
   transform: scale(0.96);
 }
@@ -1767,9 +1635,6 @@ input[type='checkbox'] {
   .toast,
   .sel-toolbar,
   .sel-toolbar.closing,
-  .block-actions,
-  .block-menu,
-  .block-compose,
   .rail-card,
   .rail-card.leaving,
   .rail-card.active {
@@ -1777,12 +1642,10 @@ input[type='checkbox'] {
   }
   .seg-btn,
   .btn-cta,
-  .block-menu > button,
   .sel-toolbar > button {
     transition: none;
   }
   .btn-cta:active:not(:disabled),
-  .block-menu > button:active,
   .sel-toolbar > button:active {
     transform: none;
   }
@@ -1880,6 +1743,11 @@ input[type='checkbox'] {
 }
 
 @media print {
+  html, body, #root, .app-content, .document-scroll {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
   /* hide all chrome and floating layers */
   .topbar,
   .toast,
@@ -1888,7 +1756,6 @@ input[type='checkbox'] {
   .mark-gutter,
   .slide-over,
   .sel-toolbar,
-  .block-actions,
   .compact-outline,
   .grain-overlay {
     display: none !important;
@@ -2000,8 +1867,6 @@ input[type='checkbox'] {
 .rail-actions button,
 .sel-toolbar > button,
 .sel-composer-actions button,
-.block-menu > button,
-.block-compose-actions button,
 .slide-over-title,
 .tooltip,
 .find-filter {

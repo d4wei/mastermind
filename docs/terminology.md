@@ -352,8 +352,7 @@ Decisions, Open questions, To-do, and Risks heading families. Keep **frontmatter
 use **document metadata / 文档元数据** when introducing its purpose to a reader. Do not call raw
 frontmatter Properties as if a typed property editor already exists.
 
-Use **Block actions / 内容块操作**, not 段落操作, for an action menu that can apply to nonparagraph
-blocks. Review badges should spell out localized categories rather than `3c 2e 1h`.
+Review badges should spell out localized categories rather than `3c 2e 1h`.
 Example: “3 comments, 2 suggested edits, 1 highlight.” / “3 条评论、2 条修改建议、1 处高亮。”
 
 ## 13. Workflow and design-document vocabulary
