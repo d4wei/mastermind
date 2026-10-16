@@ -1,10 +1,13 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { CommentBody } from './CommentBody'
+import { CheckIcon, ChevronUpIcon, MoreIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
-import { prefersReducedMotion } from '../util/presence'
 import { useCompositionGuard } from '../util/composition'
+import { revealElement, revealRange } from '../util/scroll'
+import { placeCommentCards } from './rail-layout'
 import type { CriticSpan, ReviewItem } from '../../document/critic/types'
 import type { TextEdit } from '../../document/types'
 
@@ -15,254 +18,209 @@ interface Props {
   items: readonly ReviewItem[]
   spans: readonly CriticSpan[]
   source: string
-  /** The rendered article element (anchor measurements are relative to it). */
   docRef: RefObject<HTMLElement | null>
   authorTag: string
   activeSpan: number | null
+  hoveredSpan?: number | null
+  onHover?: (spanIndex: number | null) => void
   onActivate: (spanIndex: number | null) => void
   onEdit: (edits: TextEdit[]) => void
 }
 
-interface CardLayout {
-  key: string
-  spanIndex: number
-  naturalTop: number
-  top: number
-  /** snapshotted at measure time so an exiting card survives source changes */
-  anchorText: string
-  thread: ThreadItem
-}
-
 const CARD_GAP = 8
-const EXIT_MS = 180
 
-/** Span indices shift after unrelated edits; content keys retain cards through those shifts and exits. */
+/** Appending replies must not discard a draft or remount the discussion. */
 function threadKey(thread: ThreadItem, anchorText: string): string {
-  return JSON.stringify([anchorText, thread.comments.map((c) => [c.author ?? '', c.body])])
+  const first = thread.comments[0]
+  return JSON.stringify([anchorText, first?.author ?? '', first?.body])
 }
 
-export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, onActivate, onEdit, readOnly = false }: Props) {
+export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, hoveredSpan,
+  onHover, onActivate, onEdit, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
-  const [layouts, setLayouts] = useState<CardLayout[]>([])
-  const layoutsRef = useRef<CardLayout[]>([])
-  const [exiting, setExiting] = useState<CardLayout[]>([])
-  const exitTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const measuredPositions = useRef<number[]>([])
+  const [positions, setPositions] = useState<number[]>([])
   const [railHeight, setRailHeight] = useState(0)
   const [replyFor, setReplyFor] = useState<string | null>(null)
-  const [replyText, setReplyText] = useState('')
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [resolveError, setResolveError] = useState<string | null>(null)
-
-  const threads = items.filter((i): i is ThreadItem => i.type === 'thread')
+  const activatedFromCard = useRef<number | null>(null)
+  const selectedKey = useRef<string | null>(null)
+  const cards = useMemo(() => {
+    const seen = new Map<string, number>()
+    return items.filter((item): item is ThreadItem => item.type === 'thread').map((thread) => {
+      const anchorSpan = thread.anchor ?? thread.comments[0]!.span
+      const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd) : ''
+      const key = threadKey(thread, anchorText)
+      const duplicate = seen.get(key) ?? 0
+      seen.set(key, duplicate + 1)
+      return { key: `${key}#${duplicate}`, spanIndex: spans.indexOf(anchorSpan), anchorText, thread }
+    })
+  }, [items, spans, source])
 
   useLayoutEffect(() => {
+    const rail = railRef.current
     const doc = docRef.current
-    if (!doc) return
-
-    const measure = (): void => {
-      const docRect = doc.getBoundingClientRect()
-      const next: CardLayout[] = []
-      const seen = new Map<string, number>()
-      for (const thread of threads) {
-        const anchorSpan = thread.anchor ?? thread.comments[0]?.span
-        if (!anchorSpan) continue
-        const spanIndex = spans.indexOf(anchorSpan)
-        const el = doc.querySelector(`[data-span-index="${spanIndex}"]`)
-        const naturalTop = el ? el.getBoundingClientRect().top - docRect.top : 0
-        const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd).slice(0, 80) : ''
-        let key = threadKey(thread, anchorText)
-        const dup = seen.get(key) ?? 0
-        seen.set(key, dup + 1)
-        if (dup) key = `${key}#${dup}`
-        next.push({ key, spanIndex, naturalTop, top: naturalTop, anchorText, thread })
-      }
-      next.sort((a, b) => a.naturalTop - b.naturalTop)
-      let cursor = 0
-      for (const card of next) {
-        card.top = Math.max(card.naturalTop, cursor)
-        const el = cardRefs.current.get(card.key)
-        cursor = card.top + (el?.offsetHeight ?? 96) + CARD_GAP
-      }
-
-      // Keep disappearing cards at their last measured positions until their exit finishes.
-      const nextKeys = new Set(next.map((c) => c.key))
-      const gone = layoutsRef.current.filter((p) => !nextKeys.has(p.key))
-      layoutsRef.current = next
-      if (!prefersReducedMotion()) {
-        setExiting((cur) => {
-          let result = cur.filter((x) => {
-            if (!nextKeys.has(x.key)) return true
-            const tm = exitTimers.current.get(x.key)
-            if (tm) { clearTimeout(tm); exitTimers.current.delete(x.key) }
-            return false
-          })
-          const live = new Set(result.map((c) => c.key))
-          const add = gone.filter((g) => !live.has(g.key))
-          for (const g of add) {
-            exitTimers.current.set(g.key, setTimeout(() => {
-              exitTimers.current.delete(g.key)
-              setExiting((c2) => c2.filter((x) => x.key !== g.key))
-            }, EXIT_MS))
-          }
-          if (add.length) result = [...result, ...add]
-          return result.length === cur.length && !add.length ? cur : result
-        })
-      }
-
-      setLayouts(next)
-      setRailHeight(Math.max(doc.scrollHeight, cursor))
+    if (!doc || !rail) return
+    const measure = () => {
+      const railTop = rail.getBoundingClientRect().top
+      const measurements = cards.map((card) => ({
+        anchorTop: Math.max(0, (doc.querySelector(`[data-span-index="${card.spanIndex}"]`)
+          ?.getBoundingClientRect().top ?? railTop) - railTop),
+        height: cardRefs.current.get(card.key)?.offsetHeight ?? 0,
+      }))
+      const next = placeCommentCards(measurements, cards.findIndex((card) => card.spanIndex === activeSpan), CARD_GAP)
+      measuredPositions.current = next
+      setPositions((current) => current.length === next.length && current.every((top, i) => top === next[i]) ? current : next)
+      setRailHeight(Math.max(doc.scrollHeight, ...next.map((top, i) => top + measurements[i]!.height)))
     }
-
     measure()
-    // Initial measurements create the cards; measure again after their DOM is committed.
-    const raf = requestAnimationFrame(measure)
+    const observer = new ResizeObserver(measure)
+    observer.observe(doc)
+    cardRefs.current.forEach((element) => observer.observe(element))
     window.addEventListener('resize', measure)
-    // Font and width changes move anchors without changing source.
-    const ro = new ResizeObserver(() => measure())
-    ro.observe(doc)
-    return () => {
-      cancelAnimationFrame(raf)
-      window.removeEventListener('resize', measure)
-      ro.disconnect()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, items, spans, replyFor, activeSpan])
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [cards, activeSpan, replyFor, docRef])
 
-  useLayoutEffect(() => {
-    const timers = exitTimers.current
-    return () => timers.forEach(clearTimeout)
-  }, [])
-
-  const resolveThread = (thread: ThreadItem): void => {
-    if (readOnly) return
-    let edits: TextEdit[]
-    try {
-      edits = resolveThreadEdits(source, thread)
-    } catch (error) {
-      setResolveError(error instanceof Error ? error.message : String(error))
+  useEffect(() => {
+    if (activeSpan === null) {
+      selectedKey.current = null
+      activatedFromCard.current = null
+      setReplyFor(null)
       return
     }
-    if (edits.length === 0) return
+    const card = cards.find((item) => item.spanIndex === activeSpan)
+    if (!card || selectedKey.current === card.key) return
+    selectedKey.current = card.key
+    setReplyFor((key) => key === card.key ? key : null)
+    if (activatedFromCard.current === activeSpan) { activatedFromCard.current = null; return }
+    const element = cardRefs.current.get(card.key)
+    if (!element) return
+    // Narrow panels own their scroll surface; wide cards share document scrolling.
+    if (element.closest('.comments-panel')) element.scrollIntoView({ block: 'nearest' })
+    else {
+      const frame = requestAnimationFrame(() => {
+        // Use the destination, not an intermediate position during the card's transition.
+        const top = (railRef.current?.getBoundingClientRect().top ?? 0) +
+          (measuredPositions.current[cards.indexOf(card)] ?? 0)
+        const headerBottom = element.querySelector('.rail-message-header')?.getBoundingClientRect().bottom
+        const headerExtent = headerBottom === undefined ? 0 : headerBottom - element.getBoundingClientRect().top
+        revealRange(top, top + headerExtent)
+      })
+      return () => cancelAnimationFrame(frame)
+    }
+  }, [activeSpan, cards])
+
+  const activate = (spanIndex: number) => {
+    activatedFromCard.current = spanIndex
+    onActivate(spanIndex)
+    revealElement(docRef.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null, true)
+  }
+  const collapse = () => { setReplyFor(null); onActivate(null) }
+  const resolveThread = (thread: ThreadItem) => {
+    if (readOnly) return
+    let edits: TextEdit[]
+    try { edits = resolveThreadEdits(source, thread) }
+    catch (error) { setResolveError(error instanceof Error ? error.message : String(error)); return }
+    if (!edits.length) return
+    onHover?.(null)
     onEdit(edits)
     setResolveError(null)
-    onActivate(null)
+    collapse()
   }
-
-  const submitReply = (thread: ThreadItem): void => {
-    if (readOnly) return
-    const text = replyText.trim()
-    if (!text) return
+  const submitReply = (card: typeof cards[number]) => {
+    const text = drafts[card.key]?.trim()
+    if (readOnly || !text) return
     const body = text.replace(/\n[ \t]*\n+/g, '\n').replaceAll('<<}', '<< }')
-    onEdit([{ from: thread.end, to: thread.end, insert: `{>>@${authorTag}: ${body}<<}` }])
+    onEdit([{ from: card.thread.end, to: card.thread.end, insert: `{>>@${authorTag}: ${body}<<}` }])
     setReplyFor(null)
-    setReplyText('')
+    setDrafts((current) => { const next = { ...current }; delete next[card.key]; return next })
   }
 
-  if (threads.length === 0) return null
-
-  return (
-    <div ref={railRef} className="rail" style={{ height: railHeight || undefined }}>
-      {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
-      {layouts.map((card, i) => {
-        const isActive = activeSpan !== null && card.spanIndex === activeSpan
-        return (
-          <div
-            key={card.key}
-            ref={(el) => {
-              if (el) cardRefs.current.set(card.key, el)
-              else cardRefs.current.delete(card.key)
-            }}
-            className={`rail-card${isActive ? ' active' : ''}`}
-            style={{ top: card.top, '--enter-delay': `${Math.min(i, 5) * 55}ms` } as CSSProperties}
-            onClick={() => onActivate(card.spanIndex)}
-            role="group"
-            onFocus={() => onActivate(card.spanIndex)}
-          >
-            {card.thread.anchor && <div className="rail-card-anchor">“{card.anchorText}”</div>}
-            {card.thread.comments.map((c, i) => (
-              <div key={i} className="rail-comment">
-                {c.author && <span className="rail-author">@{c.author}</span>}
-                <CommentBody body={c.body} />
-                <button type="button" className="btn-ghost rail-delete" disabled={readOnly} onClick={(event) => {
-                  event.stopPropagation()
-                  onEdit(deleteCommentEdits(source, card.thread, i))
-                  onActivate(null)
-                }}>
-                  {t('deleteComment')}
-                </button>
-              </div>
-            ))}
-            {replyFor === card.key ? (
-              <div className="rail-reply">
-                {readOnly && <p role="status">{t('editingPaused')}</p>}
-                <textarea readOnly={readOnly}
-                  autoFocus
-                  ref={ime.textareaRef}
-                  onCompositionStart={ime.onCompositionStart}
-                  onCompositionEnd={ime.onCompositionEnd}
-                  onBlur={ime.onBlur}
-                  rows={2}
-                  value={replyText}
-                  placeholder={t('replyPlaceholder')}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
-                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submitReply(card.thread)
-                    if (e.key === 'Escape') {
-                      setReplyFor(null)
-                      setReplyText('')
-                      e.stopPropagation()
-                    }
-                  }}
-                />
-                <div className="rail-actions">
-                  <button type="button" onClick={() => setReplyFor(null)}>
-                    {t('cancel')}
-                  </button>
-                  <button type="button" className="primary" disabled={readOnly || !replyText.trim()} onClick={() => submitReply(card.thread)}>
-                    {t('reply')}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="rail-actions">
-                <button
-                  type="button" disabled={readOnly}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setReplyFor(card.key)
-                    setReplyText('')
-                  }}
-                >
-                  {t('reply')}
-                </button>
-                <button
-                  type="button" disabled={readOnly}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    resolveThread(card.thread)
-                  }}
-                >
-                  {t('resolve')}
-                </button>
-              </div>
-            )}
-          </div>
-        )
-      })}
-      {exiting.map((card) => (
-        <div key={`x${card.key}`} className="rail-card leaving" style={{ top: card.top }} aria-hidden="true">
-          {card.thread.anchor && <div className="rail-card-anchor">“{card.anchorText}”</div>}
-          {card.thread.comments.map((c, i) => (
-            <div key={i} className="rail-comment">
-              {c.author && <span className="rail-author">@{c.author}</span>}
-              <CommentBody body={c.body} />
+  if (!cards.length) return null
+  return <div ref={railRef} className="rail" style={{ height: railHeight || undefined }}>
+    {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
+    {cards.map((card, index) => {
+      const selected = activeSpan === card.spanIndex
+      const replies = card.thread.comments.length - 1
+      const replyCount = t(replies === 1 ? 'countReply' : 'countReplies').replace('{count}', String(replies))
+      return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
+        ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
+        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}`}
+        style={{ top: positions[index] ?? 0 }}
+        onPointerEnter={() => onHover?.(card.spanIndex)} onPointerLeave={() => onHover?.(null)}
+        onFocus={() => onHover?.(card.spanIndex)}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onHover?.(null) }}
+        onClick={(event) => {
+          if ((event.target as HTMLElement).closest('button, textarea, [role="menuitem"]')) return
+          if (window.getSelection()?.isCollapsed !== false) activate(card.spanIndex)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && !ime.isComposing(event.nativeEvent) && !(event.target as HTMLElement).closest('[role="menu"]')) {
+            event.stopPropagation()
+            collapse()
+          }
+        }}>
+        {(selected ? card.thread.comments : card.thread.comments.slice(0, 1)).map((comment, messageIndex) =>
+          <div key={messageIndex} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
+            <div className="rail-message-header">
+              {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
+                aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
+                onClick={() => activate(card.spanIndex)}>
+                <span className="rail-author">{comment.author ?? t('comment')}</span>
+              </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
+              {messageIndex === 0 && <>
+                <button type="button" className="btn-ghost rail-icon" aria-label={t('resolve')} title={t('resolve')}
+                  disabled={readOnly} onClick={() => resolveThread(card.thread)}><CheckIcon /></button>
+                {selected && <button type="button" className="btn-ghost rail-icon" aria-label={t('collapseDiscussion')}
+                  title={t('collapseDiscussion')} onClick={collapse}><ChevronUpIcon /></button>}
+              </>}
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost rail-icon"
+                  aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
+                    <DropdownMenu.Item className="reader-menu-item" disabled={readOnly} onSelect={() => {
+                      if (readOnly) return
+                      onHover?.(null)
+                      onEdit(deleteCommentEdits(source, card.thread, messageIndex))
+                      collapse()
+                    }}>{t('deleteComment')}</DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
             </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  )
+            {messageIndex === 0 && selected && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
+            <CommentBody body={comment.body} />
+          </div>)}
+        {selected && replyFor === card.key ? <div className="rail-reply">
+          {readOnly && <p role="status">{t('editingPaused')}</p>}
+          <textarea autoFocus readOnly={readOnly} ref={ime.textareaRef} rows={2}
+            onCompositionStart={ime.onCompositionStart} onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
+            value={drafts[card.key] ?? ''} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
+            onChange={(event) => setDrafts((current) => ({ ...current, [card.key]: event.target.value }))}
+            onKeyDown={(event) => {
+              if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); submitReply(card) }
+              if (event.key === 'Escape') { event.stopPropagation(); collapse() }
+            }} />
+          <div className="rail-actions">
+            <button type="button" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
+            <button type="button" className="primary" disabled={readOnly || !drafts[card.key]?.trim()}
+              onClick={() => submitReply(card)}>{t('reply')}</button>
+          </div>
+        </div> : <div className="rail-actions rail-footer">
+          {!selected && replies > 0 && <button type="button" aria-expanded={false}
+            onClick={() => activate(card.spanIndex)}>{replyCount}</button>}
+          {(selected || replies === 0) && <button type="button" disabled={readOnly} onClick={() => {
+            activate(card.spanIndex)
+            setReplyFor(card.key)
+          }}>{t('reply')}</button>}
+        </div>}
+      </div>
+    })}
+  </div>
 }

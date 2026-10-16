@@ -55,6 +55,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const articleRef = useRef<HTMLElement | null>(null)
   const translatedRef = useRef<HTMLElement | null>(null)
   const [activeSpan, setActiveSpan] = useState<number | null>(null)
+  const [hoveredSpan, setHoveredSpan] = useState<number | null>(null)
   const narrow = useIsNarrow()
   const [railOpen, setRailOpen] = useState(!narrow)
   useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
@@ -88,6 +89,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     void load(sessionId)
+    setActiveSpan(null)
+    setHoveredSpan(null)
     useTranslation.getState().reset()
   }, [sessionId, load])
 
@@ -151,6 +154,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e)) setActiveSpan(null)
       // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -207,10 +211,10 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       if (target) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
-          setActiveSpan((prev) => (prev === idx ? null : idx))
+          setActiveSpan(idx)
           openRail()
         }
-      }
+      } else setActiveSpan(null)
     },
     [undoDeletion, openRail],
   )
@@ -228,7 +232,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         e.preventDefault()
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
-          setActiveSpan((prev) => (prev === idx ? null : idx))
+          setActiveSpan(idx)
           openRail()
         }
       }
@@ -260,6 +264,13 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     }
   }, [activeCardSpan, analysis])
 
+  useEffect(() => {
+    const doc = articleRef.current
+    if (!doc) return
+    doc.querySelectorAll('.critic.paired').forEach((element) => element.classList.remove('paired'))
+    if (hoveredSpan !== null) doc.querySelector(`.critic[data-span-index="${hoveredSpan}"]`)?.classList.add('paired')
+  }, [hoveredSpan, analysis])
+
   if (status === 'error') {
     return (
       <div className="center-note">
@@ -284,6 +295,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       docRef={articleRef}
       authorTag={authorTag}
       activeSpan={activeCardSpan}
+      hoveredSpan={hoveredSpan}
+      onHover={setHoveredSpan}
       onActivate={setActiveSpan}
       onEdit={(edits) => {
         const current = useDoc.getState()
@@ -336,7 +349,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
               </Suspense>
             )}
             {mode === 'reading' && !showTranslated && analysis && (
-              <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}>
+              <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
+                onPointerOver={(event) => {
+                  const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
+                  setHoveredSpan(target ? Number(target.dataset.spanIndex) : null)
+                }}
+                onPointerLeave={() => setHoveredSpan(null)}>
                 <MarkdownView
                   tree={analysis.tree}
                   ctx={{

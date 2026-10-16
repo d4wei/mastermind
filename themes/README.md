@@ -26,6 +26,7 @@
   selected font preset. `--md-block-gap` gives prose blocks one shared gap; `--md-heading-gap`
   separates sections. `--md-list-gap` and `--md-list-indent` keep list rhythm consistent.
 - Body: 16px base (`--font-size-body`, user-adjustable), line-height 1.6 for long-form; don't go below 14px (`--font-size-sm`); micro = 11px for labels only.
+- Comment cards use `--font-ui`, a system sans-serif stack independent of the reading font preset.
 - The home wordmark uses `--font-wordmark`, a fixed system monospace stack, so changing code fonts
   does not change the block glyphs.
 - Mono: also user-selectable (`--font-mono`) — **Geist Mono** (default), JetBrains Mono, Spline Sans Mono, Ubuntu Sans Mono — for filenames, code, CriticMarkup source.

@@ -64,7 +64,9 @@ Font presets and the reader's size and line-height settings remain independent o
 
 Each discussion has one interactive document target. Commented passages use a dotted underline and
 an active or hover fill. Only unanchored discussions have a diamond, one per discussion rather than
-per reply. Search results for any reply navigate to that same visible target. Hidden comment
+per reply. Hover connects the passage and card without moving either; selection expands the
+[anchored compact discussion](../review/comment-rail.md). Search results for any reply navigate to
+that same visible target. Hidden comment
 references remain available to print footnote numbering. Standalone
 highlights render as plain text; insertions, deletions, and replacements retain edit styling.
 

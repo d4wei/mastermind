@@ -289,12 +289,7 @@ button:disabled {
 }
 
 .doc-shell.with-rail {
-  /* The rail claims up to 320px out of the right gutter. While that gutter is
-     wider than the rail (wide / superwide screens), the right column stays 1fr —
-     the SAME as the no-rail right gutter — so toggling comments doesn't move the
-     centered content. It only shifts left on mid widths where the rail can't fit
-     otherwise. The content↔rail gap is .rail's padding, not column-gap, because
-     column-gap would also offset the content column. */
+  /* Preserve a centered document while the right gutter can accommodate comments. */
   grid-template-columns: minmax(0, 1fr) minmax(auto, var(--content-max-width)) minmax(320px, 1fr);
 }
 
@@ -316,84 +311,100 @@ button:disabled {
 
 .rail-card {
   position: absolute;
-  width: 300px;
+  width: min(300px, calc(100% - var(--space-unit) * 9));
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 3);
+  font-family: var(--font-ui);
   font-size: var(--font-size-sm);
-  transition:
-    top 160ms ease,
-    border-color var(--dur-fast) ease;
-  cursor: pointer;
+  transition: top var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease;
 }
 
-.rail-card.active {
-  border-color: var(--color-accent-dim);
-  box-shadow: 0 0 0 1px var(--color-accent-dim);
+.rail-card.active, .rail-card.paired {
+  border-color: var(--review-comment-anchor);
 }
 
+.rail-message-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-unit);
+  margin-bottom: var(--space-unit);
+}
+.rail-message-header > .rail-author, .rail-select { flex: 1; min-width: 0; }
+.rail-select {
+  font: inherit;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+  color: var(--color-text);
+  border-radius: var(--radius-xs);
+}
+.rail-message-header .rail-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-unit);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-muted);
+}
 .rail-card-anchor {
   color: var(--color-text-muted);
   font-size: var(--font-size-micro);
-  margin-bottom: calc(var(--space-unit) * 2);
-  overflow: hidden;
+  margin: calc(var(--space-unit) * 2) 0;
+  padding-left: calc(var(--space-unit) * 2);
+  border-left: 2px solid var(--color-border);
+  overflow-wrap: anywhere;
   white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.rail-comment {
-  margin-bottom: calc(var(--space-unit) * 2);
+.rail-comment-reply {
+  margin-top: calc(var(--space-unit) * 3);
+  padding-top: calc(var(--space-unit) * 2);
+  border-top: 1px solid var(--color-border);
 }
-
 .rail-author {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-micro);
-  letter-spacing: var(--ls-label);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
-
 .rail-body {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   line-height: var(--lh-snug);
-  margin-top: 2px;
 }
-
 .rail-actions {
   display: flex;
   justify-content: flex-end;
-  gap: calc(var(--space-unit) * 1);
-  margin-top: calc(var(--space-unit) * 1);
+  gap: var(--space-unit);
+  margin-top: calc(var(--space-unit) * 2);
 }
-
 .rail-actions button {
   background: transparent;
   border: none;
   border-radius: var(--radius-xs);
   color: var(--color-text-muted);
+  font: inherit;
   font-size: var(--font-size-micro);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
-  min-height: 26px;
+  padding: var(--space-unit) calc(var(--space-unit) * 1.5);
+  min-height: calc(var(--space-unit) * 7);
 }
-
-
-
-.rail-actions button.primary {
-  color: var(--color-accent-dim);
-}
-
+.rail-footer { justify-content: flex-start; }
+.rail-actions button.primary { color: var(--color-accent-dim); }
+.rail-reply { margin-top: calc(var(--space-unit) * 3); }
 .rail-reply textarea {
   width: 100%;
   resize: vertical;
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--font-size-sm);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: calc(var(--space-unit) * 1.5);
+  padding: calc(var(--space-unit) * 2);
   color: var(--color-text);
 }
 
@@ -750,8 +761,10 @@ mark.critic-hl.critic-anchor {
 }
 
 mark.critic-hl.critic-anchor.active,
+mark.critic-hl.critic-anchor.paired,
 mark.critic-hl.critic-anchor:hover,
 .critic-comment-marker.active,
+.critic-comment-marker.paired,
 .critic-comment-marker:hover {
   background: var(--review-comment-active-bg);
 }
@@ -1318,13 +1331,12 @@ input[type='checkbox'] {
 
 @media (max-width: 1180px) {
   .doc-shell.with-rail {
-    /* tighter gutters so the narrower rail still fits; .rail padding-left (24) +
-       card (248) = the 272 min on the right column. */
+    /* Narrower side cards leave more space for document text before the panel breakpoint. */
     grid-template-columns: minmax(0, 0.2fr) minmax(280px, var(--content-max-width)) minmax(272px, 1fr);
   }
 
   .rail-card {
-    width: 248px;
+    width: min(248px, calc(100% - var(--space-unit) * 9));
   }
 }
 
@@ -1403,15 +1415,6 @@ input[type='checkbox'] {
     transform: translateY(0) scale(1);
   }
 }
-@keyframes mm-card-flash {
-  from {
-    background: var(--color-accent-surface);
-  }
-  to {
-    background: var(--color-bg-elevated);
-  }
-}
-
 @keyframes mm-pop-out {
   from {
     opacity: 1;
@@ -1422,28 +1425,6 @@ input[type='checkbox'] {
     transform: translateY(10px) scale(0.94);
   }
 }
-/* comment cards live in the right rail, so they arrive from / depart toward it */
-@keyframes mm-rail-in {
-  from {
-    opacity: 0;
-    transform: translateX(22px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-@keyframes mm-rail-out {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(28px) scale(0.93);
-  }
-}
-
 /* entrances on discrete events (each element mounts on its trigger, so no replay) */
 /* the comment toolbar rises out of the selection it's anchored above */
 .sel-toolbar {
@@ -1455,23 +1436,6 @@ input[type='checkbox'] {
   animation: mm-pop-out var(--dur-fast) var(--ease-standard) forwards;
   pointer-events: none;
 }
-/* a comment thread slides in when added/loaded, and back out when resolved;
-   cards stagger in via --enter-delay (set per-card) so a full rail cascades */
-.rail-card {
-  transform-origin: right center;
-  animation: mm-rail-in var(--dur-slow) var(--ease-out) both;
-  animation-delay: var(--enter-delay, 0ms);
-}
-.rail-card.leaving {
-  animation: mm-rail-out var(--dur-base) var(--ease-standard) forwards;
-  animation-delay: 0ms;
-  pointer-events: none;
-}
-/* comment-thread activation: the landed card flashes the accent wash, then settles */
-.rail-card.active {
-  animation: mm-card-flash var(--dur-slow) var(--ease-out);
-}
-
 /* the segmented active state eases between options (view-mode, Files/Outline, presets) */
 .seg-btn {
   transition:
@@ -1511,10 +1475,10 @@ input[type='checkbox'] {
   .sel-toolbar,
   .sel-toolbar.closing,
   .rail-card,
-  .rail-card.leaving,
   .rail-card.active {
     animation: none;
   }
+  .rail-card,
   .seg-btn,
   .btn-cta,
   .sel-toolbar > button {
@@ -1788,7 +1752,7 @@ input[type='checkbox'] {
   background: var(--color-invert-bg-elevated);
   color: var(--color-invert-text);
 }
-.rail-card:hover:not(.active) { border-color: var(--color-border-hover); }
+.rail-card:hover:not(.active):not(.paired) { border-color: var(--color-border-hover); }
 .settings-check:hover:not(:disabled):not([data-state='checked']) { background: var(--color-control-hover); }
 @media print { .notification-stack { display: none; } }
 

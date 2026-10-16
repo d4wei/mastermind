@@ -26,14 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-15 — Comment-card design
-
-**Open question.** Compare a compact card, a margin note, and a conversation layout before replacing
-the existing comment sidebar. The treatments and interaction references are in
-[reading and review refinement](docs/reading-and-review.md).
-
-**Exit:** a selected treatment ships, with its semantics recorded beside the comment renderer.
-
 ## 2026-10-14 — Native file picker latency
 
 **Deferral.** macOS panel creation and sheet presentation dominate the observed delay. Retaining

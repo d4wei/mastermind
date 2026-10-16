@@ -1,4 +1,5 @@
 [data-theme='sepia'] {
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-wordmark: ui-monospace, SFMono-Regular, Menlo, monospace;
   --md-block-gap: var(--font-size-body);
   --md-heading-gap: calc(var(--font-size-body) * 1.5);

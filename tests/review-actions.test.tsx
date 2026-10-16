@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 /// <reference types="vite/client" />
-import { act, useRef } from 'react'
+import { act, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import type { TextEdit } from '../document/types'
 import { createDocStore } from '../ui/documents/store'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { parseResolvedThreads } from '../document/review-archive'
+import * as reviewScroll from '../ui/util/scroll'
 import { CommentRail } from '../ui/review/CommentRail'
 
 let host: HTMLDivElement
@@ -16,11 +17,12 @@ let activate: ReturnType<typeof vi.fn<(spanIndex: number | null) => void>>
 let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => void>>
 
 function Harness() {
+  const [active, setActive] = useState<number | null>(null)
   const source = store((state) => state.source)
   const analysis = analyzeMarkdown(source)
   const docRef = useRef<HTMLElement>(null)
   return <><article ref={docRef} /><CommentRail source={source} items={analysis.items} spans={analysis.spans}
-    docRef={docRef} authorTag="reviewer" activeSpan={null} onActivate={activate} onEdit={edit} /></>
+    readOnly={store((state) => state.conflict)} docRef={docRef} authorTag="reviewer" activeSpan={active} onActivate={(index) => { activate(index); setActive(index) }} onEdit={edit} /></>
 }
 
 beforeEach(() => {
@@ -47,7 +49,13 @@ function render(source: string) {
   act(() => root.render(<Harness />))
 }
 function click(label: string, index = 0) {
-  const buttons = Array.from(host.querySelectorAll('button')).filter((button) => button.textContent === label)
+  if (label === 'Delete comment') {
+    const trigger = host.querySelectorAll<HTMLButtonElement>('[aria-label="More"]')[index]!
+    act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+    act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
+    return
+  }
+  const buttons = Array.from(host.querySelectorAll('button')).filter((button) => button.textContent === label || button.getAttribute('aria-label') === label)
   act(() => buttons[index]!.click())
 }
 
@@ -82,20 +90,20 @@ it('resolves the complete thread into the archive and undo restores exact bytes'
   expect(store.getState().source).toBe(source)
 })
 
-it('keyboard focus activates the anchor without making the card a button', () => {
-  render('{>>@Da Wei: note<<}')
-  const button = host.querySelector<HTMLButtonElement>('.rail-delete')!
+it('uses a keyboard disclosure inside the group without making descendants presentational', () => {
+  render('{>>@Alex: note<<}{>>@Sam: reply<<}')
+  const button = host.querySelector<HTMLButtonElement>('.rail-select')!
   const card = host.querySelector<HTMLElement>('.rail-card')!
   expect(card.getAttribute('role')).toBe('group')
   expect(card.hasAttribute('tabindex')).toBe(false)
   expect(host.querySelector('[role="button"] button')).toBeNull()
   act(() => button.focus())
-  expect(activate).toHaveBeenCalledWith(0)
-  activate.mockClear()
-  act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
   expect(activate).not.toHaveBeenCalled()
-  click('Delete comment')
-  expect(store.getState().source).toBe('')
+  expect(button.getAttribute('aria-expanded')).toBe('false')
+  act(() => button.click())
+  expect(activate).toHaveBeenCalledWith(0)
+  expect(button.getAttribute('aria-expanded')).toBe('true')
+  expect(host.querySelectorAll('.rail-comment')).toHaveLength(2)
 })
 
 it('refuses resolution when an unterminated tail would hide the archive', () => {
@@ -107,26 +115,13 @@ it('refuses resolution when an unterminated tail would hide the archive', () => 
   expect(host.querySelector('[role="alert"]')!.textContent).toContain('unterminated')
 })
 
-it('each thread control remains focusable and activates its own anchor', () => {
-  const source = '{==first==}{>>@Da Wei: one<<} {==second==}{>>@reviewer: two<<}'
-  render(source)
-  const analysis = analyzeMarkdown(source)
-  const threads = analysis.items.filter((item) => item.type === 'thread')
-  const cards = host.querySelectorAll('.rail-card')
-  cards.forEach((card, index) => {
-    const anchor = threads[index]!.anchor!
-    const spanIndex = analysis.spans.indexOf(anchor)
-    const controls = card.querySelectorAll<HTMLButtonElement>('button')
-    expect(Array.from(controls, (control) => control.textContent)).toEqual([
-      'Delete comment', 'Reply', 'Resolve',
-    ])
-    controls.forEach((control) => {
-      expect(control.closest('[role="button"]')).toBeNull()
-      act(() => control.focus())
-      expect(document.activeElement).toBe(control)
-      expect(activate).toHaveBeenLastCalledWith(spanIndex)
-    })
-  })
+it('keeps opening comments readable and hides replies until their count is selected', () => {
+  render('{==first==}{>>@Alex: one<<}{>>@Sam: answer<<} {==second==}{>>@Sam: two<<}')
+  expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['one', 'two'])
+  click('1 reply')
+  expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['one', 'answer', 'two'])
+  click('Collapse discussion')
+  expect(host.querySelectorAll('.rail-comment-reply')).toHaveLength(0)
   expect(edit).not.toHaveBeenCalled()
 })
 
@@ -169,4 +164,74 @@ it('keeps the reply draft and ignores submit while the IME handles keys', () => 
   expect(edit).not.toHaveBeenCalled()
   act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
   expect(store.getState().source).toContain('{>>@reviewer: Existing reply<<}')
+})
+
+it('retains separate reply drafts when collapsing and switching discussions', () => {
+  render('{==first==}{>>@Alex: one<<} {==second==}{>>@Sam: two<<}')
+  click('Reply', 0)
+  const type = (value: string) => act(() => {
+    const input = host.querySelector('textarea')!
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  type('First unfinished reply')
+  click('Reply', 1)
+  expect(host.querySelector('textarea')!.value).toBe('')
+  type('Second unfinished reply')
+  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(host.querySelector('textarea')).toBeNull()
+  click('Reply', 0)
+  expect(host.querySelector('textarea')!.value).toBe('First unfinished reply')
+  click('Reply', 1)
+  expect(host.querySelector('textarea')!.value).toBe('Second unfinished reply')
+  expect(edit).not.toHaveBeenCalled()
+})
+
+it('keeps hover separate from selection and never changes card positions on hover', () => {
+  render('{==first==}{>>@Alex: one<<}{>>@Sam: answer<<}')
+  const card = host.querySelector<HTMLElement>('.rail-card')!
+  const top = card.style.top
+  act(() => card.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+  expect(activate).not.toHaveBeenCalled()
+  expect(card.style.top).toBe(top)
+  expect(card.querySelectorAll('.rail-body')).toHaveLength(1)
+})
+
+it('preserves the expanded thread and reading position after appending a reply', () => {
+  const reveal = vi.spyOn(reviewScroll, 'revealRange')
+  render('{==context==}{>>@Alex: question<<}')
+  click('Reply')
+  const input = host.querySelector('textarea')!
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'Answer')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const card = host.querySelector('.rail-card')!
+  click('Reply')
+  expect(host.querySelector('.rail-card')).toBe(card)
+  expect(host.querySelectorAll('.rail-body')).toHaveLength(2)
+  expect(host.querySelector('textarea')).toBeNull()
+  expect(host.querySelector('.rail-select')!.getAttribute('aria-expanded')).toBe('true')
+  act(() => vi.advanceTimersByTime(40))
+  expect(reveal).not.toHaveBeenCalled()
+  reveal.mockRestore()
+})
+
+it('retains the draft but disables mutation if a conflict arrives while replying', () => {
+  render('{>>@Alex: question<<}')
+  click('Reply')
+  const textarea = host.querySelector('textarea')!
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Keep this draft')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  act(() => store.setState({ conflict: true }))
+  expect(textarea.readOnly).toBe(true)
+  expect(textarea.value).toBe('Keep this draft')
+  click('Reply')
+  click('Resolve')
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  click('Delete comment')
+  expect(edit).not.toHaveBeenCalled()
+  expect(store.getState().source).toBe('{>>@Alex: question<<}')
 })

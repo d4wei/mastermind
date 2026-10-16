@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Keep compact discussions anchored to their passages
+
+**Ruled.** Use compact cards with readable opening comments and collapsed replies. Selecting a
+passage or card expands its discussion near the passage, arranging neighbors without overlap in
+source order. Hover only emphasizes the connection. Preserve unfinished replies when collapsing
+or switching discussions; selection is transient interaction, not a discussion status.
+
+**Beat:** shrinking neighboring comments, which reduces readability in sparse documents, and a
+fixed stack with connectors, which can separate a discussion too far from its passage.
+
 ## 2026-10-15 — Suggest changes through replacement text
 
 **Ruled.** The selection action is Suggest change. Editing the selected text proposes a replacement;

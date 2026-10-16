@@ -27,12 +27,6 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
 }
-.rail-comment .rail-delete {
-  margin-top: var(--space-unit);
-  font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
-}
-
 .rail-resolution-error {
   position: relative;
   z-index: var(--z-rail);

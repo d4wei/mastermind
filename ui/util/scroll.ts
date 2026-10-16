@@ -75,3 +75,18 @@ export function scrollToSpan(doc: RefObject<HTMLElement | null>, spanIndex: numb
 export function scrollToOffset(doc: RefObject<HTMLElement | null>, offset: number): Element | null {
   return scrollElementToTop(doc.current?.querySelector(`[data-ps="${offset}"]`) ?? null)
 }
+
+/** Reveal only the missing edge; already-visible targets must not move the reading position. */
+export function revealRange(top: number, bottom: number): void {
+  const viewport = documentViewport()
+  const visibleTop = readingLine()
+  const visibleBottom = viewport.top + viewport.height
+  if (top < visibleTop) smoothScrollTo(viewport.scrollTop + top - visibleTop)
+  else if (bottom > visibleBottom) smoothScrollTo(viewport.scrollTop + bottom - visibleBottom)
+}
+
+export function revealElement(element: Element | null, headerOnly = false): void {
+  if (!element) return
+  const rect = element.getBoundingClientRect()
+  revealRange(rect.top, headerOnly ? Math.min(rect.bottom, rect.top + 48) : rect.bottom)
+}

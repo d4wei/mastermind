@@ -11,9 +11,12 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
 
-const rail = vi.hoisted(() => ({ onEdit: null as null | ((edits: TextEdit[]) => void) }))
-vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edits: TextEdit[]) => void }) => {
+const rail = vi.hoisted(() => ({ active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void) }))
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void }) => {
   rail.onEdit = props.onEdit
+  rail.active = props.activeSpan
+  rail.hovered = props.hoveredSpan
+  rail.onHover = props.onHover
   return <div data-testid="rail" />
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
@@ -119,4 +122,33 @@ it('scrolls the article and wide comment rail together, with controls and panels
   act(() => readerMenuItem('Resolved (0)').click())
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
   expect(viewport.querySelector('[role="dialog"]')).toBeNull()
+})
+
+it('pairs passage and card hover without selecting a discussion', () => {
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  const passage = host.querySelector<HTMLElement>('.critic-anchor')!
+  act(() => passage.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+  expect(rail.hovered).toBe(0)
+  expect(rail.active).toBeNull()
+  expect(passage.classList.contains('paired')).toBe(true)
+  act(() => rail.onHover!(null))
+  expect(passage.classList.contains('paired')).toBe(false)
+  act(() => rail.onHover!(0))
+  expect(passage.classList.contains('paired')).toBe(true)
+  expect(rail.active).toBeNull()
+})
+
+it('selects from the passage and clears selection on ordinary document clicks or Escape', () => {
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  const passage = host.querySelector<HTMLElement>('.critic-anchor')!
+  act(() => passage.click())
+  expect(rail.active).toBe(0)
+  act(() => passage.click())
+  expect(rail.active).toBe(0)
+  act(() => host.querySelector('article p')!.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(rail.active).toBeNull()
+  act(() => passage.click())
+  expect(rail.active).toBe(0)
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  expect(rail.active).toBeNull()
 })
