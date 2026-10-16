@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { markEdits, type SelRange } from '../ui/modes/reading/selection'
-import { commentEdits } from '../ui/modes/reading/marks'
+import { commentEdits, changeEdits } from '../ui/modes/reading/marks'
 import { applyTextEdits } from '../document/edits'
 import { scan, group } from '../document/critic/scanner'
 
@@ -49,4 +49,25 @@ describe('markEdits — cross-block marks round-trip', () => {
     const one: SelRange[] = [{ from: 6, to: 15, text: 'paragraph' }]
     expect(applyTextEdits(SOURCE, markEdits(one, (s) => `{==${s}==}`))).toBe('First {==paragraph==}.\n\nSecond paragraph.')
   })
+})
+
+it('changes selected fragments independently and leaves their source gaps intact', () => {
+  const edits = changeEdits(CROSS, ['section.', ''])!
+  const out = applyTextEdits(SOURCE, edits)
+  expect(out).toBe('First {~~paragraph.~>section.~~}\n\n{--Second paragraph--}.')
+  expect(scan(out).map((span) => span.kind)).toEqual(['sub', 'del'])
+  expect(changeEdits(CROSS, CROSS.map((range) => range.text))).toEqual([])
+})
+
+it.each(['new\n\nparagraph', 'new~~} escape', '{++nested++}'])(
+  'rejects unrepresentable replacement text without changing it: %s', (replacement) => {
+    expect(changeEdits([CROSS[0]!], [replacement])).toBeNull()
+  },
+)
+
+it('preserves replacement Markdown and Chinese text byte for byte', () => {
+  const replacement = '**新的内容**，包括 `code`。'
+  expect(changeEdits([CROSS[0]!], [replacement])).toEqual([
+    { from: 6, to: 16, insert: `{~~paragraph.~>${replacement}~~}` },
+  ])
 })

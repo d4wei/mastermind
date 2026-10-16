@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { CriticSpan } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
 import { useT } from '../../i18n'
-import { ChatIcon, StrikethroughIcon } from '../../icons'
+import { ChatIcon, PencilIcon } from '../../icons'
 import { usePresence } from '../../util/presence'
 import { useCompositionGuard } from '../../util/composition'
-import { rangeToSourceRanges, markEdits, type SelRange } from './selection'
+import { rangeToSourceRanges, type SelRange } from './selection'
 import { documentViewport } from '../../util/scroll'
-import { commentEdits, deletionWrap } from './marks'
+import { commentEdits, changeEdits } from './marks'
 
 const EXIT_MS = 120
 
@@ -21,7 +21,7 @@ interface Props {
 }
 
 interface Active {
-  /** one source range per block the selection spans (≥1, in document order) */
+  /** Editable fragments in source order; existing marks and unmappable text stay outside them. */
   ranges: SelRange[]
   rect: { top: number; left: number; width: number }
 }
@@ -30,10 +30,13 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const t = useT()
   const ime = useCompositionGuard()
   const [active, setActive] = useState<Active | null>(null)
-  const [composing, setComposing] = useState(false)
+  const [composing, setComposing] = useState<'comment' | 'change' | null>(null)
+  const [replacements, setReplacements] = useState<string[]>([])
   const [comment, setComment] = useState('')
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [toolbarHeight, setToolbarHeight] = useState(44)
   const composingRef = useRef(false)
-  composingRef.current = composing
+  composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
 
   useEffect(() => {
@@ -75,7 +78,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       if (e.key === 'Escape') {
         // Leave Escape to active settings or dialog overlays.
         if (document.querySelector('.settings-panel')) return
-        setComposing(false)
+        setComposing(null)
         setComment('')
         setActive(null)
       }
@@ -103,9 +106,17 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     }
   }, [active])
 
-  // keep the toolbar mounted through its leave animation; render against the
-  // last live selection so position/contents hold steady while it fades out.
+  // Preserve the last position while the toolbar exits.
   const present = usePresence(!!active, EXIT_MS)
+  useLayoutEffect(() => {
+    const toolbar = toolbarRef.current
+    if (!toolbar) return
+    const measure = () => setToolbarHeight(toolbar.getBoundingClientRect().height || 44)
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(toolbar)
+    return () => observer?.disconnect()
+  }, [present.mounted, composing])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
   if (!present.mounted || !view) return null
@@ -115,42 +126,53 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     onEdit(edits)
     window.getSelection()?.removeAllRanges()
     setActive(null)
-    setComposing(false)
+    setComposing(null)
     setComment('')
   }
-  // a deletion can't cross a block boundary, so a multi-block selection becomes
-  // one `{--…--}` per block.
-  const applyDeletion = (): void => finish(markEdits(view.ranges, deletionWrap))
-  const applyComment = (): void => finish(commentEdits(view.ranges, authorTag, comment))
+  const changes = composing === 'change' ? changeEdits(view.ranges, replacements) : []
+  const canSubmit = !readOnly && (composing === 'comment' ? !!comment.trim() : !!changes?.length)
+  const submit = (): void => {
+    if (!canSubmit) return
+    finish(composing === 'comment' ? commentEdits(view.ranges, authorTag, comment) : changes!)
+  }
+  const composerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit()
+    else if (e.key === 'Escape') {
+      setComposing(null)
+      setComment('')
+      setActive(null)
+    }
+    e.stopPropagation()
+  }
 
-  const top = Math.max(8, view.rect.top - (composing ? 150 : 44))
+  const top = Math.max(8, Math.min(view.rect.top - toolbarHeight - 8, window.innerHeight - toolbarHeight - 8))
   const left = Math.min(Math.max(8, view.rect.left + view.rect.width / 2 - 130), window.innerWidth - 280)
 
   return (
-    <div
+    <div ref={toolbarRef}
       className={`sel-toolbar${present.exiting ? ' closing' : ''}`}
       style={{ top, left }}
       onMouseDown={(e) => {
-        // keep the document selection alive while clicking toolbar buttons,
-        // but never steal the caret from the composer's own textarea
+        // Preserve the document selection without stealing the composer caret.
         if ((e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault()
       }}
     >
       {!composing ? (
         <>
-          <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>
+          <button type="button" disabled={readOnly} onClick={() => setComposing('comment')}>
             <ChatIcon width={13} height={13} />
             {t('comment')}
           </button>
-          <button type="button" disabled={readOnly} onClick={applyDeletion}>
-            <StrikethroughIcon width={13} height={13} />
-            {t('suggestDeletion')}
+          <button type="button" disabled={readOnly} onClick={() => { setReplacements(view.ranges.map((range) => range.text)); setComposing('change') }}>
+            <PencilIcon width={13} height={13} />
+            {t('suggestChange')}
           </button>
         </>
       ) : (
         <div className="sel-composer">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
-          <textarea readOnly={readOnly}
+          {composing === 'comment' ? <textarea readOnly={readOnly}
             autoFocus
             ref={ime.textareaRef}
             onCompositionStart={ime.onCompositionStart}
@@ -161,24 +183,26 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
             title={t('commentHint')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => {
-              if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
-              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && comment.trim()) {
-                applyComment()
-              } else if (e.key === 'Escape') {
-                setComposing(false)
-                setComment('')
-                setActive(null)
-              }
-              e.stopPropagation()
-            }}
-          />
+            onKeyDown={composerKey}
+          /> : <>
+            <p>{t('changeHint')}</p>
+            {replacements.map((replacement, index) => <label key={index}>
+              {t('replacement')}{replacements.length > 1 ? ` ${index + 1}` : ''}
+              <textarea autoFocus={index === 0} readOnly={readOnly} rows={3}
+                ref={ime.textareaRef} onCompositionStart={ime.onCompositionStart}
+                onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
+                value={replacement} onChange={(event) => setReplacements((current) =>
+                  current.map((value, i) => i === index ? event.target.value : value))}
+                onKeyDown={composerKey} />
+            </label>)}
+            {changes === null && <p role="alert">{t('changeInvalid')}</p>}
+          </>}
           <div className="sel-composer-actions">
-            <button type="button" onClick={() => setComposing(false)}>
+            <button type="button" onClick={() => setComposing(null)}>
               {t('cancel')}
             </button>
-            <button type="button" className="primary" disabled={readOnly || !comment.trim()} onClick={applyComment}>
-              {t('comment')}
+            <button type="button" className="primary" disabled={!canSubmit} onClick={submit}>
+              {t(composing === 'comment' ? 'comment' : 'suggestChange')}
             </button>
           </div>
         </div>

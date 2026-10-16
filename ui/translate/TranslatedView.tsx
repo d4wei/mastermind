@@ -54,7 +54,7 @@ function TransBlock({ block, translated }: { block: TranslationBlock; translated
   const analysis = useMemo(() => analyzeMarkdown(shown), [shown])
   return <div className="trans-block">
     <div className="trans-block-body md-root" data-trans-block-id={block.translatable ? block.id : undefined}>
-      <MarkdownView tree={analysis.tree} ctx={{ source: shown, highlightCode }} />
+      <MarkdownView tree={analysis.tree} ctx={{ source: shown, reviewSpans: analysis.spans, highlightCode }} />
     </div>
   </div>
 }

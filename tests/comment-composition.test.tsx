@@ -27,7 +27,7 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
-async function compose() {
+async function compose(action = 'Comment') {
   act(() => root.render(<Harness />))
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('span')!)
@@ -35,7 +35,7 @@ async function compose() {
   window.getSelection()!.addRange(range)
   act(() => document.dispatchEvent(new Event('selectionchange')))
   await act(async () => vi.advanceTimersByTimeAsync(120))
-  act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
+  act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((b) => b.textContent === action)!.click())
   const textarea = host.querySelector('textarea')!
   act(() => {
     inputValue(textarea, 'Existing draft')
@@ -111,4 +111,33 @@ it('retains an unsubmitted comment when editing pauses and prevents submit', asy
   expect(textarea.value).toBe('Existing draft')
   act(() => root.render(<Harness />))
   expect(textarea.readOnly).toBe(false)
+})
+
+it('prefills a replacement and submits a substitution, or a deletion when cleared', async () => {
+  await compose('Suggest change')
+  const textarea = host.querySelector('textarea')!
+  act(() => inputValue(textarea, '新段落'))
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).toHaveBeenLastCalledWith([{ from: 0, to: 7, insert: '{~~Passage~>新段落~~}' }])
+  await compose('Suggest change')
+  act(() => inputValue(host.querySelector('textarea')!, ''))
+  act(() => host.querySelector<HTMLButtonElement>('.primary')!.click())
+  expect(edit).toHaveBeenLastCalledWith([{ from: 0, to: 7, insert: '{--Passage--}' }])
+})
+
+it('keeps change drafts during IME and blocks unchanged, invalid, or paused submissions', async () => {
+  const textarea = await compose('Suggest change')
+  act(() => inputValue(textarea, 'Passage'))
+  expect(host.querySelector<HTMLButtonElement>('.primary')!.disabled).toBe(true)
+  act(() => inputValue(textarea, 'broken~~}'))
+  expect(host.querySelector('[role="alert"]')).not.toBeNull()
+  expect(host.querySelector<HTMLButtonElement>('.primary')!.disabled).toBe(true)
+  act(() => inputValue(textarea, '候选'))
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
+  act(() => root.render(<Harness readOnly />))
+  expect(textarea.value).toBe('候选')
+  expect(textarea.readOnly).toBe(true)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate } from '../app/route'
 import { useDoc } from '../documents/store'
@@ -36,6 +36,25 @@ export function NativeReviewer() {
   const documentState = useDoc()
   const id = documentState.sessionId
   const pills = useRef<HTMLElement>(null)
+  const openButton = useRef<HTMLButtonElement>(null)
+  const openBounds = useRef<DOMRect | null>(null)
+  const atHome = files.length === 0 && setupRequired === false
+  useLayoutEffect(() => {
+    const button = openButton.current
+    if (!button || setupRequired !== false) return
+    const next = button.getBoundingClientRect()
+    const previous = openBounds.current
+    if (previous && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      button.animate?.([
+        { transform: `translate(${previous.left - next.left}px, ${previous.top - next.top}px)` },
+        { transform: 'translate(0, 0)' },
+      ], { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' })
+    }
+    openBounds.current = next
+    const measure = () => { openBounds.current = button.getBoundingClientRect() }
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [atHome, setupRequired])
   const focusAfterClose = useRef<string | null | undefined>(undefined)
   const activePath = id === null ? undefined : files.find((file) => file.id === id)?.path
   useEffect(() => {
@@ -160,8 +179,9 @@ export function NativeReviewer() {
   const openLabel = chinese ? '打开文件…' : 'Open files…'
   return <>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
-      <button type="button" className="native-open" onClick={chooseFiles}
-        aria-label={openLabel} title={openLabel}><FileIcon /></button>
+      <button ref={openButton} type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
+        aria-label={openLabel} title={openLabel}><FileIcon />
+        {atHome && <span className="native-open-label">{openLabel}</span>}</button>
       <nav ref={pills} data-tauri-drag-region className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
         {files.map((file, index) => <div key={file.id}
           className={`native-file-pill${id === file.id ? ' active' : ''}`}>
@@ -203,8 +223,9 @@ export function NativeReviewer() {
         setSetupRequired(false)
       }} /> : <div className="center-note" role="status">
         {chinese ? '正在加载设置…' : 'Loading setup…'}
-      </div>} home={<div className="center-note"><h1>mastermind</h1>
+      </div>} home={<div className="native-home">
+      <pre className="native-wordmark" aria-label="mastermind" role="img">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄\n█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</pre>
       <p>{chinese ? '打开文件以开始审阅' : 'Open a file to start reviewing'}</p>
-      <button type="button" onClick={chooseFiles}>{openLabel}</button></div>} />
+    </div>} />
   </>
 }

@@ -92,12 +92,21 @@ it('keeps one snapshot in flight and ignores it after unmount', async () => {
 })
 
 it.each([[false, 'Open files…'], [true, '打开文件…']] as const)(
-  'opens the native dialog from the bar and home with language %s', async (chinese, label) => {
+  'has one open action and moves it from home to the bar with language %s', async (chinese, label) => {
     mocks.chinese = chinese
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+      ? { ...snapshot(), files: [] } : other(command))
     await mount()
-    const buttons = Array.from(host.querySelectorAll('button')).filter((item) => item.textContent === label || item.getAttribute('aria-label') === label)
-    expect(buttons).toHaveLength(2)
-    await act(async () => { buttons[0]!.click(); buttons[1]!.click() })
+    const open = button(label)
+    expect(host.querySelectorAll('.native-open')).toHaveLength(1)
+    expect(open.classList.contains('native-open-home')).toBe(true)
+    expect(host.querySelector('.native-wordmark')?.textContent).toContain('█▀▄▀█ ▄▀█')
+    await act(async () => open.click())
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
+    await poll()
+    expect(button(label)).toBe(open)
+    expect(open.classList.contains('native-open-home')).toBe(false)
+    await act(async () => open.click())
     expect(mocks.invoke.mock.calls.filter(([command]) => command === 'choose_files')).toHaveLength(2)
   },
 )
@@ -358,4 +367,22 @@ it('keeps editing locked when quit arrives during a file close', async () => {
   await act(async () => finishWindow(false))
   expect(host.inert).toBe(false)
   expect(mocks.invoke).toHaveBeenCalledWith('cancel_close')
+})
+
+it.each([false, true])('animates the shared open control unless reduced motion is %s', async (reduced) => {
+  const animate = vi.fn()
+  const original = HTMLElement.prototype.animate
+  HTMLElement.prototype.animate = animate
+  vi.stubGlobal('matchMedia', () => ({ matches: reduced }))
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [] } : other(command))
+  try {
+    await mount()
+    const open = button('Open files…')
+    animate.mockClear()
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
+    await poll()
+    expect(button('Open files…')).toBe(open)
+    expect(animate).toHaveBeenCalledTimes(reduced ? 0 : 1)
+  } finally { HTMLElement.prototype.animate = original }
 })

@@ -107,3 +107,36 @@
 }
 
 .native-file-attention { display: grid; place-items: center; padding: var(--space-unit); }
+
+.native-documents { min-height: calc(var(--space-unit) * 11.5); }
+.native-home {
+  position: absolute;
+  top: 38%;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  padding-inline: calc(var(--space-unit) * 4);
+}
+.native-wordmark {
+  font-family: var(--font-wordmark);
+  font-size: clamp(var(--font-size-micro), 2.2vw, var(--font-size-body));
+  line-height: 1;
+  letter-spacing: 0;
+  margin: 0;
+  color: var(--color-text);
+}
+.native-home p { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.native-open-home {
+  position: fixed;
+  top: 58%;
+  left: calc(50% - var(--space-unit) * 3.75);
+}
+.native-open-label {
+  position: absolute;
+  top: calc(100% + var(--space-unit) * 2);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

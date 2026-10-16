@@ -22,8 +22,12 @@
   heading weight, and letter spacing across themes. The registry owns the available presets and
   their families; [`ui/theme/fonts.ts`](../ui/theme/fonts.ts) supplies local assets and
   fallback stacks.
-- Default display (Grid): weight 800, line-height ~1.08, sentence case (the Swiss voice is weight + tight tracking, not caps), h1–h3.
+- Reading headings follow body-relative sizes (`--md-h1-size` through `--md-h6-size`) and the
+  selected font preset. `--md-block-gap` gives prose blocks one shared gap; `--md-heading-gap`
+  separates sections. `--md-list-gap` and `--md-list-indent` keep list rhythm consistent.
 - Body: 16px base (`--font-size-body`, user-adjustable), line-height 1.6 for long-form; don't go below 14px (`--font-size-sm`); micro = 11px for labels only.
+- The home wordmark uses `--font-wordmark`, a fixed system monospace stack, so changing code fonts
+  does not change the block glyphs.
 - Mono: also user-selectable (`--font-mono`) — **Geist Mono** (default), JetBrains Mono, Spline Sans Mono, Ubuntu Sans Mono — for filenames, code, CriticMarkup source.
 - Letterspacing: tight negative on display (−0.02em); +0.08em on the small mono eyebrow labels (`.settings-body h4`, `.ws-section-label`) — the one place ALL-CAPS remains. Buttons, toggles, toolbar verbs, and panel titles read in sentence case.
 
@@ -72,5 +76,6 @@ toolbar actions use the inverted surface and matching text, including composer a
 focus retains its own ring.
 
 Text links retain underlines, review marks retain semantic colors, and scrollbars retain their
-track treatment. Comment cards use a neutral border change so hovering does not resemble the
+track treatment. The document thumb uses `--document-scrollbar-size`, sits against the window edge,
+and hides when neither scrolling nor pointing at that edge. Comment cards use a neutral border change so hovering does not resemble the
 active anchored discussion. Hover changes do not move or resize controls.

@@ -189,7 +189,7 @@ Use **suggested edit / 修改建议** for an unaccepted insertion, deletion, or 
 protocol, proposed edit is an equivalent description rather than a different object.
 
 Use **Suggested edits / 修改建议** for the search filter over unaccepted edits.
-Keep **Accept / 接受**, **Reject / 拒绝**, and **Suggest deletion / 建议删除** as actions.
+Keep **Accept / 接受**, **Reject / 拒绝**, and **Suggest change / 建议修改** as actions.
 
 Example: “Find in suggested edits.” / “在修改建议中查找。”
 Technical `suggestion` and `CriticKind` need no rename. A UI-only edit proposal and a CriticMarkup

@@ -55,3 +55,23 @@ content areas.
 Regression tests cover both interface languages, overflow access, narrow comments, outline
 expansion and progress, and scroll clearance. The manual browser procedure lives in
 `tests/manual/review-interactions.md`.
+
+## Reading and review presentation
+
+Rendered headings scale with body text instead of viewport width. Prose blocks share a bottom gap;
+section headings add a larger top gap. Nested lists do not add a paragraph gap around themselves.
+Font presets and the reader's size and line-height settings remain independent of this rhythm.
+
+Each discussion has one interactive document target. Commented passages use a dotted underline and
+an active or hover fill. Only unanchored discussions have a diamond, one per discussion rather than
+per reply. Search results for any reply navigate to that same visible target. Hidden comment
+references remain available to print footnote numbering. Standalone
+highlights render as plain text; insertions, deletions, and replacements retain edit styling.
+
+Suggest change opens one Markdown replacement field per editable selected fragment. An empty field
+suggests deletion; an unchanged field emits no edit. Fragment boundaries preserve intervening marks,
+code, and block structure. Unrepresentable replacement text is rejected without sanitizing it.
+The composer retains IME handling and pauses submission while the file has a conflict.
+
+The document scrollbar reserves a constant width at the window edge. Its thumb appears while
+scrolling or pointing at that edge and hides after idle; hiding it does not shift the document.

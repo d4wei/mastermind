@@ -29,6 +29,21 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Suggest changes through replacement text
+
+**Ruled.** The selection action is Suggest change. Editing the selected text proposes a replacement;
+clearing it proposes deletion. Preserve separate editable fragments rather than spanning intervening
+marks or block boundaries with one suggestion.
+
+**Beat:** a deletion-only action that makes one edit kind the whole feature.
+
+## 2026-10-15 — Give each discussion one visible document target
+
+**Ruled.** An anchored discussion uses its underlined passage, with fill for active and hover
+states. Only an unanchored discussion needs a separate marker. Replies do not add markers of their own.
+
+**Beat:** simultaneously highlighting, underlining, and appending a diamond to the same passage.
+
 ## 2026-10-15 — Resolve file conflicts through explicit recovery actions
 
 **Ruled.** Pause editing only for the affected file and retain its local text. Offer Use incoming,

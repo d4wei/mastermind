@@ -52,7 +52,7 @@
   --content-max-width: 46rem; /* per-user overridable */
   --space-unit: 4px;
 
-  /* ---- Motion system (theme-invariant; consumed by transitions + Phase N) ---- */
+  /* ---- Motion system (theme-invariant) ---- */
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 120ms;
@@ -111,14 +111,8 @@ body {
   background: var(--color-selection, var(--color-accent-surface));
 }
 
-/* ---------- scrollbars ----------
-   One minimal, theme-aware scrollbar everywhere: a thin translucent pill that
-   floats inset from the edge (transparent border + padding-box clip), over a
-   transparent track. Color derives from --color-text so it adapts to each
-   theme's light/dark surface. WebKit/Blink get the rounded inset pill below;
-   Firefox (no ::-webkit-scrollbar support) gets the thin standard fallback.
-   The two are kept separate because declaring scrollbar-width in Blink would
-   suppress the ::-webkit-scrollbar customization. */
+/* Panel scrollbars use an inset thumb; the document scroller overrides it at the window edge.
+   Keep standard scrollbar-width out of WebKit/Blink, where it overrides custom pseudo-elements. */
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
@@ -485,48 +479,27 @@ button:disabled {
 
 /* ---------- markdown elements ---------- */
 
-.md-root h1,
-.md-root h2 {
+/* Body-relative sizes keep the hierarchy stable when text size changes. */
+.md-root :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--font-display);
   font-weight: var(--weight-bold);
-  text-transform: var(--display-transform, none);
-  line-height: var(--lh-display);
-  letter-spacing: var(--ls-heading);
-}
-
-.md-root h1 {
-  font-size: clamp(2rem, 3.6vw, 2.75rem);
-  margin: 0 0 calc(var(--space-unit) * 6);
-}
-
-.md-root h2 {
-  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
-  margin: calc(var(--space-unit) * 12) 0 calc(var(--space-unit) * 4);
-}
-
-.md-root h3 {
-  font-family: var(--font-display);
-  font-weight: var(--weight-bold);
-  text-transform: var(--display-transform, none);
-  font-size: clamp(1.25rem, 2vw, 1.5rem);
   line-height: var(--lh-title);
-  letter-spacing: var(--ls-title);
-  margin: calc(var(--space-unit) * 8) 0 calc(var(--space-unit) * 3);
+  letter-spacing: var(--ls-heading);
+  margin: var(--md-heading-gap) 0 var(--md-block-gap);
 }
-
-.md-root h4,
-.md-root h5,
-.md-root h6 {
-  font-family: var(--font-body);
-  font-weight: var(--weight-medium);
-  line-height: var(--lh-snug);
-  letter-spacing: var(--ls-normal);
-  margin: calc(var(--space-unit) * 6) 0 calc(var(--space-unit) * 2);
+.md-root h1 { font-size: var(--md-h1-size); }
+.md-root h2 { font-size: var(--md-h2-size); }
+.md-root h3 { font-size: var(--md-h3-size); }
+.md-root h4 { font-size: var(--md-h4-size); }
+.md-root h5 { font-size: var(--md-h5-size); }
+.md-root h6 { font-size: var(--md-h6-size); color: var(--color-text-muted); }
+.md-root :is(p, ul, ol, blockquote, table, pre) {
+  margin: 0 0 var(--md-block-gap);
 }
-
-.md-root p {
-  margin: calc(var(--space-unit) * 3) 0;
-}
+.md-root .md-frontmatter + :is(h1, h2, h3, h4, h5, h6),
+.md-root:not(.trans-block-body) > :first-child,
+.trans-view > .trans-block:first-child .md-root > :first-child { margin-top: 0; }
+.md-root:not(.trans-block-body) > :last-child { margin-bottom: 0; }
 
 .md-root strong {
   font-weight: var(--weight-medium);
@@ -594,7 +567,6 @@ button:disabled {
 }
 
 .md-root blockquote {
-  margin: calc(var(--space-unit) * 4) 0;
   padding: 0 0 0 calc(var(--space-unit) * 4);
   border-left: 2px solid var(--color-text-faint);
   color: var(--color-text-muted);
@@ -687,8 +659,7 @@ button:disabled {
 .md-root table {
   border-collapse: collapse;
   width: 100%;
-  margin: calc(var(--space-unit) * 4) 0;
-  font-size: var(--font-size-sm);
+  font-size: inherit;
 }
 
 .md-root th {
@@ -707,13 +678,15 @@ button:disabled {
 
 .md-root ul,
 .md-root ol {
-  margin: calc(var(--space-unit) * 3) 0;
-  padding-left: calc(var(--space-unit) * 6);
+  padding-left: var(--md-list-indent);
 }
 
-.md-root li {
-  margin: calc(var(--space-unit) * 1) 0;
-}
+.md-root li + li { margin-top: var(--md-list-gap); }
+.md-root li:has(> p) + li { margin-top: var(--md-block-gap); }
+.md-root li > :is(ul, ol) { margin-block: 0; }
+.md-root li > p { margin-bottom: var(--md-block-gap); }
+.md-root li > :last-child,
+.md-root blockquote > :last-child { margin-bottom: 0; }
 
 .md-root li.task-item {
   list-style: none;
@@ -770,12 +743,16 @@ mark.critic-hl {
 }
 
 mark.critic-hl.critic-anchor {
+  background: transparent;
+  padding: 0;
   border-bottom: 2px dotted var(--review-comment-anchor);
   cursor: pointer;
 }
 
 mark.critic-hl.critic-anchor.active,
-mark.critic-hl.critic-anchor:hover {
+mark.critic-hl.critic-anchor:hover,
+.critic-comment-marker.active,
+.critic-comment-marker:hover {
   background: var(--review-comment-active-bg);
 }
 
@@ -801,6 +778,8 @@ mark.critic-hl.critic-anchor:hover {
   font-family: var(--font-mono);
   font-size: 0.85em;
 }
+
+.critic-comment-reference { display: none; }
 
 .critic-comment-marker {
   color: var(--review-comment-anchor);
@@ -1691,15 +1670,16 @@ input[type='checkbox'] {
     counter-reset: mm-comment;
   }
 
-  .critic-comment-marker {
+  .critic-comment-reference { display: inline; }
+  .critic-comment-marker, .critic-comment-reference {
     counter-increment: mm-comment;
   }
 
-  .critic-comment-marker svg {
+  .critic-comment-marker svg, .critic-comment-reference svg {
     display: none;
   }
 
-  .critic-comment-marker::after {
+  .critic-comment-marker::after, .critic-comment-reference::after {
     content: counter(mm-comment);
     font-size: 0.7em;
     vertical-align: super;
@@ -1811,3 +1791,21 @@ input[type='checkbox'] {
 .rail-card:hover:not(.active) { border-color: var(--color-border-hover); }
 .settings-check:hover:not(:disabled):not([data-state='checked']) { background: var(--color-control-hover); }
 @media print { .notification-stack { display: none; } }
+
+.document-scroll::-webkit-scrollbar { width: var(--document-scrollbar-size); }
+.document-scroll::-webkit-scrollbar-thumb {
+  border: none;
+  background: transparent;
+}
+.document-scroll[data-scroll-active='true']::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text) 30%, transparent);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .document-scroll { scrollbar-color: transparent transparent; }
+  .document-scroll[data-scroll-active='true'] {
+    scrollbar-color: color-mix(in srgb, var(--color-text) 30%, transparent) transparent;
+  }
+}
+.sel-composer { max-height: min(60vh, calc(var(--space-unit) * 100)); overflow-y: auto; }
+.sel-composer label, .sel-composer p { font-size: var(--font-size-xs); margin: 0; }
+.sel-composer label { display: grid; gap: var(--space-unit); }

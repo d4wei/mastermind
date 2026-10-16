@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DocumentScroll } from './DocumentScroll'
 import { APP_NAME, DEFAULT_AUTHOR_TAG } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
@@ -111,17 +112,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
     [status, source, mode, showTranslated],
   )
-  const anchoredHighlights = useMemo(() => {
-    const set = new Set<number>()
-    if (!analysis) return set
-    for (const item of analysis.items) {
-      if (item.type === 'thread' && item.anchor) {
-        const idx = analysis.spans.indexOf(item.anchor)
-        if (idx >= 0) set.add(idx)
-      }
-    }
-    return set
-  }, [analysis])
+
 
   // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
   const outline = useMemo(
@@ -148,8 +139,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         const idx = analysis.spans.indexOf(item.span)
         if (idx >= 0) ticks.push({ spanIndex: idx, kind: item.span.kind as MarkTick['kind'] })
       } else if (item.type === 'highlight') {
-        // standalone highlights are no longer rendered (only comment anchors are),
-        // so they get no gutter tick.
+        // Standalone highlights render as plain text and have no gutter target.
       } else {
         const anchor = item.anchor ?? item.comments[0]?.span
         const idx = anchor ? analysis.spans.indexOf(anchor) : -1
@@ -264,9 +254,9 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     const doc = articleRef.current
     if (!doc) return
-    doc.querySelectorAll('.critic-anchor.active').forEach((el) => el.classList.remove('active'))
+    doc.querySelectorAll('.critic-anchor.active, .critic-comment-marker.active').forEach((el) => el.classList.remove('active'))
     if (activeCardSpan !== null) {
-      doc.querySelector(`.critic-anchor[data-span-index="${activeCardSpan}"]`)?.classList.add('active')
+      doc.querySelector(`.critic[data-span-index="${activeCardSpan}"]`)?.classList.add('active')
     }
   }, [activeCardSpan, analysis])
 
@@ -337,7 +327,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       {translation.error && <Notice key={translation.error}>
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </Notice>}
-      <div className="document-scroll">
+      <DocumentScroll>
         <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
           <div className="doc-column">
             {showTranslated && (
@@ -351,8 +341,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
                   tree={analysis.tree}
                   ctx={{
                     source,
+                    reviewSpans: analysis.spans,
                     onEdit: (edit) => applyEdits([edit]),
-                    anchoredHighlights,
                     highlightCode,
                     markLabels: {
                       deletion: t('markDeletion'),
@@ -383,7 +373,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           </div>
           {showRail && analysis && !showTranslated && !narrow && commentRail}
         </div>
-      </div>
+      </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (
         <div className="comments-panel">
           <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments">

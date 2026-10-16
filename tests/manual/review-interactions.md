@@ -14,8 +14,9 @@ reading view for the selection checks.
    Comment and submit a short message. Only the first markable source range becomes a highlighted
    comment anchor; the remaining selected ranges stay unchanged. Inspect Source to check the
    `{==…==}{>>…<<}` pair, then undo to restore the copy.
-3. **Cross-block deletions:** repeat that selection and choose Suggest deletion. Each markable range
-   gets its own deletion suggestion, without enclosing paragraph separators. Try selections from a
+3. **Cross-block changes:** repeat that selection and choose Suggest change. Each editable fragment
+   gets a replacement field. Edit one field and clear another to suggest replacement and deletion,
+   without enclosing paragraph separators. Unchanged fields produce no mark. Try selections from a
    paragraph into a list and from a list into the table as well. Existing marks and text that cannot
    be mapped safely to source may split or limit the ranges. An entirely unmarkable selection should
    not offer an actionable toolbar. Undo should restore the whole operation at once.
@@ -127,7 +128,7 @@ and Chinese interface labels, a translation language configured, and light and d
   and repeat. The revealed surface matches the current page background in both reading modes.
   File controls, outline, and open overlay panels stay fixed throughout scrolling and overscroll.
 - Hover paragraphs and move along their right edges: no section action menu should appear.
-  Select text instead and check that Comment and Suggest deletion remain available.
+  Select text instead and check that Comment and Suggest change remain available.
 
 ## File conflict recovery
 

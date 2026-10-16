@@ -74,3 +74,10 @@ and remaining platform checks live in [tools/desktop](../../tools/desktop/README
 
 [implicit-submit]:
   https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+
+## Empty home
+
+With no open files after onboarding, the home displays the two-line block-letter wordmark and one
+Open files control. The same button moves into the file toolbar when the first file opens, and
+returns home after the last file closes. Its position animation respects reduced motion. The native
+window drag area remains available in both states.

@@ -8,20 +8,22 @@ import type {
   Root,
   RootContent,
 } from 'mdast'
-import { Fragment, type ReactNode, createElement } from 'react'
+import { Fragment, type ReactNode, createElement, useMemo } from 'react'
 import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../../../document/markdown/critic-mdast'
 import { highlight } from './highlight'
 import { toggleTaskEdit } from '../../../document/markdown/tasklist'
 import type { TextEdit } from '../../../document/types'
+import { group } from '../../../document/critic/scanner'
+import { scanMarkdown } from '../../../document/markdown/scan'
+import type { CriticSpan } from '../../../document/critic/types'
 import { DiamondIcon } from '../../icons'
 import { Frontmatter } from './Frontmatter'
 
 export interface RenderCtx {
   source: string
+  reviewSpans?: CriticSpan[]
   /** Absent → interactive affordances (task checkboxes) are disabled. */
   onEdit?: (edit: TextEdit) => void
-  /** spanIndexes of highlights that anchor a comment thread (dotted underline). */
-  anchoredHighlights?: ReadonlySet<number>
   highlightCode?: boolean
   /** Localized labels for the deletion-undo affordance. When present, a deletion
    *  mark becomes a tabbable button announcing that activating it removes the
@@ -29,8 +31,14 @@ export interface RenderCtx {
   markLabels?: { deletion: string; hint: string }
 }
 
+interface PresentedCtx extends RenderCtx {
+  anchoredHighlights?: ReadonlySet<number>
+  commentMarkers?: ReadonlySet<number>
+  commentTargets?: ReadonlyMap<number, number>
+}
+
 function deletionProps(
-  ctx: RenderCtx,
+  ctx: PresentedCtx,
   text: string,
 ): { tabIndex: 0; role: 'button'; 'aria-label': string } | Record<string, never> {
   if (!ctx.markLabels) return {}
@@ -48,7 +56,7 @@ function codeChildren(value: string, lang: string | undefined): ReactNode[] {
   )
 }
 
-function renderCritic(node: { type: string }, key: number, ctx: RenderCtx): ReactNode | undefined {
+function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): ReactNode | undefined {
   switch (node.type) {
     case 'criticInsert': {
       const n = node as CriticWrapNode
@@ -107,8 +115,9 @@ function renderCritic(node: { type: string }, key: number, ctx: RenderCtx): Reac
       return (
         <span
           key={key}
-          className="critic critic-comment-marker"
+          className={`critic ${ctx.commentMarkers?.has(n.data.spanIndex) ? 'critic-comment-marker' : 'critic-comment-reference'}`}
           data-span-index={n.data.spanIndex}
+          data-comment-target={ctx.commentTargets?.get(n.data.spanIndex)}
           title={n.data.content}
           role="button"
           tabIndex={0}
@@ -131,11 +140,11 @@ function posAttrs(node: Positioned): Record<string, number> {
   return start !== undefined && end !== undefined ? { 'data-ps': start, 'data-pe': end } : {}
 }
 
-function renderInline(nodes: readonly PhrasingContent[], ctx: RenderCtx): ReactNode[] {
+function renderInline(nodes: readonly PhrasingContent[], ctx: PresentedCtx): ReactNode[] {
   return nodes.map((node, i) => renderPhrasing(node, i, ctx))
 }
 
-function renderPhrasing(node: PhrasingContent, key: number, ctx: RenderCtx): ReactNode {
+function renderPhrasing(node: PhrasingContent, key: number, ctx: PresentedCtx): ReactNode {
   const critic = renderCritic(node, key, ctx)
   if (critic !== undefined) return critic
   switch (node.type) {
@@ -214,7 +223,7 @@ function renderPhrasing(node: PhrasingContent, key: number, ctx: RenderCtx): Rea
   }
 }
 
-function renderListItem(item: ListItem, key: number, ctx: RenderCtx, tight: boolean): ReactNode {
+function renderListItem(item: ListItem, key: number, ctx: PresentedCtx, tight: boolean): ReactNode {
   const isTask = typeof item.checked === 'boolean'
   const checkbox = isTask ? (
     <input
@@ -246,7 +255,7 @@ function renderListItem(item: ListItem, key: number, ctx: RenderCtx, tight: bool
   )
 }
 
-function renderList(node: List, key: number, ctx: RenderCtx): ReactNode {
+function renderList(node: List, key: number, ctx: PresentedCtx): ReactNode {
   const tight = node.spread !== true
   const items = node.children.map((item, i) => renderListItem(item, i, ctx, tight))
   return node.ordered ? (
@@ -266,7 +275,7 @@ const ALIGN_STYLE: Record<NonNullable<AlignType>, 'left' | 'center' | 'right'> =
   right: 'right',
 }
 
-function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: number, ctx: RenderCtx): ReactNode {
+function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: number, ctx: PresentedCtx): ReactNode {
   switch (node.type) {
     case 'paragraph':
       return (
@@ -379,6 +388,21 @@ function phrasingText(nodes: readonly PhrasingContent[]): string {
 }
 
 export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
+  const presentation = useMemo(() => {
+    const spans = ctx.reviewSpans ?? scanMarkdown(ctx.source)
+    const anchoredHighlights = new Set<number>()
+    const commentMarkers = new Set<number>()
+    const commentTargets = new Map<number, number>()
+    for (const item of group(spans, ctx.source)) {
+      if (item.type !== 'thread') continue
+      if (item.anchor) anchoredHighlights.add(spans.indexOf(item.anchor))
+      else if (item.comments[0]) commentMarkers.add(spans.indexOf(item.comments[0].span))
+      const target = spans.indexOf((item.anchor ?? item.comments[0]!.span))
+      for (const comment of item.comments) commentTargets.set(spans.indexOf(comment.span), target)
+    }
+    return { anchoredHighlights, commentMarkers, commentTargets }
+  }, [ctx.source, ctx.reviewSpans])
+  const presented = { ...ctx, ...presentation }
   const children = tree.children
   const out: ReactNode[] = []
   let i = 0
@@ -396,12 +420,12 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
       }
       out.push(
         <section key={i} className={kind ? `md-callout md-callout--${kind}` : 'md-callout'}>
-          {children.slice(i, j).map((b, bi) => renderBlock(b, bi, ctx))}
+          {children.slice(i, j).map((b, bi) => renderBlock(b, bi, presented))}
         </section>,
       )
       i = j
     } else {
-      out.push(renderBlock(node, i, ctx))
+      out.push(renderBlock(node, i, presented))
       i++
     }
   }

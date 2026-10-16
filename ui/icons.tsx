@@ -11,7 +11,7 @@ import {
   ChevronDownIcon as RChevronDownIcon,
   FileIcon as RFileIcon,
   Cross2Icon,
-  StrikethroughIcon as RStrikethroughIcon,
+  Pencil1Icon,
   EyeOpenIcon,
   CounterClockwiseClockIcon,
   MagnifyingGlassIcon,
@@ -26,7 +26,6 @@ type IconProps = SVGProps<SVGSVGElement>
  * currentColor); the few Radix lacks (folder, language-swap, the comment
  * diamond, the pending dot, the highlighter) stay hand-drawn at 1.5px stroke.
  * Every icon is decorative (aria-hidden) — labels/tooltips carry the meaning.
- * Existing import names are preserved so consumer call sites don't change.
  */
 function radix(Icon: ComponentType<any>, size: number) {
   return function RadixGlyph(props: IconProps) {
@@ -50,7 +49,7 @@ function base(props: IconProps, size = 14): IconProps {
   }
 }
 
-/* ---- Radix chrome glyphs (existing names preserved) ---- */
+/* ---- Radix chrome glyphs ---- */
 export const GearIcon = radix(RGearIcon, 14)
 export const ChatIcon = radix(ChatBubbleIcon, 14)
 export const AlertIcon = radix(ExclamationTriangleIcon, 14)
@@ -65,7 +64,7 @@ export const FileIcon = radix(RFileIcon, 14)
 
 /* ---- review/chrome verbs ---- */
 export const CrossIcon = radix(Cross2Icon, 14)
-export const StrikethroughIcon = radix(RStrikethroughIcon, 14)
+export const PencilIcon = radix(Pencil1Icon, 14)
 export const EyeIcon = radix(EyeOpenIcon, 14)
 export const HistoryIcon = radix(CounterClockwiseClockIcon, 14)
 export const SearchIcon = radix(MagnifyingGlassIcon, 14)
