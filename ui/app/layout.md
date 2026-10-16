@@ -7,7 +7,9 @@ under-page surface through the [theme background adapter](../theme/background.md
 mode it opens. Translation and active-comment controls appear where applicable; the overflow menu
 contains Resolved and Settings. Resolved remains reachable without active comments. Radix supplies
 menu focus, keyboard navigation, and dismissal. The native host owns the file pills and full-path
-window title; the document controls do not repeat the filename.
+window title; the document controls do not repeat the filename. On macOS the file toolbar shares
+the native traffic-light area without a separate title strip. See the
+[native adapter](../desktop/README.md) for dragging and file-closing behavior.
 
 The controls' measured height feeds `--bar-clear` in `app.css`; content, navigation, notices, and
 panels clear that space. Outline navigation also accounts for the current toolbar rectangle. Print

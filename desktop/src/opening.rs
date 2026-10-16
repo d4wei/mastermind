@@ -9,25 +9,62 @@ use tauri_plugin_dialog::DialogExt;
 #[derive(serde::Serialize)]
 pub struct Snapshot {
     pid: u32,
-    files: Vec<String>,
+    files: Vec<OpenDocument>,
     activation_revision: u64,
     active_id: Option<usize>,
     opening_errors: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+struct OpenDocument {
+    id: String,
+    path: String,
+}
+
+impl Snapshot {
+    fn from_documents(docs: &Documents) -> Self {
+        Self {
+            pid: std::process::id(),
+            files: docs
+                .order
+                .iter()
+                .map(|(id, path)| OpenDocument {
+                    id: id.to_string(),
+                    path: path.clone(),
+                })
+                .collect(),
+            activation_revision: docs.activation_revision,
+            active_id: docs.active_id,
+            opening_errors: docs.opening_errors.clone(),
+        }
+    }
 }
 
 #[tauri::command]
 pub async fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Result<Snapshot, String> {
     let state = state.inner().clone();
     crate::worker::blocking_work()
+        .run(move || Snapshot::from_documents(&state.lock().unwrap()))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn close_document(
+    id: usize,
+    active_id: Option<usize>,
+    activation_revision: u64,
+    state: tauri::State<'_, Arc<Mutex<Documents>>>,
+    watch: tauri::State<'_, Arc<Mutex<crate::document_io::FileWatch>>>,
+) -> Result<Snapshot, String> {
+    let state = state.inner().clone();
+    let watch = watch.inner().clone();
+    crate::worker::blocking_work()
         .run(move || {
-            let docs = state.lock().unwrap();
-            Snapshot {
-                pid: std::process::id(),
-                files: docs.order.clone(),
-                activation_revision: docs.activation_revision,
-                active_id: docs.active_id,
-                opening_errors: docs.opening_errors.clone(),
-            }
+            let mut docs = state.lock().unwrap();
+            docs.close(id, active_id, activation_revision);
+            watch.lock().unwrap().retain_documents(&docs);
+            Snapshot::from_documents(&docs)
         })
         .await
         .map_err(|e| e.to_string())
@@ -167,11 +204,11 @@ mod tests {
     #[test]
     fn graphical_failures_are_retained_without_discarding_other_documents() {
         let mut docs = Documents::default();
-        docs.order.push("retained".into());
+        docs.order.insert(0, "retained".into());
         docs.active_id = Some(0);
         admit_graphical(&mut docs, vec![Err("Not a local file.".into())]);
         assert_eq!(docs.opening_errors, ["Not a local file."]);
-        assert_eq!(docs.order, ["retained"]);
+        assert_eq!(docs.order.values().collect::<Vec<_>>(), ["retained"]);
         assert_eq!(docs.active_id, Some(0));
         admit_graphical(
             &mut docs,
@@ -181,6 +218,6 @@ mod tests {
         );
         assert_eq!(docs.opening_errors.len(), 1);
         assert!(docs.opening_errors[0].starts_with("Open at most"));
-        assert_eq!(docs.order, ["retained"]);
+        assert_eq!(docs.order.values().collect::<Vec<_>>(), ["retained"]);
     }
 }

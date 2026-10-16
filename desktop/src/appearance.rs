@@ -35,3 +35,28 @@ pub fn set_background_color(webview: tauri::Webview, color: [u8; 4]) -> Result<(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn set_window_title(webview: tauri::Webview, value: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    webview
+        .with_webview(move |platform| {
+            use objc2::{msg_send, runtime::AnyObject};
+            use objc2_foundation::NSString;
+            // Tauri owns these native handles for the duration of this UI-thread closure.
+            // AppKit resets traffic lights on title changes; Wry reapplies their inset when drawing.
+            let window = unsafe { &*platform.ns_window().cast::<AnyObject>() };
+            let view = unsafe { &*platform.inner().cast::<AnyObject>() };
+            let title = NSString::from_str(&value);
+            let _: () = unsafe { msg_send![window, setTitle: &*title] };
+            let parent: *mut AnyObject = unsafe { msg_send![view, superview] };
+            let _: () = unsafe { msg_send![parent, setNeedsDisplay: true] };
+        })
+        .map_err(|e| e.to_string())?;
+    #[cfg(not(target_os = "macos"))]
+    webview
+        .window()
+        .set_title(&value)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

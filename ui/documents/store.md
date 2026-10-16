@@ -61,3 +61,9 @@ buffer changes before checking all retained documents. It returns false for unre
 including a distinct comparison result or an active comparison save. The native adapter locks
 editing while awaiting this check and keeps the window open on failure. Native operating-system
 quit coverage is tracked in the [host observations](../../tools/desktop/results.md).
+
+`closeDocument` applies the save check to one document, then awaits host removal before dropping its
+record. A failed removal retains the record. Closing invalidates pending reads and loads for that
+file; closing a background file does not cancel a different file's load. The native adapter locks
+editing through this operation. Source-editor history is released with the document, including
+cleanup that runs after the active editor unmounts.

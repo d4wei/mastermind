@@ -64,7 +64,9 @@ fn main() {
         .manage(lifecycle::CloseGate::default())
         .invoke_handler(tauri::generate_handler![
             appearance::set_background_color,
+            appearance::set_window_title,
             opening::snapshot,
+            opening::close_document,
             opening::choose_files,
             opening::dismiss_opening_errors,
             document_io::document_meta,

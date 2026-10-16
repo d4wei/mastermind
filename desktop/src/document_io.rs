@@ -17,6 +17,20 @@ pub struct FileWatch {
 }
 
 impl FileWatch {
+    pub fn retain_documents(&mut self, docs: &Documents) {
+        self.parents.retain(|parent| {
+            if docs
+                .files
+                .keys()
+                .any(|path| path.parent() == Some(parent.as_path()))
+            {
+                return true;
+            }
+            // Retain failed removals so a later close can retry releasing the watch.
+            self.watcher.unwatch(parent).is_err()
+        });
+    }
+
     pub fn new(app: tauri::AppHandle) -> notify::Result<Self> {
         let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
             // Events are invalidation hints, including overflow/errors; a fresh versioned read decides.
@@ -37,7 +51,7 @@ fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
     let index = id
         .parse::<usize>()
         .ok()
-        .and_then(|index| docs.order.get(index));
+        .and_then(|index| docs.order.get(&index));
     index
         .map(PathBuf::from)
         .ok_or_else(|| FileError::new(404, "document_not_open", "The document is not open."))
@@ -122,7 +136,8 @@ pub async fn watch_document(
     let watch = watch.inner().clone();
     crate::worker::blocking_work()
         .run(move || {
-            let path = admitted(&docs.lock().unwrap(), &id).map_err(|e| e.error)?;
+            let docs = docs.lock().unwrap();
+            let path = admitted(&docs, &id).map_err(|e| e.error)?;
             let parent = path.parent().unwrap().to_owned();
             let mut watch = watch.lock().unwrap();
             if !watch.parents.contains(&parent) {
@@ -199,7 +214,7 @@ mod tests {
         use std::sync::mpsc;
         use std::time::Duration;
         let docs = Arc::new(Mutex::new(Documents {
-            order: vec!["/admitted/document.md".into()],
+            order: [(0, "/admitted/document.md".into())].into(),
             ..Documents::default()
         }));
         let (first_started_tx, first_started_rx) = mpsc::channel();

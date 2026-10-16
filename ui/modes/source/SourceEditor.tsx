@@ -60,6 +60,11 @@ const sourceTheme = EditorView.theme({
 })
 
 const retainedStates = new Map<string, { state: EditorState; revision: number }>()
+useDoc.subscribe((state) => {
+  for (const id of retainedStates.keys()) {
+    if (!state.hasDocument(id)) retainedStates.delete(id)
+  }
+})
 
 export function SourceEditor() {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -118,7 +123,7 @@ export function SourceEditor() {
     const registeredScroller = useDoc.getState().scroller
     return () => {
       // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
-      retainedStates.set(sessionId, { state: view.state, revision })
+      if (useDoc.getState().hasDocument(sessionId)) retainedStates.set(sessionId, { state: view.state, revision })
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       if (useNav.getState().sourceHeadingTop === sourceHeadingTop) useNav.setState({ sourceHeadingTop: null })

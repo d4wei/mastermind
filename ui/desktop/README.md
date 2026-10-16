@@ -25,7 +25,19 @@ behavior.
 
 `NativeReviewer.tsx` provides the square Open files action and horizontally scrolling file pills.
 `file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
-full path appears in the native window title; the adapter uses Tauri's scoped window-title command.
+full path remains in the native window title and the pill tooltip. On macOS, Tauri's overlay title
+bar hides the separate title strip, retains the traffic lights, and extends the theme behind the
+toolbar. Empty toolbar and pill-row space uses Tauri drag regions; buttons remain interactive.
+Other platforms retain their native title bars and window controls. The native title command sets
+macOS metadata and requests a redraw of Wry's parent view together, restoring the configured
+traffic-light inset after AppKit resets it on a title update
+([Tauri issue](https://github.com/tauri-apps/tauri/issues/13044)).
+
+Each pill has a separate, keyboard-accessible close button. Closing saves only that file, retaining
+it on failure or an unsaved comparison result. Editing and inventory activation pause during the
+close. The native result selects the next file, then the previous file, or home when none remain;
+background closes retain the current selection. Closed files release their document and editor
+state. The [native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.
 Polling never overlaps requests. The adapter also subscribes to native close requests. It locks

@@ -11,6 +11,7 @@
   background: var(--color-bg);
   color: var(--color-text);
 }
+.native-titlebar-overlay { padding-left: calc(var(--space-unit) * 23); }
 .native-open {
   display: grid;
   place-items: center;
@@ -33,18 +34,39 @@
   scrollbar-width: thin;
 }
 .native-file-pill {
+  display: flex;
+  align-items: center;
   flex: none;
   max-width: calc(var(--space-unit) * 65);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.native-file-select,
+.native-file-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-sm);
+}
+.native-file-select {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  border-radius: var(--radius-md);
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
-  font-size: var(--font-size-sm);
 }
+.native-file-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: calc(var(--space-unit) * 7);
+  height: calc(var(--space-unit) * 7);
+  padding: 0;
+  margin-right: var(--space-unit);
+  border-radius: var(--radius-sm);
+}
+.native-file-close:hover { background: var(--color-selection); color: var(--color-text); }
 .native-file-pill:hover {
   background: var(--color-bg-elevated);
   color: var(--color-text);

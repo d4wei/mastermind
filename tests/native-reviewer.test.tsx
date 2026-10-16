@@ -6,7 +6,7 @@ import { NativeReviewer } from '../ui/desktop/NativeReviewer'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
-  listen: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
+  listen: vi.fn(), closeDocument: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
@@ -14,7 +14,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
 vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => mocks.id, {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
-    prepareToClose: mocks.prepareToClose }),
+    prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument }),
 }) }))
 vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
   getState: () => ({ load: mocks.load }),
@@ -24,7 +24,7 @@ vi.mock('../ui/app/App', () => ({ App: ({ home, onboarding }: { home: React.Reac
 let host: HTMLDivElement
 let root: Root
 const snapshot = (revision = 0, activeId: number | null = null, errors: string[] = []) => ({
-  files: ['/first.md', '/second.md'], activation_revision: revision,
+  files: [{ id: '0', path: '/first.md' }, { id: '1', path: '/second.md' }], activation_revision: revision,
   active_id: activeId, opening_errors: errors,
 })
 const setup = () => ({ completed: true, revision: 0,
@@ -41,6 +41,7 @@ beforeEach(() => {
   mocks.navigate.mockReset()
   mocks.load.mockReset().mockResolvedValue(undefined)
   mocks.listen.mockReset().mockResolvedValue(() => {})
+  mocks.closeDocument.mockReset().mockImplementation(async (_id, release) => { await release(); return true })
   mocks.prepareToClose.mockReset().mockResolvedValue(true)
   mocks.invoke.mockReset().mockImplementation(async (command: string) =>
     command === 'snapshot' ? snapshot() : other(command))
@@ -256,9 +257,105 @@ it('updates the native title and selected pill when the active document changes'
   mocks.id = '0'
   await mount()
   expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('first.md')
-  expect(mocks.invoke).toHaveBeenCalledWith('plugin:window|set_title', { value: 'mastermind - /first.md' })
+  expect(mocks.invoke).toHaveBeenCalledWith('set_window_title', { value: 'mastermind - /first.md' })
   mocks.id = '1'
   await mount()
   expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('second.md')
-  expect(mocks.invoke).toHaveBeenLastCalledWith('plugin:window|set_title', { value: 'mastermind - /second.md' })
+  expect(mocks.invoke).toHaveBeenLastCalledWith('set_window_title', { value: 'mastermind - /second.md' })
+})
+
+it.each([['0', '/d/1'], ['1', '/d/0']] as const)(
+  'closes file %s without nesting buttons or changing a background selection', async (closing, destination) => {
+    mocks.id = '0'
+    const remaining = snapshot().files.filter((file) => file.id !== closing)
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot()
+      : command === 'close_document' ? { ...snapshot(1, Number(remaining[0]!.id)), files: remaining }
+      : other(command))
+    await mount()
+    expect(host.querySelector('button button')).toBeNull()
+    await act(async () => button(`Close ${closing === '0' ? 'first' : 'second'}.md`).click())
+    expect(mocks.closeDocument).toHaveBeenCalledWith(closing, expect.any(Function))
+    expect(mocks.invoke).toHaveBeenCalledWith('close_document', { id: Number(closing), activeId: 0, activationRevision: 0 })
+    expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
+    expect(mocks.navigate).toHaveBeenLastCalledWith(destination)
+    // A snapshot captured before the close cannot resurrect its pill.
+    await poll()
+    expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
+  },
+)
+
+it('returns home after the last file closes', async () => {
+  mocks.id = '0'
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [snapshot().files[0]] }
+    : command === 'close_document' ? { ...snapshot(1), files: [] } : other(command))
+  await mount()
+  await act(async () => button('Close first.md').click())
+  expect(host.querySelectorAll('.native-file-pill')).toHaveLength(0)
+  expect(mocks.navigate).toHaveBeenLastCalledWith('/')
+})
+
+it('keeps a file open and selects it when its save is blocked', async () => {
+  mocks.id = '0'
+  mocks.closeDocument.mockResolvedValue(false)
+  await mount()
+  await act(async () => button('Close second.md').click())
+  expect(mocks.invoke.mock.calls.some(([command]) => command === 'close_document')).toBe(false)
+  expect(host.querySelectorAll('.native-file-pill')).toHaveLength(2)
+  expect(host.textContent).toContain('unsaved changes')
+  expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
+  expect(host.inert).toBe(false)
+})
+
+it('coalesces close clicks, locks editing, and pauses activation while saving', async () => {
+  let finish!: (value: boolean) => void
+  mocks.closeDocument.mockImplementation(() => new Promise<boolean>((resolve) => { finish = resolve }))
+  await mount()
+  await act(async () => { button('Close first.md').click(); button('Close second.md').click() })
+  expect(mocks.closeDocument).toHaveBeenCalledTimes(1)
+  expect(host.inert).toBe(true)
+  mocks.invoke.mockClear()
+  await poll()
+  expect(mocks.invoke).not.toHaveBeenCalledWith('snapshot')
+  await act(async () => finish(false))
+  expect(host.inert).toBe(false)
+})
+
+it('retains the pill when the native close fails', async () => {
+  mocks.invoke.mockImplementation(async (command: string) => {
+    if (command === 'close_document') throw new Error('Native close failed')
+    return command === 'snapshot' ? snapshot() : other(command)
+  })
+  await mount()
+  await act(async () => button('Close first.md').click())
+  expect(host.querySelectorAll('.native-file-pill')).toHaveLength(2)
+  expect(host.textContent).toContain('Native close failed')
+  expect(host.inert).toBe(false)
+})
+
+it('reserves the macOS window controls and keeps file buttons outside drag regions', async () => {
+  vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+  await mount()
+  expect(host.querySelector('.native-titlebar-overlay')?.hasAttribute('data-tauri-drag-region')).toBe(true)
+  expect(host.querySelector('.native-file-pills')?.hasAttribute('data-tauri-drag-region')).toBe(true)
+  for (const item of host.querySelectorAll('button')) expect(item.hasAttribute('data-tauri-drag-region')).toBe(false)
+  vi.restoreAllMocks()
+})
+
+it('keeps editing locked when quit arrives during a file close', async () => {
+  let finishFile!: (value: boolean) => void
+  let finishWindow!: (value: boolean) => void
+  mocks.closeDocument.mockImplementation(() => new Promise<boolean>((resolve) => { finishFile = resolve }))
+  mocks.prepareToClose.mockImplementation(() => new Promise<boolean>((resolve) => { finishWindow = resolve }))
+  await mount()
+  await act(async () => button('Close first.md').click())
+  const quit = mocks.listen.mock.calls.find(([event]) => event === 'close-requested')![1] as () => void
+  await act(async () => quit())
+  expect(mocks.prepareToClose).not.toHaveBeenCalled()
+  await act(async () => finishFile(false))
+  expect(mocks.prepareToClose).toHaveBeenCalledTimes(1)
+  expect(host.inert).toBe(true)
+  await act(async () => finishWindow(false))
+  expect(host.inert).toBe(false)
+  expect(mocks.invoke).toHaveBeenCalledWith('cancel_close')
 })

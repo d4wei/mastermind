@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Integrate macOS window controls into the file toolbar
+
+**Ruled.** Remove the separate macOS title strip and retain native traffic lights in the file
+toolbar. Keep the full active path as window metadata and a pill tooltip. File pills have close
+buttons; closing releases an open file after save checks and never deletes its disk contents.
+
+**Beat:** stacked native and application headers, and file pills that only accumulate.
+
 ## 2026-10-14 — Clarify personal settings and translation selection
 
 **Ruled.** Label the comment-author preference Your name / 你的名字 in Settings. Keep the onboarding

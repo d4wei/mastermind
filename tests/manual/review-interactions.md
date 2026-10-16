@@ -29,6 +29,13 @@ reading view for the selection checks.
    local edit and the original disk bytes. Unblock the preview request or restore native write
    permission, then make another edit to retry. A disk version conflict instead opens the conflict
    controls; check that separately from a denied or unreachable save.
+6. **Native file toolbar:** on macOS, traffic lights share the file toolbar without a separate
+   title strip. Drag empty toolbar space to move the window; Open, file pills, close buttons, and
+   document controls should remain clickable. Open three disposable files, close the middle active
+   file, then a background file, then the last file. Check neighbor selection and the empty opening
+   screen. Reopen a closed file and check that its disk contents remain unchanged. Repeat after a
+   local edit, a save failure, and a distinct comparison Result; unsaved work must keep its file
+   open.
 
 ## Selection paragraphs
 

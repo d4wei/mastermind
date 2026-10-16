@@ -7,7 +7,8 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 #[derive(Default)]
 pub struct Documents {
     pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
-    pub order: Vec<String>,
+    pub order: BTreeMap<usize, String>,
+    pub next_id: usize,
     pub activation_revision: u64,
     pub active_id: Option<usize>,
     pub opening_errors: Vec<String>,
@@ -48,7 +49,10 @@ impl Documents {
             })
             .collect();
         if let Some(canonical) = results.iter().find_map(|result| result.canonical.as_ref()) {
-            self.active_id = self.order.iter().position(|path| path == canonical);
+            self.active_id = self
+                .order
+                .iter()
+                .find_map(|(id, path)| (path == canonical).then_some(*id));
             self.activation_revision += 1;
         }
         Response {
@@ -59,6 +63,25 @@ impl Documents {
             results,
             error: None,
         }
+    }
+
+    pub fn close(&mut self, id: usize, active_id: Option<usize>, activation_revision: u64) {
+        let Some(path) = self.order.remove(&id) else {
+            return;
+        };
+        self.files.remove(&PathBuf::from(path));
+        if activation_revision == self.activation_revision {
+            self.active_id = active_id;
+        }
+        if self.active_id == Some(id) {
+            self.active_id = self
+                .order
+                .range(id..)
+                .next()
+                .or_else(|| self.order.iter().next_back())
+                .map(|(id, _)| *id);
+        }
+        self.activation_revision += 1;
     }
 
     fn open(&mut self, path: &str) -> Result<(String, &'static str), FileError> {
@@ -78,7 +101,8 @@ impl Documents {
         }
         let snapshot = crate::files::read(&canonical)?;
         self.files.insert(canonical, Some(snapshot));
-        self.order.push(display.clone());
+        self.order.insert(self.next_id, display.clone());
+        self.next_id += 1;
         Ok((display, "opened"))
     }
 }
@@ -113,6 +137,52 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn closing_preserves_ids_and_reopening_allocates_a_fresh_one() {
+        let fixture = Fixture::new();
+        for name in ["a", "b", "c"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a", "b", "c"]));
+        docs.close(1, Some(1), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(2));
+        assert!(!docs.order.contains_key(&1));
+        assert_eq!(
+            docs.order[&2],
+            fs::canonicalize(fixture.0.join("c"))
+                .unwrap()
+                .to_str()
+                .unwrap()
+        );
+        assert_eq!(fs::read_to_string(fixture.0.join("b")).unwrap(), "b");
+        docs.admit(fixture.request(&["b"]));
+        assert_eq!(docs.active_id, Some(3));
+        assert_eq!(docs.order.keys().copied().collect::<Vec<_>>(), [0, 2, 3]);
+        docs.close(0, Some(2), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(2));
+        docs.close(3, Some(3), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(2));
+        docs.close(2, Some(2), docs.activation_revision);
+        assert_eq!(docs.active_id, None);
+        assert!(docs.order.is_empty());
+        assert!(docs.files.is_empty());
+    }
+
+    #[test]
+    fn closing_does_not_override_a_concurrent_open_request() {
+        let fixture = Fixture::new();
+        for name in ["a", "b", "c"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a", "b"]));
+        let revision = docs.activation_revision;
+        docs.admit(fixture.request(&["c"]));
+        docs.close(0, Some(0), revision);
+        assert_eq!(docs.active_id, Some(2));
     }
 
     #[cfg(windows)]
@@ -173,8 +243,8 @@ mod tests {
             ["opened", "error", "already_open", "opened"]
         );
         assert_eq!(docs.order.len(), 2);
-        assert_eq!(PathBuf::from(&docs.order[0]).file_name().unwrap(), "a");
-        assert_eq!(PathBuf::from(&docs.order[1]).file_name().unwrap(), "b");
+        assert_eq!(PathBuf::from(&docs.order[&0]).file_name().unwrap(), "a");
+        assert_eq!(PathBuf::from(&docs.order[&1]).file_name().unwrap(), "b");
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
     }

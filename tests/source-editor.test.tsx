@@ -155,3 +155,13 @@ it('navigates through editor geometry without requiring an off-screen line in th
   expect(useNav.getState().sourceHeadingTop).toBeNull()
   expect(useDoc.getState().scroller).toBeNull()
 })
+
+it('discards editor undo when its document closes', async () => {
+  act(() => editor().dispatch({ changes: { from: 5, insert: ' edited' } }))
+  expect(undoDepth(editor().state)).toBe(1)
+  await act(async () => { await useDoc.getState().closeDocument(a, async () => {}) })
+  expect(host.querySelector('.cm-editor')).toBeNull()
+  disk.set(a, 'alpha edited')
+  await act(async () => useDoc.getState().load(a))
+  expect(undoDepth(editor().state)).toBe(0)
+})

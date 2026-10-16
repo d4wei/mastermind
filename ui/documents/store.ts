@@ -13,7 +13,7 @@ const AUTOSAVE_MS = 600
 
 function setTabTitle(name: string): void {
   const g = globalThis as { document?: { title: string } }
-  if (g.document) g.document.title = `${name} — ${APP_NAME}`
+  if (g.document) g.document.title = name ? `${name} — ${APP_NAME}` : APP_NAME
 }
 
 export interface ConflictDraft {
@@ -58,6 +58,8 @@ export interface DocStore {
   flushAll(): Promise<void>
   hasPendingWrites(): boolean
   prepareToClose(): Promise<boolean>
+  closeDocument(id: string, release: () => Promise<void>): Promise<boolean>
+  hasDocument(id: string): boolean
   load(sessionId: string): Promise<void>
   undo(): void
   notifyDiskChange(mtimeMs: number, deleted?: boolean): void
@@ -105,6 +107,7 @@ export function createDocStore() {
   const documents = new Map<string, DocumentRecord>()
   let activeId: string | null = null
   let loadRequest = 0
+  let loadingId: string | null = null
   const clearAutosave = (id = activeId): void => {
     if (!id) return
     const record = documents.get(id)
@@ -283,6 +286,32 @@ export function createDocStore() {
         return !get().hasPendingWrites()
       },
 
+      hasDocument(id) { return documents.has(id) },
+
+      async closeDocument(id, release) {
+        if (activeId === id) get().flushEditor?.()
+        const doc = documents.get(id)
+        if (doc) {
+          await doc.write
+          await saveDocument(id)
+          if (doc.saving || doc.source !== doc.savedSource ||
+            (doc.conflictDraft && doc.conflictDraft.result !== doc.source)) return false
+        }
+        await release()
+        clearAutosave(id)
+        if (doc) doc.diskGeneration++
+        documents.delete(id)
+        // A load already in flight must not restore a closed document.
+        if (loadingId === id) { loadRequest++; loadingId = null }
+        if (activeId === id) {
+          setTabTitle('')
+          set({ sessionId: null, meta: null, source: '', savedSource: '', history: [],
+            conflictDraft: null, conflict: false, diskChange: null, notice: null,
+            flushEditor: null, scroller: null, status: 'loading' })
+        } else publish({})
+        return true
+      },
+
       hasPendingWrites() {
         return [...documents.values()].some((doc) => doc.saving || doc.source !== doc.savedSource ||
           (doc.conflictDraft !== null && doc.conflictDraft.result !== doc.source))
@@ -290,6 +319,7 @@ export function createDocStore() {
 
       async load(sessionId) {
         get().flushEditor?.()
+        loadingId = sessionId
         const request = ++loadRequest
         const retained = documents.get(sessionId)
         if (retained) {
