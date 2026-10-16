@@ -208,6 +208,25 @@ pub fn read(path: &Path) -> Result<Snapshot, FileError> {
     snapshot(&mut open(path, false)?, path)
 }
 
+pub fn create_copy(path: &Path, content: &str) -> Result<Snapshot, FileError> {
+    if content.len() as u64 > MAX_FILE_BYTES {
+        return Err(FileError::too_large());
+    }
+    // Exclusive creation also rejects existing symlinks and hard-link aliases.
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    file.write_all(content.as_bytes())?;
+    file.sync_all()?;
+    let saved = snapshot(&mut file, path)?;
+    if saved.content() != content {
+        return Err(FileError::conflict());
+    }
+    Ok(saved)
+}
+
 // Callers serialize writes for each admitted path. Other processes do not share that lock.
 pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot, FileError> {
     if content.len() as u64 > MAX_FILE_BYTES {
@@ -283,6 +302,32 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn copy_creation_preserves_bytes_and_never_overwrites_existing_paths() {
+        let f = Fixture::new();
+        let copy = f.0.join("copy.md");
+        let text = "# 标题\r\n{>>@Alex: retained<<}\r\n";
+        assert_eq!(create_copy(&copy, text).unwrap().bytes, text.as_bytes());
+        assert!(create_copy(&copy, "overwrite").is_err());
+        assert!(create_copy(&f.file(), "overwrite").is_err());
+        assert_eq!(fs::read(&copy).unwrap(), text.as_bytes());
+        assert_eq!(fs::read(f.file()).unwrap(), b"original\r\n");
+        let alias = f.0.join("alias.md");
+        fs::hard_link(f.file(), &alias).unwrap();
+        assert!(create_copy(&alias, "overwrite").is_err());
+        #[cfg(unix)]
+        {
+            let link = f.0.join("link.md");
+            std::os::unix::fs::symlink(f.file(), &link).unwrap();
+            assert!(create_copy(&link, "overwrite").is_err());
+            let dangling = f.0.join("dangling.md");
+            std::os::unix::fs::symlink(f.0.join("missing.md"), &dangling).unwrap();
+            assert!(create_copy(&dangling, "overwrite").is_err());
+        }
+        assert_eq!(fs::read(f.file()).unwrap(), b"original\r\n");
+        assert!(create_copy(&f.0.join("missing/copy.md"), text).is_err());
     }
 
     #[test]

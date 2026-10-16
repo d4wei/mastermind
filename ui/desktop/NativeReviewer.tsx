@@ -3,7 +3,7 @@ import { App } from '../app/App'
 import { navigate } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
-import { FileIcon, CrossIcon } from '../icons'
+import { FileIcon, CrossIcon, AlertIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
@@ -33,7 +33,8 @@ export function NativeReviewer() {
   const [previewLanguage, setPreviewLanguage] = useState<SetupSnapshot['values']['uiLang']>()
   const refreshSetup = useRef<() => Promise<void>>(async () => {})
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
-  const id = useDoc((s) => s.sessionId)
+  const documentState = useDoc()
+  const id = documentState.sessionId
   const pills = useRef<HTMLElement>(null)
   const focusAfterClose = useRef<string | null | undefined>(undefined)
   const activePath = id === null ? undefined : files.find((file) => file.id === id)?.path
@@ -167,6 +168,9 @@ export function NativeReviewer() {
           <button type="button" className="native-file-select"
             aria-current={id === file.id ? 'page' : undefined}
             title={file.path} onClick={() => navigate(`/d/${file.id}`)}>{labels[index]}</button>
+          {documentState.needsAttention(file.id) && <button type="button" className="native-file-attention btn-ghost"
+            aria-label={`${labels[index]} · ${chinese ? '需要处理' : 'Needs attention'}`}
+            onClick={() => { navigate(`/d/${file.id}`); if (id === file.id) void documentState.openConflict() }}><AlertIcon /></button>}
           <button type="button" className="native-file-close" onClick={() => closeFile(file)}
             aria-label={`${chinese ? '关闭' : 'Close'} ${labels[index]}`}
             title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></button>

@@ -1,3 +1,4 @@
+import { Notifications, Notice } from './Notifications'
 import { APP_NAME } from './constants'
 import { useEffect, type ReactNode } from 'react'
 import { Tooltip } from 'radix-ui'
@@ -16,11 +17,6 @@ export function App({ home, onboarding, native = false }: {
   const load = useConfig((s) => s.load)
   const saveFailed = useConfig((s) => s.saveFailed)
   const t = useT()
-  useEffect(() => {
-    if (!saveFailed) return
-    const timer = setTimeout(() => useConfig.getState().clearFailure(), 8000)
-    return () => clearTimeout(timer)
-  }, [saveFailed])
   const route = useRoute()
   const awaitingNativeSetup = native && onboarding != null
   useEffect(() => {
@@ -33,6 +29,7 @@ export function App({ home, onboarding, native = false }: {
 
   return (
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
+      <Notifications>
       <ThemeEffects />
       {onboarding ?? <>
         {route.kind === 'doc' && (
@@ -42,8 +39,9 @@ export function App({ home, onboarding, native = false }: {
         )}
         {route.kind === 'home' && (home ?? <HomeView />)}
       </>}
-      {saveFailed && <div className="toast toast-error" role="alert">{t('configSaveFailed')}</div>}
+      {saveFailed && <Notice error>{t('configSaveFailed')}</Notice>}
       <GrainOverlay />
+      </Notifications>
     </Tooltip.Provider>
   )
 }

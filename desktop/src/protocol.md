@@ -13,7 +13,7 @@ OS user; endpoint existence does not authorize reading arbitrary files.
 For a valid opening request, results retain input order and distinguish `opened`, `already_open`,
 and `error`. Admission checks existing regular files, obtains an initial versioned snapshot, and
 registers canonical identity before success. It does not require a Markdown extension. Aliases
-reuse the document. Reopening retains the document's buffer, undo, and comparison state. One file's
+reuse the document. Reopening retains the document's buffer, undo, and recovery state. One file's
 failure does not prevent other valid files from opening. See [opening](opening.md) and
 [file access](files.md) for activation, graphical requests, and filesystem limits.
 

@@ -11,7 +11,7 @@ const radii = Object.fromEntries([...tokens.matchAll(/(--radius-[a-z]+):\s*([^;]
 function installStyles() {
   const style = document.createElement('style')
   // jsdom does not resolve custom properties; retain the actual selectors and cascade.
-  style.textContent = ['ui/app/app.css', 'ui/desktop/native.css', 'ui/app/ConflictPanel.css',
+  style.textContent = ['ui/app/app.css', 'ui/desktop/native.css', 'ui/app/Notifications.css',
     'ui/modes/reading/frontmatter.css'].map((file) => readFileSync(file, 'utf8')).join('\n')
     .replace(/var\((--radius-[a-z]+)\)/g, (_, name: string) => radii[name]!)
     .replaceAll('var(--space-unit)', '4px')
@@ -25,7 +25,7 @@ it('gives peer controls and floating surfaces consistent corners', () => {
   const groups = [
     ['btn-cta', 'btn-ghost', 'settings-input', 'theme-chip', 'native-open', 'native-file-pill'],
     ['reader-menu', 'rail-card', 'sel-toolbar', 'slide-over', 'lang-menu', 'outline-popover',
-      'find-bar', 'conflict-notice'],
+      'find-bar', 'notification'],
     ['reader-menu-item', 'lang-option', 'native-file-close', 'settings-check'],
   ]
   for (const [index, names] of groups.entries()) {

@@ -28,7 +28,6 @@
   width: calc(var(--space-unit) * 7.5);
   height: calc(var(--space-unit) * 7.5);
 }
-.native-open:hover { border-color: var(--color-border-hover); }
 .native-file-pills {
   display: flex;
   gap: var(--space-unit);
@@ -71,11 +70,6 @@
   margin-right: var(--space-unit);
   border-radius: var(--radius-xs);
 }
-.native-file-close:hover { background: var(--color-selection); color: var(--color-text); }
-.native-file-pill:hover {
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
-}
 .native-file-pill.active {
   background: var(--color-selection);
   color: var(--color-text);
@@ -111,3 +105,5 @@
   display: flex;
   gap: calc(var(--space-unit) * 3);
 }
+
+.native-file-attention { display: grid; place-items: center; padding: var(--space-unit); }

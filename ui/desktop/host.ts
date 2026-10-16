@@ -42,6 +42,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     getSession: (id) => invoke('document_meta', { id }),
     getFile,
     putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),
+    saveCopy: (id, content) => invoke('save_document_copy', { id, content }),
     translation: (id, targetLang) => invoke('read_translation', { id, targetLang }),
     config,
     updateConfig(patch) {

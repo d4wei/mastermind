@@ -69,21 +69,11 @@ it.each(['resolve', 'delete'])('ignores stale double %s and callbacks captured b
   expect(useDoc.getState().source).toBe(source)
 })
 
-it('keeps resolved discussions and comparison mutually exclusive', () => {
+it('keeps resolved discussions available while a conflict pauses edits', () => {
   render('body')
   openReaderMenu(host)
-  const resolved = readerMenuItem('Resolved (0)')
-  act(() => resolved.click())
-  expect(host.querySelector('[role="dialog"]')).not.toBeNull()
-  act(() => useDoc.setState({ conflictDraft: {
-    open: true, base: 'body', local: 'body', localRevision: 0,
-    diskContent: 'disk', diskVersion: 'v2', diskMtimeMs: 2,
-    result: 'body', refreshing: false, error: null,
-  } }))
-  expect(host.querySelector('[role="dialog"]')).toBeNull()
-  openReaderMenu(host)
   act(() => readerMenuItem('Resolved (0)').click())
-  expect(useDoc.getState().conflictDraft!.open).toBe(false)
+  act(() => useDoc.setState({ conflict: true }))
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 })
 

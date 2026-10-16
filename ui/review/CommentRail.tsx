@@ -11,6 +11,7 @@ import type { TextEdit } from '../../document/types'
 type ThreadItem = Extract<ReviewItem, { type: 'thread' }>
 
 interface Props {
+  readOnly?: boolean
   items: readonly ReviewItem[]
   spans: readonly CriticSpan[]
   source: string
@@ -40,7 +41,7 @@ function threadKey(thread: ThreadItem, anchorText: string): string {
   return JSON.stringify([anchorText, thread.comments.map((c) => [c.author ?? '', c.body])])
 }
 
-export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, onActivate, onEdit }: Props) {
+export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, onActivate, onEdit, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
@@ -135,6 +136,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   }, [])
 
   const resolveThread = (thread: ThreadItem): void => {
+    if (readOnly) return
     let edits: TextEdit[]
     try {
       edits = resolveThreadEdits(source, thread)
@@ -149,6 +151,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   }
 
   const submitReply = (thread: ThreadItem): void => {
+    if (readOnly) return
     const text = replyText.trim()
     if (!text) return
     const body = text.replace(/\n[ \t]*\n+/g, '\n').replaceAll('<<}', '<< }')
@@ -182,7 +185,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
               <div key={i} className="rail-comment">
                 {c.author && <span className="rail-author">@{c.author}</span>}
                 <CommentBody body={c.body} />
-                <button type="button" className="btn-ghost rail-delete" onClick={(event) => {
+                <button type="button" className="btn-ghost rail-delete" disabled={readOnly} onClick={(event) => {
                   event.stopPropagation()
                   onEdit(deleteCommentEdits(source, card.thread, i))
                   onActivate(null)
@@ -193,7 +196,8 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             ))}
             {replyFor === card.key ? (
               <div className="rail-reply">
-                <textarea
+                {readOnly && <p role="status">{t('editingPaused')}</p>}
+                <textarea readOnly={readOnly}
                   autoFocus
                   ref={ime.textareaRef}
                   onCompositionStart={ime.onCompositionStart}
@@ -217,7 +221,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
                   <button type="button" onClick={() => setReplyFor(null)}>
                     {t('cancel')}
                   </button>
-                  <button type="button" className="primary" disabled={!replyText.trim()} onClick={() => submitReply(card.thread)}>
+                  <button type="button" className="primary" disabled={readOnly || !replyText.trim()} onClick={() => submitReply(card.thread)}>
                     {t('reply')}
                   </button>
                 </div>
@@ -225,7 +229,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             ) : (
               <div className="rail-actions">
                 <button
-                  type="button"
+                  type="button" disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation()
                     setReplyFor(card.key)
@@ -235,7 +239,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
                   {t('reply')}
                 </button>
                 <button
-                  type="button"
+                  type="button" disabled={readOnly}
                   onClick={(e) => {
                     e.stopPropagation()
                     resolveThread(card.thread)

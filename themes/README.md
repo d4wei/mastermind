@@ -32,7 +32,7 @@
 - Corner sizes live in every theme's `tokens.css` and stay the same across palettes:
   - `--radius-xs`: inline marks, inline code, checkboxes, and compact inset actions or rows.
   - `--radius-md`: buttons, inputs, file tabs, theme choices, and tooltips.
-  - `--radius-lg`: cards, code blocks, callouts, menus, banners, and floating panels.
+  - `--radius-lg`: cards, code blocks, callouts, menus, notifications, and floating panels.
   - `--radius-full`: scrollbar thumbs; outline and review-position ticks keep square ends.
 - Controls use rounded rectangles. A control does not become a pill merely because it is a primary
   action or a segmented choice. Nested segmented buttons use the smaller inset radius.
@@ -49,7 +49,7 @@
 - Document controls: compact icon buttons alongside the file tabs. Responsive placement and panel
   behavior live in [the layout contract](../ui/app/layout.md).
 - Secondary buttons and segmented choices use muted ink and sentence case. Active segments gain
-  text color and elevated fill. The view-mode button shows the icon for the mode it opens.
+  text color and selection fill. The view-mode button shows the icon for the mode it opens.
 - Selection toolbar: the dark band device miniaturized (invert-bg surface, invert-text ink).
 - Focus ring: 2px `--focus-ring`, offset 2px — ink on the light themes, the accent on Nacht.
 - Optional film-grain overlay (SVG feTurbulence, desaturated): per-theme base opacity (~0.12 on Grid) scaled by a user **intensity** (off / low / medium / high) × **texture** (fine / soft / coarse). Off by default on every theme.
@@ -61,3 +61,16 @@ Each manifest declares its appearance and grain defaults. Bundled font faces liv
 and `themes/grid/fonts/`; the [asset registry](../ui/theme/fonts.ts) declares their local URLs.
 Cross-theme preferences for font preset, code font, and code color scheme set token values at
 runtime from their registries rather than any one theme's `tokens.css`.
+
+## Interaction feedback
+
+Ordinary buttons, file tabs, choices, and navigation rows use `--color-control-hover` for a neutral
+hover surface and `--color-text` for stronger ink. Pressed controls use `--color-control-pressed`.
+Each theme maps these tokens to its neutral scale. Selected choices retain their separate fill on
+hover; disabled controls do not react. Primary actions keep their accent treatment. Selection
+toolbar actions use the inverted surface and matching text, including composer actions. Keyboard
+focus retains its own ring.
+
+Text links retain underlines, review marks retain semantic colors, and scrollbars retain their
+track treatment. Comment cards use a neutral border change so hovering does not resemble the
+active anchored discussion. Hover changes do not move or resize controls.

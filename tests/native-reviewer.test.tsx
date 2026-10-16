@@ -12,7 +12,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => mocks.id, {
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: mocks.id, needsAttention: () => false }), {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument }),
 }) }))

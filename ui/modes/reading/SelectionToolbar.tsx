@@ -12,6 +12,7 @@ import { commentEdits, deletionWrap } from './marks'
 const EXIT_MS = 120
 
 interface Props {
+  readOnly?: boolean
   containerRef: RefObject<HTMLElement | null>
   source: string
   spans: readonly CriticSpan[]
@@ -25,7 +26,7 @@ interface Active {
   rect: { top: number; left: number; width: number }
 }
 
-export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdit }: Props) {
+export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdit, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const [active, setActive] = useState<Active | null>(null)
@@ -110,6 +111,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   if (!present.mounted || !view) return null
 
   const finish = (edits: TextEdit[]): void => {
+    if (readOnly) return
     onEdit(edits)
     window.getSelection()?.removeAllRanges()
     setActive(null)
@@ -136,18 +138,19 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     >
       {!composing ? (
         <>
-          <button type="button" onClick={() => setComposing(true)}>
+          <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>
             <ChatIcon width={13} height={13} />
             {t('comment')}
           </button>
-          <button type="button" onClick={applyDeletion}>
+          <button type="button" disabled={readOnly} onClick={applyDeletion}>
             <StrikethroughIcon width={13} height={13} />
             {t('suggestDeletion')}
           </button>
         </>
       ) : (
         <div className="sel-composer">
-          <textarea
+          {readOnly && <p role="status">{t('editingPaused')}</p>}
+          <textarea readOnly={readOnly}
             autoFocus
             ref={ime.textareaRef}
             onCompositionStart={ime.onCompositionStart}
@@ -174,7 +177,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
             <button type="button" onClick={() => setComposing(false)}>
               {t('cancel')}
             </button>
-            <button type="button" className="primary" disabled={!comment.trim()} onClick={applyComment}>
+            <button type="button" className="primary" disabled={readOnly || !comment.trim()} onClick={applyComment}>
               {t('comment')}
             </button>
           </div>

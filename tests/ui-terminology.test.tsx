@@ -6,6 +6,8 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ClientConfig } from '../ui/settings/types'
 import { useConfig } from '../ui/app/configStore'
+import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
 import { ConflictPanel } from '../ui/app/ConflictPanel'
 import { createDocStore, useDoc } from '../ui/documents/store'
 import { Navigator } from '../ui/app/Navigator'
@@ -39,24 +41,18 @@ afterEach(() => {
 })
 
 it.each([
-  { lang: 'en', headings: ['Base version', 'Your edits', 'File on disk'], result: 'Merge result',
-    save: 'Save merge result', baseHint: 'The version loaded or saved before these conflicting changes.' },
-  { lang: 'zh-CN', headings: ['基准版本', '你的编辑', '磁盘文件'], result: '合并结果',
-    save: '保存合并结果', baseHint: '发生这些冲突更改前加载或保存的版本。' },
-] as const)('names the captured conflict versions and editable result in $lang', (labels) => {
+  { lang: 'en', merge: 'Try merge', incoming: 'Use incoming' },
+  { lang: 'zh-CN', merge: '尝试合并', incoming: '采用外部版本' },
+] as const)('names the recovery actions in $lang', (labels) => {
+  installHost(fakeHost())
   useConfig.setState({ config: { ...config, uiLang: labels.lang } })
   const store = createDocStore()
-  store.setState({ conflict: true, conflictDraft: {
-    open: true, base: 'loaded text', local: 'my changes', localRevision: 0,
-    diskContent: 'external changes', diskVersion: 'v2', diskMtimeMs: 2,
-    result: 'my changes', refreshing: false, error: null,
-  } })
+  store.setState({ conflict: true })
   act(() => root.render(<ConflictPanel store={store} />))
-  expect([...host.querySelectorAll('h3')].map((item) => item.textContent)).toEqual(labels.headings)
-  expect(host.querySelector('h3')?.title).toBe(labels.baseHint)
-  expect(host.querySelector('textarea')?.labels?.[0]?.querySelector('span')?.textContent).toBe(labels.result)
-  expect(host.querySelector('textarea')?.value).toBe('my changes')
-  expect([...host.querySelectorAll('button')].some((item) => item.textContent === labels.save)).toBe(true)
+  expect(host.textContent).toContain(labels.merge)
+  expect(host.textContent).toContain(labels.incoming)
+  expect(host.querySelector('textarea')).toBeNull()
+  installHost(null)
 })
 
 it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLang) => {

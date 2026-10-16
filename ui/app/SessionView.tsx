@@ -19,6 +19,7 @@ import { useConfig } from './configStore'
 import { useDoc, type ViewMode } from '../documents/store'
 import { parseResolvedThreads } from '../../document/review-archive'
 import { ResolvedThreads } from '../review/ResolvedThreads'
+import { Notice } from './Notifications'
 import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
 import { SlideOver } from './SlideOver'
@@ -43,10 +44,9 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
   const notice = useDoc((s) => s.notice)
-  const meta = useDoc((s) => s.meta)
   const mode = useDoc((s) => s.mode)
   const externalVersion = useDoc((s) => s.externalVersion)
-  const comparisonOpen = useDoc((s) => s.conflictDraft?.open ?? false)
+  const readOnly = useDoc((s) => s.conflict)
   const load = useDoc((s) => s.load)
   const applyEdits = useDoc((s) => s.applyEdits)
 
@@ -61,22 +61,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const [panel, setPanel] = useState<'settings' | 'find' | 'resolved' | null>(null)
   const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
   const togglePanel = useCallback((next: 'settings' | 'find' | 'resolved') => {
-    useDoc.getState().closeConflict()
     if (narrow) setRailOpen(false)
     setPanel((current) => current === next ? null : next)
   }, [narrow])
-  useEffect(() => {
-    if (comparisonOpen) {
-      if (narrow) setRailOpen(false)
-      setPanel(null)
-    }
-  }, [comparisonOpen, narrow])
   const closePanel = useCallback(() => setPanel(null), [])
   const openRail = useCallback(() => {
-    if (narrow) {
-      setPanel(null)
-      useDoc.getState().closeConflict()
-    }
+    if (narrow) setPanel(null)
     setRailOpen(true)
   }, [narrow])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
@@ -101,8 +91,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   }, [sessionId, load])
 
   useEffect(() => {
-    if (!notice) return
-    const timer = setTimeout(() => useDoc.getState().setNotice(null), notice.kind === 'error' ? 8000 : 5000)
+    if (!notice || notice.kind === 'error') return
+    const timer = setTimeout(() => useDoc.getState().setNotice(null), 5000)
     return () => clearTimeout(timer)
   }, [notice])
 
@@ -208,7 +198,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
   const undoDeletion = useCallback(
     (el: HTMLElement): boolean => {
       const span = analysis?.spans[Number(el.dataset.spanIndex)]
-      if (!span || span.kind !== 'del') return false
+      if (useDoc.getState().conflict || !span || span.kind !== 'del') return false
       applyEdits([rejectEdit(source, span)])
       return true
     },
@@ -297,6 +287,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 
   const commentRail = analysis && (
     <CommentRail
+      readOnly={readOnly}
       items={analysis.items}
       spans={analysis.spans}
       source={source}
@@ -321,7 +312,6 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           setRailOpen((v) => !v)
           if (narrow) {
             setPanel(null)
-            useDoc.getState().closeConflict()
           }
         }}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
@@ -344,9 +334,9 @@ export function SessionView({ sessionId }: { sessionId: string }) {
       )}
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
       <ConflictPanel />
-      {translation.error && <div className="banner" role="status"><span className="banner-text">
+      {translation.error && <Notice key={translation.error}>
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
-      </span></div>}
+      </Notice>}
       <div className="document-scroll">
         <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
           <div className="doc-column">
@@ -405,11 +395,12 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         translation.targetLang === translationLanguage && (
         <TranslatedSelection key={`${sessionId}:${translationLanguage}`}
           containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
-          stale={translation.error === 'stale'} />
+          readOnly={readOnly} stale={translation.error === 'stale'} />
       )}
       {mode === 'reading' && !showTranslated && analysis && (
         <>
           <SelectionToolbar
+            readOnly={readOnly}
             containerRef={articleRef}
             source={source}
             spans={analysis.spans}
@@ -422,7 +413,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
         </>
       )}
       {notice && (
-        <div className={`toast${notice.kind === 'error' ? ' toast-error' : ''}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
+        <Notice key={notice.msg} error={notice.kind === 'error'}>
           <SlotLabel
             revealOnMount
             text={
@@ -431,7 +422,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
                 : t(notice.msg as never)
             }
           />
-        </div>
+        </Notice>
       )}
     </>
   )

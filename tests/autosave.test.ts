@@ -73,7 +73,7 @@ describe('autosave', () => {
   })
 
   it('does not schedule writes while a disk conflict is unresolved', async () => {
-    await store.getState().openConflict()
+    store.getState().notifyDiskChange(0, true)
     store.getState().setSource('edit during conflict')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).not.toHaveBeenCalled()

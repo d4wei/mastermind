@@ -13,6 +13,7 @@ const tokens = new Map(themes.map((id) => {
 // These semantic families are consumed by the interface regardless of palette choice.
 const required = [
   '--radius-xs', '--radius-md', '--radius-lg', '--radius-full',
+  '--color-control-hover', '--color-control-pressed',
   '--color-bg', '--color-bg-elevated', '--color-text', '--color-text-muted', '--color-text-faint',
   '--color-border', '--color-accent', '--color-accent-dim', '--color-accent-surface',
   '--color-on-accent', '--color-cta-bg', '--color-cta-text', '--color-border-hover', '--color-selection', '--focus-ring', '--color-invert-bg',

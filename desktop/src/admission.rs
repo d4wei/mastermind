@@ -84,7 +84,7 @@ impl Documents {
         self.activation_revision += 1;
     }
 
-    fn open(&mut self, path: &str) -> Result<(String, &'static str), FileError> {
+    pub(crate) fn open(&mut self, path: &str) -> Result<(String, &'static str), FileError> {
         let canonical = fs::canonicalize(path)?;
         let display = canonical
             .to_str()

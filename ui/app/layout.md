@@ -38,16 +38,19 @@ expansion is transient component state.
 At the narrow breakpoint, comments use the shared dismissible panel instead of a second content
 column. The panel starts closed and opens from the comments control or a document mark. Cards flow
 vertically inside it. Wide layouts retain document-aligned cards. Settings, resolved history,
-conflict comparison, and narrow comments share the overlay area.
+and narrow comments share the overlay area.
 
-`SessionView` owns settings, find, and resolved history as one transient panel choice. Opening
-comparison closes that choice; closing comparison preserves the document-owned draft. On narrow
+`SessionView` owns settings, find, and resolved history as one transient panel choice. On narrow
 layouts, opening another panel closes comments. Settings-save feedback belongs to application
 preferences and can appear without an active document.
 
 Settings and history panels fit within the viewport width and scroll their bodies when needed.
-Conflict notices remain fixed below the controls; comparison appears below the notice. Find controls
-wrap to fit narrow widths. Long source/code lines can still scroll within their own content areas.
+`Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling.
+Conflict recovery, save failures, and translation feedback share it; Find retains the top-center
+slot. Dismissed failures remain reachable from a compact control. Conflict state also appears on
+file tabs. Successful transient messages expire; unresolved failures do not disappear on a timer.
+Find controls wrap to fit narrow widths. Long source/code lines can still scroll within their own
+content areas.
 
 Regression tests cover both interface languages, overflow access, narrow comments, outline
 expansion and progress, and scroll clearance. The manual browser procedure lives in

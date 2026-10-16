@@ -302,7 +302,7 @@ it('native quit waits for an in-flight save, then saves edits made behind it', a
   expect(store.getState().hasPendingWrites()).toBe(false)
 })
 
-it('native quit retains failed saves and edited comparison results', async () => {
+it('native quit retains failed saves and unresolved conflicts', async () => {
   const store = createDocStore()
   await store.getState().load('A')
   store.getState().setSource('local')
@@ -311,10 +311,9 @@ it('native quit retains failed saves and edited comparison results', async () =>
   writes[0]!.pending.resolve(response({ error: 'unavailable' }, 500))
   expect(await closing).toBe(false)
   expect(store.getState().source).toBe('local')
-  await store.getState().openConflict()
-  store.getState().setConflictResult('unapplied result')
+  store.getState().notifyDiskChange(0, true)
   expect(await store.getState().prepareToClose()).toBe(false)
-  expect(store.getState().conflictDraft?.result).toBe('unapplied result')
+  expect(store.getState().source).toBe('local')
 })
 
 it('closes only the requested document after its save finishes', async () => {
@@ -337,7 +336,7 @@ it('closes only the requested document after its save finishes', async () => {
   expect(store.getState().source).toBe('B changed')
 })
 
-it('keeps failed saves and distinct comparison results open', async () => {
+it('keeps failed saves and unresolved conflicts open', async () => {
   const store = createDocStore()
   await store.getState().load('A')
   store.getState().setSource('A changed')
@@ -349,11 +348,10 @@ it('keeps failed saves and distinct comparison results open', async () => {
   expect(release).not.toHaveBeenCalled()
   expect(store.getState().source).toBe('A changed')
   await store.getState().load('B')
-  await store.getState().openConflict()
-  store.getState().setConflictResult('unaccepted result')
+  store.getState().notifyDiskChange(0, true)
   expect(await store.getState().closeDocument('B', release)).toBe(false)
   expect(release).not.toHaveBeenCalled()
-  expect(store.getState().conflictDraft?.result).toBe('unaccepted result')
+  expect(store.getState().conflict).toBe(true)
 })
 
 it('releases a clean active buffer but retains it when native removal fails', async () => {

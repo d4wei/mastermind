@@ -44,8 +44,8 @@ reply to a discussion. Delete removes one comment; Resolve archives the discussi
 tail, visible through Resolved. `Cmd+Z` undoes review actions.
 
 A clean buffer reloads external changes automatically. A dirty buffer keeps local edits and the
-disk version, pauses saving, and offers an explicit comparison with an editable result. The
-[native file contract](desktop/src/files.md) describes concurrency and filesystem limits.
+disk version, pauses editing, and offers incoming adoption, three-way merging, or saving a new copy.
+The [native file contract](desktop/src/files.md) describes concurrency and filesystem limits.
 Closing the app waits for saves; failures retain recoverable text and block the close.
 
 ## Optional translated reading

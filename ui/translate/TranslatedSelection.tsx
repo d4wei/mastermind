@@ -13,9 +13,10 @@ interface Props {
   artifact: PreparedTranslation
   authorTag: string
   stale?: boolean
+  readOnly?: boolean
 }
 interface Selection { artifact: PreparedTranslation; blockId: string; quote: string; top: number; left: number }
-export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale }: Props) {
+export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -53,7 +54,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   }, [containerRef, artifact])
   const close = () => { setSelection(null); setComposing(false); setBody(''); setError(false) }
   const submit = async () => {
-    if (!selection || !body.trim() || busy.current) return
+    if (readOnly || !selection || !body.trim() || busy.current) return
     const capturedArtifact = selection.artifact
     busy.current = true
     setSubmitting(true)
@@ -68,7 +69,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const edit = await translatedCommentEdit(current.source, { blockId: selection.blockId,
         sourceHash: capturedArtifact.sourceHash, quote: selection.quote, language: capturedArtifact.targetLang, author: authorTag, body })
       const latest = useDoc.getState()
-      if (!edit || latest.sessionId !== sessionId || latest.source !== current.source ||
+      if (latest.conflict || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
         useTranslation.getState().artifact !== capturedArtifact || !useTranslation.getState().active ||
         useConfig.getState().config?.translationLanguage !== capturedArtifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])
@@ -80,9 +81,10 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   return <div className="sel-toolbar" style={{ top: Math.max(8, selection.top - (composing ? 150 : 44)),
     left: Math.max(8, Math.min(selection.left, window.innerWidth - 280)) }}
     onMouseDown={(event) => { if ((event.target as HTMLElement).tagName !== 'TEXTAREA') event.preventDefault() }}>
-    {!composing ? <button type="button" onClick={() => setComposing(true)}>{t('comment')}</button> :
+    {!composing ? <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>{t('comment')}</button> :
       <div className="sel-composer">
-        <textarea ref={ime.textareaRef} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
+        {readOnly && <p role="status">{t('editingPaused')}</p>}
+        <textarea readOnly={readOnly} ref={ime.textareaRef} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
           onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur} value={body} placeholder={t('commentPlaceholder')}
           onChange={(event) => setBody(event.target.value)} onKeyDown={(event) => {
             if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
@@ -93,7 +95,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
         {(error || stale || selection.artifact !== artifact) && <div role="alert">{t('translatedCommentStale')}</div>}
         <div className="sel-composer-actions">
           <button type="button" onClick={close}>{t('cancel')}</button>
-          <button type="button" className="primary" disabled={!body.trim() || submitting}
+          <button type="button" className="primary" disabled={readOnly || !body.trim() || submitting}
             onClick={() => void submit()}>{t('comment')}</button>
         </div>
       </div>}

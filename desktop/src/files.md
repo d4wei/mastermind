@@ -25,7 +25,7 @@ A second snapshot checks the resulting content and path identity before reportin
 This is not a filesystem transaction. Unrelated writers do not share the mutex and can intervene
 after validation. A partial write or process failure can leave partial content. No crash-durability
 claim or unconditional overwrite fallback is made. A failed response leaves the UI's local text
-available for comparison and retry.
+available for recovery and retry.
 
 Notify watches parent directories so replacing an individual file preserves the directory watch.
 Events invalidate the active document; a versioned read decides whether content changed. Read-only
@@ -50,3 +50,17 @@ including failures during post-write verification. A failed write can have modif
 its error does not imply rollback. The document store retains local text for recovery.
 
 Initial setup and per-field saved choices are described in [`setup.md`](setup.md).
+
+## Saving a new copy
+
+`save_document_copy` obtains its destination from the native save picker; the webview provides only
+an admitted document ID and retained content. It cannot supply an arbitrary write path. Cancellation
+returns without writing. `create_copy` uses exclusive creation, rejecting existing destinations,
+including symlink and hard-link aliases. It checks the size, writes and syncs the bytes, then reads
+back a versioned snapshot. Failure retains the renderer buffer; a partial new file may remain and
+is never silently removed or overwritten on retry.
+
+After successful creation and admission, the registry replaces the old document ID with a fresh ID.
+The original disk file is untouched. This does not advance activation: the renderer switches only
+if the person still has the originating document selected. Unused watches are released. A failed
+creation or admission does not release the original document.

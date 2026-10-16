@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-15 — Resolve file conflicts through explicit recovery actions
+
+**Ruled.** Pause editing only for the affected file and retain its local text. Offer Use incoming,
+Try merge, and Save my version as… in a dismissible bottom-left notification, with persistent file
+attention status. Try merge saves a clean three-way text merge immediately against the incoming
+version; overlapping changes write nothing. Saving a copy must never overwrite an existing file.
+
+**Beat:** a page-wide banner and manual comparison editor, or a separate approval step after a clean
+merge that the person explicitly requested.
+
 ## 2026-10-15 — Corner treatments follow component roles across themes
 
 **Ruled.** Use one corner scale across palettes: small for inline and inset elements, medium for

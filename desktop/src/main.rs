@@ -72,6 +72,7 @@ fn main() {
             document_io::document_meta,
             document_io::read_document,
             document_io::write_document,
+            document_io::save_document_copy,
             document_io::watch_document,
             document_io::read_translation,
             setup::setup_snapshot,

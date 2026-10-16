@@ -1,0 +1,32 @@
+.notification-stack {
+  position: fixed;
+  bottom: var(--bar-gap);
+  left: var(--bar-gap);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 2);
+  width: min(calc(var(--space-unit) * 100), calc(100vw - var(--bar-gap) * 2));
+  max-height: calc(100dvh - var(--bar-clear) - var(--bar-gap));
+  overflow: auto;
+  pointer-events: none;
+}
+.notification {
+  display: flex;
+  align-items: start;
+  gap: calc(var(--space-unit) * 2);
+  padding: calc(var(--space-unit) * 3);
+  border: thin solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+.notification-content { flex: 1; min-width: 0; }
+.notification-content p { margin: calc(var(--space-unit) * 2) 0; }
+.notification-dismiss { flex: none; padding: var(--space-unit); }
+.notification-dismiss svg { width: 1em; height: 1em; }
+.conflict-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); }
+.conflict-actions button { text-align: left; }

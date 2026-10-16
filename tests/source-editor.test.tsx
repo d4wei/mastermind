@@ -162,3 +162,16 @@ it('discards editor undo when its document closes', async () => {
   await act(async () => useDoc.getState().load(a))
   expect(undoDepth(editor().state)).toBe(0)
 })
+
+it('freezes editor mutations and undo without losing selection or text on conflict', () => {
+  const view = editor()
+  act(() => view.dispatch({ changes: { from: 5, insert: ' local' }, selection: { anchor: 2, head: 4 } }))
+  act(() => useDoc.getState().notifyDiskChange(0, true))
+  expect(view.contentDOM.getAttribute('contenteditable')).toBe('false')
+  act(() => view.dispatch({ changes: { from: 0, insert: 'forbidden' } }))
+  act(() => { undo(view) })
+  expect(view.state.doc.toString()).toBe('alpha local')
+  expect(useDoc.getState().source).toBe('alpha local')
+  expect(view.state.selection.main.from).toBe(2)
+  expect(view.state.selection.main.to).toBe(4)
+})

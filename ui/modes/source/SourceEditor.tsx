@@ -1,6 +1,6 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorState, RangeSetBuilder } from '@codemirror/state'
+import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
@@ -58,6 +58,9 @@ const sourceTheme = EditorView.theme({
   '.cm-cursor': { borderLeftColor: 'var(--color-text)' },
 })
 
+const editing = new Compartment()
+const editingState = (paused: boolean) => [EditorState.readOnly.of(paused), EditorView.editable.of(!paused)]
+
 const retainedStates = new Map<string, { state: EditorState; revision: number }>()
 useDoc.subscribe((state) => {
   for (const id of retainedStates.keys()) {
@@ -84,6 +87,7 @@ export function SourceEditor() {
           doc: entry,
           extensions: [
             history(),
+            editing.of(editingState(useDoc.getState().conflict)),
             keymap.of([...defaultKeymap, ...historyKeymap]),
             markdown(),
             EditorView.lineWrapping,
@@ -95,12 +99,20 @@ export function SourceEditor() {
       state,
       parent: host,
       dispatchTransactions(transactions, currentView) {
+        if (ownsBuffer() && useDoc.getState().conflict && transactions.some((transaction) => transaction.docChanged)) return
         currentView.update(transactions)
         if (transactions.some((transaction) => transaction.docChanged) && ownsBuffer()) {
           useDoc.getState().setSourceFromEditor(currentView.state.doc.toString())
           revision = useDoc.getState().revision
         }
       },
+    })
+
+    view.dispatch({ effects: editing.reconfigure(editingState(useDoc.getState().conflict)) })
+    const stop = useDoc.subscribe((state, previous) => {
+      if (ownsBuffer() && state.conflict !== previous.conflict) {
+        view.dispatch({ effects: editing.reconfigure(editingState(state.conflict)) })
+      }
     })
 
     const flush = (): void => {
@@ -127,6 +139,7 @@ export function SourceEditor() {
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       if (useNav.getState().sourceHeadingTop === sourceHeadingTop) useNav.setState({ sourceHeadingTop: null })
+      stop()
       view.destroy()
     }
   }, [sessionId, externalVersion])

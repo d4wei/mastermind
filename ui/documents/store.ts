@@ -1,3 +1,4 @@
+import { mergeText } from '../../document/merge'
 import { APP_NAME } from '../app/constants'
 import { create } from 'zustand'
 import { applyTextEdits } from '../../document/edits'
@@ -16,18 +17,7 @@ function setTabTitle(name: string): void {
   if (g.document) g.document.title = name ? `${name} — ${APP_NAME}` : APP_NAME
 }
 
-export interface ConflictDraft {
-  open: boolean
-  base: string
-  local: string
-  localRevision: number
-  diskContent: string | null
-  diskVersion: string | null
-  diskMtimeMs: number
-  result: string
-  refreshing: boolean
-  error: 'read' | 'save' | null
-}
+export type RecoveryError = 'read' | 'save' | 'overlap' | 'limit' | 'copy' | 'changed'
 
 export interface DocStore {
   sessionId: string | null
@@ -39,7 +29,8 @@ export interface DocStore {
   mtimeMs: number
   version: string
   revision: number
-  conflictDraft: ConflictDraft | null
+  conflictDismissed: boolean
+  recoveryError: RecoveryError | null
   mode: ViewMode
   status: 'loading' | 'ready' | 'error'
   error: string | null
@@ -68,9 +59,9 @@ export interface DocStore {
   reloadFromDisk(): Promise<void>
   openConflict(): Promise<void>
   closeConflict(): void
-  refreshConflict(): Promise<void>
-  setConflictResult(result: string): void
-  saveConflictResult(): Promise<boolean>
+  tryMerge(): Promise<boolean>
+  saveCopy(): Promise<string | null>
+  needsAttention(id: string): boolean
   useConflictDisk(): Promise<boolean>
   setNotice(notice: DocStore['notice']): void
   setSource(source: string): void
@@ -86,7 +77,7 @@ export interface DocStore {
 }
 
 const documentKeys = [
-  'meta', 'source', 'savedSource', 'eol', 'mtimeMs', 'version', 'revision', 'conflictDraft',
+  'meta', 'source', 'savedSource', 'eol', 'mtimeMs', 'version', 'revision', 'conflictDismissed', 'recoveryError',
   'mode', 'conflict', 'saving', 'savingKind', 'notice', 'history', 'diskChange',
 ] as const satisfies readonly (keyof DocStore)[]
 
@@ -118,8 +109,9 @@ export function createDocStore() {
     const doc = documents.get(id)
     if (!doc) return
     if (patch.source !== undefined && patch.source !== doc.source) patch.revision = doc.revision + 1
+    if (patch.conflict && !doc.conflict && activeId === id) store.getState().flushEditor?.()
     Object.assign(doc, patch)
-    if (activeId === id) store.setState(documentState(doc))
+    store.setState(activeId === id ? documentState(doc) : {})
   }
   const schedule = (id: string): void => {
     clearAutosave(id)
@@ -175,7 +167,7 @@ export function createDocStore() {
       doc.pendingInvalidation = { mtimeMs: file.mtimeMs, deleted: false }
       return
     }
-    if (doc.source === doc.savedSource && !doc.conflictDraft && !doc.conflict) {
+    if (doc.source === doc.savedSource && !doc.conflict) {
       const normalized = normalizeToLf(file.content)
       updateDocument(id, { source: normalized, savedSource: normalized,
         eol: detectEol(file.content), mtimeMs: file.mtimeMs, version: file.version,
@@ -192,16 +184,14 @@ export function createDocStore() {
     updateDocument(id, { conflict: true, notice: null, diskChange: {
       ...doc.diskChange, mtimeMs: doc.diskChange?.mtimeMs ?? 0,
       deleted: doc.diskChange?.deleted ?? false, version: undefined,
-    }, ...(doc.conflictDraft ? { conflictDraft: { ...doc.conflictDraft,
-      diskVersion: null, refreshing: false, error: 'read' } } : {}) })
+    }, recoveryError: 'read' })
   }
   const readDiskChange = async (id: string, mtimeMs: number, deleted: boolean): Promise<void> => {
     const doc = documents.get(id)
     if (!doc) return
-    if (doc.saving) { doc.pendingInvalidation = { mtimeMs, deleted }; return }
+    if (doc.saving) { doc.diskGeneration++; doc.pendingInvalidation = { mtimeMs, deleted }; return }
     updateDocument(id, { diskChange: { ...doc.diskChange, mtimeMs,
-      deleted: deleted || !!doc.diskChange?.deleted, version: undefined }, ...(doc.conflictDraft?.refreshing
-      ? { conflictDraft: { ...doc.conflictDraft, refreshing: false } } : {}) })
+      deleted: deleted || !!doc.diskChange?.deleted, version: undefined } })
     const request = ++doc.diskGeneration
     if (deleted) { updateDocument(id, { conflict: true, notice: null }); return }
     try {
@@ -211,32 +201,49 @@ export function createDocStore() {
       if (doc.diskGeneration === request) retainReadFailure(id)
     }
   }
-  const draftIsCurrent = (doc: DocumentState, draft: ConflictDraft): boolean =>
-    doc.revision === draft.localRevision && draft.diskVersion !== null &&
-    !doc.diskChange?.deleted && (!doc.diskChange || doc.diskChange.version === draft.diskVersion)
-
-  const refreshComparison = async (id: string): Promise<void> => {
+  const recover = async (id: string, action: 'incoming' | 'merge'): Promise<boolean> => {
     const doc = documents.get(id)
-    if (!doc?.conflictDraft) return
-    const captured = { base: doc.savedSource, local: doc.source, localRevision: doc.revision }
+    if (!doc?.conflict || doc.saving) return false
+    clearAutosave(id)
     const request = ++doc.diskGeneration
-    updateDocument(id, { conflictDraft: { ...doc.conflictDraft, refreshing: true, error: null } })
+    const revision = doc.revision
+    updateDocument(id, { saving: true, savingKind: 'save', recoveryError: null })
+    let writing = false
     try {
       const file = await requireReviewerHost().getFile(id)
-      if (doc.diskGeneration !== request) return
-      updateDocument(id, { conflict: true, diskChange: { content: file.content,
-        version: file.version, mtimeMs: file.mtimeMs, deleted: false } })
-      const latest = documents.get(id)!
-      updateDocument(id, { conflictDraft: { ...latest.conflictDraft!, ...captured,
-        diskContent: file.content, diskVersion: file.version, diskMtimeMs: file.mtimeMs,
-        refreshing: false, error: null } })
+      if (doc.diskGeneration !== request || doc.revision !== revision) {
+        updateDocument(id, { recoveryError: 'changed' })
+        return false
+      }
+      const incoming = normalizeToLf(file.content)
+      let content = incoming
+      let saved = { version: file.version, mtimeMs: file.mtimeMs }
+      if (action === 'merge') {
+        const result = mergeText(doc.savedSource, doc.source, incoming)
+        if (result.kind !== 'clean') {
+          updateDocument(id, { recoveryError: result.kind === 'conflict' ? 'overlap' : 'limit' })
+          return false
+        }
+        content = result.content
+        writing = true
+        saved = await requireReviewerHost().putFile(id, restoreEol(content, detectEol(file.content)), file.version)
+      }
+      updateDocument(id, { source: content, savedSource: content, eol: detectEol(file.content),
+        ...saved, conflict: false, conflictDismissed: false, recoveryError: null, diskChange: null,
+        history: content === doc.source ? doc.history : [...doc.history.slice(-49), doc.source] })
+      if (activeId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
+      return true
     } catch {
-      if (doc.diskGeneration === request) retainReadFailure(id)
+      updateDocument(id, { recoveryError: writing ? 'save' : 'read' })
+      // A failed write may have reached disk partially; revalidate before the next attempt.
+      if (writing) doc.pendingInvalidation = { mtimeMs: 0, deleted: false }
+      return false
     } finally {
-      const latest = documents.get(id)!
-      if (doc.diskGeneration === request && latest.conflictDraft?.refreshing) updateDocument(id, {
-        conflictDraft: { ...latest.conflictDraft, refreshing: false },
-      })
+      doc.diskGeneration++
+      updateDocument(id, { saving: false, savingKind: null })
+      const pending = doc.pendingInvalidation
+      doc.pendingInvalidation = undefined
+      if (pending) await readDiskChange(id, pending.mtimeMs, pending.deleted)
     }
   }
   const store = create<DocStore>((publish, get) => {
@@ -260,7 +267,7 @@ export function createDocStore() {
       mtimeMs: 0,
       version: '',
       revision: 0,
-      conflictDraft: null,
+      conflictDismissed: false, recoveryError: null,
       mode: 'reading',
       status: 'loading',
       error: null,
@@ -294,8 +301,7 @@ export function createDocStore() {
         if (doc) {
           await doc.write
           await saveDocument(id)
-          if (doc.saving || doc.source !== doc.savedSource ||
-            (doc.conflictDraft && doc.conflictDraft.result !== doc.source)) return false
+          if (doc.saving || doc.source !== doc.savedSource || doc.conflict) return false
         }
         await release()
         clearAutosave(id)
@@ -306,15 +312,14 @@ export function createDocStore() {
         if (activeId === id) {
           setTabTitle('')
           set({ sessionId: null, meta: null, source: '', savedSource: '', history: [],
-            conflictDraft: null, conflict: false, diskChange: null, notice: null,
+            conflictDismissed: false, recoveryError: null, conflict: false, diskChange: null, notice: null,
             flushEditor: null, scroller: null, status: 'loading' })
         } else publish({})
         return true
       },
 
       hasPendingWrites() {
-        return [...documents.values()].some((doc) => doc.saving || doc.source !== doc.savedSource ||
-          (doc.conflictDraft !== null && doc.conflictDraft.result !== doc.source))
+        return [...documents.values()].some((doc) => doc.saving || doc.source !== doc.savedSource || doc.conflict)
       },
 
       async load(sessionId) {
@@ -336,7 +341,7 @@ export function createDocStore() {
           const normalized = normalizeToLf(file.content)
           const record: DocumentRecord = {
             meta, source: normalized, savedSource: normalized, eol: detectEol(file.content),
-            mtimeMs: file.mtimeMs, version: file.version, revision: 0, conflictDraft: null,
+            mtimeMs: file.mtimeMs, version: file.version, revision: 0, conflictDismissed: false, recoveryError: null,
             mode: get().mode, conflict: false, saving: false, savingKind: null, notice: null,
             history: [], diskChange: null, diskGeneration: 0,
           }
@@ -355,6 +360,7 @@ export function createDocStore() {
       },
 
       setSource(source) {
+        if (get().conflict) return
         set((s) => ({
           source,
           externalVersion: s.externalVersion + 1,
@@ -364,6 +370,7 @@ export function createDocStore() {
       },
 
       undo() {
+        if (get().conflict) return
         set((s) => {
           const prev = s.history.at(-1)
           if (prev === undefined) return s
@@ -373,6 +380,7 @@ export function createDocStore() {
       },
 
       setSourceFromEditor(source) {
+        if (get().conflict) return
         if (source === get().source) return
         set({ source })
         get().queueAutosave()
@@ -390,6 +398,7 @@ export function createDocStore() {
       },
 
       applyEdits(edits) {
+        if (get().conflict) return
         set((s) => ({
           source: applyTextEdits(s.source, edits),
           externalVersion: s.externalVersion + 1,
@@ -427,7 +436,7 @@ export function createDocStore() {
           eol: detectEol(content),
           mtimeMs,
           version,
-          conflict: false,
+          conflict: false, conflictDismissed: false, recoveryError: null,
           externalVersion: s.externalVersion + 1,
           diskChange: null,
           // Disk adoption remains reversible so review undo can recover the discarded buffer.
@@ -457,103 +466,54 @@ export function createDocStore() {
         if (record.diskGeneration === request && get().sessionId === sessionId && record.revision === revision && !record.saving) get().adoptDiskContent(file.content, file.mtimeMs, file.version)
       },
 
+      needsAttention(id) { return !!documents.get(id)?.conflict },
+
       async openConflict() {
-        get().flushEditor?.()
-        const { sessionId, conflictDraft, source, savedSource, revision } = get()
-        if (!sessionId || get().saving) return
-        clearAutosave(sessionId)
-        set({ conflict: true, conflictDraft: conflictDraft ? { ...conflictDraft, open: true } : {
-          open: true, base: savedSource, local: source, localRevision: revision,
-          diskContent: null, diskVersion: null, diskMtimeMs: 0, result: source,
-          refreshing: false, error: null,
-        } })
-        if (!conflictDraft) await refreshComparison(sessionId)
+        if (get().conflict) set({ conflictDismissed: false })
       },
 
-      closeConflict() {
-        const draft = get().conflictDraft
-        if (draft) set({ conflictDraft: { ...draft, open: false } })
-      },
-
-      async refreshConflict() {
-        get().flushEditor?.()
-        const id = get().sessionId
-        if (id && !get().saving) await refreshComparison(id)
-      },
-
-      setConflictResult(result) {
-        const draft = get().conflictDraft
-        if (draft && !get().saving) set({ conflictDraft: { ...draft, result, error: null } })
-      },
+      closeConflict() { set({ conflictDismissed: true }) },
 
       async useConflictDisk() {
-        get().flushEditor?.()
-        const { sessionId } = get()
-        if (!sessionId) return false
-        const doc = documents.get(sessionId)!
-        const draft = doc.conflictDraft
-        if (!draft || doc.saving || draft.refreshing || !draftIsCurrent(doc, draft)) return false
-        const request = ++doc.diskGeneration
-        try {
-          const file = await requireReviewerHost().getFile(sessionId)
-          const latest = documents.get(sessionId)!
-          if (doc.diskGeneration !== request || latest.saving || latest.conflictDraft !== draft) return false
-          if (!draftIsCurrent(latest, draft) || file.version !== draft.diskVersion) {
-            reconcileDisk(sessionId, file)
-            return false
-          }
-          const normalized = normalizeToLf(file.content)
-          updateDocument(sessionId, { source: normalized, savedSource: normalized,
-            eol: detectEol(file.content), mtimeMs: file.mtimeMs, version: file.version,
-            conflict: false, diskChange: null, conflictDraft: null,
-            history: [...latest.history.slice(-49), latest.source] })
-          if (get().sessionId === sessionId) set((s) => ({ externalVersion: s.externalVersion + 1 }))
-          return true
-        } catch {
-          const latest = documents.get(sessionId)!
-          if (doc.diskGeneration === request && latest.conflictDraft === draft) retainReadFailure(sessionId)
-          return false
-        }
+        const id = get().sessionId
+        return id ? recover(id, 'incoming') : false
       },
 
-      async saveConflictResult() {
-        get().flushEditor?.()
+      async tryMerge() {
         const id = get().sessionId
-        if (!id) return false
-        const doc = documents.get(id)!
-        const draft = doc.conflictDraft
-        if (!draft || doc.saving || draft.refreshing || !draftIsCurrent(doc, draft)) return false
+        return id ? recover(id, 'merge') : false
+      },
+
+      async saveCopy() {
+        const id = get().sessionId
+        const doc = id ? documents.get(id) : undefined
+        const host = requireReviewerHost()
+        if (!id || !doc?.conflict || doc.saving || !host.saveCopy) return null
         clearAutosave(id)
-        doc.diskGeneration++
-        updateDocument(id, { saving: true, savingKind: 'save',
-          conflictDraft: { ...draft, error: null } })
-        let succeeded = false
+        const navigation = loadRequest
+        updateDocument(id, { saving: true, savingKind: 'save', recoveryError: null })
         try {
-          const result = normalizeToLf(draft.result)
-          const eol = detectEol(draft.diskContent!)
-          const res = await requireReviewerHost().putFile(id, restoreEol(result, eol), draft.diskVersion!)
-          const latest = documents.get(id)!
-          const unchanged = latest.revision === draft.localRevision
-          updateDocument(id, { savedSource: result, eol, version: res.version, mtimeMs: res.mtimeMs,
-            ...(unchanged ? { source: result, conflict: false, diskChange: null, conflictDraft: null,
-              history: [...latest.history.slice(-49), latest.source] } : { conflict: true }) })
-          if (unchanged && get().sessionId === id) set((s) => ({ externalVersion: s.externalVersion + 1 }))
-          succeeded = true
-          return true
-        } catch (err) {
-          const latest = documents.get(id)!
-          updateDocument(id, { conflict: true, conflictDraft: { ...latest.conflictDraft!, error: 'save' } })
-          if (err instanceof HostError && (err.kind === 'conflict' || err.kind === 'missing')) {
-            doc.pendingInvalidation = { mtimeMs: 0, deleted: false }
-          }
-          return false
-        } finally {
+          const copy = await host.saveCopy(id, restoreEol(doc.source, doc.eol))
+          if (!copy) return null
+          const source = normalizeToLf(copy.file.content)
+          documents.set(copy.meta.sessionId, { ...doc, meta: copy.meta, source, savedSource: source,
+            eol: detectEol(copy.file.content), version: copy.file.version, mtimeMs: copy.file.mtimeMs,
+            conflict: false, conflictDismissed: false, recoveryError: null, saving: false,
+            savingKind: null, diskChange: null, notice: null, history: [], diskGeneration: 0,
+            pendingInvalidation: undefined, write: undefined, autosaveTimer: undefined })
           doc.diskGeneration++
+          documents.delete(id)
+          if (get().sessionId === id && loadRequest === navigation) await get().load(copy.meta.sessionId)
+          else publish({})
+          return copy.meta.sessionId
+        } catch {
+          updateDocument(id, { recoveryError: 'copy' })
+          return null
+        } finally {
           updateDocument(id, { saving: false, savingKind: null })
           const pending = doc.pendingInvalidation
           doc.pendingInvalidation = undefined
-          if (pending) await readDiskChange(id, pending.mtimeMs, pending.deleted)
-          if (succeeded && documents.get(id)!.conflict) await readDiskChange(id, 0, false)
+          if (documents.has(id) && pending) await readDiskChange(id, pending.mtimeMs, pending.deleted)
         }
       },
 

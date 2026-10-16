@@ -1,69 +1,64 @@
 # Document state and save ownership
 
-`createDocStore` retains an in-memory record for every visited session. Each record owns its
-normalized source, saved base, original line endings, opaque disk version, review undo history,
-write promise and status, autosave timer, disk-read generation, and pending invalidation.
-The registry and active document ID are separate from the Zustand view. Record operations publish
-the active projection explicitly; view subscriptions never copy state back into the registry.
-The Zustand state exposes the active record; editor callbacks
-are valid only for the document and external-buffer revision where they registered.
+`createDocStore` retains an in-memory record for each visited document: normalized source, saved
+base, line endings, opaque disk version, review undo, write status, autosave timer, read generation,
+and pending invalidation. The active Zustand projection and retained registry have separate owners.
+Editor callbacks belong to one document and external-buffer revision.
 
-Navigation flushes the departing editor before loading another session. Retained documents are
-revalidated on return. Failed navigation leaves the departing record available. Load requests
-and disk reads carry generations; explicit reload also guards the captured local revision,
-including edits that return to the same text. Write boundaries invalidate older disk reads. Save
-responses
-update their originating record even after navigation, and a successful save schedules another
-write if the buffer changed during the request.
+Navigation flushes the departing editor. Retained documents revalidate on return; failed navigation
+leaves the previous record available. Read generations reject stale completions. Ordinary save
+responses update their originating record even after navigation and schedule another write if its
+buffer changed during the request. Clean external changes reload automatically.
 
-A clean external change replaces the displayed source and base. A dirty change keeps the base
-and local buffer and captures the disk content and version in `diskChange`; further automatic
-writes pause. Events arriving during writes are reconciled afterward. Comparison is explicit,
-and does not depend on Markdown mode. A disk conflict or unavailable file clears the previous
-transient notice; the persistent conflict notice presents the current recovery action.
+## Conflict recovery
 
-## Conflict comparison
+A dirty external change retains the base and local text and pauses both editing and autosave for
+that document. Store mutation entry points reject changes, including review undo. The mounted
+source editor becomes read-only without replacing its state; comment composers retain their text
+and disable submission. Reading, copying, navigation, and other documents remain available.
 
-Each document retains its comparison draft through panel close and navigation. The draft holds
-Base, captured Local and its monotonically increasing source revision, the reviewed Disk token
-and bytes, and an editable Result initialized to Local. Editing Result changes no document or
-disk bytes. Later local or disk changes mark the draft stale; they never replace Result.
-An explicit refresh updates the comparison snapshots while preserving Result. Edits arriving
-during that refresh still invalidate its captured Local revision.
+`ConflictPanel.tsx` offers these explicit operations:
 
-Save result requires both the captured Local revision and the displayed Disk token to remain
-current. The write sends that exact token to the host. A conflict response refreshes the latest
-Disk for comparison while preserving the stale draft; the user must explicitly refresh before
-retrying against a different version. Successful completion changes only its originating document.
-If local edits arrived during the write, they remain in the buffer and saving stays paused rather
-than silently replacing them with Result. Save failure retains the result for retry.
+- **Use incoming** asks for confirmation before discarding local edits. It reads again and adopts
+  the incoming text only if no newer invalidation or local revision supersedes the read. The prior
+  local buffer remains in review undo for this app session.
+- **Try merge** reads again, merges base/local/incoming with [`mergeText`](../../document/merge.ts),
+  and saves a clean result immediately against that incoming version. Overlap or a merge limit
+  writes nothing. It never inserts conflict markers or reserializes Markdown. The previous local
+  buffer remains in review undo. Host version checks still reject a changed or missing original.
+- **Save my version as…** uses the native save-copy operation. Cancellation or failure retains
+  the original buffer. Success admits the new file and releases the original record; the
+  app selects the copy only if the person has not navigated elsewhere. The original disk file is
+  untouched. The browser development host has no save picker capability.
+- **Copy my version** provides a clipboard escape when a destination is unavailable. The Markdown
+  view also supports selecting and copying the retained text.
 
-Use disk validates the displayed token with a disk read and rechecks its Local revision and read
-generation before adopting it. The discarded Local buffer remains in review undo. Missing paths
-block both apply actions; refresh retries reading without recreating the file. Any failed read
-invalidates the comparison's apply token while retaining its text. An unavailable response can mean
-missing or unreadable; only a deletion event establishes the missing-file notice. Repeated reads
-and refreshes share generation guards, and write boundaries invalidate older reads.
+Recovery reads and writes mark the document busy, preventing simultaneous recovery and close.
+Invalidations during reads reject the operation; invalidations during writes trigger revalidation
+when the write settles. Failed writes retain local text and reread because a failure can follow a
+partial filesystem write. Reads cannot always distinguish missing from unreadable files; only a
+known deletion selects the missing-file message. The native filesystem's concurrency limits are
+specified in [file I/O](../../desktop/src/files.md).
 
-[`ConflictPanel.tsx`](../app/ConflictPanel.tsx) presents the persistent viewport notice and shared
-SlideOver comparison
-shell. Result is a manual text merge; no automatic merge or normalized Markdown serialization is
-involved. Ordinary writes and accepted Result restore the appropriate original line endings.
+`conflictDismissed` hides the expanded notice without resolving the conflict. File tabs and a
+compact notification keep recovery reachable. Repeated invalidations do not reopen a dismissed
+notice. Recovery completion updates its owning record even if another file is active.
 
-`documentLifecycle.ts` registers at the app level so retained documents remain protected outside
-a document route. Blur and visibility changes start saves for all retained records. Browser
-unload cannot await those writes: while any record is dirty, saving, or holds a distinct edited
-Result, the handler requests the browser's leave-page prompt. Accepting that prompt, process
-termination, and app crashes can still lose unsaved in-memory buffers.
+Ordinary writes restore the original line endings; merges restore the incoming version's line
+endings. Unedited files are not written. There is no editable comparison-result buffer.
 
-`prepareToClose` flushes the editor, awaits existing ordinary writes, and saves any remaining
-buffer changes before checking all retained documents. It returns false for unresolved work,
-including a distinct comparison result or an active comparison save. The native adapter locks
-editing while awaiting this check and keeps the window open on failure. Native operating-system
-quit coverage is tracked in the [host observations](../../tools/desktop/results.md).
+## Closing and lifecycle
 
-`closeDocument` applies the save check to one document, then awaits host removal before dropping its
-record. A failed removal retains the record. Closing invalidates pending reads and loads for that
-file; closing a background file does not cancel a different file's load. The native adapter locks
-editing through this operation. Source-editor history is released with the document, including
-cleanup that runs after the active editor unmounts.
+`documentLifecycle.ts` starts saves on blur and visibility changes. Browser unload cannot await
+writes; any dirty, saving, or conflicted record requests the browser's leave-page prompt. Accepting
+that prompt, process termination, or a crash can still lose unsaved in-memory buffers.
+
+`prepareToClose` flushes the editor, awaits ordinary writes, saves remaining buffers, then checks
+all records. An active recovery operation or unresolved conflict keeps the window open. Native close
+locks editing while this check runs; [native validation](../../tools/desktop/results.md) records
+platform coverage.
+
+`closeDocument` checks one file, awaits host removal, then drops its record. Failure retains it.
+Closing invalidates pending reads and loads for that file without cancelling another file's load.
+The native adapter locks editing during close. Source-editor history is released with the record,
+including cleanup after the active editor unmounts.

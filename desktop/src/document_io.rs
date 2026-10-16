@@ -9,7 +9,8 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
+use tauri_plugin_dialog::DialogExt;
 
 pub struct FileWatch {
     watcher: RecommendedWatcher,
@@ -126,6 +127,91 @@ pub async fn write_document(
         .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
+fn save_registered_copy(
+    docs: &Mutex<Documents>,
+    id: &str,
+    path: PathBuf,
+    content: &str,
+) -> Result<Value, FileError> {
+    let mut docs = docs.lock().unwrap();
+    let original = admitted(&docs, id)?;
+    files::create_copy(&path, content)?;
+    let (canonical, _) = docs.open(path.to_str().ok_or_else(|| {
+        FileError::new(
+            400,
+            "unsupported_path_encoding",
+            "The file path is not valid UTF-8.",
+        )
+    })?)?;
+    let copy_id = *docs
+        .order
+        .iter()
+        .find(|(_, value)| **value == canonical)
+        .unwrap()
+        .0;
+    let saved = files::read(std::path::Path::new(&canonical))?;
+    if saved.content() != content {
+        return Err(FileError::conflict());
+    }
+    // Preserve the activation revision: a save picker must not steal later navigation.
+    let old_id = id.parse::<usize>().unwrap();
+    docs.order.remove(&old_id);
+    docs.files.remove(&original);
+    if docs.active_id == Some(old_id) {
+        docs.active_id = Some(copy_id);
+    }
+    Ok(json!({
+        "meta": { "sessionId": copy_id.to_string(), "path": canonical,
+            "displayName": path.file_name().unwrap().to_string_lossy(), "mtimeMs": saved.mtime_ms },
+        "file": saved
+    }))
+}
+
+#[tauri::command]
+pub async fn save_document_copy(
+    app: tauri::AppHandle,
+    id: String,
+    content: String,
+    docs: State<'_>,
+    watch: tauri::State<'_, Arc<Mutex<FileWatch>>>,
+) -> Result<Option<Value>, FileError> {
+    let docs = docs.inner().clone();
+    let path = admitted(&docs.lock().unwrap(), &id)?;
+    let mut dialog = app.dialog().file().set_file_name(format!(
+        "{}-copy.md",
+        path.file_stem().unwrap_or_default().to_string_lossy()
+    ));
+    if let Some(parent) = path.parent() {
+        dialog = dialog.set_directory(parent);
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    dialog.save_file(move |path| {
+        let _ = sender.send(path);
+    });
+    let Some(path) = receiver
+        .await
+        .map_err(|e| FileError::new(500, "dialog_error", e.to_string()))?
+    else {
+        return Ok(None);
+    };
+    let path = path
+        .into_path()
+        .map_err(|e| FileError::new(400, "invalid_path", e.to_string()))?;
+    let watch = watch.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || {
+            let saved = save_registered_copy(&docs, &id, path, &content)?;
+            let documents = docs.lock().unwrap();
+            watch.lock().unwrap().retain_documents(&documents);
+            Ok(Some(saved))
+        })
+        .await
+        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+}
+
 #[tauri::command]
 pub async fn watch_document(
     id: String,
@@ -208,6 +294,32 @@ mod tests {
     use super::*;
     use crate::admission::{Request, VERSION};
     use std::fs;
+
+    #[test]
+    fn saved_copy_replaces_admission_only_after_success_without_stealing_activation() {
+        let dir = std::env::temp_dir().join(format!("mastermind-copy-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("original.md");
+        let copy = dir.join("copy.md");
+        fs::write(&original, "original").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            version: VERSION,
+            paths: vec![original.to_str().unwrap().into()],
+        });
+        let revision = docs.activation_revision;
+        let docs = Mutex::new(docs);
+        assert!(save_registered_copy(&docs, "0", original.clone(), "local").is_err());
+        assert_eq!(docs.lock().unwrap().order.len(), 1);
+        let result = save_registered_copy(&docs, "0", copy.clone(), "local").unwrap();
+        assert_eq!(result["meta"]["sessionId"], "1");
+        assert_eq!(result["file"]["content"], "local");
+        assert_eq!(docs.lock().unwrap().activation_revision, revision);
+        assert!(!docs.lock().unwrap().order.contains_key(&0));
+        assert_eq!(fs::read_to_string(original).unwrap(), "original");
+        assert_eq!(fs::read_to_string(copy).unwrap(), "local");
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn writes_are_serialized_without_holding_the_document_registry() {

@@ -20,10 +20,10 @@ or data being discussed. Names must stand on their own without the development c
 | Prepared translation, in notices | Translation | 译文 |
 | Edits, as a review search filter | Suggested edits | 修改建议 |
 | Original thread, in resolved history | Discussion | 讨论 |
-| Base, in conflict comparison | Base version | 基准版本 |
-| Local, in conflict comparison | Your edits | 你的编辑 |
-| Latest disk, in conflict comparison | File on disk | 磁盘文件 |
-| Result, in conflict comparison | Merge result | 合并结果 |
+| Use disk version | Use incoming | 采用外部版本 |
+| Compare versions | Needs attention | 需要处理 |
+| Save merge result | Try merge | 尝试合并 |
+| Save a copy | Save my version as… | 将我的版本另存为… |
 | Session, in document errors | Open document | 已打开的文档 |
 | Typeface | Font preset | 字体预设 |
 | Code color | Code color scheme | 代码配色 |
@@ -232,30 +232,18 @@ Keep the stored `mastermind:resolved-thread v1` and `translated-selection v1` ma
 
 ## 8. Conflicting versions and saving
 
-Evidence: [comparison state][store] and [file writes][files]. Both the app buffer and disk are
-local, so Local does little to distinguish them. Latest disk can become false after another edit.
+Evidence: [document recovery][store] and [file writes][files]. Use **Needs attention / 需要处理**
+for a file whose conflict remains unresolved. The notice says editing is paused and names the file.
 
-| Earlier heading | Canonical heading | 简体中文 |
-| --- | --- | --- |
-| Base | Base version | 基准版本 |
-| Local | Your edits | 你的编辑 |
-| Latest disk | File on disk | 磁盘文件 |
-| Result | Merge result | 合并结果 |
+Use **Use incoming / 采用外部版本** for discarding unsaved edits after confirmation; **Try merge /
+尝试合并** for a three-way text merge that saves immediately when clean; **Save my version as… /
+将我的版本另存为…** for saving retained text to a new file. **Copy my version / 复制我的版本** copies
+that text to the clipboard. A clean text merge does not imply semantic correctness.
 
-Explain **Base version** as “The version loaded or saved before these conflicting changes.” The
-base may have come from opening or reloading a file; the app need not have saved it.
-
-Explain **Merge result** as “Edit this text to combine the changes.” It starts as a copy of Your
-edits; no automatic merge has happened. The label must not imply a computed merge.
-
-Use **Compare versions / 比较版本**, **Refresh versions / 刷新版本**, **Use disk version / 采用磁盘版本**,
-and **Save merge result / 保存合并结果**. The first three comparison panes are captured versions;
-“Your edits” does not promise a live view while editing the merge result.
-
-Example: “Saving paused. Compare your edits with the file on disk.”
-Example: “The versions changed. Refresh them before saving the merge result.”
-Keep **autosave / 自动保存** and **saving paused / 保存已暂停**. In notices use unsaved changes rather
-than dirty buffer; technical clean/dirty buffer terminology remains useful.
+Keep **base version / 基准版本**, **your edits / 你的编辑**, and **file on disk / 磁盘文件** when explaining
+merge inputs. **Merge result / 合并结果** is computed output, not a separate manual editor.
+Use **autosave / 自动保存**, **editing paused / 编辑已暂停**, and **unsaved changes / 未保存的更改** in
+public explanations; clean/dirty buffer remains useful technical terminology.
 
 ## 9. Document lifetime, sessions, and drafts
 
@@ -271,8 +259,8 @@ Use **Restore open files / 恢复已打开的文件** for the deferred public ca
 restoration** for its technical scope. Naming does not decide which buffers, positions, or panels
 persist; restoration remains deferred in [DIRECTION.md][direction].
 
-Use **merge result / 合并结果** for the retained editable conflict comparison. Blank-draft creation
-is retired; do not introduce an untitled-document workflow through terminology changes.
+Blank-draft creation is retired; do not introduce an untitled-document workflow through
+terminology changes.
 
 ## 10. Version, revision, snapshot, and source
 
@@ -287,12 +275,12 @@ Keep the ordinary engineering vocabulary, but qualify it where several kinds mee
 | Version | Editor reset counter | `externalVersion`, which remounts the editor |
 | Version | Format version | Version of a serialized schema |
 | Revision | Git revision | A commit or other Git reference |
-| Snapshot | Comparison snapshot | Captured content used in conflict comparison |
+| Snapshot | File snapshot | Captured disk content and its version token |
 | Range/span | Source range / mark span | UTF-16 positions, including defined delimiters |
 | Splice | Source splice | Replace an exact range without re-rendering Markdown |
 
 Qualify snapshot where several kinds meet. A version does not necessarily contain captured text;
-a comparison snapshot does.
+a file snapshot does.
 
 Do not automatically rename `version` inside a clearly typed response or every `source` parameter.
 Rename misleading boundary fields deliberately; preserve byte-preserving round trip as an invariant,

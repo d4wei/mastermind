@@ -8,10 +8,10 @@ import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 let host: HTMLDivElement
 let root: Root
 const edit = vi.fn()
-function Harness() {
+function Harness({ readOnly = false }: { readOnly?: boolean }) {
   const containerRef = useRef<HTMLElement>(null)
   return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe="7">Passage</span></p></article></div>
-    <SelectionToolbar containerRef={containerRef} source="Passage" spans={[]} authorTag="reviewer" onEdit={edit} /></>
+    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source="Passage" spans={[]} authorTag="reviewer" onEdit={edit} /></>
 }
 beforeEach(() => {
   vi.useFakeTimers()
@@ -98,4 +98,17 @@ it('repositions the selection controls when the document container scrolls', asy
   await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(toolbar.style.top).not.toBe(initialTop)
   expect(host.querySelector('textarea')!.value).toBe('Existing draft')
+})
+
+it('retains an unsubmitted comment when editing pauses and prevents submit', async () => {
+  const textarea = await compose()
+  act(() => root.render(<Harness readOnly />))
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe('Existing draft')
+  expect(textarea.readOnly).toBe(true)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
+  expect(textarea.value).toBe('Existing draft')
+  act(() => root.render(<Harness />))
+  expect(textarea.readOnly).toBe(false)
 })
