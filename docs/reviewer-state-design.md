@@ -7,9 +7,9 @@ exit: Adopt the reviewed interactions, graduate their contracts and tests, then 
 # Review states, recovery, and visual feedback
 
 This is a proposed design, grounded in the current implementation. It covers the document lifecycle,
-review drafts, recovery, application exit, and the visual changes reported during use. Proposed
-behavior below is not yet a settled ruling. The file remains the authority; no hidden recovery
-store, automatic overwrite, or background translation service is introduced.
+review drafts, recovery, application exit, and the visual changes reported during use. The exit
+policy is settled in DECISIONS.md; the remaining design is proposed. The file remains the authority;
+no hidden recovery store, automatic overwrite, or background translation service is introduced.
 
 ## Findings
 
@@ -152,9 +152,9 @@ file switches is part of this design, not a claim that the current component-loc
 
 ## Notifications and recovery controls
 
-Use one bottom-left notification host for document and application events. Move native opening,
-file-close, window-close, and setup-loading failures into it. Keep field validation local. Find
-retains the top-center slot. No error text should displace file tabs or toolbar controls.
+Use one bottom-left notification host for document and application events. Move native opening
+and setup-loading failures into it. Close decisions use the save-changes dialog below. Keep field
+validation local. Find retains the top-center slot. No error text should displace toolbar controls.
 
 A new conflict notice names the file and states the consequence in one sentence:
 “Edits paused: this file also changed on disk.” Its primary action is **Review options**. That opens
@@ -179,42 +179,55 @@ File pills retain their own small warning icon for direct navigation. Do not rep
 “filename · Needs attention” banner. No pulsing, color-only meaning, or repeated alert announcement.
 Dismissal and successful resolution restore focus to the invoking control.
 
-## Closing without a dead end
+## Closing follows editor conventions
 
-Recommend a contextual **Close without saving…** path and a multi-file **Quit without saving…**
-path. These are explicit user decisions, never automatic fallbacks. They leave disk contents alone
-and release only the selected unsaved buffers/drafts after confirmation.
+Use the familiar save-changes dialog, with **Save**, **Don't Save**, and **Cancel**, when closing
+would lose unsaved edits. The dialog itself is the confirmation. Do not hide Don't Save in an
+alternatives menu or follow it with another confirmation. A clean document closes silently;
+autosave normally makes this the common case.
+
+Apple's [document close contract][apple-close] explicitly offers saving, not saving, or cancelling.
+VS Code also supports [Hot Exit][vscode-exit], retaining unsaved buffers for a later launch. That
+requires persisted session recovery, which this project still defers; do not imply that discarded
+text will return. These are distinct editor behaviors, not interchangeable implementations.
+
+[apple-close]: https://developer.apple.com/documentation/appkit/nsdocument/canclose(withdelegate:shouldclose:contextinfo:)
+[vscode-exit]: https://code.visualstudio.com/docs/editing/codebasics#_hot-exit
 
 | Close condition | Interaction |
 | --- | --- |
-| Saved, no draft, including stale conflict flag | Close without another recovery demand |
-| Unsaved, normal writes available | Save once; close on success |
-| Saving | Show pending operation; coalesce repeated close requests |
-| Save fails or conflict remains | Open close choices in the notification area |
-| No accepted edits, nonempty draft | Offer keep reviewing or discard draft and close |
-| Copy succeeds during a close | Complete the original close request; do not trap user in the copy |
-| Copy cancelled or fails | Keep close choices and buffer; never imply completion |
-| User cancels close | Clear close intent; leave recovery state and edits available |
-| User confirms discard | Release only named buffers/drafts; close requested file/window |
-| Native close itself fails | Report separately; retained or saved document state stays accurate |
+| Saved, no draft | Close silently; a stale warning alone cannot block close |
+| Pending autosave | Flush once; close on success |
+| Saving | Coalesce requests; allow cancellation of the close request |
+| Unsaved after failure | Save / Don't Save / Cancel dialog naming the file |
+| Conflict prevents safe save | Save As… / Don't Save / Cancel; explain the external change |
+| Copy succeeds during close | Complete close; do not open a replacement tab |
+| Save or copy fails | Retain edits and dialog; show failure beside the attempted action |
+| Save picker cancelled | Return to close dialog without discarding anything |
+| Don't Save | Close immediately, discarding only the named unsaved work |
+| Cancel or Escape | Cancel close and restore focus; keep edits and recovery available |
+| Native close fails | Report separately without mislabelling document state |
 
-The compact close surface should offer **Keep reviewing**, a save/copy action appropriate to the
-state, and **Close without saving…** in its alternatives menu. Discard confirmation names the file
-and says exactly what will be lost. It must work when disk cannot be read; adopting incoming is
-not a prerequisite for leaving.
+The save-changes dialog is a focused, accessible modal sheet, following platform button ordering
+and keyboard behavior. Background conflict and save-error notices stay in the bottom-left area;
+a deliberate close request gets the customary decision dialog. Don't Save is never the default
+keyboard action. It leaves disk contents untouched and does not undo already completed autosaves.
 
-For quit, use one summary listing only affected files and drafts. Successfully saved files need no
-choice. Offer save/recovery, cancel quit, and one explicit discard confirmation for the listed
-remaining edits. Do not require a sequence of alerts or independently click through every file.
-Recheck the remaining set before exit; a new unsaved document cannot inherit an old discard consent.
+For quit, collect affected files into one save-changes dialog. Offer **Save All**, **Don't Save**,
+and **Cancel**, naming the files whose unsaved work will be lost. Saving must retain native version
+guards: if a file cannot safely save, offer Save As rather than silently overwriting incoming work.
+After a partial save, update the remaining list. Cancellation keeps the app open. A changed set of
+unsaved files must not inherit an earlier discard decision.
 
-An indefinitely pending native operation is a separate state: after a bounded wait, offer **Keep
-waiting**, **Cancel quit**, and **Quit anyway…**. Explain that a write may already have reached disk
-and cannot be rolled back. Do not call that action “discard” or claim it preserves an earlier disk
-version. The implementation must distinguish abandoning a wait from cancelling a write.
+Unsubmitted comment and reply drafts need explicit wording: closing discards them, while saving
+Markdown does not preserve them. A draft-only close offers **Discard Draft** and **Cancel**. For
+mixed edits and drafts, disclose draft loss in the same dialog before the user chooses a closing
+action; never silently submit a draft or add a second confirmation after that choice.
 
-This changes the earlier retain-the-window policy and needs an explicit ruling before it ships.
-It does not authorize exercising discard or force-quit against anyone's real review during testing.
+A native write that never completes remains a separate implementation question. Cancelling close
+must remain available. A timeout cannot imply rollback or make Don't Save claim to cancel an
+already dispatched write. Validate the host's termination behavior before specifying a force-exit
+control; do not add an unfamiliar exit flow solely for this hypothetical state.
 
 ## Comment layout and movement
 
@@ -263,7 +276,8 @@ and Chinese accessible names remain part of the same controls.
 
 1. Address reproducible persistence defects with failing regression tests first. Keep the
    intermittent native comment report open until its trigger is identified or measured.
-2. Review the exit policy and notification hierarchy here, then implement the lifecycle states and
+2. Apply the settled editor-conventional exit policy and review the notification hierarchy, then
+   implement the lifecycle states and
    their transitions before polishing recovery controls. Use the existing native host, Radix
    popovers/menus, and shared notification area; no new UI framework is needed.
 3. Preview one complete recovery interaction, including dismissed and close/quit states. Review a

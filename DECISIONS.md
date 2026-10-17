@@ -29,6 +29,18 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Follow familiar editor save and close conventions
+
+**Ruled.** Closing saved work is silent. When closing would lose unsaved work, offer the familiar
+save, don't-save, and cancel decision, with the affected files and drafts named. That dialog is the
+confirmation; do not add a second confirmation or hide discard behind recovery controls. Preserve
+version-checked writes and offer Save As when saving the original is unsafe. Familiar editor
+behavior takes precedence over a custom recovery workflow; session restoration remains deferred.
+
+**Beat:** trapping the user behind unresolved conflicts, or inventing a two-stage discard-and-exit
+flow with its own terminology.
+
+
 ## 2026-10-17 — Animate the home wordmark as two intact rows
 
 **Ruled.** Drift the two rows independently and send them beyond opposite window edges when opening

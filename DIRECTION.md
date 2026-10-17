@@ -26,15 +26,14 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-17 — Leaving a review with unresolved edits
+## 2026-10-17 — Intermittent comment-triggered conflict
 
-**Open question.** Current conflict protection can block both closing and quitting with no explicit
-way to discard retained edits. The proposed lifecycle, notification, and visual design is in
-[reviewer states](docs/reviewer-state-design.md), including multi-file quit and unsubmitted drafts.
-The intermittent comment-triggered conflict also needs a captured cause, not an assumed fix.
+**Gap.** The reported comment-triggered warning has not been reproduced. A separate transient-read
+recovery defect was fixed, but does not establish its cause. The remaining state and interaction
+proposal is in [reviewer states](docs/reviewer-state-design.md); the editor-conventional exit policy
+is settled in DECISIONS.md.
 
-**Exit:** approve and implement the exit/recovery policy with state-transition coverage, and identify
-or explicitly defer the intermittent report with its diagnostic requirements recorded.
+**Exit:** capture and fix the trigger, or explicitly defer it with diagnostic requirements recorded.
 
 ## 2026-10-14 — Native file picker latency
 
