@@ -44,6 +44,10 @@ specified in [file I/O](../../desktop/src/files.md).
 compact notification keep recovery reachable. Repeated invalidations do not reopen a dismissed
 notice. Recovery completion updates its owning record even if another file is active.
 
+A successful reread of the acknowledged disk version clears a preceding read failure and resumes
+autosave for retained edits. A different version with local edits remains a conflict; its readable
+incoming contents replace the obsolete read-failure message.
+
 Ordinary writes restore the original line endings; merges restore the incoming version's line
 endings. Unedited files are not written. There is no editable comparison-result buffer.
 

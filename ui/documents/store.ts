@@ -160,7 +160,10 @@ export function createDocStore() {
     const doc = documents.get(id)
     if (!doc) return
     if (doc.version === file.version) {
-      updateDocument(id, { diskChange: null })
+      const recoveredRead = doc.recoveryError === 'read'
+      updateDocument(id, { diskChange: null, ...(recoveredRead
+        ? { conflict: false, conflictDismissed: false, recoveryError: null } : {}) })
+      if (recoveredRead && doc.source !== doc.savedSource) schedule(id)
       return
     }
     if (doc.saving) {
@@ -175,7 +178,8 @@ export function createDocStore() {
       if (store.getState().sessionId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
     } else {
       updateDocument(id, { conflict: true, notice: null, diskChange: { mtimeMs: file.mtimeMs,
-        deleted: false, content: file.content, version: file.version } })
+        deleted: false, content: file.content, version: file.version },
+        recoveryError: doc.recoveryError === 'read' ? null : doc.recoveryError })
     }
   }
   const retainReadFailure = (id: string): void => {

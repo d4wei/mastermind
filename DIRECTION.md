@@ -26,6 +26,16 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-17 — Leaving a review with unresolved edits
+
+**Open question.** Current conflict protection can block both closing and quitting with no explicit
+way to discard retained edits. The proposed lifecycle, notification, and visual design is in
+[reviewer states](docs/reviewer-state-design.md), including multi-file quit and unsubmitted drafts.
+The intermittent comment-triggered conflict also needs a captured cause, not an assumed fix.
+
+**Exit:** approve and implement the exit/recovery policy with state-transition coverage, and identify
+or explicitly defer the intermittent report with its diagnostic requirements recorded.
+
 ## 2026-10-14 — Native file picker latency
 
 **Deferral.** macOS panel creation and sheet presentation dominate the observed delay. Retaining
