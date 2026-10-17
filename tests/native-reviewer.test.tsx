@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -376,24 +375,6 @@ it('keeps editing locked when quit arrives during a file close', async () => {
   expect(mocks.invoke).toHaveBeenCalledWith('cancel_close')
 })
 
-it.each([false, true])('animates the shared open control unless reduced motion is %s', async (reduced) => {
-  const animate = vi.fn()
-  const original = HTMLElement.prototype.animate
-  HTMLElement.prototype.animate = animate
-  vi.stubGlobal('matchMedia', () => ({ matches: reduced }))
-  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
-    ? { ...snapshot(), files: [] } : other(command))
-  try {
-    await mount()
-    const open = button('Open Markdown files…')
-    animate.mockClear()
-    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
-    await poll()
-    expect(button('Open Markdown files…')).toBe(open)
-    expect(animate).toHaveBeenCalledTimes(reduced ? 0 : 1)
-  } finally { HTMLElement.prototype.animate = original }
-})
-
 it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(
   'shows the native Open shortcut on %s', async (platform, shortcut) => {
     const platformSpy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform)
@@ -406,24 +387,65 @@ it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(
   },
 )
 
-it.each(['hover', 'focus-visible'])('targets the home wordmark from %s inside the motion opt-in rules', async (state) => {
+it('waits for home departure only after admission, then changes screens without moving Open', async () => {
+  const original = HTMLElement.prototype.animate
+  const pending: { element: HTMLElement; finish: () => void }[] = []
+  HTMLElement.prototype.animate = function () {
+    let finish!: () => void
+    const finished = new Promise<void>((resolve) => { finish = resolve })
+    pending.push({ element: this, finish })
+    return { finished, cancel: finish } as unknown as Animation
+  }
   mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
     ? { ...snapshot(), files: [] } : other(command))
-  await mount()
-  const style = document.createElement('style')
-  // Substitute the browser interaction state so jsdom invalidates its selector cache.
-  style.textContent = readFileSync('ui/desktop/native.css', 'utf8').replaceAll(`:${state}`, '.test-engaged')
-  document.head.append(style)
   try {
-    const motion = Array.from(style.sheet!.cssRules).find((rule) =>
-      'conditionText' in rule && rule.conditionText === '(prefers-reduced-motion: no-preference)') as CSSMediaRule
-    const lift = Array.from(motion.cssRules).find((rule) =>
-      'style' in rule && (rule as CSSStyleRule).style.transform.includes('translateY')) as CSSStyleRule
-    const wordmark = host.querySelector('.native-wordmark')!
-    expect(wordmark.matches(lift.selectorText)).toBe(false)
-    button('Open Markdown files…').classList.add('test-engaged')
-    expect(wordmark.matches(lift.selectorText)).toBe(true)
-    button('Open Markdown files…').classList.remove('test-engaged')
-    expect(wordmark.matches(lift.selectorText)).toBe(false)
-  } finally { style.remove() }
+    await mount()
+    const open = button('Open Markdown files…')
+    await act(async () => open.click())
+    await poll()
+    expect(pending).toHaveLength(0)
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
+    await poll()
+    expect(pending).toHaveLength(3)
+    expect(mocks.navigate).not.toHaveBeenCalled()
+    expect(open.classList.contains('native-open-home')).toBe(true)
+    await act(async () => pending.forEach((animation) => animation.finish()))
+    expect(mocks.navigate).toHaveBeenLastCalledWith('/d/0')
+    expect(open.classList.contains('native-open-home')).toBe(false)
+    expect(pending).toHaveLength(4)
+    expect(pending.every((animation) => animation.element !== open)).toBe(true)
+    await act(async () => pending.forEach((animation) => animation.finish()))
+    await poll()
+    expect(pending).toHaveLength(4)
+  } finally { HTMLElement.prototype.animate = original }
+})
+
+it.each([false, true])('fades the last file only if closing succeeds: %s', async (success) => {
+  const original = HTMLElement.prototype.animate
+  const pending: (() => void)[] = []
+  HTMLElement.prototype.animate = function () {
+    let finish!: () => void
+    const finished = new Promise<void>((resolve) => { finish = resolve })
+    pending.push(finish)
+    return { finished, cancel: finish } as unknown as Animation
+  }
+  mocks.id = '0'
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [snapshot().files[0]] }
+    : command === 'close_document' ? { ...snapshot(1), files: [] } : other(command))
+  if (!success) mocks.closeDocument.mockResolvedValue(false)
+  try {
+    await mount()
+    await act(async () => button('Close first.md').click())
+    expect(pending).toHaveLength(success ? 1 : 0)
+    expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
+    if (success) {
+      expect(host.inert).toBe(true)
+      await act(async () => pending[0]!())
+      expect(mocks.navigate).toHaveBeenLastCalledWith('/')
+      expect(host.querySelectorAll('.native-file-pill')).toHaveLength(0)
+      expect(pending).toHaveLength(2)
+    }
+    expect(host.inert).toBe(false)
+  } finally { HTMLElement.prototype.animate = original }
 })

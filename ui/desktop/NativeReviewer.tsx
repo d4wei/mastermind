@@ -7,6 +7,7 @@ import { FileIcon, CrossIcon, AlertIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
+import { createHomeMotion } from './home-motion'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
 
 interface OpenDocument { id: string; path: string }
@@ -36,25 +37,18 @@ export function NativeReviewer() {
   const documentState = useDoc()
   const id = documentState.sessionId
   const pills = useRef<HTMLElement>(null)
-  const openButton = useRef<HTMLButtonElement>(null)
-  const openBounds = useRef<DOMRect | null>(null)
+  const homeMotion = useRef<ReturnType<typeof createHomeMotion> | null>(null)
   const atHome = files.length === 0 && setupRequired === false
+  const homeReady = useRef(false)
   useLayoutEffect(() => {
-    const button = openButton.current
-    if (!button || setupRequired !== false) return
-    const next = button.getBoundingClientRect()
-    const previous = openBounds.current
-    if (previous && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      button.animate?.([
-        { transform: `translate(${previous.left - next.left}px, ${previous.top - next.top}px)` },
-        { transform: 'translate(0, 0)' },
-      ], { duration: 300, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' })
-    }
-    openBounds.current = next
-    const measure = () => { openBounds.current = button.getBoundingClientRect() }
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [atHome, setupRequired])
+    const motion = createHomeMotion(document.getElementById('root')!)
+    homeMotion.current = motion
+    return () => { motion.dispose(); homeMotion.current = null }
+  }, [])
+  useLayoutEffect(() => {
+    homeReady.current = atHome
+    homeMotion.current?.show(atHome)
+  }, [atHome])
   const focusAfterClose = useRef<string | null | undefined>(undefined)
   const activePath = id === null ? undefined : files.find((file) => file.id === id)?.path
   useEffect(() => {
@@ -92,6 +86,10 @@ export function NativeReviewer() {
         if (disposed || closingFile.current) return
         if (opening.status === 'fulfilled' && opening.value.activation_revision >= activationRevision.current) {
           const snapshot = opening.value
+          if (snapshot.files.length > 0 && homeReady.current) {
+            await homeMotion.current?.leave(true)
+            if (disposed) return
+          }
           setFiles(snapshot.files)
           setOpeningErrors(snapshot.opening_errors)
           if (snapshot.activation_revision > activationRevision.current) {
@@ -159,6 +157,7 @@ export function NativeReviewer() {
             id: Number(file.id), activeId: id === null ? null : Number(id),
             activationRevision: activationRevision.current,
           })
+          if (snapshot.files.length === 0) await homeMotion.current?.leave(false)
         })
         if (!closed) {
           setError(chinese ? '文件尚有未保存的更改，请处理后再关闭。' :
@@ -179,7 +178,7 @@ export function NativeReviewer() {
   const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
   return <>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
-      <button ref={openButton} type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
+      <button type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
         aria-label={openLabel} title={openLabel}><FileIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
@@ -225,7 +224,7 @@ export function NativeReviewer() {
       }} /> : <div className="center-note" role="status">
         {chinese ? '正在加载设置…' : 'Loading setup…'}
       </div>} home={<div className="native-home">
-      <pre className="native-wordmark" aria-label="mastermind" role="img">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄\n█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</pre>
+      <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
     </div>} />
   </>
 }

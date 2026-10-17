@@ -80,8 +80,11 @@ and remaining platform checks live in [tools/desktop](../../tools/desktop/README
 
 With no open files after onboarding, the home displays the two-line block-letter wordmark and one
 Open Markdown files… control (打开 Markdown 文件… in Chinese). The home button combines the file
-icon, label, and platform Open shortcut. Its focus or hover gives the wordmark a small lift and ink
-shadow; reduced motion keeps it still. The wordmark retains a horizontal slit between its rows.
-The same button moves into the file toolbar when the first file opens, and returns home after the
-last file closes. Its position animation respects reduced motion. The native
-window drag area remains available in both states.
+icon, label, and platform Open shortcut. The wordmark retains a horizontal slit between its rows.
+`home-motion.ts` drifts each complete row independently, sends the rows beyond opposite window
+edges when the first file is admitted, and fades the outgoing and incoming screens. Cancelling the
+picker or failing to open a file leaves home in place. The last document fades only after saving
+and native close succeed; ordinary document switching has no screen transition. The Open button
+changes between home and toolbar placement without position animation. Reduced motion skips drift
+and screen transitions. Unmount cancels pending animations and animation frames. The native window
+drag area remains available in both states.

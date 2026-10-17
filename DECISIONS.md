@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Animate the home wordmark as two intact rows
+
+**Ruled.** Drift the two rows independently and send them beyond opposite window edges when opening
+leaves home. Fade the entire outgoing and incoming screens. Keep the Open button stationary within
+each screen and respect reduced motion. This supersedes the earlier action-hover lift.
+
+**Beat:** independent character motion, which distorted the wordmark, and moving the Open button
+between home and toolbar alongside the wordmark departure.
+
 ## 2026-10-17 — Keep the empty home focused on opening Markdown
 
 **Ruled.** Show the two-row block-letter wordmark with its horizontal slit and one outlined

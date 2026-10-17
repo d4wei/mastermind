@@ -147,11 +147,4 @@
   font-size: var(--font-size-micro);
   color: var(--color-text-muted);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .native-wordmark { transition: transform 260ms ease, text-shadow 260ms ease; }
-  .native-documents:has(.native-open-home:hover) ~ .native-home .native-wordmark,
-  .native-documents:has(.native-open-home:focus-visible) ~ .native-home .native-wordmark {
-    transform: translateY(calc(var(--space-unit) * -0.5));
-    text-shadow: var(--wordmark-shadow);
-  }
-}
+.native-wordmark-row { display: inline-block; }
