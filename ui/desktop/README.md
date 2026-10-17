@@ -23,7 +23,8 @@ behavior.
 
 [notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
 
-`NativeReviewer.tsx` provides the square Open files action and horizontally scrolling file pills.
+`NativeReviewer.tsx` provides the square Open Markdown files action and horizontally scrolling
+file pills.
 `file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
 full path remains in the native window title and the pill tooltip. On macOS, Tauri's overlay title
 bar hides the separate title strip, retains the traffic lights, and extends the theme behind the
@@ -78,6 +79,9 @@ and remaining platform checks live in [tools/desktop](../../tools/desktop/README
 ## Empty home
 
 With no open files after onboarding, the home displays the two-line block-letter wordmark and one
-Open files control. The same button moves into the file toolbar when the first file opens, and
-returns home after the last file closes. Its position animation respects reduced motion. The native
+Open Markdown files… control (打开 Markdown 文件… in Chinese). The home button combines the file
+icon, label, and platform Open shortcut. Its focus or hover gives the wordmark a small lift and ink
+shadow; reduced motion keeps it still. The wordmark retains a horizontal slit between its rows.
+The same button moves into the file toolbar when the first file opens, and returns home after the
+last file closes. Its position animation respects reduced motion. The native
 window drag area remains available in both states.

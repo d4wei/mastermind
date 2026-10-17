@@ -176,12 +176,13 @@ export function NativeReviewer() {
       finally { closingFile.current = false; root.inert = closingWindow.current; fileCloseCompletion.current = null }
     })()
   }
-  const openLabel = chinese ? '打开文件…' : 'Open files…'
+  const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
   return <>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
       <button ref={openButton} type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
         aria-label={openLabel} title={openLabel}><FileIcon />
-        {atHome && <span className="native-open-label">{openLabel}</span>}</button>
+        {atHome && <><span className="native-open-label">{openLabel}</span>
+          <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
       <nav ref={pills} data-tauri-drag-region className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
         {files.map((file, index) => <div key={file.id}
           className={`native-file-pill${id === file.id ? ' active' : ''}`}>
@@ -225,7 +226,6 @@ export function NativeReviewer() {
         {chinese ? '正在加载设置…' : 'Loading setup…'}
       </div>} home={<div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄\n█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</pre>
-      <p>{chinese ? '打开文件以开始审阅' : 'Open a file to start reviewing'}</p>
     </div>} />
   </>
 }

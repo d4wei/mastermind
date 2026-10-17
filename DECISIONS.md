@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Keep the empty home focused on opening Markdown
+
+**Ruled.** Show the two-row block-letter wordmark with its horizontal slit and one outlined
+Open Markdown files… action. Give the wordmark a subtle lift on action hover or keyboard focus,
+respecting reduced motion. Keep the native ellipsis convention and an explicit Markdown label.
+
+**Beat:** repeating the opening instruction above the button, or adding continuous decoration.
+
 ## 2026-10-15 — Keep compact discussions anchored to their passages
 
 **Ruled.** Use compact cards with readable opening comments and collapsed replies. Selecting a

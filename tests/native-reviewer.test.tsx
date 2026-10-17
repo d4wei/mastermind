@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -91,7 +92,7 @@ it('keeps one snapshot in flight and ignores it after unmount', async () => {
   root = createRoot(host)
 })
 
-it.each([[false, 'Open files…'], [true, '打开文件…']] as const)(
+it.each([[false, 'Open Markdown files…'], [true, '打开 Markdown 文件…']] as const)(
   'has one open action and moves it from home to the bar with language %s', async (chinese, label) => {
     mocks.chinese = chinese
     mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
@@ -100,12 +101,18 @@ it.each([[false, 'Open files…'], [true, '打开文件…']] as const)(
     const open = button(label)
     expect(host.querySelectorAll('.native-open')).toHaveLength(1)
     expect(open.classList.contains('native-open-home')).toBe(true)
-    expect(host.querySelector('.native-wordmark')?.textContent).toContain('█▀▄▀█ ▄▀█')
+    expect(host.querySelector('.native-wordmark')?.textContent).toBe(
+      '█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄\n█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀')
+    expect(host.querySelector('.native-home p')).toBeNull()
+    expect(open.querySelector('.native-open-label')?.textContent).toBe(label)
+    expect(open.querySelector('.native-open-shortcut')?.getAttribute('aria-hidden')).toBe('true')
     await act(async () => open.click())
     mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
     await poll()
     expect(button(label)).toBe(open)
     expect(open.classList.contains('native-open-home')).toBe(false)
+    expect(open.querySelector('.native-open-label')).toBeNull()
+    expect(open.querySelector('.native-open-shortcut')).toBeNull()
     await act(async () => open.click())
     expect(mocks.invoke.mock.calls.filter(([command]) => command === 'choose_files')).toHaveLength(2)
   },
@@ -120,7 +127,7 @@ it('dismisses retained graphical errors without erasing local command errors', a
     return other(command)
   })
   await mount()
-  await act(async () => button('Open files…').click())
+  await act(async () => button('Open Markdown files…').click())
   await poll()
   expect(host.textContent).toContain('Missing /lost.md')
   expect(host.textContent).toContain('Dialog unavailable')
@@ -153,7 +160,7 @@ it('keeps opening activation and close registration alive before setup completes
   expect(host.querySelector('.native-setup')).not.toBeNull()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
   expect(mocks.invoke).toHaveBeenCalledWith('close_ready')
-  await act(async () => button('Open files…').click())
+  await act(async () => button('Open Markdown files…').click())
   expect(mocks.invoke).toHaveBeenCalledWith('choose_files')
   await act(async () => host.querySelector('form')!.dispatchEvent(
     new Event('submit', { bubbles: true, cancelable: true })))
@@ -161,7 +168,7 @@ it('keeps opening activation and close registration alive before setup completes
   expect(host.querySelector('.native-setup')).not.toBeNull()
   await act(async () => release())
   expect(host.querySelector('.native-setup')).toBeNull()
-  expect(button('Open files…')).toBeDefined()
+  expect(button('Open Markdown files…')).toBeDefined()
   expect(mocks.navigate).toHaveBeenCalledTimes(1)
 })
 
@@ -178,7 +185,7 @@ it('keeps file admission usable while setup loading fails and supports explicit 
   expect(host.textContent).toContain('Preferences unreadable')
   expect(host.querySelector('.native-setup')).toBeNull()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/0')
-  await act(async () => button('Open files…').click())
+  await act(async () => button('Open Markdown files…').click())
   expect(mocks.invoke).toHaveBeenCalledWith('choose_files')
   failed = false
   await act(async () => button('Retry loading setup').click())
@@ -189,7 +196,7 @@ it('keeps file admission usable while setup loading fails and supports explicit 
 it('does not repeat setup for saved completion or mutate saved choices on open', async () => {
   await mount()
   expect(host.querySelector('.native-setup')).toBeNull()
-  await act(async () => button('Open files…').click())
+  await act(async () => button('Open Markdown files…').click())
   await poll()
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
   expect(mocks.invoke).not.toHaveBeenCalledWith('write_preferences', expect.anything())
@@ -202,8 +209,8 @@ it('previews the setup language on native Open files without writing preferences
   })
   await mount()
   await act(async () => host.querySelector<HTMLButtonElement>('[name="uiLang"][value="zh-CN"]')!.click())
-  expect(button('打开文件…')).toBeDefined()
-  await act(async () => button('打开文件…').click())
+  expect(button('打开 Markdown 文件…')).toBeDefined()
+  await act(async () => button('打开 Markdown 文件…').click())
   expect(mocks.invoke).toHaveBeenCalledWith('choose_files')
   expect(mocks.invoke).not.toHaveBeenCalledWith('write_preferences', expect.anything())
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
@@ -378,11 +385,45 @@ it.each([false, true])('animates the shared open control unless reduced motion i
     ? { ...snapshot(), files: [] } : other(command))
   try {
     await mount()
-    const open = button('Open files…')
+    const open = button('Open Markdown files…')
     animate.mockClear()
     mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 0) : other(command))
     await poll()
-    expect(button('Open files…')).toBe(open)
+    expect(button('Open Markdown files…')).toBe(open)
     expect(animate).toHaveBeenCalledTimes(reduced ? 0 : 1)
   } finally { HTMLElement.prototype.animate = original }
+})
+
+it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(
+  'shows the native Open shortcut on %s', async (platform, shortcut) => {
+    const platformSpy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform)
+    mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+      ? { ...snapshot(), files: [] } : other(command))
+    try {
+      await mount()
+      expect(button('Open Markdown files…').querySelector('.native-open-shortcut')?.textContent).toBe(shortcut)
+    } finally { platformSpy.mockRestore() }
+  },
+)
+
+it.each(['hover', 'focus-visible'])('targets the home wordmark from %s inside the motion opt-in rules', async (state) => {
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [] } : other(command))
+  await mount()
+  const style = document.createElement('style')
+  // Substitute the browser interaction state so jsdom invalidates its selector cache.
+  style.textContent = readFileSync('ui/desktop/native.css', 'utf8').replaceAll(`:${state}`, '.test-engaged')
+  document.head.append(style)
+  try {
+    const motion = Array.from(style.sheet!.cssRules).find((rule) =>
+      'conditionText' in rule && rule.conditionText === '(prefers-reduced-motion: no-preference)') as CSSMediaRule
+    const lift = Array.from(motion.cssRules).find((rule) =>
+      'style' in rule && (rule as CSSStyleRule).style.transform.includes('translateY')) as CSSStyleRule
+    const wordmark = host.querySelector('.native-wordmark')!
+    expect(wordmark.matches(lift.selectorText)).toBe(false)
+    button('Open Markdown files…').classList.add('test-engaged')
+    expect(wordmark.matches(lift.selectorText)).toBe(true)
+    button('Open Markdown files…').classList.remove('test-engaged')
+    expect(wordmark.matches(lift.selectorText)).toBe(false)
+  } finally { style.remove() }
 })

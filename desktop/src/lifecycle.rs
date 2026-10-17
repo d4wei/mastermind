@@ -40,7 +40,7 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
     let open = tauri::menu::MenuItem::with_id(
         app,
         "open-files",
-        "Open files…",
+        "Open Markdown files…",
         true,
         Some("CmdOrCtrl+O"),
     )?;

@@ -292,6 +292,9 @@ Use **Open selected files / 打开所选文件** for the operation and **agent-s
 explaining selection responsibility. The agent chooses files using its judgment; the app has no
 separate smart selection algorithm. Keep `open` as the concise typed command.
 
+Use **Open Markdown files… / 打开 Markdown 文件…** for the file-picker action. Keep the ellipsis
+because choosing files requires another step.
+
 Use **Open files / 打开的文件**, **Outline / 大纲**, and **Filename / 文件名** for document navigation.
 **Repository / 仓库** means a version-controlled project, not any folder. The workspace tree is
 retired; describe opening files rather than introducing a renamed workspace product.
