@@ -26,6 +26,20 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-17 — Local persisted work buffers
+
+**Bet.** A local persisted buffer can preserve pending document edits and unfinished comments,
+replies, and suggested changes together with the source revision, target, and context they depend
+on. Autosave alone does not cover these interrupted operations. Persistence preserves the work;
+resuming still requires target validation, and undo must not restore an obsolete file snapshot.
+Accepted review feedback continues to reach agents through the Markdown file only.
+
+**Exit:** settle storage, retention/discard rules, restoration scope, and stale-target behavior;
+reconcile the ephemeral-session and no-database constraints in a ruling, then implement and test
+recovery across external file changes and app restarts, or explicitly drop the proposal. This
+supersedes the general session-restoration deferral without adopting a storage mechanism.
+
+
 ## 2026-10-17 — Retiring in-app three-way merge
 
 **Open question.** Autosave reduces the ordinary need for merging, while save-copy and incoming
@@ -55,14 +69,6 @@ Measurements and the experiment are in [picker latency](desktop/picker-latency.m
 
 **Exit:** a library-supported optimization or an approved native implementation improves measured
 latency without changing file admission, or the remaining delay is accepted.
-
-## 2026-10-10 — Restoring app sessions is deferred
-
-**Deferral.** Review-session state currently targets the app's lifetime. Restoration and a possible
-SQLite implementation are later options; no database or alternate review-feedback store is adopted.
-
-**Exit:** a concrete restoration need and a ruling on persisted state, storage, and the existing
-no-database invariant, or the option is dropped.
 
 ## 2026-10-13 — Native release hardening
 
