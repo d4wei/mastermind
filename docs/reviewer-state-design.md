@@ -8,7 +8,8 @@ exit: Adopt the reviewed interactions, graduate their contracts and tests, then 
 
 This is a proposed design, grounded in the current implementation. It covers the document lifecycle,
 review drafts, recovery, application exit, and the visual changes reported during use. The exit
-policy is settled in DECISIONS.md; the remaining design is proposed. The file remains the authority;
+policy is settled in DECISIONS.md; retiring merge below is a recommendation awaiting a ruling.
+The remaining design is proposed. The file remains the authority;
 no hidden recovery store, automatic overwrite, or background translation service is introduced.
 
 ## Findings
@@ -90,7 +91,7 @@ is available. Settings failures use that same area; field validation remains bes
 | Unavailable | A read failed; cause may be temporary | Retain text; pause writes pending check |
 | Missing | Fresh evidence confirms the path is absent | Retain text; never recreate silently |
 | Conflict | Verified incoming version differs with local edits | Pause affected-file mutation |
-| Recovering | Merge, adoption, or copy is in flight | Pause affected-file mutation |
+| Recovering | Adoption or copy is in flight | Pause affected-file mutation |
 
 A watcher event is a hint, not a conflict. A metadata-only difference is not proof of a text change.
 The implementation must retain the native identity/version guard even if a fresh read permits
@@ -113,8 +114,6 @@ never suppress all watcher events during saving.
 | Retry reads different contents with local edits | Conflict |
 | Disk now equals current buffer | Reconcile as saved after a fresh guarded read |
 | Disk again changes during recovery | Retain local text; update recovery choices |
-| Try merge succeeds | Save immediately against freshly read version; resume editing |
-| Try merge overlaps or exceeds limits | Write nothing; offer copy or incoming version |
 | Use incoming confirmed | Adopt fresh contents; resume editing |
 | Copy picker cancelled | Keep buffer and original state |
 | Copy succeeds | Select admitted copy; release original buffer |
@@ -150,6 +149,53 @@ Unsubmitted comment/reply text is not in the Markdown buffer. Saving a document 
 those drafts. A close decision must disclose and handle them separately. Their retention across
 file switches is part of this design, not a claim that the current component-local state does it.
 
+## Does this reviewer need three-way merge?
+
+**Recommendation under review:** remove the merge operation and use preservation plus explicit
+version choice for genuine conflicts. The existing merge ruling and implementation remain in
+force until superseded; this assessment does not authorize their removal by itself.
+
+Autosave reduces how often local edits remain unwritten while an external update arrives. It does
+not eliminate concurrent writing. The current store resets its debounce on each edit, so continuous
+source editing can keep a buffer dirty longer than one debounce interval. An in-flight write,
+unreadable file, permission failure, or missing destination can also extend that interval. Conflict
+frequency has not been measured; calling every remaining collision rare would exceed the evidence.
+
+The ordinary path is already simple: save accepted edits; reload external changes when no accepted
+local edits are pending. A conflict needs protection only when the app has pending local edits and
+cannot safely write them against the disk version. That protection requires retaining text and
+checking versions, not a merge algorithm.
+
+The strongest case for keeping merge is simultaneous source editing by a person and an agent on
+different parts of a document. A clean merge can combine those changes in one step without a copy.
+Removing it makes that case less convenient: preserve a separate file and reconcile deliberately,
+using an agent or editor chosen by the person. Merely creating the copy does not reconcile it.
+This is the concrete tradeoff, not a claim that autosave makes merging mathematically redundant.
+
+There is a different risk that the current merge feature does not address. An agent can read an
+old file, compute an edit, and overwrite newer, already-autosaved review marks later. The reviewer
+then has no pending local edits and reloads the incoming version. Its existing merge operation is
+never offered. Preventing stale external overwrites requires cooperation from that writer, or a
+separate revision-history/concurrency policy; keeping this merge button does not provide it.
+
+Prefer the smaller reviewer model unless concurrent independent editing becomes a demonstrated
+primary workflow. Genuine conflicts expose **Save As…** and **Use incoming** directly. Missing or
+unavailable destinations expose **Save As…** and **Retry**. The generic recovery menu is no longer
+needed. A successful read showing unchanged bytes can be reconciled without merging content, while
+retaining file-identity and write-version checks.
+
+Removing merge would delete its UI action, store write-recovery branch, overlap/limit states,
+`document/merge.ts` and its sidecar, merge-only tests, the `node-diff3` dependency, and its explicit
+license-packaging entry. Update translated labels and canonical terminology with that removal.
+Keep tests for read/write races, source preservation, copy failure, incoming adoption, and close.
+The saved snapshot is still needed to distinguish pending edits and preserve exact source; removing
+merge does not justify deleting it or weakening the native write guard.
+
+The remaining model is: saved, save pending/in flight, unable to save or verify, and conflicting
+versions. Composer drafts are a separate axis. There is no merge candidate, merge overlap, merge
+limit, or merged-write recovery state. Closing continues to flush and only asks when preservation
+fails or a meaningful unsubmitted draft remains.
+
 ## Recovery choices by cause
 
 Action rankings below are design judgments about the likely intent, not measured usage frequencies.
@@ -163,8 +209,7 @@ is a distinct intent and must not be disguised as retrying a failed operation.
 | Temporary read failure, local edits | Resume against a verified file | Retry; Save As… |
 | Missing file, local edits | Preserve the work somewhere accessible | Save As…; Retry |
 | Write failure, original readable | Get accepted edits onto disk | Save As…; Retry |
-| Both versions changed | Preserve both sets of work | Try merge; Save As…; Use incoming |
-| Merge overlaps or exceeds limits | Keep a copy, or abandon local edits | Save As…; Use incoming |
+| Both versions changed | Preserve local work, or adopt incoming | Save As…; Use incoming |
 | Another change during recovery | Act on current evidence | Recheck, then show the relevant pair |
 | Copy fails or is cancelled | Preserve the buffer | Stay in the same recovery state |
 
@@ -178,13 +223,8 @@ unsubmitted composer drafts. It must not bypass the original file's version guar
 same destination. Existing destinations require the usual overwrite safeguards. Claim success only
 after the copy has actually been saved.
 
-**Try merge** is useful only with base, local, and fresh incoming contents. Its appeal is preserving
-both contributions in the original file. A clean text merge is not a semantic judgment; the settled
-policy still saves it immediately when explicitly requested. Overlap or a merge limit changes the
-same notice to the fallback choices. Do not offer a futile retry against the same three versions.
-
 **Use incoming** is useful when the local work is expendable or superseded. It is not equivalent to
-saving, copying, or merging, and remains reachable without first attempting a merge. Confirmation
+saving or copying. It remains directly reachable in the proposed two-action notice. Confirmation
 must state that local accepted edits will be replaced. No force-overwrite-original action is added.
 
 **Copy my version** does not deserve a permanent recovery slot. It does not complete persistence or
@@ -198,16 +238,13 @@ notice. Changing condition, confirming replacement, or reporting a failed attemp
 surface. A native save picker temporarily replaces the custom recovery interaction; cancelling it
 returns to that interaction. Do not leave multiple custom cards layered beneath the picker.
 
-Use at most two decision controls. Temporary read/write failures need Retry and Save As; an
-unmergeable conflict needs Save As and Use incoming. Dismissal collapses the surface into the small
+Use at most two decision controls. Temporary read/write failures need Retry and Save As; a
+content conflict needs Save As and Use incoming. Dismissal collapses the surface into the small
 warning icon without clearing its state. File pills retain a warning indicator. A new operation
 updates the existing notice and does not stack another one or repeatedly seize focus.
 
-The unresolved choice is a mergeable conflict: it has three legitimate intents. Dropping Use
-incoming or making the person fail a merge to reach it is not acceptable. The proposed exception
-is one direct Save As action and one compact action menu containing Try merge and Use incoming.
-This is the only state that presently justifies a menu; its wording and hierarchy need a focused
-visual comparison. A split button adds an extra target, so it does not evade the control budget.
+If the merge retirement recommendation is adopted, both meaningful conflict actions fit directly
+on the notice: Save As and Use incoming. No action menu is needed to meet the control budget.
 
 No generic menu is needed for states with only two useful choices. A dismissed notification's
 warning icon restores the same surface directly. Repeated events update it without reopening it.
@@ -330,7 +367,7 @@ and keyboard-focus states in every theme. Exact optical adjustments remain a vis
 
 1. Address reproducible persistence defects with failing regression tests first. Keep the
    intermittent native comment report open until its trigger is identified or measured.
-2. Apply the settled editor-conventional exit policy and review the notification hierarchy, then
+2. Settle merge retirement, apply the exit policy, and review the notification hierarchy, then
    implement lifecycle transitions before polishing recovery controls. Use the existing native host,
    Radix popovers/menus, and shared notification area; no new UI framework is needed.
 3. Preview one complete recovery interaction, including dismissed and close/quit states. Review a
