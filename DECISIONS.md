@@ -29,6 +29,19 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Autosave handles routine exit; recovery stays direct
+
+**Ruled.** Flush accepted edits on close or quit and leave silently when saving succeeds. Show a
+save decision only after failure or a conflict blocks saving. Recovery surfaces expose useful
+actions directly with at most two decision controls; no Review options gate or stacked custom
+recovery boxes. Only failed/blocked-save close dialogs retain Save As, Don't Save, and Cancel.
+An unfinished draft stays in its existing composer; Cancel returns focus there instead of showing
+a second input. This refines the preceding editor-conventional close ruling for autosave.
+
+**Beat:** ordinary Save All prompts in an autosaving editor, hidden recovery choices, and duplicated
+draft editors that disconnect a close decision from the work being interrupted.
+
+
 ## 2026-10-17 — Follow familiar editor save and close conventions
 
 **Ruled.** Closing saved work is silent. When closing would lose unsaved work, offer the familiar

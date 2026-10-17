@@ -150,92 +150,143 @@ Unsubmitted comment/reply text is not in the Markdown buffer. Saving a document 
 those drafts. A close decision must disclose and handle them separately. Their retention across
 file switches is part of this design, not a claim that the current component-local state does it.
 
-## Notifications and recovery controls
+## Recovery choices by cause
 
-Use one bottom-left notification host for document and application events. Move native opening
-and setup-loading failures into it. Close decisions use the save-changes dialog below. Keep field
-validation local. Find retains the top-center slot. No error text should displace toolbar controls.
+Action rankings below are design judgments about the likely intent, not measured usage frequencies.
+The common objective is to preserve accepted review work and continue. Choosing a different version
+is a distinct intent and must not be disguised as retrying a failed operation.
 
-A new conflict notice names the file and states the consequence in one sentence:
-“Edits paused: this file also changed on disk.” Its primary action is **Review options**. That opens
-a compact recovery popover at the notification area, not another full-screen comparison tool.
+| Situation | Likely intent | Useful actions, in priority order |
+| --- | --- | --- |
+| Pending or in-flight autosave | Keep reviewing, or finish closing | Wait; no decision yet |
+| External change, no local edits | Read the latest version | Reload automatically; no decision |
+| Temporary read failure, local edits | Resume against a verified file | Retry; Save As… |
+| Missing file, local edits | Preserve the work somewhere accessible | Save As…; Retry |
+| Write failure, original readable | Get accepted edits onto disk | Save As…; Retry |
+| Both versions changed | Preserve both sets of work | Try merge; Save As…; Use incoming |
+| Merge overlaps or exceeds limits | Keep a copy, or abandon local edits | Save As…; Use incoming |
+| Another change during recovery | Act on current evidence | Recheck, then show the relevant pair |
+| Copy fails or is cancelled | Preserve the buffer | Stay in the same recovery state |
 
-The recovery popover uses one primary action and a labelled alternatives menu:
+**Retry** makes sense for temporary unavailability. It is less promising when evidence identifies a
+persistent permission or destination problem. If there are no local edits or drafts, unavailability
+needs Retry and an ordinary close path, not a warning about work that does not exist.
 
-- When a merge is possible: **Try merge**; alternatives **Use incoming…**, **Save my version as…**,
-  and **Copy my version**.
-- After an overlapping merge: **Save my version as…**; **Use incoming…** stays available. Explain
-  the overlap without showing a four-button row or repeating a failed recommendation.
-- For unavailable or missing files: **Retry**; copy and clipboard remain alternatives. Do not offer
-  a merge or adoption until incoming contents are readable.
-- While an operation is pending: show its operation name, prevent duplicate requests, and retain
-  navigation and a way to cancel the broader close request. Cancelling a native picker is safe;
-  cancelling a screen cannot imply cancellation of a filesystem write already underway.
+**Save As…** is the broadly useful preservation route: it does not require combining versions or
+being able to read the original. It can still fail, and it saves accepted document edits rather than
+unsubmitted composer drafts. It must not bypass the original file's version guard by selecting the
+same destination. Existing destinations require the usual overwrite safeguards. Claim success only
+after the copy has actually been saved.
 
-Dismissing the expanded notice leaves one small warning-icon button in the notification corner,
-with an issue count only when more than one file needs attention. Its tooltip and accessible name
-identify the condition; clicking opens the list or the single affected file's recovery popover.
-File pills retain their own small warning icon for direct navigation. Do not repeat a permanent
-“filename · Needs attention” banner. No pulsing, color-only meaning, or repeated alert announcement.
-Dismissal and successful resolution restore focus to the invoking control.
+**Try merge** is useful only with base, local, and fresh incoming contents. Its appeal is preserving
+both contributions in the original file. A clean text merge is not a semantic judgment; the settled
+policy still saves it immediately when explicitly requested. Overlap or a merge limit changes the
+same notice to the fallback choices. Do not offer a futile retry against the same three versions.
 
-## Closing follows editor conventions
+**Use incoming** is useful when the local work is expendable or superseded. It is not equivalent to
+saving, copying, or merging, and remains reachable without first attempting a merge. Confirmation
+must state that local accepted edits will be replaced. No force-overwrite-original action is added.
 
-Use the familiar save-changes dialog, with **Save**, **Don't Save**, and **Cancel**, when closing
-would lose unsaved edits. The dialog itself is the confirmation. Do not hide Don't Save in an
-alternatives menu or follow it with another confirmation. A clean document closes silently;
-autosave normally makes this the common case.
+**Copy my version** does not deserve a permanent recovery slot. It does not complete persistence or
+restore editing, and clipboard contents are easy to replace. Keep ordinary text copying available.
 
-Apple's [document close contract][apple-close] explicitly offers saving, not saving, or cancelling.
-VS Code also supports [Hot Exit][vscode-exit], retaining unsaved buffers for a later launch. That
-requires persisted session recovery, which this project still defers; do not imply that discarded
-text will return. These are distinct editor behaviors, not interchangeable implementations.
+### One surface, direct actions
 
-[apple-close]: https://developer.apple.com/documentation/appkit/nsdocument/canclose(withdelegate:shouldclose:contextinfo:)
-[vscode-exit]: https://code.visualstudio.com/docs/editing/codebasics#_hot-exit
+Use the bottom-left notification host for background document and application failures. Present
+the relevant actions directly. Remove Review options and do not open a recovery box above another
+notice. Changing condition, confirming replacement, or reporting a failed attempt updates the same
+surface. A native save picker temporarily replaces the custom recovery interaction; cancelling it
+returns to that interaction. Do not leave multiple custom cards layered beneath the picker.
+
+Use at most two decision controls. Temporary read/write failures need Retry and Save As; an
+unmergeable conflict needs Save As and Use incoming. Dismissal collapses the surface into the small
+warning icon without clearing its state. File pills retain a warning indicator. A new operation
+updates the existing notice and does not stack another one or repeatedly seize focus.
+
+The unresolved choice is a mergeable conflict: it has three legitimate intents. Dropping Use
+incoming or making the person fail a merge to reach it is not acceptable. The proposed exception
+is one direct Save As action and one compact action menu containing Try merge and Use incoming.
+This is the only state that presently justifies a menu; its wording and hierarchy need a focused
+visual comparison. A split button adds an extra target, so it does not evade the control budget.
+
+No generic menu is needed for states with only two useful choices. A dismissed notification's
+warning icon restores the same surface directly. Repeated events update it without reopening it.
+Opening a close-confirmation sheet hides the background recovery notice until that decision ends.
+
+## Closing in an autosaving editor
+
+There is no ordinary Save changes or Save All terminal screen. Accepted source edits and submitted
+review marks already schedule autosave. The current store debounces writes and explicitly flushes
+on close: an unsaved interval is a normal internal state, not ordinarily a user decision.
+
+1. If there is a meaningful unsubmitted draft, handle that draft first as described below.
+2. Flush pending accepted edits and await the current write. If they save, close silently.
+3. If saving fails or a verified conflict blocks it, show the exceptional close decision.
+4. Cancel aborts the close request. Saving or explicitly discarding completes only its named scope.
 
 | Close condition | Interaction |
 | --- | --- |
 | Saved, no draft | Close silently; a stale warning alone cannot block close |
-| Pending autosave | Flush once; close on success |
-| Saving | Coalesce requests; allow cancellation of the close request |
-| Unsaved after failure | Save / Don't Save / Cancel dialog naming the file |
-| Conflict prevents safe save | Save As… / Don't Save / Cancel; explain the external change |
+| Pending autosave | Flush; close on success without asking whether to save |
+| Saving | Await completion; coalesce repeated requests; allow cancellation |
+| Save failed or blocked by conflict | Save As… / Don't Save / Cancel |
 | Copy succeeds during close | Complete close; do not open a replacement tab |
-| Save or copy fails | Retain edits and dialog; show failure beside the attempted action |
-| Save picker cancelled | Return to close dialog without discarding anything |
-| Don't Save | Close immediately, discarding only the named unsaved work |
-| Cancel or Escape | Cancel close and restore focus; keep edits and recovery available |
+| Copy fails | Retain edits and explain the failure in the same close surface |
+| Copy picker cancelled | Restore the close surface without discarding anything |
+| Don't Save | Close, discarding only the named unsaved work; no second confirmation |
+| Cancel or Escape | Cancel close and return to the relevant document or composer |
 | Native close fails | Report separately without mislabelling document state |
 
-The save-changes dialog is a focused, accessible modal sheet, following platform button ordering
-and keyboard behavior. Background conflict and save-error notices stay in the bottom-left area;
-a deliberate close request gets the customary decision dialog. Don't Save is never the default
-keyboard action. It leaves disk contents untouched and does not undo already completed autosaves.
+Only the failed/blocked-save close sheet gets three decision actions, per the explicit exception.
+It follows familiar editor ordering and keyboard behavior. Don't Save is never the default action,
+does not undo completed autosaves, and does not claim to cancel a write already dispatched.
 
-For quit, collect affected files into one save-changes dialog. Offer **Save All**, **Don't Save**,
-and **Cancel**, naming the files whose unsaved work will be lost. Saving must retain native version
-guards: if a file cannot safely save, offer Save As rather than silently overwriting incoming work.
-After a partial save, update the remaining list. Cancellation keeps the app open. A changed set of
-unsaved files must not inherit an earlier discard decision.
+Quitting flushes every open file first. If all save and no drafts remain, quit silently regardless
+of file count. If some cannot save, name only those remaining files in one close sheet. Offer to
+save copies, quit without saving them, or cancel. A successful copy removes its file from that
+list. A cancelled picker or failed copy retains the remaining work. A changed set of unsaved files
+cannot inherit an earlier discard decision. Do not invent a routine Save All screen.
 
-Unsubmitted comment and reply drafts need explicit wording: closing discards them, while saving
-Markdown does not preserve them. A draft-only close offers **Discard Draft** and **Cancel**. For
-mixed edits and drafts, disclose draft loss in the same dialog before the user chooses a closing
-action; never silently submit a draft or add a second confirmation after that choice.
+Apple's [document close contract][apple-close] describes the exceptional save/not-save/cancel
+choice. VS Code's [Hot Exit][vscode-exit] retains unsaved buffers across launches; that separate
+session-restoration feature remains deferred here. Familiar dismissal must not imply such storage.
+
+[apple-close]: https://developer.apple.com/documentation/appkit/nsdocument/canclose(withdelegate:shouldclose:contextinfo:)
+[vscode-exit]: https://code.visualstudio.com/docs/editing/codebasics#_hot-exit
+
+### Return to the existing draft
+
+Drafts belong to their original comment, reply, or suggestion composer. Never create another text
+field or a read-only duplicate inside a close dialog. Empty untouched composers do not block close;
+a changed suggested replacement is meaningful even if its new text is empty, meaning deletion.
+
+A close request with a meaningful draft offers **Cancel** and **Discard draft**. Cancel ends the
+close/quit request, selects the owning document, reveals its original composer, scrolls it into
+view, and restores focus and selection. It does not merely dismiss the dialog. Submission remains
+a deliberate action in that composer. A conflict may still prevent submitting, but draft text and
+focus must be retained while recovery remains available.
+
+Discard draft discards the identified draft and continues the original close request. Accepted
+edits still follow the autosave/failed-save sequence above. With several drafts, name their owning
+files and composers in a compact list; Cancel focuses the first unfinished composer, while an
+explicit plural discard applies only to the listed drafts. No draft is silently posted or treated
+as preserved by saving a Markdown copy.
 
 A native write that never completes remains a separate implementation question. Cancelling close
 must remain available. A timeout cannot imply rollback or make Don't Save claim to cancel an
-already dispatched write. Validate the host's termination behavior before specifying a force-exit
-control; do not add an unfamiliar exit flow solely for this hypothetical state.
+already dispatched write. Validate host termination behavior before adding a force-exit control.
 
 ## Comment layout and movement
 
-Use the actual document width, fixed card width, gap, and available viewport as the layout inputs.
-The current unrelated 1180 px rule should not choose an asymmetric gutter split.
+Use the document width, fixed card width, gap, outline strip, and viewport as layout inputs. The
+outline occupies visual space on the left even though it is narrow. Center the reading group in
+the space remaining to its right, rather than treating that strip as empty margin. This produces a
+smaller outer gap on the right than on the left and should be compared at several window widths.
+The correction applies only while the outline is visible, including its absence in source view.
+Do not move the document when the outline expands on hover; its popup overlays the reserved strip.
 
 - If the right margin fits the cards and their gap, keep the document at its no-comments position.
-- Otherwise, center the bounded document-plus-comments group with equal outer margins. Allocate
+- Otherwise, center the document-plus-comments group in the remaining reading area. Allocate
   only the rail width that cards use, rather than a whole flexible column beyond a capped card.
 - If the combined group cannot fit while keeping a readable document width, use the Comments panel.
   Large text and user-selected text widths participate in this calculation.
@@ -267,19 +318,21 @@ in the same specimen. Check ordinary, hovered, pressed, selected, disabled, and 
 against both page and elevated surfaces. Verify neutral hover is visible in every theme and remains
 distinct from pressed and selected states. Film grain cannot be what makes a control visible.
 
-Give the top-right controls the Open control's normal text weight, matching square surface, border,
-radius, and icon footprint. Preserve a distinct selected state for Comments and Translation.
-Do not fix visual weight merely by thickening a few unrelated SVG paths. Keyboard focus, tooltips,
-and Chinese accessible names remain part of the same controls.
+Normalize controls at three separate levels: hit area, icon geometry, and interaction state. Use
+one outline icon family, a shared stroke weight, and equal optical bounds; enclosed shapes may need
+a slightly smaller footprint than open shapes. Equal nominal SVG dimensions alone are insufficient.
+Use the same quiet button surface and border for Open, Source, Comments, and More. Keep the same
+comment glyph in both states; indicate selection with a restrained surface change rather than a
+heavier border plus stronger fill plus darker glyph. Check the whole row in normal, hover, selected,
+and keyboard-focus states in every theme. Exact optical adjustments remain a visual decision.
 
 ## Implementation sequence and acceptance
 
 1. Address reproducible persistence defects with failing regression tests first. Keep the
    intermittent native comment report open until its trigger is identified or measured.
 2. Apply the settled editor-conventional exit policy and review the notification hierarchy, then
-   implement the lifecycle states and
-   their transitions before polishing recovery controls. Use the existing native host, Radix
-   popovers/menus, and shared notification area; no new UI framework is needed.
+   implement lifecycle transitions before polishing recovery controls. Use the existing native host,
+   Radix popovers/menus, and shared notification area; no new UI framework is needed.
 3. Preview one complete recovery interaction, including dismissed and close/quit states. Review a
    full theme specimen and wide/constrained comment layouts before selecting final palette values.
 4. Implement the layout, control, and theme changes. Graduate this design into module contracts,
