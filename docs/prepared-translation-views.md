@@ -28,19 +28,45 @@ current store and translated-comment guards use the global preference as their t
 
 ## Visual choices for review
 
-All three designs expose the same available versions and preserve the existing file pills.
+The labeled language menu is preferred. Its placement remains open because file pills and document
+controls compete for the same row. Compare these arrangements with many files already open:
 
-- **Labeled menu:** the current version, such as 中文, appears beside the reading controls. Its
-  menu lists Original and available translations. Recommended: the current language is visible,
-  and several languages do not widen the toolbar substantially.
-- **Inline choices:** Original, 中文, and Français appear together as compact text choices. Fast
-  switching and strong discoverability, at the cost of space. Larger sets need an overflow menu.
-- **File-attached menu:** a language button beside the active file pill opens the same list.
-  The relationship to the file is explicit, but the additional control competes with file names.
+- **Overflow list:** preserve one row, reserve the controls' actual width, and show only the file
+  pills that fit. A count opens a searchable list of all open files. Keep the active file visible
+  without reordering the underlying file list. Recommended starting point.
+- **Separate controls row:** give file pills the full first row; put the language menu and document
+  controls on a compact second row. More filenames remain visible, at the cost of vertical space.
+- **Focused file:** show the active file and a counted file-list button. The language menu and
+  document controls fit comfortably, but readers lose the visible neighboring file pills.
 
-The takes include original-only, one-translation, multiple-translation, and stale-translation
-states. A single available version needs no picker. Language names use their native names;
+All takes retain a labeled language menu and show Find, Markdown, comments, and More actions
+together. Compare short and long filenames, 3–30 open files, and narrower windows. Menu selection
+and closing files are interactive previews, not a native app stress-test result.
+
+A single available reading version needs no picker. Language names use their native names;
 Interface language controls surrounding labels. Regional variants must remain distinguishable.
+
+### Existing overflow and required stress test
+
+The current file strip scrolls horizontally and reveals the active pill on selection. The native
+row reserves fixed right padding while document controls are positioned separately. That reserve
+does not measure a new text language button. Existing native reviewer tests primarily exercise one
+or two files; the inspected coverage does not establish many-file geometry or reachability.
+
+Before shipping the chosen layout, run a native matrix with 1, 3, 12, 30, and 50 disposable files;
+short names, long CJK names, and duplicate basenames; and wide, medium, and minimum supported window
+widths. Enable every applicable document control and use a long language label. Check:
+
+- Every file is reachable by pointer and keyboard, including first, middle, and last files.
+- The active file and its close button remain visible after opening, switching, closing, and resize.
+- Traffic lights, Open, Find, language, comments, and More actions never overlap or steal hit areas.
+- The overflow list disambiguates duplicate names and exposes full paths; file order stays stable.
+- Closing a file near the overflow boundary preserves sensible focus and selection.
+- Horizontal trackpad input stays within the file strip where applicable; vertical document scroll
+  and elastic scrolling do not move the controls.
+- Language menus, Find, and file lists dismiss predictably and do not stack over one another.
+
+Use a disposable native session for this matrix so the reader's open files and drafts are untouched.
 
 ## Proposed behavior
 
@@ -126,6 +152,6 @@ source mapping. No translation generation belongs in either host.
 
 ## Decisions still needed
 
-Choose the switcher placement from the visual takes. Confirm the initial-view presentation hint
+Choose the crowded-toolbar arrangement from the visual takes. Confirm the initial-view hint
 and its launcher spelling when reviewing the implementation contract. The language preference's
 removal and the preservation of freshness/source mapping are settled in DECISIONS.md.
