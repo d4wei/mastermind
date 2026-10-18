@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Find uses a compact floating panel
+
+**Ruled.** Place Find below the top-right controls without shifting document layout. Typical search
+queries are short, so the field and navigation controls should occupy only the space they need.
+Keep the current result visible outside the panel's footprint when navigating matches.
+
+**Beat:** a full-width Find row that reserves document space for mostly unused input width.
+
 ## 2026-10-17 — Theme accents identify discussions and primary actions
 
 **Ruled.** Comments and primary actions use the selected theme's accent family. Navigation,

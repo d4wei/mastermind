@@ -23,12 +23,12 @@ Use **Find / 查找**, with **Find in document / 在文档中查找** as the fie
 button beside the view toggle, with the same size, weight, hover, and focus treatment as its peers.
 Also expose Edit → Find in the native menu. Disable these entries when no document is open.
 
-Recommend a temporary Find row immediately below the file controls. It reserves its own height and
-stays outside document scrolling. This prevents it from covering headings, comments, or the outline.
-The alternative preview uses a compact floating panel below the top-right controls: less movement
-when opening, but it covers reading space. Both use the same behavior.
+Use a compact floating panel below the top-right controls, fixed outside document scrolling.
+Opening Find does not move the document. Short queries do not justify a full-width row; keep the
+field and its controls together without stretching across unused space. Match navigation must
+reveal the current result outside the panel's footprint.
 
-The row contains the query, an occurrence count, previous and next arrows, Match case, and Close.
+The panel contains the query, an occurrence count, previous and next arrows, Match case, and Close.
 There is no review-mark filter in the initial design. Search is literal and case-insensitive by
 default, scoped to the active file. Replacement and cross-file search are outside this change.
 
@@ -63,7 +63,8 @@ searching the entire raw file remains available in Markdown view.
   assistive technology without adding persistent chrome.
 - Highlight every occurrence quietly and distinguish the current one with an additional outline.
   Search emphasis must be distinguishable from review markup and must not change document bytes
-  or disrupt selection/comment creation. Scroll only enough to reveal the current match.
+  or disrupt selection/comment creation. Scroll only enough to reveal the current match clear of
+  the floating panel.
 - Escape or Close dismisses Find and clears its highlights. Return focus to the document/editor or
   invoking button as appropriate; preserve source selection and editing history.
 - Retain query, case setting, and open state per document for the current app session. Recompute
@@ -71,8 +72,8 @@ searching the entire raw file remains available in Markdown view.
   the scope table above. A content update must not steal typing focus or retain stale ranges.
 - Honor IME composition: Enter confirms Chinese input before it can navigate results. Keyboard
   commands inside unrelated inputs must not accidentally submit or alter a draft.
-- At narrow widths, wrap the field and controls into two rows. Keep the Find row, file controls,
-  outline, and recovery notices separate. Respect reduced motion.
+- At narrow widths, constrain the panel to the viewport and wrap its field and controls into two
+  rows as needed. Keep file controls and recovery notices accessible. Respect reduced motion.
 
 ## Implementation boundaries
 
@@ -99,4 +100,5 @@ Pinyin composition; empty/no/multiple matches; forward/backward wrap; inline-for
 frontmatter, code, suggestions, and collapsed replies; source virtualization; translated reading;
 file/mode changes; external updates; narrow windows; focus restoration; and no file writes from
 search alone. Run the full tests, both typechecks, and the native build, then repeat the principal
-flows in the native app. Implementation waits for review of the proposed scope and placement.
+flows in the native app. Floating placement is settled in `DECISIONS.md`; the remaining behavior
+is specified above.
