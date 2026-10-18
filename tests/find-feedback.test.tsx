@@ -94,6 +94,21 @@ it('does not navigate or close while confirming IME composition', () => {
   key('Enter'); expect(host.querySelector('[role="status"]')?.textContent).toBe('2 of 2')
 })
 
+it.each(['en', 'zh-CN'] as const)('reserves the largest result counter while navigating in %s', (uiLang) => {
+  act(() => {
+    useConfig.setState({ config: { ...useConfig.getState().config!, uiLang } })
+    root.render(<Harness text={'Review '.repeat(12)} />)
+  })
+  key('f', { metaKey: true }); fill('Review')
+  const reserved = () => host.querySelector('.find-count-size')!
+  const expected = uiLang === 'en' ? '12 of 12' : '第 12 项，共 12 项'
+  expect(reserved().textContent).toBe(expected)
+  expect(reserved().getAttribute('aria-hidden')).toBe('true')
+  for (let i = 0; i < 9; i++) key('Enter')
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(uiLang === 'en' ? '10 of 12' : '第 10 项，共 12 项')
+  expect(reserved().textContent).toBe(expected)
+})
+
 it('recomputes after external content replacement without stealing field focus or retaining detached ranges', () => {
   key('f', { metaKey: true }); fill('Review')
   act(() => root.render(<Harness text="A replacement with no match." source="changed" />))

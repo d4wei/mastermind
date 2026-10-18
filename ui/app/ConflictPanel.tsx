@@ -18,7 +18,7 @@ export function ConflictPanel({ store = useDoc }: Props) {
   const [confirmIncoming, setConfirmIncoming] = useState(false)
   if (!state.conflict || state.saving) return null
   if (state.conflictDismissed) return <Notification compact>
-    <button type="button" className="btn-ghost recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
+    <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
       title={t('needsAttention')} onClick={() => void state.openConflict()}>
       <AlertIcon />
     </button>

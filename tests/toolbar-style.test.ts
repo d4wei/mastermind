@@ -6,7 +6,7 @@ it('keeps generic button padding from squeezing the document toolbar icons', () 
   const style = document.createElement('style')
   style.textContent = readFileSync('ui/app/app.css', 'utf8')
   const button = document.createElement('button')
-  button.className = 'btn-ghost topbar-icon-btn'
+  button.className = 'btn-ghost btn-icon topbar-icon-btn'
   document.head.append(style); document.body.append(button)
   try {
     const computed = getComputedStyle(button)

@@ -28,6 +28,8 @@
   --dur-slow: 300ms;
 
   --find-input-width: 12rem;
+  --control-size: calc(var(--space-unit) * 7.5);
+  --control-size-compact: calc(var(--space-unit) * 6);
   --control-icon-size: 14px;
   --control-enclosed-icon-size: 13px;
   --reading-min-em: 28;

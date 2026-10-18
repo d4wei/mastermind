@@ -34,7 +34,8 @@ the same CSS variables as the theme defaults.
   even when a theme accent resembles a review color.
 - **Navigation:** Open, Source, Comments, More, file tabs, and secondary actions use neutral ink and
   surfaces. The current outline tick uses the text-safe accent. Find matches and its Match case
-  control use neutral emphasis, independent of review colors.
+  control use neutral emphasis, independent of review colors. The current match uses a darker fill
+  without an additional underline or outline.
 - **Selection and focus:** neutral selection fill and a neutral keyboard focus ring remain separate
   from review colors. Focus never substitutes for a selected state.
 - **Document content:** ordinary links retain underlines and neutral ink; task checkboxes are
@@ -71,6 +72,10 @@ labels. Corner roles are shared across palettes:
 Chrome uses the Radix icon family in [icons.tsx](../ui/icons.tsx), with matching custom review
 strokes. Shared icon dimensions normalize document controls; the enclosed comment glyph uses a
 slightly smaller optical bound. Selection changes the surface rather than the glyph's weight.
+Icon-only buttons share `.btn-icon`: a square border box, centered glyph, no text-button padding,
+and no flex shrinking. Document controls use `--control-size`; inset controls use
+`--control-size-compact`. The outline tracker is a document-shaped navigation surface, not a single
+icon button.
 
 Reading measure, margins, outline reservation, comment width, and gap are shared tokens. The
 [layout contract](../ui/app/layout.md) owns centering, panel fallback, scrolling, and movement.

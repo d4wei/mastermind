@@ -60,7 +60,7 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector,
     <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}>
       <div className="slide-over-head">
         <span className="slide-over-title">{title}</span>
-        <button type="button" className="btn-ghost slide-over-close" onClick={onClose} aria-label={t('close')}>
+        <button type="button" className="btn-ghost btn-icon slide-over-close" onClick={onClose} aria-label={t('close')}>
           <CrossIcon />
         </button>
       </div>

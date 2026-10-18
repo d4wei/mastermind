@@ -29,6 +29,13 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Icon-only buttons have square interaction surfaces
+
+**Ruled.** Icon-only buttons share square hit and hover areas at standard or compact sizes. Text
+button padding must not distort them; glyph shape does not determine the control's proportions.
+
+**Beat:** independently padded icon controls with inconsistent rectangular hover surfaces.
+
 ## 2026-10-17 — Find uses a compact floating panel
 
 **Ruled.** Place Find below the top-right controls without shifting document layout. Typical search

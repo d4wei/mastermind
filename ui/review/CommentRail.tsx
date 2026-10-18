@@ -206,13 +206,13 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
                 <span className="rail-author">{comment.author ?? t('comment')}</span>
               </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
               {messageIndex === 0 && <>
-                <button type="button" className="btn-ghost rail-icon" aria-label={t('resolve')} title={t('resolve')}
+                <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')} title={t('resolve')}
                   disabled={readOnly} onClick={() => resolveThread(card.thread)}><CheckIcon /></button>
-                {selected && <button type="button" className="btn-ghost rail-icon" aria-label={t('collapseDiscussion')}
+                {selected && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('collapseDiscussion')}
                   title={t('collapseDiscussion')} onClick={collapse}><ChevronUpIcon /></button>}
               </>}
               <DropdownMenu.Root modal={false}>
-                <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost rail-icon"
+                <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
                   aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
                 <DropdownMenu.Portal>
                   <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>

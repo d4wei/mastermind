@@ -21,7 +21,7 @@ export function Notification({ children, onDismiss, error = false, compact = fal
   const t = useT()
   const content = <section className={`notification${compact ? ' notification-compact' : ''}`} role={error ? 'alert' : 'status'}>
     <div className="notification-content">{children}</div>
-    {onDismiss && <button type="button" className="btn-ghost notification-dismiss"
+    {onDismiss && <button type="button" className="btn-ghost btn-icon notification-dismiss"
       aria-label={t('dismiss')} onClick={onDismiss}><CrossIcon /></button>}
   </section>
   return target ? createPortal(content, target) : content

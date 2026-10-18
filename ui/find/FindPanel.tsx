@@ -213,6 +213,7 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
 
   if (!open) return null
   const count = results.length ? t('findCount').replace('{current}', String(currentIndex + 1)).replace('{total}', String(results.length)) : query ? t('findNone') : ''
+  const countSize = results.length ? t('findCount').replace('{current}', String(results.length)).replace('{total}', String(results.length)) : count
   return <div className="find-bar" role="search" aria-label={t('find')} ref={panel}>
     <SearchIcon />
     <input ref={setInput}
@@ -226,17 +227,22 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
         if (ime.isComposing(event.nativeEvent)) return
         if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); step(event.shiftKey ? -1 : 1) }
       }} />
-    <span className="find-count" role="status" aria-live="polite">{count}<span className="find-announcement">{wrapped ? ` · ${t('findWrapped')}` : ''}</span></span>
-    <button className="btn-ghost find-nav" type="button" aria-label={t('findCase')} title={t('findCase')}
-      aria-pressed={caseSensitive} onClick={() => {
-        pendingReveal.current = true; chooseFromPosition.current = true
-        setState((current) => ({ ...current, caseSensitive: !current.caseSensitive }))
-      }}>Aa</button>
-    <button className="btn-ghost find-nav" type="button" disabled={!results.length} aria-label={t('findPrevious')}
-      title={t('findPrevious')} onClick={() => step(-1)}><ChevronUpIcon /></button>
-    <button className="btn-ghost find-nav" type="button" disabled={!results.length} aria-label={t('findNext')}
-      title={t('findNext')} onClick={() => step(1)}><ChevronDownIcon /></button>
-    <button className="btn-ghost find-nav" type="button" aria-label={t('findClose')} title={t('findClose')}
-      onClick={close}><CrossIcon /></button>
+    <span className="find-count">
+      <span className="find-count-size" aria-hidden="true">{countSize}</span>
+      <span role="status" aria-live="polite">{count}<span className="find-announcement">{wrapped ? ` · ${t('findWrapped')}` : ''}</span></span>
+    </span>
+    <div className="find-actions">
+      <button className="btn-ghost btn-icon find-nav" type="button" aria-label={t('findCase')} title={t('findCase')}
+        aria-pressed={caseSensitive} onClick={() => {
+          pendingReveal.current = true; chooseFromPosition.current = true
+          setState((current) => ({ ...current, caseSensitive: !current.caseSensitive }))
+        }}>Aa</button>
+      <button className="btn-ghost btn-icon find-nav" type="button" disabled={!results.length} aria-label={t('findPrevious')}
+        title={t('findPrevious')} onClick={() => step(-1)}><ChevronUpIcon /></button>
+      <button className="btn-ghost btn-icon find-nav" type="button" disabled={!results.length} aria-label={t('findNext')}
+        title={t('findNext')} onClick={() => step(1)}><ChevronDownIcon /></button>
+      <button className="btn-ghost btn-icon find-nav" type="button" aria-label={t('findClose')} title={t('findClose')}
+        onClick={close}><CrossIcon /></button>
+    </div>
   </div>
 }

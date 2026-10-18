@@ -196,7 +196,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               aria-label={t('fontSize')}
             >
               {FONT_OPTS.map((o) => (
-                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn" aria-label={`${o.v}px`}>
+                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn btn-icon" aria-label={`${o.v}px`}>
                   <span className="preset-A" style={{ fontSize: `${o.a}px` }}>
                     A
                   </span>
@@ -216,7 +216,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               aria-label={t('lineHeight')}
             >
               {LINE_OPTS.map((o) => (
-                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn" aria-label={o.v.toFixed(2)}>
+                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn btn-icon" aria-label={o.v.toFixed(2)}>
                   <LineGapGlyph gap={o.gap} />
                 </ToggleGroup.Item>
               ))}
@@ -234,7 +234,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               aria-label={t('contentWidth')}
             >
               {WIDTH_OPTS.map((o) => (
-                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn" aria-label={`${o.v}px`}>
+                <ToggleGroup.Item key={o.v} value={String(o.v)} className="seg-btn btn-icon" aria-label={`${o.v}px`}>
                   <WidthGlyph w={o.w} />
                 </ToggleGroup.Item>
               ))}

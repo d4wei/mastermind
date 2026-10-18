@@ -14,6 +14,8 @@ function installStyles() {
     'ui/modes/reading/frontmatter.css', 'ui/find/find.css'].map((file) => readFileSync(file, 'utf8')).join('\n')
     .replace(/var\((--radius-[a-z]+)\)/g, (_, name: string) => radii[name]!)
     .replaceAll('var(--space-unit)', '4px')
+    .replaceAll('var(--control-size-compact)', '24px')
+    .replaceAll('var(--control-size)', '30px')
   document.head.append(style)
 }
 
@@ -36,6 +38,44 @@ it('gives peer controls and floating surfaces consistent corners', () => {
       expect(getComputedStyle(element).borderRadius, name).toBe(expected)
     }
   }
+})
+
+it('keeps icon-only hover targets square without inherited text-button padding', () => {
+  installStyles()
+  const controls = [
+    ['btn-ghost btn-icon topbar-icon-btn', 30], ['native-open btn-icon', 30],
+    ['btn-ghost btn-icon find-nav', 24], ['btn-ghost btn-icon slide-over-close', 24],
+    ['btn-ghost btn-icon notification-dismiss', 24], ['btn-ghost btn-icon recovery-warning', 24],
+    ['native-file-close btn-icon', 24], ['native-file-attention btn-ghost btn-icon', 24],
+    ['btn-ghost btn-icon rail-icon', 24],
+  ] as const
+  for (const [classes, size] of controls) {
+    const parent = document.createElement('div'); parent.className = 'rail-message-header'
+    const button = document.createElement('button'); button.className = classes
+    parent.append(button); document.body.append(parent)
+    const style = getComputedStyle(button)
+    expect(style.width, classes).toBe(`${size}px`)
+    expect(style.height, classes).toBe(`${size}px`)
+    for (const edge of ['Top', 'Right', 'Bottom', 'Left'] as const) expect(style[`padding${edge}`], classes).toBe('0px')
+    expect(style.flexShrink, classes).toBe('0')
+  }
+  document.body.innerHTML = '<div class="seg preset-seg"><button class="seg-btn btn-icon"></button></div>'
+  const preset = getComputedStyle(document.querySelector('button')!)
+  expect(preset.width).toBe('30px')
+  expect(preset.height).toBe('30px')
+  expect(preset.padding).toBe('0px')
+  expect(preset.flexShrink).toBe('0')
+})
+
+it('reserves counter space and groups compact Find controls without gaps', () => {
+  installStyles()
+  document.body.innerHTML = '<span class="find-count"><span class="find-count-size" aria-hidden="true">12 of 12</span><span>1 of 12</span></span><div class="find-actions"></div>'
+  const count = document.querySelector('.find-count')!
+  expect(getComputedStyle(count).fontVariantNumeric).toBe('tabular-nums')
+  expect(getComputedStyle(count).display).toBe('grid')
+  for (const child of count.children) expect(getComputedStyle(child).gridArea).toBe('1 / 1')
+  expect(getComputedStyle(count.firstElementChild!).visibility).toBe('hidden')
+  expect(getComputedStyle(document.querySelector('.find-actions')!).gap).toBe('0px')
 })
 
 it('adds no frontmatter top inset and leaves space between properties and below the divider', () => {

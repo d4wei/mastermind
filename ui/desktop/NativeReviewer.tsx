@@ -196,7 +196,7 @@ export function NativeReviewer() {
   const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
   return <Notifications>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
-      <button type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
+      <button type="button" className={`native-open${atHome ? ' native-open-home' : ' btn-icon'}`} onClick={chooseFiles}
         aria-label={openLabel} title={openLabel}><FileIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
@@ -206,10 +206,10 @@ export function NativeReviewer() {
           <button type="button" className="native-file-select"
             aria-current={id === file.id ? 'page' : undefined}
             title={file.path} onClick={() => navigate(`/d/${file.id}`)}>{labels[index]}</button>
-          {documentState.needsAttention(file.id) && <button type="button" className="native-file-attention btn-ghost"
+          {documentState.needsAttention(file.id) && <button type="button" className="native-file-attention btn-ghost btn-icon"
             aria-label={`${labels[index]} · ${chinese ? '需要处理' : 'Needs attention'}`}
             onClick={() => { navigate(`/d/${file.id}`); if (id === file.id) void documentState.openConflict() }}><AlertIcon /></button>}
-          <button type="button" className="native-file-close" onClick={() => closeFile(file)}
+          <button type="button" className="native-file-close btn-icon" onClick={() => closeFile(file)}
             aria-label={`${chinese ? '关闭' : 'Close'} ${labels[index]}`}
             title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></button>
         </div>)}

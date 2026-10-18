@@ -12,6 +12,10 @@ blocks do. Repeated quote previews, hidden syntax, resolved archives, and toolba
 excluded. Translated reading searches its displayed content and appended discussions once, without
 opening the original document's comment rail. Markdown searches the complete source.
 
+The current match uses a darker neutral fill without an additional underline or outline. The count
+uses tabular digits and reserves the width of the largest result number, keeping navigation still.
+Its four compact square controls stay grouped when the panel wraps.
+
 `matches.ts` uses the pinned CodeMirror search package for literal matching and Unicode offsets.
 `reading.ts` maps displayed text to DOM ranges without rewriting the renderer's nodes. Comment
 search uses the same whitespace normalization as `CommentBody`, then maps the visible result when

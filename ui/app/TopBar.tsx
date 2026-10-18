@@ -43,25 +43,25 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
 
   return (
     <header className="topbar" ref={headerRef}>
-      <button type="button" className="btn-ghost topbar-icon-btn topbar-find" onClick={requestFind}
+      <button type="button" className="btn-ghost btn-icon topbar-icon-btn topbar-find" onClick={requestFind}
         aria-label={t('find')} title={`${t('find')} (${navigator.platform.startsWith('Mac') ? '⌘F' : 'Ctrl+F'})`}><SearchIcon /></button>
-      <button type="button" className="btn-ghost topbar-icon-btn" onClick={() => setMode(destination)}
+      <button type="button" className="btn-ghost btn-icon topbar-icon-btn" onClick={() => setMode(destination)}
         aria-label={t(destination)} title={t(destination)}><ModeIcon /></button>
       {translation && mode === 'reading' && (
-        <button type="button" className={`btn-ghost topbar-icon-btn${translation.active ? ' active' : ''}`}
+        <button type="button" className={`btn-ghost btn-icon topbar-icon-btn${translation.active ? ' active' : ''}`}
           onClick={translation.onToggle} disabled={translation.loading} aria-pressed={translation.active}
           aria-label={translation.loading ? t('translating') : translation.label} title={t('toggleLang')}>
           <LanguageIcon />
         </button>
       )}
       {onToggleRail && mode === 'reading' && commentsAvailable && (
-        <button type="button" className={`btn-ghost topbar-icon-btn topbar-comments${railOpen ? ' active' : ''}`}
+        <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-comments${railOpen ? ' active' : ''}`}
           onClick={onToggleRail} aria-label={railOpen ? t('hideComments') : t('showComments')}
           aria-pressed={railOpen} title={t('toggleRail')}><ChatIcon /></button>
       )}
       {(settings || resolved) && <DropdownMenu.Root modal={false}>
         <DropdownMenu.Trigger asChild>
-          <button type="button" className={`btn-ghost topbar-icon-btn topbar-overflow${settings?.open || resolved?.open ? ' active' : ''}`}
+          <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-overflow${settings?.open || resolved?.open ? ' active' : ''}`}
             aria-label={t('moreActions')}
             title={t('moreActions')}><MoreIcon /></button>
         </DropdownMenu.Trigger>

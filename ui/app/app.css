@@ -154,13 +154,9 @@ body {
   white-space: normal; /* notices can wrap; let the roll line break naturally */
 }
 
-.topbar-icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: calc(var(--space-unit) * 7.5);
-  height: calc(var(--space-unit) * 7.5);
-  padding: 0;
+.topbar-icon-btn.btn-icon {
+  width: var(--control-size);
+  height: var(--control-size);
 }
 /* Equal surfaces and optical bounds keep enclosed icons from outweighing open glyphs. */
 .native-open:not(.native-open-home), .btn-ghost.topbar-icon-btn {
@@ -224,6 +220,17 @@ button:disabled {
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2.5);
 }
 
+.btn-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--control-size-compact);
+  height: var(--control-size-compact);
+  padding: 0;
+  line-height: 1;
+}
+.btn-icon > svg { width: var(--control-icon-size); height: var(--control-icon-size); }
 
 
 .seg {
@@ -318,10 +325,6 @@ button:disabled {
   border-radius: var(--radius-xs);
 }
 .rail-message-header .rail-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-unit);
   border-radius: var(--radius-xs);
   color: var(--color-text-muted);
 }
@@ -879,11 +882,6 @@ mark.critic-hl.critic-anchor:hover,
   text-transform: uppercase;
   color: var(--color-text);
 }
-.slide-over-close {
-  font-size: var(--font-size-sm);
-  line-height: 1;
-  padding: 2px 6px;
-}
 .slide-over-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -980,16 +978,12 @@ mark.critic-hl.critic-anchor:hover,
 
 /* reading presets: self-illustrating glyph ToggleGroups (replace the sliders) */
 .preset-seg {
-  width: 100%;
+  width: max-content;
 }
-.preset-seg .seg-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
+.preset-seg .btn-icon {
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  color: var(--color-text-muted);
 }
 .preset-seg .seg-btn[data-state='on'] {
   color: var(--color-text);
