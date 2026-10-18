@@ -1,32 +1,21 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { ThemeFontInfo, ThemeInfo } from './types'
+import postcss from 'postcss'
+import type { ThemeInfo } from './types'
 
-interface ThemeJson {
-  id?: string
-  name?: string
-  appearance?: string
-  fonts?: Array<{ family?: string; src?: string; weight?: string | number }>
-  swatch?: { bg?: unknown; ink?: unknown; accent?: unknown }
-}
+interface ThemeJson { name?: string }
 
-function parseSwatch(s: ThemeJson['swatch']): ThemeInfo['swatch'] {
-  if (!s) return null
-  const { bg, ink, accent } = s
-  if (typeof bg === 'string' && typeof ink === 'string' && typeof accent === 'string') {
-    return { bg, ink, accent }
+function paletteMetadata(css: string): Pick<ThemeInfo, 'appearance' | 'swatch'> {
+  const colors = new Map<string, string>()
+  postcss.parse(css).walkDecls((decl) => { colors.set(decl.prop, decl.value) })
+  const color = (name: string): string => {
+    const value = colors.get(`--color-${name}`)
+    if (!value || value.includes('var(')) throw new Error(`Theme must define a literal --color-${name}`)
+    return value
   }
-  return null
-}
-
-/**
- * Font srcs in theme.json are theme-relative ("/fonts/X.woff2" lives in the
- * theme's own folder); an explicit "/themes/..." src may reference another
- * theme's files.
- */
-function resolveFontUrl(themeId: string, src: string): string {
-  if (src.startsWith('/themes/')) return src
-  return `/themes/${themeId}${src.startsWith('/') ? '' : '/'}${src}`
+  const appearance = colors.get('color-scheme')
+  if (appearance !== 'light' && appearance !== 'dark') throw new Error('Theme must declare light or dark color-scheme')
+  return { appearance, swatch: { bg: color('bg'), ink: color('text-muted'), accent: color('accent') } }
 }
 
 export async function scanThemes(themesDir: string): Promise<ThemeInfo[]> {
@@ -47,22 +36,15 @@ export async function scanThemes(themesDir: string): Promise<ThemeInfo[]> {
       continue
     }
     try {
-      const [jsonRaw] = await Promise.all([
+      const [jsonRaw, css] = await Promise.all([
         fs.readFile(path.join(dir, 'theme.json'), 'utf8'),
-        fs.access(path.join(dir, 'tokens.css')),
+        fs.readFile(path.join(dir, 'tokens.css'), 'utf8'),
       ])
       const parsed = JSON.parse(jsonRaw) as ThemeJson
-      const fonts: ThemeFontInfo[] = []
-      for (const f of parsed.fonts ?? []) {
-        if (!f.family || !f.src) continue
-        fonts.push({ family: f.family, url: resolveFontUrl(id, f.src), weight: f.weight ?? 400 })
-      }
       out.push({
         id,
         name: parsed.name ?? id,
-        appearance: parsed.appearance === 'dark' ? 'dark' : 'light',
-        fonts,
-        swatch: parseSwatch(parsed.swatch),
+        ...paletteMetadata(css),
       })
     } catch (err) {
       console.error(`theme ${id} skipped:`, err instanceof Error ? err.message : err)

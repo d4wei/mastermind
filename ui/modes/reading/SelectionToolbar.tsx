@@ -216,7 +216,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
             <button type="button" onClick={() => setComposing(null)}>
               {t('cancel')}
             </button>
-            <button type="button" className="primary" disabled={!canSubmit} onClick={submit}>
+            <button type="button" className="btn-primary btn-compact" disabled={!canSubmit} onClick={submit}>
               {t(composing === 'comment' ? 'comment' : 'suggestChange')}
             </button>
           </div>

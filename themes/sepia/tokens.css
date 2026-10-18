@@ -1,94 +1,28 @@
+@import '../common.css';
+
 [data-theme='sepia'] {
-  --control-icon-size: 14px;
-  --control-enclosed-icon-size: 13px;
-  --reading-min-em: 28;
-  --reading-edge: 16px;
-  --reading-outline: 48px;
-  --reading-rail: 300px;
-  --reading-gap: 24px;
-  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-wordmark: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --wordmark-line-height: 1.25;
-  --md-block-gap: var(--font-size-body);
-  --md-heading-gap: calc(var(--font-size-body) * 1.5);
-  --md-h1-size: 2em;
-  --md-h2-size: 1.5em;
-  --md-h3-size: 1.25em;
-  --md-h4-size: 1em;
-  --md-h5-size: 0.875em;
-  --md-h6-size: 0.85em;
-  --md-list-indent: 2em;
-  --md-list-gap: 0.25em;
-  --document-scrollbar-size: 6px;
-  --radius-xs: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-
-  /* Swiss International — Sepia (warm paper, ochre). */
-
-  /* ---- Layer 1: raw scales (values differ per theme) ---- */
-  --gray-1: oklch(0.944 0.017 88.001);
-  --gray-2: oklch(0.968 0.014 88.683);
-  --gray-3: oklch(0.944 0.004 70.928);
-  --gray-4: oklch(0.921 0.004 70.928);
-  --gray-5: oklch(0.898 0.004 70.928);
-  --gray-6: oklch(0.874 0.022 85.948);
-  --gray-7: oklch(0.82 0.004 70.928);
-  --gray-8: oklch(0.766 0.004 70.928);
-  --gray-9: oklch(0.712 0.004 70.928);
-  --gray-10: oklch(0.658 0.023 76.438);
-  --gray-11: oklch(0.512 0.02 72.867);
-  --gray-12: oklch(0.214 0.014 61.811);
-  --accent-1: oklch(0.984 0.012 70.928);
-  --accent-2: oklch(0.968 0.022 70.928);
-  --accent-3: oklch(0.943 0.038 70.928);
-  --accent-4: oklch(0.913 0.054 70.928);
-  --accent-5: oklch(0.877 0.072 70.928);
-  --accent-6: oklch(0.832 0.09 70.928);
-  --accent-7: oklch(0.776 0.107 70.928);
-  --accent-8: oklch(0.702 0.122 70.928);
-  --accent-9: oklch(0.668 0.136 70.928);
-  --accent-10: oklch(0.552 0.132 70.928);
-  --accent-11: oklch(0.508 0.105 71.812);
-  --accent-12: oklch(0.353 0.101 70.928);
-
-  /* ---- Layer 2: semantic mapping (identical names across all themes) ---- */
-  --color-dialog-backdrop: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  --color-control-hover: color-mix(in srgb, var(--color-text) 9%, var(--color-bg-elevated));
-  --color-control-pressed: color-mix(in srgb, var(--color-text) 16%, var(--color-bg-elevated));
-  --color-bg: var(--gray-1);
-  --color-bg-elevated: var(--gray-2);
-  --color-text: var(--gray-12);
-  --color-text-muted: var(--gray-11);
-  --color-text-faint: var(--gray-10);
-  --color-border: var(--gray-6);
-  --color-border-hover: var(--gray-7);
-  --color-accent: var(--accent-9);
-  --color-accent-dim: var(--accent-11);
+  --color-bg: oklch(0.944 0.017 88.001);
+  --color-bg-elevated: oklch(0.968 0.014 88.683);
+  --color-text: oklch(0.214 0.014 61.811);
+  --color-text-muted: oklch(0.512 0.02 72.867);
+  --color-text-faint: oklch(0.658 0.023 76.438);
+  --color-border: oklch(0.874 0.022 85.948);
+  --color-border-hover: oklch(0.82 0.004 70.928);
+  --color-accent: oklch(0.668 0.136 70.928);
   --color-on-accent: #2a1b06;
-  --color-cta-bg: var(--gray-12);
-  --color-cta-text: var(--gray-1);
-  --focus-ring: var(--gray-10);
-  --color-selection: color-mix(in oklab, var(--color-text) 12%, transparent);
-  --color-accent-surface: color-mix(in oklab, var(--color-accent) 14%, transparent);
   --color-invert-bg: #1e1813;
   --color-invert-bg-elevated: #2a231b;
   --color-invert-text: #f4efe4;
   --color-invert-text-muted: rgba(244, 239, 228, 0.66);
   --color-invert-border: rgba(244, 239, 228, 0.16);
-
-  /* Review colors remain independent of the interface accent. */
-  --review-insert-text: #2c7a3f;
-  --review-insert-bg: rgba(44, 122, 63, 0.12);
-  --review-insert-border: #2c7a3f;
-  --review-delete-text: #a8431f;
-  --review-delete-bg: rgba(168, 67, 31, 0.12);
-  --review-delete-border: rgba(168, 67, 31, 0.45);
+  --review-insert-text: #1c6d32;
+  --review-delete-text: #a33e1a;
   --review-highlight-bg: rgba(168, 150, 40, 0.24);
   --review-highlight-border: rgba(168, 150, 40, 0.6);
-  --review-comment-anchor: #846638;
-  --review-comment-active-bg: rgba(132, 102, 56, 0.13);
-
+  --color-accent-text: oklch(0.508 0.105 71.812);
+  --color-accent-hover: #d28e2a;
+  --color-accent-pressed: #dd9a39;
+  --focus-ring: #70675c;
+  --color-shadow: rgb(0 0 0 / 0.16);
   color-scheme: light;
 }

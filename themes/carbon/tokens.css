@@ -1,94 +1,28 @@
+@import '../common.css';
+
 [data-theme='carbon'] {
-  --control-icon-size: 14px;
-  --control-enclosed-icon-size: 13px;
-  --reading-min-em: 28;
-  --reading-edge: 16px;
-  --reading-outline: 48px;
-  --reading-rail: 300px;
-  --reading-gap: 24px;
-  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-wordmark: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --wordmark-line-height: 1.25;
-  --md-block-gap: var(--font-size-body);
-  --md-heading-gap: calc(var(--font-size-body) * 1.5);
-  --md-h1-size: 2em;
-  --md-h2-size: 1.5em;
-  --md-h3-size: 1.25em;
-  --md-h4-size: 1em;
-  --md-h5-size: 0.875em;
-  --md-h6-size: 0.85em;
-  --md-list-indent: 2em;
-  --md-list-gap: 0.25em;
-  --document-scrollbar-size: 6px;
-  --radius-xs: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-
-  /* Carbon (near-black, steel blue-gray). */
-
-  /* ---- Layer 1: raw scales (values differ per theme) ---- */
-  --gray-1: oklch(0.139 0.003 246.256);
-  --gray-2: oklch(0.187 0.006 271.067);
-  --gray-3: oklch(0.209 0.006 254.388);
-  --gray-4: oklch(0.232 0.006 254.388);
-  --gray-5: oklch(0.254 0.006 254.388);
-  --gray-6: oklch(0.276 0.008 264.438);
-  --gray-7: oklch(0.331 0.006 254.388);
-  --gray-8: oklch(0.386 0.006 254.388);
-  --gray-9: oklch(0.44 0.006 254.388);
-  --gray-10: oklch(0.495 0.007 255.514);
-  --gray-11: oklch(0.692 0.006 264.522);
-  --gray-12: oklch(0.958 0.002 247.84);
-  --accent-1: oklch(0.205 0.005 254.388);
-  --accent-2: oklch(0.245 0.008 254.388);
-  --accent-3: oklch(0.3 0.014 254.388);
-  --accent-4: oklch(0.36 0.02 254.388);
-  --accent-5: oklch(0.42 0.027 254.388);
-  --accent-6: oklch(0.485 0.034 254.388);
-  --accent-7: oklch(0.56 0.04 254.388);
-  --accent-8: oklch(0.65 0.046 254.388);
-  --accent-9: oklch(0.656 0.051 254.388);
-  --accent-10: oklch(0.74 0.049 254.388);
-  --accent-11: oklch(0.77 0.043 256.264);
-  --accent-12: oklch(0.93 0.038 254.388);
-
-  /* ---- Layer 2: semantic mapping (identical names across all themes) ---- */
-  --color-dialog-backdrop: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  --color-control-hover: color-mix(in srgb, var(--color-text) 14%, var(--color-bg-elevated));
-  --color-control-pressed: color-mix(in srgb, var(--color-text) 22%, var(--color-bg-elevated));
-  --color-bg: var(--gray-1);
-  --color-bg-elevated: var(--gray-2);
-  --color-text: var(--gray-12);
-  --color-text-muted: var(--gray-11);
-  --color-text-faint: var(--gray-10);
-  --color-border: var(--gray-6);
-  --color-border-hover: var(--gray-7);
-  --color-accent: var(--accent-9);
-  --color-accent-dim: var(--accent-11);
+  --color-bg: oklch(0.139 0.003 246.256);
+  --color-bg-elevated: oklch(0.187 0.006 271.067);
+  --color-text: oklch(0.958 0.002 247.84);
+  --color-text-muted: oklch(0.692 0.006 264.522);
+  --color-text-faint: oklch(0.495 0.007 255.514);
+  --color-border: oklch(0.276 0.008 264.438);
+  --color-border-hover: oklch(0.331 0.006 254.388);
+  --color-accent: oklch(0.656 0.051 254.388);
   --color-on-accent: #0a0e14;
-  --color-cta-bg: var(--accent-9);
-  --color-cta-text: #0a0e14;
-  --focus-ring: var(--gray-10);
-  --color-selection: color-mix(in oklab, var(--color-text) 16%, transparent);
-  --color-accent-surface: color-mix(in oklab, var(--color-accent) 16%, transparent);
   --color-invert-bg: #f4f4f1;
   --color-invert-bg-elevated: #ffffff;
   --color-invert-text: #141414;
   --color-invert-text-muted: rgba(20, 20, 20, 0.62);
   --color-invert-border: rgba(20, 20, 20, 0.14);
-
-  /* Review colors remain independent of the interface accent. */
   --review-insert-text: #4fc76e;
-  --review-insert-bg: rgba(79, 199, 110, 0.16);
-  --review-insert-border: #4fc76e;
   --review-delete-text: #f0664a;
-  --review-delete-bg: rgba(240, 102, 74, 0.16);
-  --review-delete-border: rgba(240, 102, 74, 0.5);
   --review-highlight-bg: rgba(232, 190, 58, 0.2);
   --review-highlight-border: rgba(232, 190, 58, 0.55);
-  --review-comment-anchor: #b9a9d1;
-  --review-comment-active-bg: rgba(185, 169, 209, 0.15);
-
+  --color-accent-text: oklch(0.77 0.043 256.264);
+  --color-accent-hover: #8da4c1;
+  --color-accent-pressed: #9eb5d1;
+  --focus-ring: #989a9e;
+  --color-shadow: rgb(0 0 0 / 0.32);
   color-scheme: dark;
 }

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { syncHostBackground } from './background'
+import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
 import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
@@ -20,6 +20,7 @@ export function ThemeEffects() {
     const id = theme?.id ?? themeId
     const root = document.documentElement
     const prev = root.dataset.theme
+    const synchronize = () => syncHostAppearance(theme?.appearance ?? 'light')
     const href = `/themes/${id}/tokens.css`
     let link = document.getElementById(TOKENS_LINK_ID) as HTMLLinkElement | null
     const firstLoad = !link
@@ -30,9 +31,9 @@ export function ThemeEffects() {
       document.head.appendChild(link)
     }
     if (prev === id && link.href.endsWith(href)) {
-      if (link.sheet) syncHostBackground()
-      else link.addEventListener('load', syncHostBackground, { once: true })
-      return () => link?.removeEventListener('load', syncHostBackground)
+      if (link.sheet) synchronize()
+      else link.addEventListener('load', synchronize, { once: true })
+      return () => link?.removeEventListener('load', synchronize)
     }
 
     const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -58,7 +59,7 @@ export function ThemeEffects() {
         }),
       )
     }
-    const loaded = (): void => { syncHostBackground(); reveal() }
+    const loaded = (): void => { synchronize(); reveal() }
     link.onload = loaded
     if (!link.href.endsWith(href)) link.href = href
     else if (link.sheet) loaded()
@@ -68,7 +69,7 @@ export function ThemeEffects() {
       if (link.onload === loaded) link.onload = null
       veil?.remove()
     }
-  }, [theme?.id, themeId])
+  }, [theme?.id, theme?.appearance, themeId])
 
   // Declare local font faces independently of the selected theme.
   useEffect(() => {

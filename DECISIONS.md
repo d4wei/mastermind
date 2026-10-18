@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Theme accents identify discussions and primary actions
+
+**Ruled.** Comments and primary actions use the selected theme's accent family. Navigation,
+selection, focus, and ordinary document content remain neutral; insertion, deletion, and highlight
+retain distinct semantic roles. The theme layer owns shared derived tokens and print colors;
+palette CSS also supplies picker swatches and native light/dark appearance.
+
+**Beat:** independent comment palettes, duplicated CTA aliases and manifest colors, and native
+appearance disconnected from the selected theme.
+
 ## 2026-10-17 — Comment activation opens a reply
 
 **Ruled.** Comment cards always show their quoted passage. Activating a commented passage or card

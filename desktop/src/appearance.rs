@@ -1,5 +1,13 @@
 #[tauri::command]
-pub fn set_background_color(webview: tauri::Webview, color: [u8; 4]) -> Result<(), String> {
+pub fn set_appearance(
+    webview: tauri::Webview,
+    color: [u8; 4],
+    appearance: tauri::Theme,
+) -> Result<(), String> {
+    webview
+        .window()
+        .set_theme(Some(appearance))
+        .map_err(|e| e.to_string())?;
     let [red, green, blue, alpha] = color;
     #[cfg(target_os = "macos")]
     webview

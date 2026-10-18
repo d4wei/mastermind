@@ -1,21 +1,3 @@
-/**
- * Code-color schemes — a cross-theme USER preference, exactly like the font
- * registry (`fonts.ts`). The reading view's code blocks are normally monochrome
- * (the document body reserves color for CriticMarkup review marks); turning on a
- * scheme is an explicit opt-in that paints syntax tokens via `--code-*` CSS
- * variables, set at runtime by `ThemeProvider`.
- *
- * Isomorphic / browser-safe (pure data + lookups, no DOM) so the CLI can list the
- * schemes for the setup picker; re-exported from ui/theme/codeThemes.ts.
- *
- * Each scheme carries a `light` and `dark` palette so the same choice reads well
- * on the light (grid / sepia) and dark (nacht) app themes — selection keys off the
- * active theme's `appearance`. `none` keeps the current uncolored look.
- *
- * `tokenize()` (./highlight) emits exactly these seven colorable token types;
- * `text` falls through to the base `--color-text`.
- */
-
 import type { HlToken } from '../modes/reading/highlight'
 
 export type ColorTok = Exclude<HlToken['type'], 'text'>
@@ -34,30 +16,27 @@ export interface CodeTheme {
 export const CODE_THEMES: CodeTheme[] = [
   { id: 'none', name: 'None', palettes: null },
   {
-    // low-saturation, editorial — quietest of the three
     id: 'soft',
     name: 'Soft',
     palettes: {
-      light: { comment: '#9aa0a6', keyword: '#9a6fb0', string: '#5f8a5f', number: '#b0844f', function: '#5a86b8', property: '#6b7785', constant: '#b06a6a' },
-      dark: { comment: '#6f757d', keyword: '#c4a7e7', string: '#a3c9a8', number: '#e0bb7a', function: '#8fb6e8', property: '#aab4c0', constant: '#e0a0a0' },
+      light: { comment: '#666c71', keyword: '#855b9a', string: '#4b754b', number: '#8e632e', function: '#436e9f', property: '#606b79', constant: '#9b5758' },
+      dark: { comment: '#9fa5ae', keyword: '#c4a7e7', string: '#a3c9a8', number: '#e0bb7a', function: '#8fb6e8', property: '#aab4c0', constant: '#e0a0a0' },
     },
   },
   {
-    // the One Light / One Dark palette — balanced and widely loved
     id: 'vivid',
     name: 'Vivid',
     palettes: {
-      light: { comment: '#a0a1a7', keyword: '#a626a4', string: '#50a14f', number: '#986801', function: '#4078f2', property: '#e45649', constant: '#986801' },
-      dark: { comment: '#7f848e', keyword: '#c678dd', string: '#98c379', number: '#d19a66', function: '#61afef', property: '#e06c75', constant: '#d19a66' },
+      light: { comment: '#6a6b71', keyword: '#a626a4', string: '#277b29', number: '#926200', function: '#2e63db', property: '#c4372e', constant: '#926200' },
+      dark: { comment: '#9fa4ae', keyword: '#d586ec', string: '#98c379', number: '#d19a66', function: '#61afef', property: '#f78088', constant: '#d19a66' },
     },
   },
   {
-    // warm / earthy (Gruvbox) — pairs naturally with the sepia theme
     id: 'warm',
     name: 'Warm',
     palettes: {
-      light: { comment: '#a89984', keyword: '#9d0006', string: '#79740e', number: '#8f3f71', function: '#b57614', property: '#076678', constant: '#8f3f71' },
-      dark: { comment: '#928374', keyword: '#fb4934', string: '#b8bb26', number: '#d3869b', function: '#fabd2f', property: '#83a598', constant: '#d3869b' },
+      light: { comment: '#766854', keyword: '#9d0006', string: '#736e00', number: '#8f3f71', function: '#9a5d00', property: '#076678', constant: '#8f3f71' },
+      dark: { comment: '#b1a192', keyword: '#ff7e65', string: '#b8bb26', number: '#db8ea3', function: '#fabd2f', property: '#89ab9e', constant: '#db8ea3' },
     },
   },
 ]

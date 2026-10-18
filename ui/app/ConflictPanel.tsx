@@ -39,12 +39,12 @@ export function ConflictPanel({ store = useDoc }: Props) {
     {confirmIncoming && !ioFailure ? <>
       <p>{t('conflictDiscard')}</p>
       <div className="conflict-actions">
-        <button type="button" className="btn-cta" disabled={state.saving}
+        <button type="button" className="btn-primary" disabled={state.saving}
           onClick={() => { setConfirmIncoming(false); void state.useConflictDisk() }}>{t('conflictUseDisk')}</button>
         <button type="button" className="btn-ghost" onClick={() => setConfirmIncoming(false)}>{t('cancel')}</button>
       </div>
     </> : <div className="conflict-actions">
-      {requireReviewerHost().saveCopy && <button type="button" className="btn-cta"
+      {requireReviewerHost().saveCopy && <button type="button" className="btn-primary"
         onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>}
       {ioFailure ? <button type="button" className="btn-ghost"
         onClick={() => void state.retryRecovery()}>{t('retry')}</button> :

@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { renderMarkdown } from './helpers/markdown'
 import { createReactHost, removeReactHost } from './helpers/dom'
 import { scrollToSpan } from '../ui/util/scroll'
+import { themeTokens } from './helpers/themes'
 import { DocumentScroll } from '../ui/app/DocumentScroll'
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -49,8 +50,7 @@ it('reveals the scrollbar during scrolling or edge pointing and hides it after i
 })
 
 it('uses equal prose gaps, body-relative headings, and tight nested list margins', () => {
-  const tokens = Object.fromEntries([...readFileSync('themes/grid/tokens.css', 'utf8')
-    .matchAll(/(--md-[a-z0-9-]+):\s*([^;]+);/g)].map((match) => [match[1]!, match[2]!]))
+  const tokens = themeTokens('grid')
   const style = document.createElement('style')
   style.textContent = readFileSync('ui/app/app.css', 'utf8')
     .replace(/var\((--md-[a-z0-9-]+)\)/g, (_, name: string) => tokens[name]!)

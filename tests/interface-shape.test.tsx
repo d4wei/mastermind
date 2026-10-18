@@ -2,11 +2,10 @@
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, expect, it } from 'vitest'
+import { themeTokens } from './helpers/themes'
 import { Frontmatter } from '../ui/modes/reading/Frontmatter'
 
-const tokens = readFileSync('themes/grid/tokens.css', 'utf8')
-const radii = Object.fromEntries([...tokens.matchAll(/(--radius-[a-z]+):\s*([^;]+);/g)]
-  .map((match) => [match[1]!, match[2]!]))
+const radii = themeTokens('grid')
 
 function installStyles() {
   const style = document.createElement('style')
@@ -23,10 +22,10 @@ afterEach(() => { document.head.replaceChildren(); document.body.replaceChildren
 it('gives peer controls and floating surfaces consistent corners', () => {
   installStyles()
   const groups = [
-    ['btn-cta', 'btn-ghost', 'settings-input', 'theme-chip', 'native-open', 'native-file-pill'],
+    ['btn-primary', 'btn-ghost', 'settings-input', 'theme-chip', 'native-open', 'native-file-pill'],
     ['reader-menu', 'rail-card', 'sel-toolbar', 'slide-over', 'lang-menu', 'outline-popover',
       'find-bar', 'notification'],
-    ['reader-menu-item', 'lang-option', 'native-file-close', 'settings-check'],
+    ['reader-menu-item', 'lang-option', 'native-file-close'],
   ]
   for (const [index, names] of groups.entries()) {
     const expected = [radii['--radius-md'], radii['--radius-lg'], radii['--radius-xs']][index]

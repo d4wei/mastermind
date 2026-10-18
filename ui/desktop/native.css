@@ -137,7 +137,9 @@
   max-width: calc(100% - var(--space-unit) * 8);
   height: auto;
   padding: calc(var(--space-unit) * 2.5) calc(var(--space-unit) * 4);
-  background: transparent;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: transparent;
   font-family: var(--font-ui);
   font-size: var(--font-size-sm);
 }
@@ -145,6 +147,6 @@
 .native-open-shortcut {
   margin-left: calc(var(--space-unit) * 3);
   font-size: var(--font-size-micro);
-  color: var(--color-text-muted);
+  color: inherit;
 }
 .native-wordmark-row { display: inline-block; }

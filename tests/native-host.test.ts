@@ -14,11 +14,11 @@ function deferred<T>() {
 afterEach(() => { installHost(null); vi.unstubAllGlobals() })
 
 describe('native reviewer boundary', () => {
-  it('passes theme background channels to the native appearance command', async () => {
+  it('passes theme background and light/dark mode to the native appearance command', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
     const host = createNativeHost({ invoke, listen: vi.fn() }, [])
-    await host.setBackgroundColor!([40, 42, 54, 255])
-    expect(invoke).toHaveBeenCalledWith('set_background_color', { color: [40, 42, 54, 255] })
+    await host.setAppearance!([40, 42, 54, 255], 'dark')
+    expect(invoke).toHaveBeenCalledWith('set_appearance', { color: [40, 42, 54, 255], appearance: 'dark' })
   })
 
   it('uses native commands without issuing HTTP requests and retains conflict errors', async () => {

@@ -99,7 +99,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
         {(error || stale || selection.artifact !== artifact) && <div role="alert">{t('translatedCommentStale')}</div>}
         <div className="sel-composer-actions">
           <button type="button" onClick={close}>{t('cancel')}</button>
-          <button type="button" className="primary" disabled={readOnly || !body.trim() || submitting}
+          <button type="button" className="btn-primary btn-compact" disabled={readOnly || !body.trim() || submitting}
             onClick={() => void submit()}>{t('comment')}</button>
         </div>
       </div>}

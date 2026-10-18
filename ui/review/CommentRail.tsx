@@ -242,7 +242,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             }} />
           <div className="rail-actions">
             <button type="button" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
-            <button type="button" className="primary" disabled={readOnly || !drafts[card.key]?.trim()}
+            <button type="button" className="btn-primary btn-compact" disabled={readOnly || !drafts[card.key]?.trim()}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
         </div> : <div className="rail-actions rail-footer">

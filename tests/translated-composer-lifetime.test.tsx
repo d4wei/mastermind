@@ -64,7 +64,7 @@ it.each(['same source', 'new source'])('retains the captured passage and draft w
   await act(async () => useTranslation.setState({ artifact: newer }))
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
   expect(host.querySelector('.sel-composer [role="alert"]')).not.toBeNull()
-  await act(async () => host.querySelector<HTMLButtonElement>('.sel-composer .primary')!.click())
+  await act(async () => host.querySelector<HTMLButtonElement>('.sel-composer .btn-primary')!.click())
   expect(useDoc.getState().source).toBe(source)
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
 })

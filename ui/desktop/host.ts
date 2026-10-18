@@ -38,7 +38,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
   }
   let preferenceWrite: Promise<unknown> = Promise.resolve()
   return {
-    setBackgroundColor: (color) => invoke<void>('set_background_color', { color }),
+    setAppearance: (color, appearance) => invoke<void>('set_appearance', { color, appearance }),
     getSession: (id) => invoke('document_meta', { id }),
     getFile,
     putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),

@@ -36,9 +36,9 @@ export function CloseDialog() {
       <div className="close-actions">
         {prompt.kind !== 'saving' && <button type="button" className="btn-ghost" onClick={() => choose('discard')}>
           {t(prompt.kind === 'draft' ? 'discardDrafts' : 'dontSave')}</button>}
-        <button type="button" className={prompt.kind === 'draft' ? 'btn-cta' : 'btn-ghost'}
+        <button type="button" className={prompt.kind === 'draft' ? 'btn-primary' : 'btn-ghost'}
           autoFocus={prompt.kind !== 'save'} onClick={() => choose('cancel')}>{t('cancel')}</button>
-        {prompt.kind === 'save' && <button type="button" className="btn-cta" autoFocus
+        {prompt.kind === 'save' && <button type="button" className="btn-primary" autoFocus
           onClick={() => choose('save')}>{t('conflictSaveCopy')}</button>}
       </div>
     </>}

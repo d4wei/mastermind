@@ -200,3 +200,15 @@ Rose comments plum; insertion and deletion keep their separate meanings.
   themes. Keyboard focus is visible; clicking a button adds no ring. Inputs have one focused border.
 - Search for a mark, then a nonexistent term. The result highlight clears and remains distinct from
   focus in the search field. Check inverted selection composers and Markdown editor caret focus.
+
+## Theme color roles
+
+- In Grid, Sepia, and Mint, inspect a selected comment and an open reply composer. Underline and
+  card border follow the theme accent; submission uses a filled accent button with readable text.
+- Inspect primary actions at rest, hover, pressed, focused, and disabled, including selection
+  composers on inverted surfaces. Secondary actions retain neutral treatment.
+- Switch between light and dark themes. Inspect native controls while focused and inactive;
+  macOS traffic lights remain system-drawn. Inspect menus and elastic-scroll backgrounds too.
+- Print a document containing comments, insertions, deletions, highlights, and colored code from
+  both a light and dark theme. The print palette remains light with distinct review roles and
+  neutral code ink.

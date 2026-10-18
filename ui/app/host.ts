@@ -21,7 +21,7 @@ export interface ReviewerHost {
   config(): Promise<ClientConfig>
   updateConfig(patch: Partial<Omit<ClientConfig, 'version'>>): Promise<ClientConfig>
   themes(): Promise<ThemeInfo[]>
-  setBackgroundColor?(color: [number, number, number, number]): Promise<void>
+  setAppearance?(color: [number, number, number, number], appearance: ThemeInfo['appearance']): Promise<void>
 }
 
 let installed: ReviewerHost | null = null

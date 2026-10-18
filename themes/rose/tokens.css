@@ -1,94 +1,28 @@
+@import '../common.css';
+
 [data-theme='rose'] {
-  --control-icon-size: 14px;
-  --control-enclosed-icon-size: 13px;
-  --reading-min-em: 28;
-  --reading-edge: 16px;
-  --reading-outline: 48px;
-  --reading-rail: 300px;
-  --reading-gap: 24px;
-  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-wordmark: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --wordmark-line-height: 1.25;
-  --md-block-gap: var(--font-size-body);
-  --md-heading-gap: calc(var(--font-size-body) * 1.5);
-  --md-h1-size: 2em;
-  --md-h2-size: 1.5em;
-  --md-h3-size: 1.25em;
-  --md-h4-size: 1em;
-  --md-h5-size: 0.875em;
-  --md-h6-size: 0.85em;
-  --md-list-indent: 2em;
-  --md-list-gap: 0.25em;
-  --document-scrollbar-size: 6px;
-  --radius-xs: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-full: 9999px;
-
-  /* Rose (warm light, muted magenta). */
-
-  /* ---- Layer 1: raw scales (values differ per theme) ---- */
-  --gray-1: oklch(0.991 0.003 106.447);
-  --gray-2: oklch(0.96 0.004 106.474);
-  --gray-3: oklch(0.947 0.004 5.248);
-  --gray-4: oklch(0.935 0.004 5.248);
-  --gray-5: oklch(0.922 0.004 5.248);
-  --gray-6: oklch(0.909 0.008 98.888);
-  --gray-7: oklch(0.85 0.004 5.248);
-  --gray-8: oklch(0.791 0.004 5.248);
-  --gray-9: oklch(0.732 0.004 5.248);
-  --gray-10: oklch(0.674 0.015 88.723);
-  --gray-11: oklch(0.508 0.011 106.779);
-  --gray-12: oklch(0.191 0 89.876);
-  --accent-1: oklch(0.984 0.018 5.248);
-  --accent-2: oklch(0.968 0.032 5.248);
-  --accent-3: oklch(0.943 0.056 5.248);
-  --accent-4: oklch(0.913 0.08 5.248);
-  --accent-5: oklch(0.877 0.107 5.248);
-  --accent-6: oklch(0.832 0.133 5.248);
-  --accent-7: oklch(0.776 0.159 5.248);
-  --accent-8: oklch(0.702 0.181 5.248);
-  --accent-9: oklch(0.588 0.201 5.248);
-  --accent-10: oklch(0.552 0.195 5.248);
-  --accent-11: oklch(0.514 0.183 4.481);
-  --accent-12: oklch(0.353 0.149 5.248);
-
-  /* ---- Layer 2: semantic mapping (identical names across all themes) ---- */
-  --color-dialog-backdrop: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  --color-control-hover: color-mix(in srgb, var(--color-text) 9%, var(--color-bg-elevated));
-  --color-control-pressed: color-mix(in srgb, var(--color-text) 16%, var(--color-bg-elevated));
-  --color-bg: var(--gray-1);
-  --color-bg-elevated: var(--gray-2);
-  --color-text: var(--gray-12);
-  --color-text-muted: var(--gray-11);
-  --color-text-faint: var(--gray-10);
-  --color-border: var(--gray-6);
-  --color-border-hover: var(--gray-7);
-  --color-accent: var(--accent-9);
-  --color-accent-dim: var(--accent-11);
+  --color-bg: oklch(0.991 0.003 106.447);
+  --color-bg-elevated: oklch(0.96 0.004 106.474);
+  --color-text: oklch(0.191 0 89.876);
+  --color-text-muted: oklch(0.508 0.011 106.779);
+  --color-text-faint: oklch(0.674 0.015 88.723);
+  --color-border: oklch(0.909 0.008 98.888);
+  --color-border-hover: oklch(0.85 0.004 5.248);
+  --color-accent: oklch(0.588 0.201 5.248);
   --color-on-accent: #ffffff;
-  --color-cta-bg: var(--accent-9);
-  --color-cta-text: #ffffff;
-  --focus-ring: var(--gray-10);
-  --color-selection: color-mix(in oklab, var(--color-text) 12%, transparent);
-  --color-accent-surface: color-mix(in oklab, var(--color-accent) 10%, transparent);
   --color-invert-bg: #141414;
   --color-invert-bg-elevated: #1f1f1e;
   --color-invert-text: #f4f4f1;
   --color-invert-text-muted: rgba(244, 244, 241, 0.66);
   --color-invert-border: rgba(244, 244, 241, 0.16);
-
-  /* Review colors remain independent of the interface accent. */
-  --review-insert-text: #1b7a35;
-  --review-insert-bg: rgba(27, 122, 53, 0.1);
-  --review-insert-border: #1b7a35;
+  --review-insert-text: #197834;
   --review-delete-text: #a23618;
-  --review-delete-bg: rgba(162, 54, 24, 0.1);
-  --review-delete-border: rgba(162, 54, 24, 0.45);
   --review-highlight-bg: rgba(224, 176, 18, 0.22);
   --review-highlight-border: rgba(224, 176, 18, 0.55);
-  --review-comment-anchor: #835471;
-  --review-comment-active-bg: rgba(131, 84, 113, 0.12);
-
+  --color-accent-text: oklch(0.514 0.183 4.481);
+  --color-accent-hover: #be285d;
+  --color-accent-pressed: #a82050;
+  --focus-ring: #6c6962;
+  --color-shadow: rgb(0 0 0 / 0.16);
   color-scheme: light;
 }

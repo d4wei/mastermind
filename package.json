@@ -65,20 +65,22 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@asamuzakjp/css-color": "5.1.11",
+    "@hono/node-server": "^2.0.4",
     "@types/mdast": "^4.0.4",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/unist": "^3.0.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "hono": "^4.12.25",
     "jsdom": "^29.1.1",
+    "postcss": "8.5.15",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.8",
-    "hono": "^4.12.25",
-    "@hono/node-server": "^2.0.4"
+    "vitest": "^4.1.8"
   },
   "packageManager": "pnpm@10.6.2+sha512.47870716bea1572b53df34ad8647b42962bc790ce2bf4562ba0f643237d7302a3d6a8ecef9e4bdfc01d23af1969aa90485d4cebb0b9638fa5ef1daef656f6c1b",
   "private": true

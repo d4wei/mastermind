@@ -62,7 +62,7 @@ function ThemeSwatch({ s }: { s: { bg: string; ink: string; accent: string } | n
   if (!s) return null
   return (
     <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden focusable={false} style={{ flex: 'none' }}>
-      <rect x={1} y={1} width={14} height={14} rx={2.5} fill={s.bg} stroke="rgba(128,128,128,0.35)" strokeWidth={1} />
+      <rect x={1} y={1} width={14} height={14} rx={2.5} fill={s.bg} stroke="var(--color-border-hover)" strokeWidth={1} />
       <rect x={4} y={5} width={5} height={1.4} rx={0.7} fill={s.ink} />
       <rect x={4} y={8.5} width={8} height={1.2} rx={0.6} fill={s.ink} opacity={0.55} />
       <circle cx={11.5} cy={5.7} r={1.6} fill={s.accent} />

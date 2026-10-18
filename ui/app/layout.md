@@ -1,7 +1,7 @@
 # Document controls and panels
 
 Both `html` and `body` paint the active theme's background. The native host also synchronizes its
-under-page surface through the [theme background adapter](../theme/background.md).
+under-page surface through the [theme appearance adapter](../theme/appearance.md).
 
 `TopBar` places standalone document controls at the top right. The Read/Markdown button shows the
 mode it opens. Translation and active-comment controls appear where applicable; the overflow menu

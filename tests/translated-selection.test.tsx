@@ -57,7 +57,7 @@ function compose() {
   act(() => {
     inputValue(input, 'My authored note {++literal++}\nline two')
   })
-  return host.querySelector<HTMLButtonElement>('.primary')!
+  return host.querySelector<HTMLButtonElement>('.btn-primary')!
 }
 async function submitComment(button: HTMLButtonElement) {
   const changed = new Promise<void>((resolve) => {

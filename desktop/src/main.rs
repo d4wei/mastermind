@@ -63,7 +63,7 @@ fn main() {
         .manage(docs.clone())
         .manage(lifecycle::CloseGate::default())
         .invoke_handler(tauri::generate_handler![
-            appearance::set_background_color,
+            appearance::set_appearance,
             appearance::set_window_title,
             opening::snapshot,
             opening::close_document,

@@ -1,65 +1,19 @@
-/* ============================================================
-   mastermind base styles — token-consuming rules ONLY.
-   Every color/face/size comes from var(--*) supplied by the
-   active theme's tokens.css (themes/<id>/tokens.css). Fonts are
-   selected from the font registry at runtime.
-   ============================================================ */
-
-/* ---------- base ---------- */
-
 :root {
   /* TopBar measures its wrapped height; content and overlays reserve that space. */
   --bar-gap: calc(var(--space-unit) * 3);
   --bar-h: 57px;
   --bar-clear: calc(var(--bar-h) + var(--bar-gap) * 2);
 
-  /* Stacking scale (structural, theme-independent). Ordered low→high; the
-     topbar deliberately sits ABOVE the navigator so the nav tucks under it. */
-  --z-sticky: 10; /* in-flow sticky badges (translation loading) */
-  --z-rail: 15; /* mark gutter / minimap */
-  --z-nav: 30; /* left navigator / file tree + its reveal button */
-  --z-topbar: 40; /* fixed document controls */
-  --z-panel: 50; /* slide-overs: settings, find */
-  --z-popover: 60; /* selection toolbar, proposal card */
-  --z-overlay: 65; /* off-canvas scrim for nav/rail at narrow widths */
-  --z-toast: 70; /* notifications */
+  /* Document controls remain above the outline and comment rail. */
+  --z-sticky: 10;
+  --z-rail: 15;
+  --z-nav: 30;
+  --z-topbar: 40;
+  --z-panel: 50;
+  --z-popover: 60;
+  --z-overlay: 65;
+  --z-toast: 70;
   --z-theme-veil: 100;
-
-  /* ---- Typography ---- */
-  --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
-  --font-body: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
-  --font-size-body: 1rem; /* per-user overridable via ThemeProvider inline style */
-  --font-size-sm: 0.875rem;
-  --font-size-xs: 0.8125rem;
-  --font-size-micro: 0.6875rem;
-  --font-size-nano: 0.625rem;
-  --lh-display: 1.08;
-  --lh-title: 1.2;
-  --lh-snug: 1.4;
-  --lh-body: 1.6; /* per-user overridable */
-  --ls-heading: -0.02em;
-  --ls-title: -0.015em;
-  --ls-normal: 0;
-  --ls-caps: 0.06em;
-  --ls-label: 0.08em;
-  --display-transform: none;
-  --weight-regular: 400;
-  --weight-medium: 600; /* single UI-emphasis weight (consolidates old 500/600/700) */
-  --weight-bold: 800; /* display headings */
-
-  /* ---- Shape & layout (theme-invariant) ---- */
-  --content-max-width: 46rem; /* per-user overridable */
-  --space-unit: 4px;
-
-  /* ---- Motion system (theme-invariant) ---- */
-  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 120ms;
-  --dur-base: 180ms;
-  --dur-fade: 260ms;
-  --dur-slow: 300ms;
-  --dur-draw: 520ms;
 }
 
 * {
@@ -120,7 +74,7 @@ body {
 .sel-toolbar { --focus-ring: var(--color-invert-text-muted); }
 
 ::selection {
-  background: var(--color-selection, var(--color-accent-surface));
+  background: var(--color-selection);
 }
 
 /* Panel scrollbars use an inset thumb; the document scroller overrides it at the window edge.
@@ -191,7 +145,7 @@ body {
    inline-flex of clipped per-glyph cells. Keep those cells aligned to the
    surrounding chrome text rather than the lib's default bottom alignment. */
 .seg-btn .slot-text,
-.btn-cta .slot-text,
+.btn-primary .slot-text,
 .notification .slot-text {
   vertical-align: middle;
 }
@@ -235,13 +189,14 @@ button:disabled {
   opacity: 0.45;
 }
 
-.btn-cta {
+.btn-primary,
+.native-open-home {
   display: inline-flex;
   align-items: center;
   gap: calc(var(--space-unit) * 1.5);
   white-space: nowrap;
-  background: var(--color-cta-bg);
-  color: var(--color-cta-text);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   border: none;
   border-radius: var(--radius-md);
   font-weight: var(--weight-medium);
@@ -250,12 +205,12 @@ button:disabled {
   transition: background-color var(--dur-fast) ease;
 }
 
-.btn-cta:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-cta-bg) 84%, var(--color-cta-text) 16%);
+:is(.btn-primary, .native-open-home):hover:not(:disabled) {
+  background: var(--color-accent-hover);
 }
 
-.btn-cta:active:not(:disabled) {
-  background: color-mix(in srgb, var(--color-cta-bg) 72%, var(--color-cta-text) 28%);
+:is(.btn-primary, .native-open-home):active:not(:disabled) {
+  background: var(--color-accent-pressed);
 }
 
 .btn-ghost {
@@ -403,7 +358,7 @@ button:disabled {
   gap: var(--space-unit);
   margin-top: calc(var(--space-unit) * 2);
 }
-.rail-actions button {
+.rail-actions button:not(.btn-primary) {
   background: transparent;
   border: none;
   border-radius: var(--radius-xs);
@@ -414,7 +369,6 @@ button:disabled {
   min-height: calc(var(--space-unit) * 7);
 }
 .rail-footer { justify-content: flex-start; }
-.rail-actions button.primary { color: var(--color-accent-dim); }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
 .rail-reply textarea {
   width: 100%;
@@ -439,7 +393,7 @@ button:disabled {
   color: var(--color-invert-text);
   border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 1);
-  box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.18 * var(--shadow-strength)));
+  box-shadow: var(--shadow-popover);
 }
 
 .sel-toolbar > button {
@@ -489,7 +443,7 @@ button:disabled {
   gap: calc(var(--space-unit) * 1);
 }
 
-.sel-composer-actions button {
+.sel-composer-actions button:not(.btn-primary) {
   background: transparent;
   border: none;
   border-radius: var(--radius-xs);
@@ -500,8 +454,11 @@ button:disabled {
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
 }
 
-.sel-composer-actions button.primary {
-  color: var(--color-cta-text);
+.btn-compact {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  min-height: calc(var(--space-unit) * 7);
+  padding: var(--space-unit) calc(var(--space-unit) * 2);
 }
 
 .sel-composer-actions button:disabled {
@@ -537,14 +494,14 @@ button:disabled {
 }
 
 .md-root a {
-  color: var(--color-accent-dim);
+  color: var(--color-text);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--color-accent-dim) 40%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--color-text) 40%, transparent);
   text-underline-offset: 2px;
 }
 
 .md-root a:hover {
-  text-decoration-color: var(--color-accent-dim);
+  text-decoration-color: var(--color-text);
 }
 
 .md-inline-code {
@@ -725,7 +682,7 @@ button:disabled {
 }
 
 .task-checkbox {
-  accent-color: var(--color-accent-dim);
+  accent-color: var(--color-text);
   width: 15px;
   height: 15px;
   margin-right: calc(var(--space-unit) * 2);
@@ -888,7 +845,7 @@ mark.critic-hl.critic-anchor:hover,
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 8px 28px rgb(0 0 0 / calc(0.14 * var(--shadow-strength)));
+  box-shadow: var(--shadow-panel);
   transform-origin: top right;
   animation: slide-over-in var(--dur-base) var(--ease-out);
 }
@@ -996,33 +953,6 @@ mark.critic-hl.critic-anchor:hover,
   gap: calc(var(--space-unit) * 2);
 }
 
-.settings-row.is-toggle {
-  flex-direction: row;
-  align-items: center;
-  gap: calc(var(--space-unit) * 2);
-}
-.settings-row.is-toggle label {
-  cursor: pointer;
-}
-.settings-check {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  color: var(--color-bg);
-  cursor: pointer;
-}
-.settings-check[data-state='checked'] {
-  background: var(--color-accent-dim);
-  border-color: var(--color-accent-dim);
-}
-
 /* shared tooltip (Radix) for icon-only controls */
 .tooltip {
   z-index: var(--z-toast);
@@ -1034,7 +964,7 @@ mark.critic-hl.critic-anchor:hover,
   text-transform: uppercase;
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
   border-radius: var(--radius-md);
-  box-shadow: 0 2px 10px rgb(0 0 0 / calc(0.18 * var(--shadow-strength)));
+  box-shadow: var(--shadow-popover);
   user-select: none;
 }
 .tooltip-arrow {
@@ -1202,11 +1132,11 @@ mark.critic-hl.critic-anchor:hover,
 }
 
 input[type='range'] {
-  accent-color: var(--color-accent-dim);
+  accent-color: var(--color-text);
 }
 
 input[type='checkbox'] {
-  accent-color: var(--color-accent-dim);
+  accent-color: var(--color-text);
 }
 
 /* ---------- translated view ---------- */
@@ -1231,37 +1161,6 @@ input[type='checkbox'] {
   position: relative;
   padding-right: calc(var(--space-unit) * 8);
 }
-
-.trans-block-side {
-  position: absolute;
-  top: calc(var(--space-unit) * 3);
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--space-unit) * 1);
-  align-items: center;
-  opacity: 0;
-  transition: opacity var(--dur-fast) ease;
-}
-
-.trans-block:hover .trans-block-side {
-  opacity: 1;
-}
-
-.trans-block.failed .trans-block-side {
-  opacity: 1;
-}
-
-.trans-miss {
-  color: var(--review-delete-text);
-  font-size: var(--font-size-sm);
-}
-
-.lang-toggle.active {
-  color: var(--color-accent-dim);
-}
-
-/* The document outline now lives in the left Navigator (see .nav-outline). */
 
 /* ---------- mark gutter / minimap ---------- */
 
@@ -1333,17 +1232,6 @@ input[type='checkbox'] {
   color: var(--color-text-muted);
 }
 
-.lang-toggle,
-.settings-gear {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--space-unit) * 1.5);
-}
-
-.trans-miss svg {
-  display: block;
-}
-
 .critic-comment-marker svg {
   display: inline-block;
   vertical-align: 0.25em;
@@ -1365,7 +1253,7 @@ input[type='checkbox'] {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / calc(0.14 * var(--shadow-strength)));
+  box-shadow: var(--shadow-popover);
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
 
@@ -1393,7 +1281,8 @@ input[type='checkbox'] {
 
 .find-filter.active {
   color: var(--color-text);
-  border-color: var(--color-accent-dim);
+  border-color: var(--color-border-hover);
+  background: var(--color-selection);
 }
 
 .find-count {
@@ -1459,7 +1348,7 @@ input[type='checkbox'] {
 }
 
 /* tactile: a small press-scale on the action buttons (not idle/nav chrome) */
-.btn-cta {
+.btn-primary {
   transition:
     background-color var(--dur-fast) ease,
     transform var(--dur-fast) var(--ease-standard);
@@ -1470,7 +1359,7 @@ input[type='checkbox'] {
     color var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
-.btn-cta:active:not(:disabled),
+.btn-primary:active:not(:disabled),
 .sel-toolbar > button:active:not(:disabled) {
   transform: scale(0.96);
 }
@@ -1497,11 +1386,11 @@ input[type='checkbox'] {
   }
   .rail-card,
   .seg-btn,
-  .btn-cta,
+  .btn-primary,
   .sel-toolbar > button {
     transition: none;
   }
-  .btn-cta:active:not(:disabled),
+  .btn-primary:active:not(:disabled),
   .sel-toolbar > button:active:not(:disabled) {
     transform: none;
   }
@@ -1546,7 +1435,7 @@ input[type='checkbox'] {
 .outline-tick.active,
 .nav-outline button[aria-current] .outline-list-tick {
   width: calc(var(--space-unit) * 5);
-  background: var(--color-accent);
+  background: var(--color-accent-text);
 }
 .outline-popover {
   position: absolute;
@@ -1619,22 +1508,6 @@ input[type='checkbox'] {
   }
 
 
-  /* reviewer-grade: ink on white, light review palette regardless of theme */
-  [data-theme] {
-    --color-bg: #ffffff;
-    --color-bg-elevated: #ffffff;
-    --color-text: #111111;
-    --color-text-muted: #444444;
-    --color-text-faint: #666666;
-    --color-border: #cccccc;
-    --review-insert-text: #00662e;
-    --review-insert-bg: #e9f7ee;
-    --review-delete-text: #9a3b22;
-    --review-delete-bg: #faece7;
-    --review-highlight-bg: #fbf0c8;
-    --review-comment-anchor: #00662e;
-  }
-
   .doc-shell,
   .doc-shell.with-rail {
     display: block;
@@ -1687,6 +1560,8 @@ input[type='checkbox'] {
   .print-footnotes li {
     margin: calc(var(--space-unit) * 1) 0;
   }
+
+  .md-code [class^='tok-'] { color: var(--color-text); }
 
   .print-footnotes .pf-author {
     font-family: var(--font-mono);
@@ -1745,21 +1620,20 @@ input[type='checkbox'] {
 
 /* Ordinary controls share hover feedback; selection remains a separate state. */
 :is(.btn-ghost, .seg-btn, .theme-chip, .lang-trigger, .find-nav, .find-filter,
-  .rail-actions button, .nav-outline button, .native-open, .native-file-close,
+  .rail-actions button:not(.btn-primary), .nav-outline button, .native-open:not(.native-open-home), .native-file-close,
   .native-file-pill, .outline-progress, .resolved-threads summary):hover:not(:disabled):not([aria-disabled='true']):not(.active):not([data-state='on']):not([aria-current]):not([aria-pressed='true']) {
   background: var(--color-control-hover);
   color: var(--color-text);
 }
 :is(.btn-ghost, .seg-btn, .theme-chip, .lang-trigger, .find-nav, .find-filter,
-  .rail-actions button, .nav-outline button, .native-open, .native-file-close):active:not(:disabled) {
+  .rail-actions button:not(.btn-primary), .nav-outline button, .native-open:not(.native-open-home), .native-file-close):active:not(:disabled) {
   background: var(--color-control-pressed);
 }
-.sel-toolbar button:hover:not(:disabled) {
+.sel-toolbar button:not(.btn-primary):hover:not(:disabled) {
   background: var(--color-invert-bg-elevated);
   color: var(--color-invert-text);
 }
 .rail-card:hover:not(.active):not(.paired) { border-color: var(--color-border-hover); }
-.settings-check:hover:not(:disabled):not([data-state='checked']) { background: var(--color-control-hover); }
 @media print { .notification-stack { display: none; } }
 
 .document-scroll::-webkit-scrollbar { width: var(--document-scrollbar-size); }

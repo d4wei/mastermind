@@ -150,7 +150,7 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
               setValues((current) => ({ ...current, translationLanguage }))
             }} />
         </div>
-        <button className="btn-cta" type="submit" disabled={!name}>
+        <button className="btn-primary" type="submit" disabled={!name}>
           {saving ? (chinese ? '正在保存…' : 'Saving…') : (chinese ? '开始审阅' : 'Start reviewing')}
         </button>
       </fieldset>

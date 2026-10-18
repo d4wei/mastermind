@@ -1,10 +1,3 @@
 {
-  "id": "sepia",
-  "name": "Sepia",
-  "appearance": "light",
-  "fonts": [
-    { "family": "Schibsted Grotesk", "src": "/themes/grid/fonts/SchibstedGrotesk-Variable.woff2", "weight": "400 900" },
-    { "family": "Geist Mono", "src": "/themes/grid/fonts/GeistMono-Variable.woff2", "weight": "100 900" }
-  ],
-  "swatch": { "bg": "#f1ece0", "ink": "#6e655a", "accent": "#c8841c" }
+  "name": "Sepia"
 }

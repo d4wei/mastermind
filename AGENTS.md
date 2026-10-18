@@ -35,8 +35,9 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 - Nothing reaches disk without the user's acceptance: agent and assist suggestions render on screen
   only.
 - `document/` is imported by translation tooling and both UI hosts; keep it isomorphic.
-- Components reference `var(--*)` only; colors and spacing live in `themes/*/tokens.css`, whose
-  token names `themes/README.md` fixes. Review marks are the only color in the document body.
+- Components reference `var(--*)` only; colors and spacing live in `themes/common.css` and
+  `themes/*/tokens.css`, whose roles `themes/README.md` fixes. Review marks are the only color in
+  the document body.
 
 ## Working the code
 

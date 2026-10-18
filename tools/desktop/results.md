@@ -592,6 +592,8 @@ package. These results cover the refactor and do not close the remaining hardeni
 Tauri is adopted as the application host. These remaining checks bound release claims; they do not
 require keeping a second browser product or continuing the old feature plan.
 
+- Check inactive macOS traffic lights across dark themes after native appearance synchronization.
+  The 2026-10-17 build passed, but its native visual check was blocked by the locked Mac.
 - Exercise Dock Quit and remaining desktop termination paths without interrupting the development
   machine's session. Keep failed-save and recoverable-buffer behavior covered.
 - Exercise actual drag and drop, broader translated-review refresh and preferences, and interactive
