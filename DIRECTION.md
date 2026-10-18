@@ -68,12 +68,11 @@ Adoption is not a claim that these release checks have passed.
 **Exit:** the relevant checks pass before a release claims their support, or their scope is
 explicitly revised.
 
-## 2026-10-10 — Repository language settings (updated 2026-10-10)
+## 2026-10-10 — Repository language settings (updated 2026-10-17)
 
-**Open question.** Project language and personal translation language have settled roles, but
-repository settings still need storage, discovery, precedence, and defaults outside a repo.
-Translation uses explicit preparation languages and an optional personal translation preference;
-that does not choose a repo-settings mechanism.
+**Open question.** Agents prepare translations with explicit source and target languages, guided
+by user requests and session context. Whether repository language defaults add value still needs
+a ruling; no repository storage, discovery, or precedence mechanism has been selected.
 
 **Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 

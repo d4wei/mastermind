@@ -29,6 +29,19 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Agents prepare languages; readers choose prepared versions
+
+**Ruled.** Remove the app's Translation language preference from Settings and onboarding. The
+preparing session agent chooses whether and which translations to prepare; explicit user requests
+override that discretion and may name multiple languages. The app offers available prepared
+versions per document, retaining freshness validation, source mapping, and feedback in the original
+Markdown. Interface language remains independent. Missing translations never gate opening.
+
+This supersedes the personal translation preference and its earlier Settings picker rulings.
+
+**Beat:** asking readers to configure translation preparation in the app, or replacing mapped
+translations with independent Markdown copies that lose source-linked review feedback.
+
 ## 2026-10-17 — Square sizing applies only to single-icon buttons
 
 **Ruled.** Narrow the icon-button rule below to simple, single-icon actions. Settings' segmented
