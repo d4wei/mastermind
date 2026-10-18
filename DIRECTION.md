@@ -26,6 +26,17 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-18 — Agent-requested file closing
+
+**Bet.** Let the bundled skill close files as well as open them, so completed reviews need not
+accumulate in the reader. Proposed contract: explicit paths, per-file results, idempotent closure,
+and no force-discard option. Unfinished drafts, unsaved edits, and recovery states must remain
+protected through the renderer's close handling; removing only the native snapshot is insufficient.
+
+**Exit:** settle pending-work and selection behavior, implement the launcher-to-renderer close
+request and public skill instructions, and test concurrent opens, blocked closes, and retries;
+or drop agent closing. No agent should infer that unrelated open files belong to its session.
+
 ## 2026-10-17 — Local persisted work buffers
 
 **Bet.** A local persisted buffer can preserve pending document edits and unfinished comments,

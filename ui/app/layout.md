@@ -62,7 +62,9 @@ Settings and history panels fit within the viewport width and scroll their bodie
 `Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling.
 Conflict recovery, save failures, and translation feedback share it; Find retains the top-center
 slot. Dismissed failures remain reachable from a compact control. Conflict state also appears on
-file tabs. Successful transient messages expire; unresolved failures do not disappear on a timer.
+file tabs. Informational notices dismiss completely. Error notices retain an icon-only warning
+control that reopens their content. Successful transient messages expire; unresolved failures do
+not disappear on a timer.
 Find controls wrap to fit narrow widths. Long source/code lines can still scroll within their own
 content areas.
 

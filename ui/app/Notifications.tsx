@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { CrossIcon } from '../icons'
+import { AlertIcon, CrossIcon } from '../icons'
 import { useT } from '../i18n'
 import './Notifications.css'
 
@@ -31,9 +31,14 @@ export function Notification({ children, onDismiss, error = false, compact = fal
 export function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) {
   const [dismissed, setDismissed] = useState(false)
   const t = useT()
-  return <Notification onDismiss={dismissed ? undefined : () => setDismissed(true)} error={error && !dismissed}>
-    {dismissed ? <button type="button" className="btn-ghost" onClick={() => setDismissed(false)}>
-      {t('showNotification')}
-    </button> : children}
+  if (dismissed && !error) return null
+  if (dismissed) return <Notification compact>
+    <button type="button" className="btn-ghost btn-icon recovery-warning"
+      aria-label={t('showNotification')} title={t('showNotification')} onClick={() => setDismissed(false)}>
+      <AlertIcon />
+    </button>
+  </Notification>
+  return <Notification onDismiss={() => setDismissed(true)} error={error}>
+    {children}
   </Notification>
 }

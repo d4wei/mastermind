@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-18 — File overflow uses a plain list
+
+**Ruled.** Keep file pills and the labeled reading-language menu in one row. Fit pills into the
+space remaining after document controls, keep the active file visible, and expose the other open
+files through a counted overflow menu. Use a plain file list without search.
+
+**Beat:** adding a second controls row, hiding every neighboring file, or adding search for the
+expected small set of open review documents.
+
 ## 2026-10-17 — Agents prepare languages; readers choose prepared versions
 
 **Ruled.** Remove the app's Translation language preference from Settings and onboarding. The

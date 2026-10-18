@@ -1,6 +1,6 @@
 ---
 status: living
-updated: 2026-10-17
+updated: 2026-10-18
 exit: Ship document-level language switching and graduate its contract beside translation code.
 ---
 
@@ -26,22 +26,19 @@ Artifacts already have separate paths for each document and target language. The
 are discovering them, choosing a version per document, and reacting to artifact changes. The
 current store and translated-comment guards use the global preference as their target identity.
 
-## Visual choices for review
+## Selected toolbar design
 
-The labeled language menu is preferred. Its placement remains open because file pills and document
-controls compete for the same row. Compare these arrangements with many files already open:
+Keep one row with file pills, a counted overflow menu, and the labeled language menu beside the
+document controls. Reserve the controls' actual width and show only the pills that fit. Keep the
+active file visible without reordering the underlying file list.
 
-- **Overflow list:** preserve one row, reserve the controls' actual width, and show only the file
-  pills that fit. A count opens a searchable list of all open files. Keep the active file visible
-  without reordering the underlying file list. Recommended starting point.
-- **Separate controls row:** give file pills the full first row; put the language menu and document
-  controls on a compact second row. More filenames remain visible, at the cost of vertical space.
-- **Focused file:** show the active file and a counted file-list button. The language menu and
-  document controls fit comfortably, but readers lose the visible neighboring file pills.
+The overflow menu is a plain list of open files, without search. Show which file is active and let
+the reader select or close a file. Preserve file order and disambiguate duplicate names. A long
+list may scroll within the available window height; keyboard focus must reveal its current item.
 
-All takes retain a labeled language menu and show Find, Markdown, comments, and More actions
-together. Compare short and long filenames, 3–30 open files, and narrower windows. Menu selection
-and closing files are interactive previews, not a native app stress-test result.
+Find, Markdown, comments, and More actions remain available alongside the language control. The
+preview explored short and long filenames, 3–30 files, and narrower windows; it is not a native
+app stress-test result.
 
 A single available reading version needs no picker. Language names use their native names;
 Interface language controls surrounding labels. Regional variants must remain distinguishable.
@@ -152,6 +149,6 @@ source mapping. No translation generation belongs in either host.
 
 ## Decisions still needed
 
-Choose the crowded-toolbar arrangement from the visual takes. Confirm the initial-view hint
-and its launcher spelling when reviewing the implementation contract. The language preference's
+Confirm the initial-view hint and its launcher spelling when reviewing the implementation
+contract. The selected toolbar, the language preference's
 removal and the preservation of freshness/source mapping are settled in DECISIONS.md.
