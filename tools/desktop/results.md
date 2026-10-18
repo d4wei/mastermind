@@ -587,13 +587,20 @@ fresh source checkouts at the same revision. Windows exercised its installer, la
 endpoint denial, and installed-reviewer WebDriver cases; Linux installed and exercised its Debian
 package. These results cover the refactor and do not close the remaining hardening list below.
 
+### Native theme appearance — 2026-10-17
+
+Build `b434b11` synchronizes native light/dark appearance with the loaded theme. After unlocking
+macOS, the reviewer and settings rendered in Carbon. The user confirmed that the inactive traffic
+lights were clearly visible against Carbon. The automation capture indicator covered those controls
+in screenshots, so that contrast observation comes from the user's direct inspection. Mint and
+Slate have not received the same inactive-control check.
+
 ### Remaining hardening and distribution checks
 
 Tauri is adopted as the application host. These remaining checks bound release claims; they do not
 require keeping a second browser product or continuing the old feature plan.
 
-- Check inactive macOS traffic lights across dark themes after native appearance synchronization.
-  The 2026-10-17 build passed, but its native visual check was blocked by the locked Mac.
+- Check inactive macOS traffic lights in Mint and Slate; Carbon has been checked above.
 - Exercise Dock Quit and remaining desktop termination paths without interrupting the development
   machine's session. Keep failed-save and recoverable-buffer behavior covered.
 - Exercise actual drag and drop, broader translated-review refresh and preferences, and interactive
