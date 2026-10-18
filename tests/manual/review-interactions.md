@@ -187,3 +187,16 @@ Compare Open, Source, Comments, and More: matching button surfaces and icon weig
 selected Comments state. Across all themes, compare ordinary, hovered, pressed, selected, disabled,
 and keyboard-focused controls on both the page and raised surfaces. Sepia comments use brown and
 Rose comments plum; insertion and deletion keep their separate meanings.
+
+## Comment activation, motion, and focus
+
+- Toggle comments in wide and narrow windows. Cards fade in at their anchors; no card descends from
+  the top. The wide document moves horizontally only when space requires it. Check reduced motion.
+- Quotes remain visible on collapsed cards. Click an anchor, card body, author, or reply count; the
+  matching reply field receives the caret. Repeat after cancelling, and while a draft is open.
+- Drag to select passage or comment text; no reply opens. Hover pairs the passage and card without
+  changing layout. Escape closes a reply and returns focus to its card control.
+- Tab through file controls, document controls, settings, outline, and comments in light and dark
+  themes. Keyboard focus is visible; clicking a button adds no ring. Inputs have one focused border.
+- Search for a mark, then a nonexistent term. The result highlight clears and remains distinct from
+  focus in the search field. Check inverted selection composers and Markdown editor caret focus.

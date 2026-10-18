@@ -1,5 +1,5 @@
 import { useDraftGuard, useDraftState } from './drafts'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { CommentBody } from './CommentBody'
@@ -7,7 +7,7 @@ import { CheckIcon, ChevronUpIcon, MoreIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
-import { revealElement, revealRange } from '../util/scroll'
+import { revealElement } from '../util/scroll'
 import { placeCommentCards } from './rail-layout'
 import type { CriticSpan, ReviewItem } from '../../document/critic/types'
 import type { TextEdit } from '../../document/types'
@@ -22,6 +22,8 @@ interface Props {
   docRef: RefObject<HTMLElement | null>
   authorTag: string
   activeSpan: number | null
+  replyRequest?: { spanIndex: number } | null
+  onReplyHandled?: () => void
   hoveredSpan?: number | null
   onHover?: (spanIndex: number | null) => void
   onActivate: (spanIndex: number | null) => void
@@ -37,12 +39,11 @@ function threadKey(thread: ThreadItem, anchorText: string): string {
 }
 
 export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, hoveredSpan,
-  onHover, onActivate, onEdit, readOnly = false }: Props) {
+  onHover, onActivate, onEdit, replyRequest, onReplyHandled, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
-  const measuredPositions = useRef<number[]>([])
   const [positions, setPositions] = useState<number[]>([])
   const [railHeight, setRailHeight] = useState(0)
   const [replyFor, setReplyFor] = useState<string | null>(null)
@@ -74,7 +75,6 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         height: cardRefs.current.get(card.key)?.offsetHeight ?? 0,
       }))
       const next = placeCommentCards(measurements, cards.findIndex((card) => card.spanIndex === activeSpan), CARD_GAP)
-      measuredPositions.current = next
       setPositions((current) => current.length === next.length && current.every((top, i) => top === next[i]) ? current : next)
       setRailHeight(Math.max(doc.scrollHeight, ...next.map((top, i) => top + measurements[i]!.height)))
     }
@@ -96,31 +96,45 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     const card = cards.find((item) => item.spanIndex === activeSpan)
     if (!card || selectedKey.current === card.key) return
     selectedKey.current = card.key
-    setReplyFor((key) => key === card.key ? key : null)
     if (activatedFromCard.current === activeSpan) { activatedFromCard.current = null; return }
     const element = cardRefs.current.get(card.key)
     if (!element) return
-    // Narrow panels own their scroll surface; wide cards share document scrolling.
-    if (element.closest('.comments-panel')) element.scrollIntoView({ block: 'nearest' })
-    else {
-      const frame = requestAnimationFrame(() => {
-        // Use the destination, not an intermediate position during the card's transition.
-        const top = (railRef.current?.getBoundingClientRect().top ?? 0) +
-          (measuredPositions.current[cards.indexOf(card)] ?? 0)
-        const headerBottom = element.querySelector('.rail-message-header')?.getBoundingClientRect().bottom
-        const headerExtent = headerBottom === undefined ? 0 : headerBottom - element.getBoundingClientRect().top
-        revealRange(top, top + headerExtent)
-      })
-      return () => cancelAnimationFrame(frame)
-    }
+    const frame = requestAnimationFrame(() => {
+      const target = element.querySelector('textarea') ?? element.querySelector('.rail-message-header') ?? element
+      // Narrow panels own their scroll surface; wide cards share document scrolling.
+      if (element.closest('.comments-panel')) target.scrollIntoView({ block: 'nearest' })
+      else revealElement(target)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [activeSpan, cards])
+
+  const focusReply = useCallback((key: string) => {
+    if (readOnly) return
+    setReplyFor(key)
+    // An already-open composer does not remount, so autofocus cannot handle repeat clicks.
+    cardRefs.current.get(key)?.querySelector('textarea')?.focus({ preventScroll: true })
+  }, [readOnly])
+  useEffect(() => {
+    if (!replyRequest) return
+    const card = cards.find((item) => item.spanIndex === replyRequest.spanIndex)
+    if (card) focusReply(card.key)
+    onReplyHandled?.()
+  }, [replyRequest, onReplyHandled, cards, focusReply])
 
   const activate = (spanIndex: number) => {
     activatedFromCard.current = spanIndex
     onActivate(spanIndex)
+    const card = cards.find((item) => item.spanIndex === spanIndex)
+    if (card) focusReply(card.key)
     revealElement(docRef.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null, true)
   }
-  const collapse = () => { setReplyFor(null); onActivate(null) }
+  const collapse = () => {
+    const card = cards.find((item) => item.spanIndex === activeSpan)
+    const element = card && cardRefs.current.get(card.key)
+    if (element?.contains(document.activeElement)) element.querySelector<HTMLButtonElement>('.rail-select')?.focus({ preventScroll: true })
+    setReplyFor(null)
+    onActivate(null)
+  }
   const resolveThread = (thread: ThreadItem) => {
     if (readOnly) return
     let edits: TextEdit[]
@@ -174,7 +188,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         onFocus={() => onHover?.(card.spanIndex)}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onHover?.(null) }}
         onClick={(event) => {
-          if ((event.target as HTMLElement).closest('button, textarea, [role="menuitem"]')) return
+          if ((event.target as HTMLElement).closest('button, a, input, select, textarea, [role="menuitem"]')) return
           if (window.getSelection()?.isCollapsed !== false) activate(card.spanIndex)
         }}
         onKeyDown={(event) => {
@@ -212,7 +226,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
             </div>
-            {messageIndex === 0 && selected && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
+            {messageIndex === 0 && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
             <CommentBody body={comment.body} />
           </div>)}
         {selected && replyFor === card.key ? <div className="rail-reply">
@@ -236,7 +250,6 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             onClick={() => activate(card.spanIndex)}>{replyCount}</button>}
           {(selected || replies === 0) && <button type="button" disabled={readOnly} onClick={() => {
             activate(card.spanIndex)
-            setReplyFor(card.key)
           }}>{t('reply')}</button>}
         </div>}
       </div>

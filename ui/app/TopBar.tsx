@@ -20,6 +20,7 @@ interface TopBarProps {
 
 export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation, resolved, settings }: TopBarProps) {
   const t = useT()
+  const openingPanel = useRef(false)
   const headerRef = useRef<HTMLElement | null>(null)
   const mode = useDoc((s) => s.mode)
   const setMode = useDoc((s) => s.setMode)
@@ -57,16 +58,20 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
       )}
       {(settings || resolved) && <DropdownMenu.Root modal={false}>
         <DropdownMenu.Trigger asChild>
-          <button type="button" className={`btn-ghost topbar-icon-btn${settings?.open || resolved?.open ? ' active' : ''}`}
+          <button type="button" className={`btn-ghost topbar-icon-btn topbar-overflow${settings?.open || resolved?.open ? ' active' : ''}`}
             aria-label={t('moreActions')}
             title={t('moreActions')}><MoreIcon /></button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content className="reader-menu" align="end" sideOffset={8}>
-            {resolved && <DropdownMenu.Item className="reader-menu-item" onSelect={resolved.onToggle}>
+          <DropdownMenu.Content className="reader-menu" align="end" sideOffset={8}
+            onCloseAutoFocus={(event) => {
+              if (openingPanel.current) event.preventDefault()
+              openingPanel.current = false
+            }}>
+            {resolved && <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; resolved.onToggle() }}>
               <HistoryIcon />{t('resolved')} ({resolved.count})
             </DropdownMenu.Item>}
-            {settings && <DropdownMenu.Item className="reader-menu-item" onSelect={settings.onToggle}>
+            {settings && <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; settings.onToggle() }}>
               <GearIcon />{t('settings')}
             </DropdownMenu.Item>}
           </DropdownMenu.Content>

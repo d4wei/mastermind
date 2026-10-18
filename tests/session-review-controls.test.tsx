@@ -11,10 +11,11 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
 
-const rail = vi.hoisted(() => ({ active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void) }))
-vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void }) => {
+const rail = vi.hoisted(() => ({ request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void) }))
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void }) => {
   rail.onEdit = props.onEdit
   rail.active = props.activeSpan
+  rail.request = props.replyRequest ?? null
   rail.hovered = props.hoveredSpan
   rail.onHover = props.onHover
   return <div data-testid="rail" />
@@ -106,6 +107,7 @@ it.each(['pointer', 'keyboard'])('opens comments exclusively from a narrow-scree
     if (input === 'pointer') marker.click()
     else marker.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   })
+  expect(rail.request).toEqual({ spanIndex: 0 })
   expect(host.querySelectorAll('[role="dialog"]')).toHaveLength(1)
   expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Comments')
 })

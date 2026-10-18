@@ -9,7 +9,7 @@ export function ResolvedThreads({ source, onClose }: { source: string; onClose: 
   const t = useT()
   const archive = parseResolvedThreads(source)
   return (
-    <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} ignoreSelector=".topbar-resolved">
+    <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} ignoreSelector=".reader-menu" returnFocusSelector=".topbar-overflow">
       <div className="resolved-threads">
         {archive.entries.length === 0 && archive.diagnostics.length === 0 && <p>{t('resolvedEmpty')}</p>}
         {archive.entries.map((entry) => (

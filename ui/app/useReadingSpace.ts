@@ -49,7 +49,9 @@ export function useReadingMovement(element: HTMLDivElement | null, left: number 
     if (!element || left === undefined || !old || old.rail === rail || old.left === left ||
       !element.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const css = getComputedStyle(element)
-    animation.current = element.animate([
+    const column = element.querySelector<HTMLElement>('.doc-column')
+    if (!column?.animate) return
+    animation.current = column.animate([
       { transform: `translateX(${old.left - left}px)` }, { transform: 'translateX(0)' },
     ], { duration: parseFloat(css.getPropertyValue('--dur-base')), easing: css.getPropertyValue('--ease-out').trim() })
     let frame = 0

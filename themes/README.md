@@ -10,7 +10,8 @@
   `--color-accent #E5241B` (Swiss red), text-safe `--color-accent-dim #C01A12` (AA on bg),
   wash `--color-accent-surface`, CTA = red button with white ink. Per theme: Nacht = electric blue,
   Sepia = ochre with an ink-colored CTA.
-- `--focus-ring`: ink on light themes, the accent on Nacht. `--color-selection`: neutral ink wash — selected text must not read as an insertion.
+- `--focus-ring`: neutral gray-10 in every theme. `--color-selection`: neutral ink wash — selected
+  text must not read as an insertion.
 - Inversion family (the dark-band device — the selection toolbar): `--color-invert-bg #141414` etc. (light themes invert to dark; Nacht inverts to light).
 - Review semantics: `--review-insert-*` (green), `--review-delete-*` (brick, kept browner than the accent red), `--review-highlight-*` (gold), `--review-comment-anchor` (blue dotted underline; **violet on Nacht** so it doesn't collide with the blue accent), `--review-comment-active-bg`. Marks are the only color in the document; the accent stays in the chrome.
 - Code color (the one sanctioned exception to "marks own document color"): **off by default**. When the user opts in, fenced-block syntax tokens paint via runtime `--code-*` vars — schemes **Soft** / **Vivid** / **Warm**, each carrying light+dark palettes selected by the active theme's appearance. Like fonts, this is an app-level user preference (`ui/theme/codeThemes.ts`), not per-theme `tokens.css`; the picker lives under **Code font** in settings.

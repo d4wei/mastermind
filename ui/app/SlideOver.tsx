@@ -7,24 +7,29 @@ interface Props {
   onClose: () => void
   /** Selector of the invoking control, so its own click doesn't immediately re-close the panel. */
   ignoreSelector?: string
+  returnFocusSelector?: string
   children: ReactNode
 }
 
-/**
- * The one transient-panel shell: a right-anchored slide-over with a titled
- * header, Escape-to-close, click-outside-to-dismiss (ignoring the invoking
- * control), and focus return on close.
- */
-export function SlideOver({ title, onClose, ignoreSelector, children }: Props) {
+export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector, children }: Props) {
   const t = useT()
   const panelRef = useRef<HTMLDivElement | null>(null)
-  const returnFocus = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    returnFocus.current = document.activeElement as HTMLElement | null
+    const panel = panelRef.current
+    const previous = document.activeElement as HTMLElement | null
+    const returnFocus = previous && previous !== document.body && !panel?.contains(previous) &&
+      !previous.closest('[role="menu"]') ? previous :
+      document.querySelector<HTMLElement>(returnFocusSelector ?? ignoreSelector ?? '.topbar-overflow')
+    // Let child composers take focus before choosing the panel’s first control.
+    const frame = requestAnimationFrame(() => {
+      if (!panel?.contains(document.activeElement)) {
+        panel?.querySelector<HTMLElement>('button:not(:disabled), input, textarea, select')?.focus({ preventScroll: true })
+      }
+    })
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation() // don't also trigger the document walker's Escape
+      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
+        e.stopPropagation()
         onClose()
       }
     }
@@ -43,9 +48,12 @@ export function SlideOver({ title, onClose, ignoreSelector, children }: Props) {
     return () => {
       window.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onPointerDown)
-      returnFocus.current?.focus?.()
+      cancelAnimationFrame(frame)
+      if (panel?.contains(document.activeElement) || document.activeElement === document.body) {
+        returnFocus?.focus({ preventScroll: true })
+      }
     }
-  }, [onClose, ignoreSelector])
+  }, [onClose, ignoreSelector, returnFocusSelector])
 
   return (
     <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}>

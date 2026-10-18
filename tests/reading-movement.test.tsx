@@ -8,7 +8,7 @@ const cancel = vi.fn(), animate = vi.fn(() => ({ cancel }))
 let reduced = false
 function Movement({ left, rail }: { left: number; rail: boolean }) {
   useReadingMovement(view.host, left, rail)
-  return null
+  return <div className="doc-column" ref={(el) => { if (el) Object.assign(el, { animate }) }} />
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -20,7 +20,7 @@ beforeEach(() => {
   reduced = false; animate.mockClear(); cancel.mockClear()
 })
 afterEach(() => { removeReactHost(view.root, view.host); vi.unstubAllGlobals() })
-it('moves document and rail together only when comment visibility changes', () => {
+it('moves only the document column when comment visibility changes', () => {
   act(() => view.root.render(<Movement left={300} rail={false} />))
   expect(animate).not.toHaveBeenCalled()
   act(() => view.root.render(<Movement left={140} rail />))

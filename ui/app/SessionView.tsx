@@ -62,6 +62,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const t = useT()
   const articleRef = useRef<HTMLElement | null>(null)
   const translatedRef = useRef<HTMLElement | null>(null)
+  const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
+  const replyHandled = useCallback(() => setReplyRequest(null), [])
   const [activeSpan, setActiveSpan] = useState<number | null>(null)
   const [hoveredSpan, setHoveredSpan] = useState<number | null>(null)
   const smallWindow = useIsNarrow()
@@ -207,8 +209,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [togglePanel])
 
-  // Remove a suggested deletion the user placed: rejecting a `del` keeps the
-  // original text (unwraps the `{--…--}`). Reuses the live source/analysis.
   const undoDeletion = useCallback(
     (el: HTMLElement): boolean => {
       const span = analysis?.spans[Number(el.dataset.spanIndex)]
@@ -219,8 +219,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     [analysis, source, applyEdits],
   )
 
-  // clicking a deletion removes it; clicking an anchored highlight / comment
-  // marker activates its rail card.
   const onArticleClick = useCallback(
     (e: React.MouseEvent) => {
       // a drag-to-select that ends inside a deletion shouldn't also undo it
@@ -232,6 +230,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
           setActiveSpan(idx)
+          setReplyRequest({ spanIndex: idx })
           openRail()
         }
       } else setActiveSpan(null)
@@ -253,6 +252,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         const idx = Number((target as HTMLElement).dataset.spanIndex)
         if (Number.isFinite(idx)) {
           setActiveSpan(idx)
+          setReplyRequest({ spanIndex: idx })
           openRail()
         }
       }
@@ -320,6 +320,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       docRef={articleRef}
       authorTag={authorTag}
       activeSpan={activeCardSpan}
+      replyRequest={replyRequest}
+      onReplyHandled={replyHandled}
       hoveredSpan={hoveredSpan}
       onHover={setHoveredSpan}
       onActivate={setActiveSpan}

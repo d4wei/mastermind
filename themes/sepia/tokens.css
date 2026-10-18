@@ -69,7 +69,7 @@
   --color-on-accent: #2a1b06;
   --color-cta-bg: var(--gray-12);
   --color-cta-text: var(--gray-1);
-  --focus-ring: var(--gray-12);
+  --focus-ring: var(--gray-10);
   --color-selection: color-mix(in oklab, var(--color-text) 12%, transparent);
   --color-accent-surface: color-mix(in oklab, var(--color-accent) 14%, transparent);
   --color-invert-bg: #1e1813;

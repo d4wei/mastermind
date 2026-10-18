@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Comment activation opens a reply
+
+**Ruled.** Comment cards always show their quoted passage. Activating a commented passage or card
+opens the discussion and focuses its reply composer; hover and text selection do not. Paused editing
+keeps discussions readable without starting new replies. Comment entrances fade without vertical
+travel, independently of the document's horizontal layout transition.
+
+**Beat:** selecting a discussion solely to reveal its quote or an additional Reply action.
+
 ## 2026-10-17 — Balance reading space and normalize document controls
 
 **Ruled.** Preserve document centering when comments fit beside it; otherwise center the reading

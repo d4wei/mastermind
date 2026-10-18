@@ -16,13 +16,13 @@ let store: ReturnType<typeof createDocStore>
 let activate: ReturnType<typeof vi.fn<(spanIndex: number | null) => void>>
 let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => void>>
 
-function Harness() {
+function Harness({ request }: { request?: { spanIndex: number } }) {
   const [active, setActive] = useState<number | null>(null)
   const source = store((state) => state.source)
   const analysis = analyzeMarkdown(source)
   const docRef = useRef<HTMLElement>(null)
   return <><article ref={docRef} /><CommentRail source={source} items={analysis.items} spans={analysis.spans}
-    readOnly={store((state) => state.conflict)} docRef={docRef} authorTag="reviewer" activeSpan={active} onActivate={(index) => { activate(index); setActive(index) }} onEdit={edit} /></>
+    replyRequest={request} readOnly={store((state) => state.conflict)} docRef={docRef} authorTag="reviewer" activeSpan={active} onActivate={(index) => { activate(index); setActive(index) }} onEdit={edit} /></>
 }
 
 beforeEach(() => {
@@ -90,7 +90,7 @@ it('resolves the complete thread into the archive and undo restores exact bytes'
   expect(store.getState().source).toBe(source)
 })
 
-it('uses a keyboard disclosure inside the group without making descendants presentational', () => {
+it('opens a focused reply from the keyboard control without making descendants presentational', () => {
   render('{>>@Alex: note<<}{>>@Sam: reply<<}')
   const button = host.querySelector<HTMLButtonElement>('.rail-select')!
   const card = host.querySelector<HTMLElement>('.rail-card')!
@@ -104,6 +104,7 @@ it('uses a keyboard disclosure inside the group without making descendants prese
   expect(activate).toHaveBeenCalledWith(0)
   expect(button.getAttribute('aria-expanded')).toBe('true')
   expect(host.querySelectorAll('.rail-comment')).toHaveLength(2)
+  expect(document.activeElement).toBe(host.querySelector('textarea'))
 })
 
 it('refuses resolution when an unterminated tail would hide the archive', () => {
@@ -234,4 +235,67 @@ it('retains the draft but disables mutation if a conflict arrives while replying
   click('Delete comment')
   expect(edit).not.toHaveBeenCalled()
   expect(store.getState().source).toBe('{>>@Alex: question<<}')
+})
+
+
+it('keeps the quoted passage visible before, during and after replying', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  const quote = () => host.querySelector('.rail-card-anchor')?.textContent
+  expect(quote()).toBe('context')
+  click('Reply')
+  expect(quote()).toBe('context')
+  click('Collapse discussion')
+  expect(quote()).toBe('context')
+})
+
+it('opens a reply on the card body and focuses it again on repeat clicks', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  const body = host.querySelector<HTMLElement>('.rail-body')!
+  act(() => body.click())
+  const input = host.querySelector('textarea')!
+  expect(document.activeElement).toBe(input)
+  act(() => input.blur())
+  act(() => body.click())
+  expect(document.activeElement).toBe(input)
+  expect(edit).not.toHaveBeenCalled()
+})
+
+it('does not open a reply when selecting comment text', () => {
+  render('{>>@Alex: selectable words<<}')
+  const body = host.querySelector<HTMLElement>('.rail-body')!
+  const range = document.createRange()
+  range.selectNodeContents(body)
+  window.getSelection()!.removeAllRanges()
+  window.getSelection()!.addRange(range)
+  act(() => body.click())
+  expect(activate).not.toHaveBeenCalled()
+  expect(host.querySelector('textarea')).toBeNull()
+  window.getSelection()!.removeAllRanges()
+})
+
+it('opens a reply for each passage request, including after cancelling the same thread', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  click('Reply')
+  click('Cancel')
+  expect(host.querySelector('textarea')).toBeNull()
+  act(() => root.render(<Harness request={{ spanIndex: 0 }} />))
+  expect(document.activeElement).toBe(host.querySelector('textarea'))
+  click('Cancel')
+  act(() => root.render(<Harness request={{ spanIndex: 0 }} />))
+  expect(document.activeElement).toBe(host.querySelector('textarea'))
+})
+
+it('returns keyboard focus to the card when Escape closes the composer', () => {
+  render('{>>@Alex: question<<}')
+  click('Reply')
+  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  expect(document.activeElement).toBe(host.querySelector('.rail-select'))
+})
+
+it('keeps paused discussions readable without opening a new reply input', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  act(() => store.setState({ conflict: true }))
+  act(() => host.querySelector<HTMLElement>('.rail-body')!.click())
+  expect(host.querySelector('textarea')).toBeNull()
+  expect(host.querySelector('.rail-card-anchor')!.textContent).toBe('context')
 })

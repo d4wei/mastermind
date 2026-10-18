@@ -47,7 +47,8 @@ closed and opens from the comments control or a document mark. Cards flow vertic
 Wide layouts retain document-aligned cards. Settings, resolved history, and panel comments share
 the overlay area.
 
-Changing inline comment visibility animates only horizontal displacement of the reading group.
+Changing inline comment visibility animates only horizontal displacement of the document column.
+The comment rail fades in independently at its measured anchors.
 Text widths settle immediately. Resizing cancels the running movement rather than queuing another;
 reduced motion changes position immediately. The animation uses the shared duration and easing.
 
@@ -75,11 +76,11 @@ Font presets and the reader's size and line-height settings remain independent o
 
 Each discussion has one interactive document target. Commented passages use a dotted underline and
 an active or hover fill. Only unanchored discussions have a diamond, one per discussion rather than
-per reply. Hover connects the passage and card without moving either; selection expands the
-[anchored compact discussion](../review/comment-rail.md). Search results for any reply navigate to
-that same visible target. Hidden comment
-references remain available to print footnote numbering. Standalone
-highlights render as plain text; insertions, deletions, and replacements retain edit styling.
+per reply. Hover connects the passage and card without moving either; activation opens the reply
+composer in the [anchored compact discussion](../review/comment-rail.md). Search results for any
+reply navigate to that same visible target. Hidden comment references remain available to print footnote
+numbering. Standalone highlights render as plain text; insertions, deletions, and replacements
+retain edit styling.
 
 Suggest change opens one Markdown replacement field per editable selected fragment. An empty field
 suggests deletion; an unchanged field emits no edit. Fragment boundaries preserve intervening marks,
@@ -88,3 +89,13 @@ The composer retains IME handling and pauses submission while the file has a con
 
 The document scrollbar reserves a constant width at the window edge. Its thumb appears while
 scrolling or pointing at that edge and hides after idle; hiding it does not shift the document.
+
+## Focus feedback
+
+Keyboard navigation uses `:focus-visible` with one neutral ring across controls. Pointer clicks do
+not add a ring to buttons. Text fields strengthen their existing boundary while focused; the source
+editor uses its caret rather than a page-sized outline. Inverted composers use a local light ring.
+Panels move keyboard focus inside on open and return it to the invoking control on dismissal;
+clicking elsewhere keeps focus at the clicked destination. Radix menu items use the highlighted row
+surface. Search matches use an inline wash and underline, independent of focus, and clear when no
+match remains or Find closes.

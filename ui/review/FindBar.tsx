@@ -56,18 +56,17 @@ export function FindBar({ analysis, source, docRef, onClose }: Props) {
     return entries.filter((e) => (filter === 'all' || e.group === filter) && (q === '' || e.text.toLowerCase().includes(q)))
   }, [entries, filter, query])
 
-  // keep idx in range and paint the current match
   useEffect(() => {
-    if (matches.length === 0) return
     const clamped = ((idx % matches.length) + matches.length) % matches.length
     const doc = docRef.current
-    doc?.querySelectorAll('.kbd-focus').forEach((el) => el.classList.remove('kbd-focus'))
+    doc?.querySelectorAll('.find-match').forEach((el) => el.classList.remove('find-match'))
+    if (matches.length === 0) return
     const el = scrollToSpan(docRef, matches[clamped]!.spanIndex)
-    el?.classList.add('kbd-focus')
+    el?.classList.add('find-match')
   }, [idx, matches, docRef])
 
   useEffect(() => {
-    return () => docRef.current?.querySelectorAll('.kbd-focus').forEach((el) => el.classList.remove('kbd-focus'))
+    return () => docRef.current?.querySelectorAll('.find-match').forEach((el) => el.classList.remove('find-match'))
   }, [docRef])
 
   const step = (delta: number): void => setIdx((i) => i + delta)
