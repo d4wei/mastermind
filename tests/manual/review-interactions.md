@@ -137,12 +137,36 @@ change a different paragraph on disk. Check that editing pauses, existing commen
 and the file tab shows Needs attention. Dismiss and reopen recovery; repeated watcher events must
 not expand the dismissed notice. Other files and Find remain usable.
 
-Try merge should save both separated changes immediately. Competing edits to the same line should
-write nothing. Use incoming asks before discarding edits; review undo can recover the old buffer.
-Delete the original and check that no recovery operation silently recreates it.
+Recovery offers Save As and Use incoming for a verified conflict, or Retry and Save As for a
+read/write failure or missing file. Use incoming replaces the same notice with confirmation; no
+second box opens. Review undo can recover the old buffer. Delete the original and check that no
+recovery operation silently recreates it. Dismissed recovery becomes a small warning icon.
 
-Save my version as… opens the native save picker. Cancel and check retained text, then try an
-existing destination and check that it is unchanged. Choose a new destination and check that the
-new file has the local text, the original disk file is unchanged, and the app switches to the copy.
-Repeat while switching documents during the picker; completion must not steal the new selection.
+Save As opens the native save picker. Cancel and check retained text, then try an existing
+destination and check that it is unchanged. Choose a new destination and check that the new file
+has the local text, the original disk file is unchanged, and the app switches to the copy.
+Composer drafts remain available in the copy but are not included in its saved Markdown.
 Check readable notification and hover colors in a light and dark theme at narrow window widths.
+
+## Closing with pending work
+
+Use disposable files. Closing a file normally waits for autosave and closes silently. A slow save
+shows a cancellable progress sheet; Cancel stops closing while the dispatched write may finish.
+Closing a clean file with an old warning must not be blocked.
+
+After a failed save, closing offers Save As, Don't Save, and Cancel. Cancel returns to the file;
+Don't Save closes without changing disk. Save As writes the local buffer to a new destination and
+closes the original tab. Cancelling its picker returns to the same close sheet without an error;
+a failed copy shows its error in that sheet. During quit, successful copies disappear from the
+remaining-file list. The recovery notice is hidden while the close sheet or picker owns focus.
+
+Type a comment, suggestion, or reply without submitting. Switch files and reading modes, then
+return and check that the draft remains. Close or quit: Discard Drafts and Cancel are the only
+choices. Cancel returns to the original composer; no duplicate input appears in the sheet. Cancel
+must preserve the existing input and selection when its composer stayed mounted. Repeat with
+Apple Pinyin composition. Discard affects only the drafts in the listed files.
+
+Change the selected passage externally while a comment/suggestion draft is open. Its text remains
+available, but submission against old offsets is disabled. Remove a thread while a reply is being
+written: the reply remains copyable without being attached to another thread. Repeat in translated
+reading after invalidating its translation. Drafts are temporary app memory, not restart recovery.

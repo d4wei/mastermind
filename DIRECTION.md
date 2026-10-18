@@ -40,23 +40,12 @@ recovery across external file changes and app restarts, or explicitly drop the p
 supersedes the general session-restoration deferral without adopting a storage mechanism.
 
 
-## 2026-10-17 — Retiring in-app three-way merge
-
-**Open question.** Autosave reduces the ordinary need for merging, while save-copy and incoming
-adoption already preserve an explicit recovery path. Evaluate the benefit for concurrent source
-editing against the extra operation and recovery states in the
-[merge assessment](docs/reviewer-state-design.md#does-this-reviewer-need-three-way-merge).
-
-**Exit:** retain merge for a concrete workflow, or supersede its ruling and remove the operation
-with its dependency and merge-only states while preserving guarded writes and recovery coverage.
-
-
 ## 2026-10-17 — Intermittent comment-triggered conflict
 
 **Gap.** The reported comment-triggered warning has not been reproduced. A separate transient-read
-recovery defect was fixed, but does not establish its cause. The remaining state and interaction
-proposal is in [reviewer states](docs/reviewer-state-design.md); the editor-conventional exit policy
-is settled in DECISIONS.md.
+recovery defect was fixed, but does not establish its cause. Recovery and exit now follow the
+[document contract](ui/documents/store.md). Capture the source revision, pending write, watcher
+event, and native error classification if the warning recurs.
 
 **Exit:** capture and fix the trigger, or explicitly defer it with diagnostic requirements recorded.
 

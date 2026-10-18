@@ -1,3 +1,4 @@
+import { useDraftGuard, useDraftState } from '../../review/drafts'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { CriticSpan } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
@@ -21,6 +22,7 @@ interface Props {
 }
 
 interface Active {
+  source: string
   /** Editable fragments in source order; existing marks and unmappable text stay outside them. */
   ranges: SelRange[]
   rect: { top: number; left: number; width: number }
@@ -29,10 +31,10 @@ interface Active {
 export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdit, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
-  const [active, setActive] = useState<Active | null>(null)
-  const [composing, setComposing] = useState<'comment' | 'change' | null>(null)
-  const [replacements, setReplacements] = useState<string[]>([])
-  const [comment, setComment] = useState('')
+  const [active, setActive] = useDraftState<Active | null>('selection:active', null)
+  const [composing, setComposing] = useDraftState<'comment' | 'change' | null>('selection:kind', null)
+  const [replacements, setReplacements] = useDraftState<string[]>('selection:replacements', [])
+  const [comment, setComment] = useDraftState('selection:comment', '')
   const toolbarRef = useRef<HTMLDivElement>(null)
   const [toolbarHeight, setToolbarHeight] = useState(44)
   const composingRef = useRef(false)
@@ -62,7 +64,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
           return
         }
         const rect = range.getBoundingClientRect()
-        setActive({ ranges: res.ranges, rect: { top: rect.top, left: rect.left, width: rect.width } })
+        setActive({ source, ranges: res.ranges, rect: { top: rect.top, left: rect.left, width: rect.width } })
       }, 120)
     }
     document.addEventListener('selectionchange', onSelectionChange)
@@ -77,7 +79,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       if (ime.isComposing(e)) return
       if (e.key === 'Escape') {
         // Leave Escape to active settings or dialog overlays.
-        if (document.querySelector('.settings-panel')) return
+        if (document.querySelector('.settings-panel, .close-dialog[open]')) return
         setComposing(null)
         setComment('')
         setActive(null)
@@ -106,6 +108,12 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     }
   }, [active])
 
+  const meaningful = composing === 'comment' ? !!comment.trim() : composing === 'change' &&
+    !!active && replacements.some((text, index) => text !== active.ranges[index]?.text)
+  useDraftGuard('selection', t(composing === 'change' ? 'suggestChange' : 'comment'), meaningful,
+    () => { requestAnimationFrame(() => toolbarRef.current?.querySelector('textarea')?.focus()) },
+    () => { setComment(''); setReplacements([]); setComposing(null); setActive(null) })
+
   // Preserve the last position while the toolbar exits.
   const present = usePresence(!!active, EXIT_MS)
   useLayoutEffect(() => {
@@ -130,7 +138,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     setComment('')
   }
   const changes = composing === 'change' ? changeEdits(view.ranges, replacements) : []
-  const canSubmit = !readOnly && (composing === 'comment' ? !!comment.trim() : !!changes?.length)
+  const canSubmit = source === view.source && !readOnly && (composing === 'comment' ? !!comment.trim() : !!changes?.length)
   const submit = (): void => {
     if (!canSubmit) return
     finish(composing === 'comment' ? commentEdits(view.ranges, authorTag, comment) : changes!)
@@ -171,7 +179,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
         </>
       ) : (
         <div className="sel-composer">
-          {readOnly && <p role="status">{t('editingPaused')}</p>}
+          {(readOnly || source !== view.source) && <p role="status">{t(readOnly ? 'editingPaused' : 'draftSelectionChanged')}</p>}
           {composing === 'comment' ? <textarea readOnly={readOnly}
             autoFocus
             ref={ime.textareaRef}

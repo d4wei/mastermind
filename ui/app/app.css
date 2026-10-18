@@ -325,6 +325,9 @@ button:disabled {
   border-color: var(--review-comment-anchor);
 }
 
+.rail-orphan { padding-inline: calc(var(--space-unit) * 3); }
+.rail-orphan textarea { width: 100%; color: var(--color-text); background: var(--color-bg-elevated); }
+
 .rail-message-header {
   display: flex;
   align-items: center;

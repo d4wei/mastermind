@@ -1,3 +1,4 @@
+import { useDraftGuard, useDraftState } from './drafts'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
@@ -45,7 +46,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   const [positions, setPositions] = useState<number[]>([])
   const [railHeight, setRailHeight] = useState(0)
   const [replyFor, setReplyFor] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [drafts, setDrafts] = useDraftState<Record<string, string>>('replies', {})
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   const selectedKey = useRef<string | null>(null)
@@ -140,7 +141,25 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     setDrafts((current) => { const next = { ...current }; delete next[card.key]; return next })
   }
 
-  if (!cards.length) return null
+  useDraftGuard('replies', t('reply'), Object.values(drafts).some((text) => !!text.trim()), () => {
+    const card = cards.find((item) => drafts[item.key]?.trim())
+    if (!card) {
+      requestAnimationFrame(() => {
+        const input = railRef.current?.querySelector<HTMLTextAreaElement>('.rail-orphan textarea')
+        input?.focus(); input?.scrollIntoView({ block: 'nearest' })
+      })
+      return
+    }
+    onActivate(card.spanIndex)
+    setReplyFor(card.key)
+    requestAnimationFrame(() => {
+      const input = cardRefs.current.get(card.key)?.querySelector('textarea')
+      input?.focus(); input?.scrollIntoView({ block: 'nearest' })
+    })
+  }, () => { setDrafts({}); setReplyFor(null) })
+
+  const orphaned = Object.entries(drafts).filter(([key, text]) => text.trim() && !cards.some((card) => card.key === key))
+  if (!cards.length && !orphaned.length) return null
   return <div ref={railRef} className="rail" style={{ height: railHeight || undefined }}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.map((card, index) => {
@@ -222,5 +241,11 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
         </div>}
       </div>
     })}
+    {orphaned.length > 0 && <div className="rail-orphan" style={{ paddingTop: cards.length ? railHeight : undefined }}>
+      <p>{t('draftTargetChanged')}</p>
+      {orphaned.map(([key, text]) => <label key={key}>{t('reply')}
+        <textarea readOnly value={text} />
+      </label>)}
+    </div>}
   </div>
 }

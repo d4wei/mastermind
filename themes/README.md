@@ -42,6 +42,7 @@
 - Controls use rounded rectangles. A control does not become a pill merely because it is a primary
   action or a segmented choice. Nested segmented buttons use the smaller inset radius.
 - The native operating system owns window corners and traffic lights.
+- `--color-dialog-backdrop` dims the document behind the single modal close decision.
 - Reading measure: `--content-max-width` 46rem (~736px), centered. Right margin rail for comment cards.
 - Spacing scale: 4px base, steps ×1,2,3,4,6,8,12,16,24.
 

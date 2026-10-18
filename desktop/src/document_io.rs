@@ -167,11 +167,30 @@ fn save_registered_copy(
     }))
 }
 
+fn save_close_copy(
+    docs: &Mutex<Documents>,
+    id: &str,
+    path: PathBuf,
+    content: &str,
+) -> Result<Value, FileError> {
+    serialized_write(docs, id, |_| {
+        files::create_copy(&path, content)?;
+        let saved = files::read(&path)?;
+        if saved.content() != content {
+            return Err(FileError::conflict());
+        }
+        Ok(json!({ "meta": { "sessionId": id, "path": path,
+            "displayName": path.file_name().unwrap().to_string_lossy(),
+            "mtimeMs": saved.mtime_ms }, "file": saved }))
+    })
+}
+
 #[tauri::command]
 pub async fn save_document_copy(
     app: tauri::AppHandle,
     id: String,
     content: String,
+    for_close: Option<bool>,
     docs: State<'_>,
     watch: tauri::State<'_, Arc<Mutex<FileWatch>>>,
 ) -> Result<Option<Value>, FileError> {
@@ -203,6 +222,9 @@ pub async fn save_document_copy(
     let watch = watch.inner().clone();
     crate::worker::blocking_work()
         .run(move || {
+            if for_close.unwrap_or(false) {
+                return save_close_copy(&docs, &id, path, &content).map(Some);
+            }
             let saved = save_registered_copy(&docs, &id, path, &content)?;
             let documents = docs.lock().unwrap();
             watch.lock().unwrap().retain_documents(&documents);
@@ -318,6 +340,32 @@ mod tests {
         assert!(!docs.lock().unwrap().order.contains_key(&0));
         assert_eq!(fs::read_to_string(original).unwrap(), "original");
         assert_eq!(fs::read_to_string(copy).unwrap(), "local");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn close_copy_preserves_admission_and_original_without_opening_another_file() {
+        let dir =
+            std::env::temp_dir().join(format!("mastermind-close-copy-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("original.md");
+        let copy = dir.join("copy.md");
+        fs::write(&original, "original").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            version: VERSION,
+            paths: vec![original.to_str().unwrap().into()],
+        });
+        let revision = docs.activation_revision;
+        let docs = Mutex::new(docs);
+        assert!(save_close_copy(&docs, "0", original.clone(), "local").is_err());
+        let saved = save_close_copy(&docs, "0", copy.clone(), "local\r\n").unwrap();
+        assert_eq!(saved["file"]["content"], "local\r\n");
+        assert_eq!(fs::read_to_string(original).unwrap(), "original");
+        assert_eq!(fs::read_to_string(copy).unwrap(), "local\r\n");
+        assert_eq!(docs.lock().unwrap().order.len(), 1);
+        assert!(docs.lock().unwrap().order.contains_key(&0));
+        assert_eq!(docs.lock().unwrap().activation_revision, revision);
         fs::remove_dir_all(dir).unwrap();
     }
 

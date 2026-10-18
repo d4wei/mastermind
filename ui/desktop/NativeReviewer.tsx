@@ -7,6 +7,10 @@ import { FileIcon, CrossIcon, AlertIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
+import { confirmClose } from './confirm-close'
+import { CloseDialog } from './CloseDialog'
+import { releaseDrafts } from '../review/drafts'
+import { Notifications, Notice, Notification } from '../app/Notifications'
 import { createHomeMotion } from './home-motion'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
 
@@ -27,7 +31,6 @@ export function NativeReviewer() {
   const activationRevision = useRef(0)
   const [openingErrors, setOpeningErrors] = useState<string[]>([])
   const [error, setError] = useState('')
-  const [blocked, setBlocked] = useState(false)
   const [setup, setSetup] = useState<SetupSnapshot | null>(null)
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
   const [setupError, setSetupError] = useState('')
@@ -74,7 +77,7 @@ export function NativeReviewer() {
     let setupRevision = -1
     let refreshing = false
     const refresh = async (): Promise<void> => {
-      if (refreshing || closingFile.current) return
+      if (refreshing || closingFile.current || closingWindow.current) return
       refreshing = true
       try {
         const [opening, onboarding] = await Promise.allSettled([
@@ -83,7 +86,7 @@ export function NativeReviewer() {
             uiLangDefault: systemInterfaceLanguage(navigator.languages),
           }),
         ])
-        if (disposed || closingFile.current) return
+        if (disposed || closingFile.current || closingWindow.current) return
         if (opening.status === 'fulfilled' && opening.value.activation_revision >= activationRevision.current) {
           const snapshot = opening.value
           if (snapshot.files.length > 0 && homeReady.current) {
@@ -119,15 +122,14 @@ export function NativeReviewer() {
       await fileCloseCompletion.current
       const confirmation = setupConfirmation.current
       if (confirmation && !await confirmation) return false
-      return useDoc.getState().prepareToClose()
+      return (await confirmClose(useDoc.getState(), undefined, (id) => navigate(`/d/${id}`))) !== null
     } },
-      () => nativeBridge.invoke('finish_close'),
+      () => nativeBridge.invoke<void>('finish_close').catch((error) => { setError(String(error)); throw error }),
       (locked) => {
         closingWindow.current = locked
         document.getElementById('root')!.inert = locked || closingFile.current
       },
       async () => {
-        setBlocked(true)
         try { await nativeBridge.invoke('cancel_close') }
         catch (error) { setError(String(error)) }
       })
@@ -152,19 +154,21 @@ export function NativeReviewer() {
     fileCloseCompletion.current = (async () => {
       try {
         let snapshot: OpeningSnapshot | undefined
+        const allowed = await confirmClose(useDoc.getState(), [file.id], (id) => navigate(`/d/${id}`))
+        if (!allowed) return
         const closed = await useDoc.getState().closeDocument(file.id, async () => {
           snapshot = await nativeBridge.invoke<OpeningSnapshot>('close_document', {
             id: Number(file.id), activeId: id === null ? null : Number(id),
             activationRevision: activationRevision.current,
           })
           if (snapshot.files.length === 0) await homeMotion.current?.leave(false)
-        })
+        }, allowed.get(file.id))
         if (!closed) {
-          setError(chinese ? '文件尚有未保存的更改，请处理后再关闭。' :
-            'This file has unsaved changes. Resolve them before closing it.')
+          setError(chinese ? '文件状态再次变化，请重试关闭。' : 'The file changed again. Please try closing it again.')
           navigate(`/d/${file.id}`)
           return
         }
+        releaseDrafts(file.id)
         focusAfterClose.current = snapshot!.active_id === null ? null : String(snapshot!.active_id)
         activationRevision.current = snapshot!.activation_revision
         setFiles(snapshot!.files)
@@ -176,7 +180,7 @@ export function NativeReviewer() {
     })()
   }
   const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
-  return <>
+  return <Notifications>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
       <button type="button" className={`native-open${atHome ? ' native-open-home' : ''}`} onClick={chooseFiles}
         aria-label={openLabel} title={openLabel}><FileIcon />
@@ -196,21 +200,17 @@ export function NativeReviewer() {
             title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></button>
         </div>)}
       </nav>
-      {blocked && useDoc.getState().hasPendingWrites() && <span role="alert">{chinese ? '尚有未保存的更改。请检查打开的文件后重试。' :
-        'Changes remain unsaved. Check the open files before quitting again.'}</span>}
-      {openingErrors.length > 0 && <div className="native-opening-errors" role="alert">
+    </div>
+      {openingErrors.length > 0 && <Notification error onDismiss={dismissOpeningErrors}>
         <ul>{openingErrors.map((message, index) => <li key={index}>{message}</li>)}</ul>
-        <button type="button" onClick={dismissOpeningErrors}>
-          {chinese ? '关闭打开错误提示' : 'Dismiss opening errors'}
-        </button>
-      </div>}
-      {error && <span role="alert">{error}</span>}
-      {setupError && <span role="alert">{setupError}
+      </Notification>}
+      {error && <Notice key={error} error>{error}</Notice>}
+      {setupError && <Notice key={setupError} error>{setupError}
         <button type="button" onClick={() => { void refreshSetup.current() }}>
           {chinese ? '重试加载设置' : 'Retry loading setup'}
         </button>
-      </span>}
-    </div>
+      </Notice>}
+    <CloseDialog />
     <App native onboarding={setupRequired === false ? undefined : setup
       ? <NativeSetup snapshot={setup} onLanguagePreview={setPreviewLanguage}
         onConfirmationStarted={(completion) => {
@@ -226,5 +226,5 @@ export function NativeReviewer() {
       </div>} home={<div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
     </div>} />
-  </>
+  </Notifications>
 }

@@ -41,15 +41,15 @@ afterEach(() => {
 })
 
 it.each([
-  { lang: 'en', merge: 'Try merge', incoming: 'Use incoming' },
-  { lang: 'zh-CN', merge: '尝试合并', incoming: '采用外部版本' },
+  { lang: 'en', copy: 'Save As…', incoming: 'Use incoming' },
+  { lang: 'zh-CN', copy: '另存为…', incoming: '采用外部版本' },
 ] as const)('names the recovery actions in $lang', (labels) => {
-  installHost(fakeHost())
+  installHost(fakeHost({ saveCopy: async () => null }))
   useConfig.setState({ config: { ...config, uiLang: labels.lang } })
   const store = createDocStore()
   store.setState({ conflict: true })
   act(() => root.render(<ConflictPanel store={store} />))
-  expect(host.textContent).toContain(labels.merge)
+  expect(host.textContent).toContain(labels.copy)
   expect(host.textContent).toContain(labels.incoming)
   expect(host.querySelector('textarea')).toBeNull()
   installHost(null)

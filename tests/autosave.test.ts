@@ -79,11 +79,11 @@ describe('autosave', () => {
     expect(putFile).not.toHaveBeenCalled()
   })
 
-  it('a failed write raises the saveFailed notice and retains dirty source', async () => {
+  it('a failed write pauses saves and retains dirty source for recovery', async () => {
     putFile.mockRejectedValue(new Error('disk unavailable'))
     store.getState().setSource('accepted edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(store.getState().notice).toEqual({ kind: 'error', msg: 'saveFailed' })
+    expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save', notice: null })
     expect(store.getState().savedSource).toBe('hello')
     expect(store.getState().source).toBe('accepted edit')
   })

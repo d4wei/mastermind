@@ -71,14 +71,13 @@ describe('native reviewer boundary', () => {
     expect(await store.getState().autosave()).toBe(false)
     expect(store.getState()).toMatchObject({
       source: 'local\n', savedSource: 'original\n', version: 'base',
-      saving: false, conflict: failure.conflict,
+      saving: false, conflict: true,
     })
     expect(invoke).toHaveBeenCalledWith('write_document', {
       id: '0', content: 'local\r\n', baseVersion: 'base',
     })
-    expect(store.getState().notice).toEqual(failure.conflict ? null : {
-      kind: 'error', msg: 'saveFailed',
-    })
+    expect(store.getState().notice).toBeNull()
+    expect(store.getState().recoveryError).toBe(failure.conflict ? null : 'save')
   })
 
   it('does not leak a subscription that completes after document navigation', async () => {

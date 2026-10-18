@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Resolve conflicts by preserving or choosing a version
+
+**Ruled.** Remove in-app three-way merge. Autosave accepted edits and reload external changes when
+no local edits remain. A verified conflict offers Save As and Use incoming; I/O failures offer
+Retry and Save As. Keep version-checked writes, retained local text, and the exceptional close
+choices. This supersedes the earlier immediate-clean-merge ruling. Persisted work buffers remain
+a separate direction.
+
+**Beat:** maintaining a merge operation and its recovery states for concurrent editing that can
+instead be preserved as separate files and reconciled deliberately outside the reviewer.
+
 ## 2026-10-17 — Autosave handles routine exit; recovery stays direct
 
 **Ruled.** Flush accepted edits on close or quit and leave silently when saving succeeds. Show a

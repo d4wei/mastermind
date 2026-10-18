@@ -35,20 +35,19 @@ traffic-light inset after AppKit resets it on a title update
 ([Tauri issue](https://github.com/tauri-apps/tauri/issues/13044)).
 
 Each pill has a separate, keyboard-accessible close button and an attention action for conflicts.
-Closing saves only that file, retaining it on failure or an unresolved conflict. Editing and
-inventory activation pause during the close. The native result selects the next file, then the
-previous file, or home when none remain;
-background closes retain the current selection. Closed files release their document and editor
-state. The [native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
+Closing and quitting use the
+[document recovery contract](../documents/store.md#closing-and-lifecycle).
+Editing and inventory activation pause during the close. The native result selects the next file,
+then the previous file, or home; background closes retain the current selection. Closed files
+release their document, composer, and editor state. The
+[native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
+
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.
-Polling never overlaps requests. The adapter also subscribes to native close requests. It locks
-editing while pending setup confirmation and `store.prepareToClose()` finish, then authorizes exit
-only when no retained document has unsaved source, an active save, or an unresolved conflict.
-Failed confirmation or document saves keep the window available. `close.ts` coalesces close requests
-and awaits native termination cancellation before unlocking the editor. Native lifecycle details
-live
-beside the [termination adapter](../../desktop/src/termination.md).
+Polling never overlaps requests. Native opening, setup, and command errors share the application's
+notification host. `close.ts` coalesces window close requests and awaits native termination
+cancellation before unlocking the editor. Failed setup confirmation keeps the window available.
+Native lifecycle details live beside the [termination adapter](../../desktop/src/termination.md).
 The browser entry point retains its own unload prompt and localhost adapter.
 
 `NativeSetup.tsx` holds unconfirmed name and language choices separately from saved configuration.

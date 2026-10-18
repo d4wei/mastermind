@@ -169,14 +169,14 @@ it('rejects a delayed reload after local edits return to the captured source', a
 })
 
 it.each(['changed', 'deleted', 'unreadable'] as const)(
-  'replaces an obsolete save-error toast with the %s file conflict', async (event) => {
+  'updates a failed-save recovery notice with the %s file conflict', async (event) => {
     const store = createDocStore()
     await store.getState().load('A')
     store.getState().setSource('local')
     const save = store.getState().autosave()
     writes[0]!.pending.resolve(response({ error: 'read only' }, 500))
     await save
-    expect(store.getState().notice?.msg).toBe('saveFailed')
+    expect(store.getState().recoveryError).toBe('save')
     const disk = deferred<unknown>()
     reads.set('A', disk)
     store.getState().notifyDiskChange(2, event === 'deleted')
@@ -336,7 +336,7 @@ it('closes only the requested document after its save finishes', async () => {
   expect(store.getState().source).toBe('B changed')
 })
 
-it('keeps failed saves and unresolved conflicts open', async () => {
+it('keeps failed saves open but permits closing a clean missing file', async () => {
   const store = createDocStore()
   await store.getState().load('A')
   store.getState().setSource('A changed')
@@ -349,9 +349,8 @@ it('keeps failed saves and unresolved conflicts open', async () => {
   expect(store.getState().source).toBe('A changed')
   await store.getState().load('B')
   store.getState().notifyDiskChange(0, true)
-  expect(await store.getState().closeDocument('B', release)).toBe(false)
-  expect(release).not.toHaveBeenCalled()
-  expect(store.getState().conflict).toBe(true)
+  expect(await store.getState().closeDocument('B', release)).toBe(true)
+  expect(release).toHaveBeenCalledOnce()
 })
 
 it('releases a clean active buffer but retains it when native removal fails', async () => {

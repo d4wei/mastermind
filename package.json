@@ -52,7 +52,6 @@
     "codemirror": "^6.0.2",
     "commander": "^15.0.0",
     "diff": "^9.0.0",
-    "node-diff3": "3.2.1",
     "radix-ui": "^1.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

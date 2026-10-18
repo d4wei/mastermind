@@ -1,0 +1,16 @@
+.close-dialog {
+  font-family: var(--font-ui);
+  color: var(--color-text);
+  background: var(--color-bg-elevated);
+  border: thin solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: calc(var(--space-unit) * 6);
+  width: min(calc(var(--space-unit) * 110), calc(100vw - var(--bar-gap) * 2));
+}
+.close-dialog::backdrop { background: var(--color-dialog-backdrop); }
+.close-dialog h2 { font-size: var(--font-size-body); margin-top: 0; }
+.close-dialog p { font-size: var(--font-size-sm); }
+.close-dialog li { overflow-wrap: anywhere; }
+.close-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); justify-content: flex-end; }
+.close-actions > :first-child { margin-right: auto; }
+body:has(.close-dialog[open]) .notification-stack { visibility: hidden; }

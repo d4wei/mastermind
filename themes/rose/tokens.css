@@ -47,6 +47,7 @@
   --accent-12: oklch(0.353 0.149 5.248);
 
   /* ---- Layer 2: semantic mapping (identical names across all themes) ---- */
+  --color-dialog-backdrop: color-mix(in srgb, var(--color-bg) 55%, transparent);
   --color-control-hover: var(--gray-3);
   --color-control-pressed: var(--gray-4);
   --color-bg: var(--gray-1);

@@ -14,7 +14,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
 vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: mocks.id, needsAttention: () => false }), {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
-    prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument }),
+    prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [] }),
 }) }))
 vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
   getState: () => ({ load: mocks.load }),
@@ -35,6 +35,8 @@ const setup = () => ({ completed: true, revision: 0,
 const other = (command: string) => command === 'setup_snapshot' ? setup() : undefined
 beforeEach(() => {
   vi.useFakeTimers()
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   mocks.id = null
   mocks.chinese = false
@@ -130,7 +132,7 @@ it('dismisses retained graphical errors without erasing local command errors', a
   await poll()
   expect(host.textContent).toContain('Missing /lost.md')
   expect(host.textContent).toContain('Dialog unavailable')
-  await act(async () => button('Dismiss opening errors').click())
+  await act(async () => (host.querySelector('[aria-label="Dismiss"]') as HTMLButtonElement).click())
   await poll()
   expect(host.textContent).not.toContain('Missing /lost.md')
   expect(host.textContent).toContain('Dialog unavailable')
@@ -289,7 +291,7 @@ it.each([['0', '/d/1'], ['1', '/d/0']] as const)(
     await mount()
     expect(host.querySelector('button button')).toBeNull()
     await act(async () => button(`Close ${closing === '0' ? 'first' : 'second'}.md`).click())
-    expect(mocks.closeDocument).toHaveBeenCalledWith(closing, expect.any(Function))
+    expect(mocks.closeDocument).toHaveBeenCalledWith(closing, expect.any(Function), undefined)
     expect(mocks.invoke).toHaveBeenCalledWith('close_document', { id: Number(closing), activeId: 0, activationRevision: 0 })
     expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
     expect(mocks.navigate).toHaveBeenLastCalledWith(destination)
@@ -317,7 +319,7 @@ it('keeps a file open and selects it when its save is blocked', async () => {
   await act(async () => button('Close second.md').click())
   expect(mocks.invoke.mock.calls.some(([command]) => command === 'close_document')).toBe(false)
   expect(host.querySelectorAll('.native-file-pill')).toHaveLength(2)
-  expect(host.textContent).toContain('unsaved changes')
+  expect(host.textContent).toContain('The file changed again')
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
   expect(host.inert).toBe(false)
 })
@@ -361,18 +363,18 @@ it('keeps editing locked when quit arrives during a file close', async () => {
   let finishFile!: (value: boolean) => void
   let finishWindow!: (value: boolean) => void
   mocks.closeDocument.mockImplementation(() => new Promise<boolean>((resolve) => { finishFile = resolve }))
-  mocks.prepareToClose.mockImplementation(() => new Promise<boolean>((resolve) => { finishWindow = resolve }))
+  mocks.prepareToClose.mockResolvedValueOnce(true).mockImplementation(() => new Promise<boolean>((resolve) => { finishWindow = resolve }))
   await mount()
   await act(async () => button('Close first.md').click())
   const quit = mocks.listen.mock.calls.find(([event]) => event === 'close-requested')![1] as () => void
   await act(async () => quit())
-  expect(mocks.prepareToClose).not.toHaveBeenCalled()
-  await act(async () => finishFile(false))
   expect(mocks.prepareToClose).toHaveBeenCalledTimes(1)
+  await act(async () => finishFile(false))
+  expect(mocks.prepareToClose).toHaveBeenCalledTimes(2)
   expect(host.inert).toBe(true)
-  await act(async () => finishWindow(false))
+  await act(async () => finishWindow(true))
   expect(host.inert).toBe(false)
-  expect(mocks.invoke).toHaveBeenCalledWith('cancel_close')
+  expect(mocks.invoke).toHaveBeenCalledWith('finish_close')
 })
 
 it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(

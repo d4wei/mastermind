@@ -17,7 +17,3 @@ await build({
 await fs.cp(path.join(root, 'themes'), path.join(outDir, 'themes'), { recursive: true,
   filter: (source) => !/\.(?:ts|md)$/.test(source) })
 await fs.writeFile(path.join(outDir, 'themes.json'), JSON.stringify(await scanThemes(path.join(root, 'themes'))))
-
-const licenses = path.join(outDir, 'licenses')
-await fs.mkdir(licenses, { recursive: true })
-await fs.copyFile(path.join(root, 'node_modules/node-diff3/LICENSE.md'), path.join(licenses, 'node-diff3.txt'))

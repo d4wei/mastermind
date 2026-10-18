@@ -22,8 +22,7 @@ or data being discussed. Names must stand on their own without the development c
 | Original thread, in resolved history | Discussion | 讨论 |
 | Use disk version | Use incoming | 采用外部版本 |
 | Compare versions | Needs attention | 需要处理 |
-| Save merge result | Try merge | 尝试合并 |
-| Save a copy | Save my version as… | 将我的版本另存为… |
+| Save a copy | Save As… | 另存为… |
 | Session, in document errors | Open document | 已打开的文档 |
 | Typeface | Font preset | 字体预设 |
 | Code color | Code color scheme | 代码配色 |
@@ -235,13 +234,13 @@ Keep the stored `mastermind:resolved-thread v1` and `translated-selection v1` ma
 Evidence: [document recovery][store] and [file writes][files]. Use **Needs attention / 需要处理**
 for a file whose conflict remains unresolved. The notice says editing is paused and names the file.
 
-Use **Use incoming / 采用外部版本** for discarding unsaved edits after confirmation; **Try merge /
-尝试合并** for a three-way text merge that saves immediately when clean; **Save my version as… /
-将我的版本另存为…** for saving retained text to a new file. **Copy my version / 复制我的版本** copies
-that text to the clipboard. A clean text merge does not imply semantic correctness.
+Use **Use incoming / 采用外部版本** for discarding unsaved edits after confirmation; **Save As… /
+另存为…** for preserving retained document text in another file; **Retry / 重试** for checking a
+failed read or write again. **Don't Save / 不保存** explicitly discards unsaved edits when closing.
+**Discard Drafts / 丢弃草稿** discards unsubmitted review input; Cancel returns to its composer.
 
-Keep **base version / 基准版本**, **your edits / 你的编辑**, and **file on disk / 磁盘文件** when explaining
-merge inputs. **Merge result / 合并结果** is computed output, not a separate manual editor.
+Keep **saved version / 已保存的版本**, **your edits / 你的编辑**, and **file on disk / 磁盘文件** when
+explaining version checks. There is no in-app merge operation or comparison editor.
 Use **autosave / 自动保存**, **editing paused / 编辑已暂停**, and **unsaved changes / 未保存的更改** in
 public explanations; clean/dirty buffer remains useful technical terminology.
 

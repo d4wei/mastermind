@@ -30,3 +30,7 @@
 .notification-dismiss svg { width: 1em; height: 1em; }
 .conflict-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); }
 .conflict-actions button { text-align: left; }
+
+.notification-compact { align-self: flex-start; padding: var(--space-unit); }
+.recovery-warning { color: var(--color-text-muted); display: flex; }
+#root[inert] .notification-stack { visibility: hidden; }

@@ -1,3 +1,4 @@
+import { useDraftGuard, useDraftState } from '../review/drafts'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
 import { useDoc } from '../documents/store'
@@ -19,9 +20,9 @@ interface Selection { artifact: PreparedTranslation; blockId: string; quote: str
 export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
-  const [selection, setSelection] = useState<Selection | null>(null)
-  const [composing, setComposing] = useState(false)
-  const [body, setBody] = useState('')
+  const [selection, setSelection] = useDraftState<Selection | null>('translated:selection', null)
+  const [composing, setComposing] = useDraftState('translated:composing', false)
+  const [body, setBody] = useDraftState('translated:body', '')
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const busy = useRef(false)
@@ -77,8 +78,11 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       close()
     } finally { busy.current = false; setSubmitting(false) }
   }
+  const composer = useRef<HTMLDivElement>(null)
+  useDraftGuard('translated', t('comment'), composing && !!body.trim(),
+    () => { requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus()) }, close)
   if (!selection) return null
-  return <div className="sel-toolbar" style={{ top: Math.max(8, selection.top - (composing ? 150 : 44)),
+  return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, selection.top - (composing ? 150 : 44)),
     left: Math.max(8, Math.min(selection.left, window.innerWidth - 280)) }}
     onMouseDown={(event) => { if ((event.target as HTMLElement).tagName !== 'TEXTAREA') event.preventDefault() }}>
     {!composing ? <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>{t('comment')}</button> :

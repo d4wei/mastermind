@@ -64,3 +64,7 @@ After successful creation and admission, the registry replaces the old document 
 The original disk file is untouched. This does not advance activation: the renderer switches only
 if the person still has the originating document selected. Unused watches are released. A failed
 creation or admission does not release the original document.
+
+When `forClose` is true, creation and readback use the same exclusive-copy path, but the new file
+is not admitted and the original registry entry stays intact. The renderer can complete its close
+only after the copy succeeds; cancelling the picker does not alter either document's state.

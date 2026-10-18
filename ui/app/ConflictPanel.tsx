@@ -1,36 +1,42 @@
 import { useState } from 'react'
 import { useT } from '../i18n'
 import { Notification } from './Notifications'
+import { AlertIcon } from '../icons'
 import { useDoc, type createDocStore, type RecoveryError } from '../documents/store'
 import { requireReviewerHost } from './host'
 import { navigate } from './route'
+import { transferDrafts } from '../review/drafts'
 
 interface Props { store?: ReturnType<typeof createDocStore> }
 const errorKeys = {
-  read: 'conflictReadFailed', save: 'conflictSaveFailed', overlap: 'conflictOverlap',
-  limit: 'conflictLimit', copy: 'conflictCopyFailed', changed: 'conflictStale',
+  read: 'conflictReadFailed', save: 'conflictSaveFailed', changed: 'conflictStale',
 } as const satisfies Record<RecoveryError, string>
 
 export function ConflictPanel({ store = useDoc }: Props) {
   const state = store()
   const t = useT()
   const [confirmIncoming, setConfirmIncoming] = useState(false)
-  const [copyFailed, setCopyFailed] = useState(false)
-  if (!state.conflict) return null
-  if (state.conflictDismissed) return <Notification>
-    <button type="button" className="btn-ghost" onClick={() => void state.openConflict()}>
-      {state.meta?.displayName} · {t('needsAttention')}
+  if (!state.conflict || state.saving) return null
+  if (state.conflictDismissed) return <Notification compact>
+    <button type="button" className="btn-ghost recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
+      title={t('needsAttention')} onClick={() => void state.openConflict()}>
+      <AlertIcon />
     </button>
   </Notification>
   const saveCopy = async () => {
     const copyId = await state.saveCopy()
+    if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
     if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
   }
-  return <Notification onDismiss={state.closeConflict}>
+  const ioFailure = state.diskChange?.deleted || state.recoveryError === 'read' || state.recoveryError === 'save'
+  const message = state.diskChange?.deleted ? 'conflictMissing' : state.recoveryError === 'read'
+    ? 'conflictReadFailed' : state.recoveryError === 'save' ? 'conflictSaveFailed' : 'conflictNotice'
+  return <Notification onDismiss={() => { setConfirmIncoming(false); state.closeConflict() }}>
     <strong>{state.meta?.displayName}</strong>
-    <p>{t(state.diskChange?.deleted ? 'conflictMissing' : 'conflictNotice')}</p>
-    {state.recoveryError && <p role="alert">{t(errorKeys[state.recoveryError])}</p>}
-    {confirmIncoming ? <>
+    <p>{t(message)}</p>
+    {state.recoveryError && !ioFailure && <p role="alert">{t(errorKeys[state.recoveryError])}</p>}
+    {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
+    {confirmIncoming && !ioFailure ? <>
       <p>{t('conflictDiscard')}</p>
       <div className="conflict-actions">
         <button type="button" className="btn-cta" disabled={state.saving}
@@ -38,17 +44,12 @@ export function ConflictPanel({ store = useDoc }: Props) {
         <button type="button" className="btn-ghost" onClick={() => setConfirmIncoming(false)}>{t('cancel')}</button>
       </div>
     </> : <div className="conflict-actions">
-      <button type="button" className="btn-cta" disabled={state.saving}
-        onClick={() => void state.tryMerge()}>{t('conflictTryMerge')}</button>
-      <button type="button" className="btn-ghost" disabled={state.saving}
-        onClick={() => setConfirmIncoming(true)}>{t('conflictUseDisk')}</button>
-      {requireReviewerHost().saveCopy && <button type="button" className="btn-ghost" disabled={state.saving}
+      {requireReviewerHost().saveCopy && <button type="button" className="btn-cta"
         onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>}
-      <button type="button" className="btn-ghost" onClick={async () => {
-        try { await navigator.clipboard.writeText(state.source); setCopyFailed(false) }
-        catch { setCopyFailed(true) }
-      }}>{t('conflictCopy')}</button>
+      {ioFailure ? <button type="button" className="btn-ghost"
+        onClick={() => void state.retryRecovery()}>{t('retry')}</button> :
+        <button type="button" className="btn-ghost"
+          onClick={() => setConfirmIncoming(true)}>{t('conflictUseDisk')}</button>}
     </div>}
-    {copyFailed && <p role="alert">{t('conflictClipboardFailed')}</p>}
   </Notification>
 }

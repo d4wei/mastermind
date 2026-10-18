@@ -15,7 +15,7 @@ export interface ReviewerHost {
   getSession(id: string): Promise<SessionMeta>
   getFile(id: string): Promise<FileResponse>
   putFile(id: string, content: string, baseVersion: string): Promise<{ mtimeMs: number; version: string }>
-  saveCopy?(id: string, content: string): Promise<{ meta: SessionMeta; file: FileResponse } | null>
+  saveCopy?(id: string, content: string, forClose?: boolean): Promise<{ meta: SessionMeta; file: FileResponse } | null>
   subscribe(id: string, listener: (event: HostInvalidation) => void): () => void
   translation(id: string, targetLang: string): Promise<unknown>
   config(): Promise<ClientConfig>

@@ -1,3 +1,4 @@
+import { DraftScope, useDraftFocus, pendingDrafts, draftValue } from '../review/drafts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DocumentScroll } from './DocumentScroll'
 import { APP_NAME, DEFAULT_AUTHOR_TAG } from './constants'
@@ -41,6 +42,11 @@ function isTypingTarget(e: KeyboardEvent): boolean {
 }
 
 export function SessionView({ sessionId }: { sessionId: string }) {
+  const name = useDoc((s) => s.sessionId === sessionId ? s.meta?.displayName : undefined)
+  return <DraftScope id={sessionId} name={name}><DocumentView sessionId={sessionId} /></DraftScope>
+}
+
+function DocumentView({ sessionId }: { sessionId: string }) {
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
@@ -66,6 +72,13 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     if (narrow) setRailOpen(false)
     setPanel((current) => current === next ? null : next)
   }, [narrow])
+  const draftFocus = useDraftFocus((s) => s.target)
+  useEffect(() => {
+    if (draftFocus?.id !== sessionId) return
+    useDoc.getState().setMode('reading')
+    setRailOpen(true)
+    setPanel(null)
+  }, [draftFocus, sessionId])
   const closePanel = useCallback(() => setPanel(null), [])
   const openRail = useCallback(() => {
     if (narrow) setPanel(null)
@@ -80,8 +93,10 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     retainedTranslation.current = { sessionId, targetLang: translation.artifact.targetLang, artifact: translation.artifact }
   }
   const captured = retainedTranslation.current
+  const translatedDraft = pendingDrafts([sessionId]).some((draft) => draft.key === 'translated')
+    ? draftValue<{ artifact: NonNullable<typeof translation.artifact> }>(sessionId, 'translated:selection') : undefined
   const composerArtifact = translation.artifact ?? (translation.error === 'stale' &&
-    captured?.sessionId === sessionId && captured.targetLang === translationLanguage ? captured.artifact : null)
+    captured?.sessionId === sessionId && captured.targetLang === translationLanguage ? captured.artifact : null) ?? translatedDraft?.artifact
   const transActive = translation.active && translation.sessionId === sessionId &&
     translation.source === source && translation.targetLang === translationLanguage
   useEffect(() => { void useTranslation.getState().synchronize() }, [sessionId, source, translationLanguage])
@@ -154,6 +169,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
       if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e)) setActiveSpan(null)
       // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
@@ -283,7 +299,8 @@ export function SessionView({ sessionId }: { sessionId: string }) {
     return <div className="center-note loading-note">{t('loadingDocument')}</div>
   }
 
-  const hasThreads = analysis?.items.some((i) => i.type === 'thread') ?? false
+  const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
+    pendingDrafts([sessionId]).some((draft) => draft.key === 'replies')
   const showRail = mode === 'reading' && railOpen && hasThreads
 
   const commentRail = analysis && (
@@ -399,11 +416,11 @@ export function SessionView({ sessionId }: { sessionId: string }) {
           </SlideOver>
         </div>
       )}
-      {mode === 'reading' && composerArtifact && translation.sessionId === sessionId &&
-        translation.targetLang === translationLanguage && (
+      {mode === 'reading' && composerArtifact && ((translation.sessionId === sessionId &&
+        translation.targetLang === translationLanguage) || translatedDraft) && (
         <TranslatedSelection key={`${sessionId}:${translationLanguage}`}
           containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
-          readOnly={readOnly} stale={translation.error === 'stale'} />
+          readOnly={readOnly} stale={translation.error === 'stale' || !!translatedDraft && !translation.active} />
       )}
       {mode === 'reading' && !showTranslated && analysis && (
         <>

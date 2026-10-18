@@ -1,3 +1,4 @@
+import { releaseDrafts } from '../ui/review/drafts'
 // @vitest-environment jsdom
 import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
@@ -45,7 +46,7 @@ beforeEach(async () => {
   })
 })
 afterEach(() => {
-  act(() => root.unmount()); host.remove(); useDoc.setState(initial); useConfig.setState(config); useTranslation.getState().reset()
+  act(() => root.unmount()); releaseDrafts('A'); host.remove(); useDoc.setState(initial); useConfig.setState(config); useTranslation.getState().reset()
   window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals(); installHost(null)
 })
 it.each(['comment', 'narrative'])('retains the composer draft through a %s update', async (kind) => {

@@ -1,6 +1,6 @@
 import { Notifications, Notice } from './Notifications'
 import { APP_NAME } from './constants'
-import { useEffect, type ReactNode } from 'react'
+import { Fragment, useEffect, type ReactNode } from 'react'
 import { Tooltip } from 'radix-ui'
 import { useT } from '../i18n'
 import { GrainOverlay, ThemeEffects } from '../theme/ThemeProvider'
@@ -27,9 +27,10 @@ export function App({ home, onboarding, native = false }: {
 
   useEffect(() => native ? undefined : registerDocumentLifecycle(), [native])
 
+  const NotificationHost = native ? Fragment : Notifications
   return (
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
-      <Notifications>
+      <NotificationHost>
       <ThemeEffects />
       {onboarding ?? <>
         {route.kind === 'doc' && (
@@ -41,7 +42,7 @@ export function App({ home, onboarding, native = false }: {
       </>}
       {saveFailed && <Notice error>{t('configSaveFailed')}</Notice>}
       <GrainOverlay />
-      </Notifications>
+      </NotificationHost>
     </Tooltip.Provider>
   )
 }

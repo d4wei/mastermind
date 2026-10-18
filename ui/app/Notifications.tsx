@@ -14,12 +14,12 @@ export function Notifications({ children }: { children: ReactNode }) {
   </NotificationTarget.Provider>
 }
 
-export function Notification({ children, onDismiss, error = false }: {
-  children: ReactNode; onDismiss?: () => void; error?: boolean
+export function Notification({ children, onDismiss, error = false, compact = false }: {
+  children: ReactNode; onDismiss?: () => void; error?: boolean; compact?: boolean
 }) {
   const target = useContext(NotificationTarget)
   const t = useT()
-  const content = <section className="notification" role={error ? 'alert' : 'status'}>
+  const content = <section className={`notification${compact ? ' notification-compact' : ''}`} role={error ? 'alert' : 'status'}>
     <div className="notification-content">{children}</div>
     {onDismiss && <button type="button" className="btn-ghost notification-dismiss"
       aria-label={t('dismiss')} onClick={onDismiss}><CrossIcon /></button>}

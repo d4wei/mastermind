@@ -39,25 +39,6 @@ async function conflict() {
   return store
 }
 
-it('saves a clean merge immediately against the freshly read version and retains undo', async () => {
-  const store = await conflict()
-  getFile.mockResolvedValue(file('one\r\nmiddle\r\nLAST\r\n', 'fresh'))
-  expect(await store.getState().tryMerge()).toBe(true)
-  expect(putFile).toHaveBeenCalledWith('A', 'ONE\r\nmiddle\r\nLAST\r\n', 'fresh')
-  expect(store.getState()).toMatchObject({ source: 'ONE\nmiddle\nLAST\n', conflict: false, version: 'v3' })
-  store.getState().undo()
-  expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
-})
-
-it('writes nothing for overlap and retains local text', async () => {
-  const store = await conflict()
-  getFile.mockResolvedValue(file('competing\nmiddle\nlast\n', 'v4'))
-  expect(await store.getState().tryMerge()).toBe(false)
-  expect(store.getState().recoveryError).toBe('overlap')
-  expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
-  expect(putFile).not.toHaveBeenCalled()
-})
-
 it('rejects every editing entry point and autosave while conflict is retained', async () => {
   const store = await conflict()
   const source = store.getState().source
@@ -74,19 +55,6 @@ it('rejects every editing entry point and autosave while conflict is retained', 
   expect(release).not.toHaveBeenCalled()
 })
 
-it('preserves local text after missing reads and uncertain or rejected writes', async () => {
-  const store = await conflict()
-  getFile.mockRejectedValueOnce(new HostError('missing', 'missing'))
-  expect(await store.getState().tryMerge()).toBe(false)
-  expect(store.getState().recoveryError).toBe('read')
-  expect(putFile).not.toHaveBeenCalled()
-  putFile.mockRejectedValueOnce(new HostError('conflict', 'changed'))
-  expect(await store.getState().tryMerge()).toBe(false)
-  expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
-  expect(store.getState().conflict).toBe(true)
-  expect(await store.getState().tryMerge()).toBe(true)
-})
-
 it('adopts fresh incoming content only after the operation and makes discard undoable', async () => {
   const store = await conflict()
   expect(await store.getState().useConflictDisk()).toBe(true)
@@ -96,33 +64,16 @@ it('adopts fresh incoming content only after the operation and makes discard und
   expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
 })
 
-it.each(['merge', 'incoming'])('rejects a newer invalidation during a %s read', async (action) => {
+it('rejects a newer invalidation during an incoming read', async () => {
   const store = await conflict()
   const read = deferred<ReturnType<typeof file>>()
   getFile.mockReturnValueOnce(read.promise)
-  const result = action === 'merge' ? store.getState().tryMerge() : store.getState().useConflictDisk()
+  const result = store.getState().useConflictDisk()
   store.getState().notifyDiskChange(3)
   read.resolve(file('one\nmiddle\nLAST\n', 'v2'))
   expect(await result).toBe(false)
   expect(putFile).not.toHaveBeenCalled()
   expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
-})
-
-it('does not apply a background merge to another document, and revalidates after write invalidations', async () => {
-  const store = await conflict()
-  const write = deferred<{ mtimeMs: number; version: string }>()
-  putFile.mockReturnValueOnce(write.promise)
-  const merging = store.getState().tryMerge()
-  await vi.advanceTimersByTimeAsync(0)
-  store.getState().notifyDiskChange(2)
-  getFile.mockResolvedValue(file('B', 'B1'))
-  await store.getState().load('B')
-  getFile.mockResolvedValue(file('ONE\nmiddle\nnew disk\n', 'v4'))
-  write.resolve({ mtimeMs: 2, version: 'v3' })
-  expect(await merging).toBe(true)
-  expect(store.getState().source).toBe('B')
-  await store.getState().load('A')
-  expect(store.getState().source).toBe('ONE\nmiddle\nnew disk\n')
 })
 
 it('retains dismissal across invalidations and navigation without hiding file attention state', async () => {
@@ -148,7 +99,7 @@ it('retains the whole local buffer on save-copy cancellation or failure', async 
   expect(await store.getState().saveCopy()).toBeNull()
   saveCopy.mockRejectedValueOnce(new Error('existing destination'))
   expect(await store.getState().saveCopy()).toBeNull()
-  expect(store.getState()).toMatchObject({ conflict: true, source: 'ONE\nmiddle\nlast\n', recoveryError: 'copy' })
+  expect(store.getState()).toMatchObject({ conflict: true, source: 'ONE\nmiddle\nlast\n', copyError: true })
   expect(putFile).not.toHaveBeenCalled()
 })
 
@@ -157,12 +108,13 @@ it('switches to the admitted copy only after success, releasing the original buf
   const saving = deferred<unknown>()
   saveCopy.mockReturnValueOnce(saving.promise)
   const operation = store.getState().saveCopy()
-  expect(await store.getState().prepareToClose()).toBe(false)
+  const closing = store.getState().prepareToClose()
   expect(store.getState().hasDocument('A')).toBe(true)
   getFile.mockResolvedValue(file('ONE\nmiddle\nlast\n', 'copy-v1'))
   saving.resolve({ meta: { sessionId: 'copy', path: 'copy.md', displayName: 'copy.md', mtimeMs: 1 },
     file: file('ONE\nmiddle\nlast\n', 'copy-v1') })
   expect(await operation).toBe('copy')
+  expect(await closing).toBe(true)
   expect(store.getState()).toMatchObject({ sessionId: 'copy', conflict: false, source: 'ONE\nmiddle\nlast\n' })
   expect(store.getState().hasDocument('A')).toBe(false)
   expect(store.getState().hasPendingWrites()).toBe(false)
@@ -183,11 +135,12 @@ it('shows dismissible corner recovery, requires discard confirmation, and has no
     expect(host.textContent).toContain('conflictDiscard')
     await act(async () => button('cancel').click())
     await act(async () => (host.querySelector('[aria-label="dismiss"]') as HTMLButtonElement).click())
-    expect(host.textContent).toContain('needsAttention')
+    expect(host.querySelector('[aria-label*="needsAttention"]')).not.toBeNull()
     await act(async () => (host.querySelector('button') as HTMLButtonElement).click())
-    await act(async () => button('conflictTryMerge').click())
+    await act(async () => button('conflictUseDisk').click())
+    await act(async () => button('conflictUseDisk').click())
     expect(host.querySelector('.notification')).toBeNull()
-    expect(putFile).toHaveBeenCalledWith('A', 'ONE\nmiddle\nLAST\n', 'v2')
+    expect(putFile).not.toHaveBeenCalled()
   } finally { act(() => root.unmount()); host.remove() }
 })
 
@@ -206,4 +159,52 @@ it('does not cancel navigation already in flight when a saved copy completes', a
   await navigation
   expect(store.getState()).toMatchObject({ sessionId: 'B', source: 'B contents' })
   expect(store.getState().hasDocument('copy')).toBe(true)
+})
+
+it('retries a failed write only after reading the acknowledged version', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('local')
+  putFile.mockRejectedValueOnce(new HostError('failure', 'permission denied'))
+  await store.getState().flushAll()
+  expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save' })
+  getFile.mockClear(); putFile.mockClear()
+  expect(await store.getState().retryRecovery()).toBe(true)
+  expect(getFile).toHaveBeenCalledWith('A')
+  expect(putFile).toHaveBeenCalledWith('A', 'local', 'v1')
+  expect(getFile.mock.invocationCallOrder[0]).toBeLessThan(putFile.mock.invocationCallOrder[0]!)
+  expect(store.getState()).toMatchObject({ conflict: false, savedSource: 'local' })
+})
+
+it('reconciles a failed write whose complete buffer is already on disk', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('local')
+  putFile.mockImplementationOnce(async () => {
+    getFile.mockResolvedValue(file('local', 'v2'))
+    throw new HostError('failure', 'readback failed')
+  })
+  await store.getState().flushAll()
+  expect(store.getState()).toMatchObject({ conflict: false, savedSource: 'local', version: 'v2' })
+  expect(store.getState().pendingDocuments()).toEqual([])
+  expect(putFile).toHaveBeenCalledOnce()
+})
+
+it('keeps Retry available when saving a copy fails after a read failure', async () => {
+  const store = await conflict()
+  getFile.mockRejectedValue(new HostError('failure', 'permission denied'))
+  store.getState().notifyDiskChange(3)
+  await vi.advanceTimersByTimeAsync(0)
+  saveCopy.mockRejectedValue(new Error('copy failed'))
+  await store.getState().saveCopy()
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
+    const choices = [...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent)
+    expect(choices).toEqual(['conflictSaveCopy', 'retry'])
+    expect(host.textContent).toContain('conflictCopyFailed')
+    expect(store.getState().recoveryError).toBe('read')
+  } finally { act(() => root.unmount()); host.remove() }
 })
