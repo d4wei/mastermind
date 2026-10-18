@@ -328,8 +328,7 @@ column. Editors use different labels: Obsidian calls its limit
 [Readable line length][obsidian-width], while Typora calls the column dimension
 [Width of Writing Area][typora-width]. Text width describes
 this app's setting directly; it does not imply paper dimensions or a hard line-wrap character count.
-Keep Font size, Line height, Theme, Appearance, Film grain, Texture, and System default.
-For grain textures use 细腻、柔和、粗糙; 粗粝 is unusually literary for a setting.
+Keep Font size, Line height, Theme, Appearance, and System default.
 
 Keep theme names and actual font-family names as proper names.
 Label the font preset with stored ID `grid` **Schibsted**, matching its family and avoiding a false
@@ -406,7 +405,6 @@ The remaining terms below retain their ordinary meanings in context.
 | Navigation | File, Folder, Files, Recent, Outline, Filename, Selection |
 | Status | Loading, Saving, Saved, Unsaved changes, Missing file, Save failed |
 | Preferences | Settings, Appearance, Theme, Font size, Line height, System default |
-| Grain | Film grain, Texture, Off, Low, Medium, High, Fine, Soft, Coarse |
 | Language chooser | Search languages, No matching language, Custom language code |
 | Markdown | Heading, Paragraph, List item, Table, Code block, Frontmatter, Callout |
 | Source mechanics | Parser, Renderer, Source offset, UTF-16 range, Source splice, Line ending |

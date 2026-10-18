@@ -20,7 +20,7 @@ const initialDoc = useDoc.getState()
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
   authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', translationLanguage: null, grain: {},
+  uiLang: 'en', translationLanguage: null,
 }
 let host: HTMLDivElement
 let root: Root

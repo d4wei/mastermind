@@ -26,6 +26,15 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-17 — Theme color roles
+
+**Open question.** Comments, primary actions, and native chrome do not consistently reflect the
+selected theme. The [color audit](docs/color-audit.md) proposes shared accent roles and records
+contrast and token defects, including inactive traffic-light appearance.
+
+**Exit:** review the proposed mapping, apply it with palette and native checks, and graduate the
+contract into the theme layer.
+
 ## 2026-10-17 — Local persisted work buffers
 
 **Bet.** A local persisted buffer can preserve pending document edits and unfinished comments,

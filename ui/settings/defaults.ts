@@ -13,5 +13,4 @@ export const DEFAULT_CONFIG: MastermindConfig = {
   codeTheme: 'none',
   uiLang: 'en',
   translationLanguage: null,
-  grain: {},
 }

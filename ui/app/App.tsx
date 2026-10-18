@@ -3,7 +3,7 @@ import { APP_NAME } from './constants'
 import { Fragment, useEffect, type ReactNode } from 'react'
 import { Tooltip } from 'radix-ui'
 import { useT } from '../i18n'
-import { GrainOverlay, ThemeEffects } from '../theme/ThemeProvider'
+import { ThemeEffects } from '../theme/ThemeProvider'
 import { useConfig } from './configStore'
 import { Navigator } from './Navigator'
 import { useNav } from './navStore'
@@ -41,7 +41,6 @@ export function App({ home, onboarding, native = false }: {
         {route.kind === 'home' && (home ?? <HomeView />)}
       </>}
       {saveFailed && <Notice error>{t('configSaveFailed')}</Notice>}
-      <GrainOverlay />
       </NotificationHost>
     </Tooltip.Provider>
   )

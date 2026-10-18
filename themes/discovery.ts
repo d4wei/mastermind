@@ -7,7 +7,6 @@ interface ThemeJson {
   name?: string
   appearance?: string
   fonts?: Array<{ family?: string; src?: string; weight?: string | number }>
-  grain?: { enabled?: boolean; opacity?: number; tintOpacity?: number }
   swatch?: { bg?: unknown; ink?: unknown; accent?: unknown }
 }
 
@@ -62,9 +61,6 @@ export async function scanThemes(themesDir: string): Promise<ThemeInfo[]> {
         id,
         name: parsed.name ?? id,
         appearance: parsed.appearance === 'dark' ? 'dark' : 'light',
-        grain: parsed.grain
-          ? { enabled: parsed.grain.enabled ?? false, opacity: parsed.grain.opacity, tintOpacity: parsed.grain.tintOpacity }
-          : null,
         fonts,
         swatch: parseSwatch(parsed.swatch),
       })

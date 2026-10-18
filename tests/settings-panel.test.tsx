@@ -6,11 +6,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ClientConfig } from '../ui/settings/types'
 import { useConfig } from '../ui/app/configStore'
 import { SettingsPanel } from '../ui/settings/SettingsPanel'
+import { scanThemes } from '../themes/discovery'
+import path from 'node:path'
+
+const bundledThemes = await scanThemes(path.resolve('themes'))
 
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
   authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
-  uiLang: 'en', translationLanguage: null, grain: {},
+  uiLang: 'en', translationLanguage: null,
 }
 
 let host: HTMLDivElement
@@ -38,6 +42,23 @@ it('omits browser selection while retaining appearance settings', () => {
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
   expect(host.textContent).not.toContain('Open in browser')
   expect(host.textContent).toContain('Appearance')
+})
+
+it.each(['en', 'zh-CN'] as const)('offers theme choices without texture controls in %s', (uiLang) => {
+  useConfig.setState({ themes: bundledThemes })
+  for (const theme of bundledThemes) {
+    const savedConfig = { ...config, uiLang, theme: theme.id,
+      grain: { [theme.id]: { intensity: 'high', texture: 'coarse' } } }
+    act(() => {
+      useConfig.setState({ config: savedConfig })
+      root.render(<SettingsPanel onClose={() => {}} />)
+    })
+    const appearance = host.querySelectorAll('section')[1]!
+    expect(appearance.querySelectorAll('.settings-row')).toHaveLength(1)
+    expect(appearance.querySelectorAll('button')).toHaveLength(bundledThemes.length)
+    expect(appearance.querySelector('[aria-pressed="true"]')?.textContent).toBe(theme.name)
+    expect(host.querySelector('feTurbulence')).toBeNull()
+  }
 })
 
 it.each([

@@ -3,7 +3,6 @@ import { syncHostBackground } from './background'
 import { useConfig } from '../app/configStore'
 import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
-import { INTENSITY_SCALE, TEXTURES, resolveGrain } from './grain'
 
 const TOKENS_LINK_ID = 'theme-tokens'
 const FONTS_STYLE_ID = 'theme-fonts'
@@ -111,28 +110,4 @@ export function ThemeEffects() {
   }, [config, theme?.appearance])
 
   return null
-}
-
-/** The optional film-grain overlay (SVG turbulence), per theme + user toggle. */
-export function GrainOverlay() {
-  const config = useConfig((s) => s.config)
-  const themes = useConfig((s) => s.themes)
-  const themeId = config?.theme ?? 'grid'
-  const theme = themes.find((t) => t.id === themeId)
-
-  const { intensity, texture } = resolveGrain(theme, config?.grain[themeId])
-  if (intensity === 'off') return null
-
-  const baseOpacity = theme?.grain?.opacity ?? 0.12
-  const opacity = baseOpacity * INTENSITY_SCALE[intensity]
-  const tx = TEXTURES[texture]
-  return (
-    <svg className="grain-overlay" style={{ opacity }} aria-hidden>
-      <filter id="mm-grain">
-        <feTurbulence type={tx.type} baseFrequency={tx.baseFrequency} numOctaves={tx.numOctaves} stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" />
-      </filter>
-      <rect width="100%" height="100%" filter="url(#mm-grain)" />
-    </svg>
-  )
 }

@@ -62,12 +62,11 @@
   text color and selection fill. The view-mode button shows the icon for the mode it opens.
 - Selection toolbar: the dark band device miniaturized (invert-bg surface, invert-text ink).
 - Focus ring: 2px `--focus-ring`, offset 2px — ink on the light themes, the accent on Nacht.
-- Optional film-grain overlay (SVG feTurbulence, desaturated): per-theme base opacity (~0.12 on Grid) scaled by a user **intensity** (off / low / medium / high) × **texture** (fine / soft / coarse). Off by default on every theme.
 
 ## Themes
 
 A theme is `themes/<id>/theme.json` plus `tokens.css`; the token names above are the contract.
-Each manifest declares its appearance and grain defaults. Bundled font faces live in `themes/fonts/`
+Each manifest declares its appearance and preview swatch. Bundled font faces live in `themes/fonts/`
 and `themes/grid/fonts/`; the [asset registry](../ui/theme/fonts.ts) declares their local URLs.
 Cross-theme preferences for font preset, code font, and code color scheme set token values at
 runtime from their registries rather than any one theme's `tokens.css`.

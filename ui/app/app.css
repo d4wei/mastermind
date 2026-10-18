@@ -23,7 +23,7 @@
   --z-popover: 60; /* selection toolbar, proposal card */
   --z-overlay: 65; /* off-canvas scrim for nav/rail at narrow widths */
   --z-toast: 70; /* notifications */
-  --z-grain: 100; /* film-grain overlay — always on top */
+  --z-theme-veil: 100;
 
   /* ---- Typography ---- */
   --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
@@ -1479,7 +1479,7 @@ input[type='checkbox'] {
 .theme-veil {
   position: fixed;
   inset: 0;
-  z-index: var(--z-grain);
+  z-index: var(--z-theme-veil);
   pointer-events: none;
   opacity: 1;
   transition: opacity var(--dur-slow) var(--ease-standard);
@@ -1610,8 +1610,7 @@ input[type='checkbox'] {
   .mark-gutter,
   .slide-over,
   .sel-toolbar,
-  .compact-outline,
-  .grain-overlay {
+  .compact-outline {
     display: none !important;
   }
 
@@ -1693,18 +1692,6 @@ input[type='checkbox'] {
     font-family: var(--font-mono);
     color: var(--color-text-muted);
   }
-}
-
-/* ---------- grain overlay ---------- */
-
-.grain-overlay {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: var(--z-grain);
-  mix-blend-mode: multiply;
 }
 
 .center-note code {

@@ -7,25 +7,9 @@ import { LangSelect } from './LangSelect'
 import { useT, type MsgKey } from '../i18n'
 import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme } from '../theme/codeThemes'
-import { GrainOffGlyph, GrainSwatch, INTENSITY_STEPS, TEXTURE_STEPS, resolveGrain } from '../theme/grain'
-import type { GrainIntensity, GrainTexture } from './types'
 
 const CODE_COLOR_LABEL: Record<string, MsgKey> = {
   none: 'codeColorNone', soft: 'codeColorSoft', vivid: 'codeColorVivid', warm: 'codeColorWarm',
-}
-
-/** Cosmetic opacity for the intensity swatches — louder than the live overlay so the icon reads. */
-const INTENSITY_PREVIEW: Record<Exclude<GrainIntensity, 'off'>, number> = { low: 0.4, medium: 0.7, high: 1 }
-const INTENSITY_LABEL: Record<GrainIntensity, MsgKey> = {
-  off: 'grainOff',
-  low: 'grainLow',
-  medium: 'grainMedium',
-  high: 'grainHigh',
-}
-const TEXTURE_LABEL: Record<GrainTexture, MsgKey> = {
-  fine: 'textureFine',
-  soft: 'textureSoft',
-  coarse: 'textureCoarse',
 }
 
 const FONT_OPTS = [
@@ -179,71 +163,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
-          {activeTheme?.grain &&
-            (() => {
-              const override = config.grain[config.theme]
-              const { intensity, texture } = resolveGrain(activeTheme, override)
-              const setGrain = (p: Partial<{ intensity: GrainIntensity; texture: GrainTexture }>) =>
-                patch({ grain: { ...config.grain, [config.theme]: { ...override, ...p } } })
-              return (
-                <>
-                  <div className="settings-row">
-                    <span>
-                      {t('filmGrain')} <span className="settings-val">{t(INTENSITY_LABEL[intensity])}</span>
-                    </span>
-                    <ToggleGroup.Root
-                      className="seg preset-seg"
-                      type="single"
-                      value={intensity}
-                      onValueChange={(v) => v && setGrain({ intensity: v as GrainIntensity })}
-                      aria-label={t('filmGrain')}
-                    >
-                      {INTENSITY_STEPS.map((step) => (
-                        <ToggleGroup.Item
-                          key={step}
-                          value={step}
-                          className="seg-btn"
-                          aria-label={t(INTENSITY_LABEL[step])}
-                          title={t(INTENSITY_LABEL[step])}
-                        >
-                          {step === 'off' ? (
-                            <GrainOffGlyph />
-                          ) : (
-                            <GrainSwatch id={`grain-int-${step}`} texture={texture} opacity={INTENSITY_PREVIEW[step]} />
-                          )}
-                        </ToggleGroup.Item>
-                      ))}
-                    </ToggleGroup.Root>
-                  </div>
-                  {intensity !== 'off' && (
-                    <div className="settings-row">
-                      <span>
-                        {t('grainTexture')} <span className="settings-val">{t(TEXTURE_LABEL[texture])}</span>
-                      </span>
-                      <ToggleGroup.Root
-                        className="seg preset-seg"
-                        type="single"
-                        value={texture}
-                        onValueChange={(v) => v && setGrain({ texture: v as GrainTexture })}
-                        aria-label={t('grainTexture')}
-                      >
-                        {TEXTURE_STEPS.map((tex) => (
-                          <ToggleGroup.Item
-                            key={tex}
-                            value={tex}
-                            className="seg-btn"
-                            aria-label={t(TEXTURE_LABEL[tex])}
-                            title={t(TEXTURE_LABEL[tex])}
-                          >
-                            <GrainSwatch id={`grain-tex-${tex}`} texture={tex} opacity={0.7} />
-                          </ToggleGroup.Item>
-                        ))}
-                      </ToggleGroup.Root>
-                    </div>
-                  )}
-                </>
-              )
-            })()}
         </section>
 
         <section>
