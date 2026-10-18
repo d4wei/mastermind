@@ -48,7 +48,10 @@
 
 ## Iconography
 
-- Tiny stroke SVGs on currentColor (ui/icons.tsx), 1.5px strokes. Never emoji or dingbat glyphs in chrome.
+- Chrome uses the Radix icon family in `ui/icons.tsx`; custom review glyphs use matching strokes.
+- Open, Source, Comments, and More share button dimensions, neutral surfaces, borders, and ink.
+  `--control-icon-size` sets their optical bounds; `--control-enclosed-icon-size` slightly reduces
+  the enclosed comment glyph. Selection changes the surface, not the icon or border weight.
 
 ## Component treatments
 
@@ -72,12 +75,26 @@ runtime from their registries rather than any one theme's `tokens.css`.
 
 Ordinary buttons, file tabs, choices, and navigation rows use `--color-control-hover` for a neutral
 hover surface and `--color-text` for stronger ink. Pressed controls use `--color-control-pressed`.
-Each theme maps these tokens to its neutral scale. Selected choices retain their separate fill on
+Each theme mixes text ink into its elevated surface for these tokens. Selected choices retain their separate fill on
 hover; disabled controls do not react. Primary actions keep their accent treatment. Selection
 toolbar actions use the inverted surface and matching text, including composer actions. Keyboard
 focus retains its own ring.
 
 Text links retain underlines, review marks retain semantic colors, and scrollbars retain their
 track treatment. The document thumb uses `--document-scrollbar-size`, sits against the window edge,
-and hides when neither scrolling nor pointing at that edge. Comment cards use a neutral border change so hovering does not resemble the
-active anchored discussion. Hover changes do not move or resize controls.
+and hides when neither scrolling nor pointing at that edge. Comment cards use a neutral border
+change so hovering does not resemble the active anchored discussion. Hover changes do not move or resize controls.
+
+## Reading group geometry and review palettes
+
+`--reading-edge` reserves the outer margin, `--reading-outline` the visible outline strip,
+`--reading-rail` the comment card width, and `--reading-gap` its distance from the document column.
+`--reading-min-em` scales the minimum inline reading measure with the selected body font size.
+The [layout contract](../ui/app/layout.md) owns centering, panel fallback, and movement.
+
+Comment colors remain separate from insertion green and deletion brick. Sepia uses warm brown,
+Rose muted plum, Grid blue, and Cobalt violet. The dark themes use violet with restrained saturation;
+Carbon reduces its brightness relative to the original palette. Anchor underlines and selected card
+borders share `--review-comment-anchor`; selected passage fill uses `--review-comment-active-bg`.
+Application actions and outline progress retain the theme accent. Shape and labels carry review
+meaning alongside color.

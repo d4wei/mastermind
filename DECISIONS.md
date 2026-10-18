@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Balance reading space and normalize document controls
+
+**Ruled.** Preserve document centering when comments fit beside it; otherwise center the reading
+and comment group after reserving the visible outline strip. Use a panel when the selected font
+size leaves insufficient reading width. Document controls share neutral surfaces and optical icon
+weight; selection changes their surface rather than making the comment icon heavier.
+
+**Beat:** flexible empty space beyond fixed-width cards, uniformly shifting the document whenever
+comments appear, and emphasizing one toolbar action through several visual changes at once.
+
 ## 2026-10-17 — Resolve conflicts by preserving or choosing a version
 
 **Ruled.** Remove in-app three-way merge. Autosave accepted edits and reload external changes when

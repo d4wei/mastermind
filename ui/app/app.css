@@ -2,7 +2,7 @@
    mastermind base styles — token-consuming rules ONLY.
    Every color/face/size comes from var(--*) supplied by the
    active theme's tokens.css (themes/<id>/tokens.css). Fonts are
-   injected from the theme.json manifest at runtime.
+   selected from the font registry at runtime.
    ============================================================ */
 
 /* ---------- base ---------- */
@@ -191,14 +191,21 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--space-unit) * 9);
-  height: calc(var(--space-unit) * 9);
-  padding: calc(var(--space-unit) * 2);
-  color: var(--color-text-muted);
+  width: calc(var(--space-unit) * 7.5);
+  height: calc(var(--space-unit) * 7.5);
+  padding: 0;
 }
-.topbar-icon-btn.active {
-  color: var(--color-accent-dim);
+/* Equal surfaces and optical bounds keep enclosed icons from outweighing open glyphs. */
+.native-open:not(.native-open-home), .btn-ghost.topbar-icon-btn {
+  padding: 0;
+  background: var(--color-bg-elevated);
+  border: thin solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
 }
+.native-open svg, .topbar-icon-btn svg { width: var(--control-icon-size); height: var(--control-icon-size); }
+.topbar-comments svg { width: var(--control-enclosed-icon-size); height: var(--control-enclosed-icon-size); }
+.btn-ghost.topbar-icon-btn.active { background: var(--color-selection); }
 
 /* ---------- buttons ---------- */
 
@@ -281,17 +288,11 @@ button:disabled {
 
 .doc-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(auto, var(--content-max-width)) minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--content-max-width));
+  margin-inline: auto;
+  width: min(100%, var(--content-max-width));
 }
-
-.doc-shell .doc-column {
-  grid-column: 2;
-}
-
-.doc-shell.with-rail {
-  /* Preserve a centered document while the right gutter can accommodate comments. */
-  grid-template-columns: minmax(0, 1fr) minmax(auto, var(--content-max-width)) minmax(320px, 1fr);
-}
+.doc-shell .doc-column { grid-column: 1; }
 
 .doc-column {
   width: 100%;
@@ -302,16 +303,15 @@ button:disabled {
 
 
 .rail {
-  grid-column: 3;
+  grid-column: 2;
   position: relative;
   padding-top: calc(var(--space-unit) * 8);
-  /* the content↔rail gap; on .rail (not column-gap) so it never offsets content */
-  padding-left: calc(var(--space-unit) * 6);
+  padding-left: var(--reading-gap);
 }
 
 .rail-card {
   position: absolute;
-  width: min(300px, calc(100% - var(--space-unit) * 9));
+  width: var(--reading-rail);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1332,17 +1332,6 @@ input[type='checkbox'] {
   vertical-align: 0.25em;
 }
 
-@media (max-width: 1180px) {
-  .doc-shell.with-rail {
-    /* Narrower side cards leave more space for document text before the panel breakpoint. */
-    grid-template-columns: minmax(0, 0.2fr) minmax(280px, var(--content-max-width)) minmax(272px, 1fr);
-  }
-
-  .rail-card {
-    width: min(248px, calc(100% - var(--space-unit) * 9));
-  }
-}
-
 /* ---------- mark-aware find bar ---------- */
 
 .find-bar {
@@ -1625,6 +1614,8 @@ input[type='checkbox'] {
   .doc-shell,
   .doc-shell.with-rail {
     display: block;
+    margin: 0 !important;
+    width: auto !important;
   }
 
   .doc-column {

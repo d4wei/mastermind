@@ -35,10 +35,21 @@ off-screen headings. Its scroll effect remeasures virtualized lines before posit
 `navStore` shares headings, the reading article, and the mounted editor's measurement callback;
 expansion is transient component state.
 
-At the narrow breakpoint, comments use the shared dismissible panel instead of a second content
-column. The panel starts closed and opens from the comments control or a document mark. Cards flow
-vertically inside it. Wide layouts retain document-aligned cards. Settings, resolved history,
-and narrow comments share the overlay area.
+`reading-space.ts` sizes the reading group from the available scroller width, preferred text width,
+font size, outline strip, fixed card width, and gap. The outline reserves space only while visible;
+opening its popup never changes that reservation. If cards fit in the centered document's right
+margin, opening comments leaves the document in place. Otherwise the whole group is centered after
+the outline strip. The rail reserves its card width and gap, with no unused flexible column.
+
+Comments use the shared dismissible panel below the small-window breakpoint or when the inline
+layout cannot preserve the minimum reading measure at the selected font size. The panel starts
+closed and opens from the comments control or a document mark. Cards flow vertically inside it.
+Wide layouts retain document-aligned cards. Settings, resolved history, and panel comments share
+the overlay area.
+
+Changing inline comment visibility animates only horizontal displacement of the reading group.
+Text widths settle immediately. Resizing cancels the running movement rather than queuing another;
+reduced motion changes position immediately. The animation uses the shared duration and easing.
 
 `SessionView` owns settings, find, and resolved history as one transient panel choice. On narrow
 layouts, opening another panel closes comments. Settings-save feedback belongs to application

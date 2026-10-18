@@ -26,6 +26,8 @@ import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
 import { SlideOver } from './SlideOver'
 import { useIsNarrow } from './Navigator'
+import { readingSpace } from './reading-space'
+import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -62,7 +64,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const translatedRef = useRef<HTMLElement | null>(null)
   const [activeSpan, setActiveSpan] = useState<number | null>(null)
   const [hoveredSpan, setHoveredSpan] = useState<number | null>(null)
-  const narrow = useIsNarrow()
+  const smallWindow = useIsNarrow()
+  const reading = useReadingSpace()
+  const narrow = smallWindow || reading.panel
   const [railOpen, setRailOpen] = useState(!narrow)
   useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
   const closeRail = useCallback(() => setRailOpen(false), [])
@@ -287,6 +291,13 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     if (hoveredSpan !== null) doc.querySelector(`.critic[data-span-index="${hoveredSpan}"]`)?.classList.add('paired')
   }, [hoveredSpan, analysis])
 
+  const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
+    pendingDrafts([sessionId]).some((draft) => draft.key === 'replies')
+  const showRail = mode === 'reading' && railOpen && hasThreads
+  const inlineRail = showRail && !narrow && !showTranslated
+  const geometry = reading.space ? readingSpace(reading.space, inlineRail) : null
+  useReadingMovement(reading.element, geometry?.left, inlineRail)
+
   if (status === 'error') {
     return (
       <div className="center-note">
@@ -299,9 +310,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     return <div className="center-note loading-note">{t('loadingDocument')}</div>
   }
 
-  const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
-    pendingDrafts([sessionId]).some((draft) => draft.key === 'replies')
-  const showRail = mode === 'reading' && railOpen && hasThreads
 
   const commentRail = analysis && (
     <CommentRail
@@ -358,7 +366,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </Notice>}
       <DocumentScroll>
-        <div className={`doc-shell${showRail && !narrow ? ' with-rail' : ''}`}>
+        <div ref={reading.ref} className={`doc-shell${inlineRail ? ' with-rail' : ''}`}
+          style={geometry ? { marginLeft: geometry.left, width: geometry.width + geometry.extent,
+            gridTemplateColumns: `${geometry.width}px${inlineRail ? ` ${geometry.extent}px` : ''}` } : undefined}>
           <div className="doc-column">
             {showTranslated && (
               <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>

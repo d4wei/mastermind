@@ -1,4 +1,11 @@
 [data-theme='nacht'] {
+  --control-icon-size: 14px;
+  --control-enclosed-icon-size: 13px;
+  --reading-min-em: 28;
+  --reading-edge: 16px;
+  --reading-outline: 48px;
+  --reading-rail: 300px;
+  --reading-gap: 24px;
   --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-wordmark: ui-monospace, SFMono-Regular, Menlo, monospace;
   --wordmark-line-height: 1.25;
@@ -48,8 +55,8 @@
 
   /* ---- Layer 2: semantic mapping (identical names across all themes) ---- */
   --color-dialog-backdrop: color-mix(in srgb, var(--color-bg) 55%, transparent);
-  --color-control-hover: var(--gray-3);
-  --color-control-pressed: var(--gray-4);
+  --color-control-hover: color-mix(in srgb, var(--color-text) 14%, var(--color-bg-elevated));
+  --color-control-pressed: color-mix(in srgb, var(--color-text) 22%, var(--color-bg-elevated));
   --color-bg: var(--gray-1);
   --color-bg-elevated: var(--gray-2);
   --color-text: var(--gray-12);

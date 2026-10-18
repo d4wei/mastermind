@@ -1,3 +1,4 @@
+import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { CriticSpan } from '../../../document/critic/types'
@@ -40,6 +41,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const composingRef = useRef(false)
   composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
+  const selectedRange = useRef<Range | null>(null)
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -63,6 +65,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
           setActive(null)
           return
         }
+        selectedRange.current = range.cloneRange()
         const rect = range.getBoundingClientRect()
         setActive({ source, ranges: res.ranges, rect: { top: rect.top, left: rect.left, width: rect.width } })
       }, 120)
@@ -91,8 +94,10 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       raf = requestAnimationFrame(() => {
         raf = 0
         const sel = window.getSelection()
-        if (!sel || sel.rangeCount === 0) return
-        const rect = sel.getRangeAt(0).getBoundingClientRect()
+        const range = selectedRange.current?.commonAncestorContainer.isConnected
+          ? selectedRange.current : sel?.rangeCount ? sel.getRangeAt(0) : null
+        if (!range) return
+        const rect = range.getBoundingClientRect()
         setActive((prev) => (prev ? { ...prev, rect: { top: rect.top, left: rect.left, width: rect.width } } : prev))
       })
     }
@@ -100,10 +105,12 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     if (active) {
       window.addEventListener('keydown', onKey)
       scrollTarget.addEventListener('scroll', onScroll, { passive: true })
+      window.addEventListener(READING_LAYOUT_EVENT, onScroll)
     }
     return () => {
       window.removeEventListener('keydown', onKey)
       scrollTarget.removeEventListener('scroll', onScroll)
+      window.removeEventListener(READING_LAYOUT_EVENT, onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [active])

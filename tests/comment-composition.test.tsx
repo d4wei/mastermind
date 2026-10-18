@@ -3,11 +3,14 @@ import { act, useRef } from 'react'
 import type { Root } from 'react-dom/client'
 import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { READING_LAYOUT_EVENT } from '../ui/app/reading-space'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 
 let host: HTMLDivElement
 let root: Root
 const edit = vi.fn()
+let selectionRect: DOMRect
+const rangeBounds = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
 function Harness({ readOnly = false }: { readOnly?: boolean }) {
   const containerRef = useRef<HTMLElement>(null)
   return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe="7">Passage</span></p></article></div>
@@ -18,6 +21,8 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   edit.mockReset()
+  selectionRect = { top: 100, left: 100, width: 40 } as DOMRect
+  Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true, value: () => selectionRect })
   ;({ host, root } = createReactHost())
 })
 afterEach(() => {
@@ -26,12 +31,13 @@ afterEach(() => {
   vi.clearAllTimers()
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  if (rangeBounds) Object.defineProperty(Range.prototype, 'getBoundingClientRect', rangeBounds)
+  else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
 })
 async function compose(action = 'Comment') {
   act(() => root.render(<Harness />))
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('span')!)
-  range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 40 } as DOMRect)
   window.getSelection()!.addRange(range)
   act(() => document.dispatchEvent(new Event('selectionchange')))
   await act(async () => vi.advanceTimersByTimeAsync(120))
@@ -88,13 +94,15 @@ it('resets IME state when a selection composer is removed without blur', async (
   expect(edit).not.toHaveBeenCalled()
 })
 
-it('repositions the selection controls when the document container scrolls', async () => {
+it.each(['scroll', 'layout'])('keeps the composer anchored during %s changes', async (change) => {
   await compose()
   const toolbar = host.querySelector<HTMLElement>('.sel-toolbar')!
   const initialTop = toolbar.style.top
-  window.getSelection()!.getRangeAt(0).getBoundingClientRect = () =>
-    ({ top: 300, left: 100, width: 40 } as DOMRect)
-  act(() => host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll')))
+  selectionRect = { top: 300, left: 200, width: 40 } as DOMRect
+  if (change === 'layout') window.getSelection()!.removeAllRanges()
+  act(() => change === 'scroll'
+    ? host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll'))
+    : window.dispatchEvent(new Event(READING_LAYOUT_EVENT)))
   await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(toolbar.style.top).not.toBe(initialTop)
   expect(host.querySelector('textarea')!.value).toBe('Existing draft')

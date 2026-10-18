@@ -170,3 +170,20 @@ Change the selected passage externally while a comment/suggestion draft is open.
 available, but submission against old offsets is disabled. Remove a thread while a reply is being
 written: the reply remains copyable without being attached to another thread. Repeat in translated
 reading after invalidating its translation. Drafts are temporary app memory, not restart recovery.
+
+## Reading balance and control feedback
+
+Compare comments hidden and visible in a wide window: the document stays in place when the cards
+fit beside it. In a constrained window, the document and cards form a balanced group after the
+outline strip. No flexible empty column remains beyond the cards. Increase font size and text
+width: comments switch to their panel before the reading measure becomes too narrow. Expand the
+outline; its popup does not move the document. Compare a document with fewer than two headings.
+
+Toggle comments repeatedly and resize during movement. Horizontal movement must not accumulate,
+text width must not animate, and reduced motion must switch directly. Check the active passage,
+selection, and open composer during these changes.
+
+Compare Open, Source, Comments, and More: matching button surfaces and icon weight, including the
+selected Comments state. Across all themes, compare ordinary, hovered, pressed, selected, disabled,
+and keyboard-focused controls on both the page and raised surfaces. Sepia comments use brown and
+Rose comments plum; insertion and deletion keep their separate meanings.

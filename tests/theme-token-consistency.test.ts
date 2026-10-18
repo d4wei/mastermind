@@ -14,6 +14,8 @@ const tokens = new Map(themes.map((id) => {
 const required = [
   '--radius-xs', '--radius-md', '--radius-lg', '--radius-full',
   '--color-control-hover', '--color-control-pressed',
+  '--control-icon-size', '--control-enclosed-icon-size', '--reading-min-em',
+  '--reading-edge', '--reading-outline', '--reading-rail', '--reading-gap',
   '--color-bg', '--color-bg-elevated', '--color-text', '--color-text-muted', '--color-text-faint',
   '--color-border', '--color-accent', '--color-accent-dim', '--color-accent-surface',
   '--color-on-accent', '--color-cta-bg', '--color-cta-text', '--color-border-hover', '--color-selection', '--focus-ring', '--color-invert-bg',
