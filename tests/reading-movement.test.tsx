@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, useState } from 'react'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { createReactHost, removeReactHost } from './helpers/dom'
 import { useReadingMovement } from '../ui/app/useReadingSpace'
@@ -38,5 +38,19 @@ it('does not animate reduced motion or unchanged document positions', () => {
   expect(animate).not.toHaveBeenCalled()
   reduced = true
   act(() => view.root.render(<Movement left={200} rail={false} />))
+  expect(animate).not.toHaveBeenCalled()
+})
+it('does not animate a removed document when closing also removes its comment rail', () => {
+  function ClosingDocument({ open }: { open: boolean }) {
+    const [element, ref] = useState<HTMLDivElement | null>(null)
+    useReadingMovement(element, open ? 140 : 300, open)
+    return open ? <div ref={(el) => { if (el) Object.assign(el, { animate }); ref(el) }}>
+      <div className="doc-column" ref={(el) => { if (el) Object.assign(el, { animate }) }} />
+    </div> : null
+  }
+  act(() => view.root.render(<ClosingDocument open />))
+  animate.mockClear()
+  act(() => view.root.render(<ClosingDocument open={false} />))
+  expect(view.host.childElementCount).toBe(0)
   expect(animate).not.toHaveBeenCalled()
 })

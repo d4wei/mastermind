@@ -46,7 +46,8 @@ export function useReadingMovement(element: HTMLDivElement | null, left: number 
     animation.current?.cancel()
     const notify = () => window.dispatchEvent(new Event(READING_LAYOUT_EVENT))
     notify()
-    if (!element || left === undefined || !old || old.rail === rail || old.left === left ||
+    // Ref state can still hold the removed document shell during the closing render's layout effects.
+    if (!element?.isConnected || left === undefined || !old || old.rail === rail || old.left === left ||
       !element.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const css = getComputedStyle(element)
     const duration = css.getPropertyValue('--dur-base').trim()
