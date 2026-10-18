@@ -51,6 +51,8 @@ Changing inline comment visibility animates only horizontal displacement of the 
 The comment rail fades in independently at its measured anchors.
 Text widths settle immediately. Resizing cancels the running movement rather than queuing another;
 reduced motion changes position immediately. The animation uses the shared duration and easing.
+The Web Animations duration converts CSS seconds or milliseconds explicitly; production CSS may
+shorten the token to seconds.
 
 `SessionView` owns settings, find, and resolved history as one transient panel choice. On narrow
 layouts, opening another panel closes comments. Settings-save feedback belongs to application

@@ -20,7 +20,8 @@ beforeEach(() => {
   reduced = false; animate.mockClear(); cancel.mockClear()
 })
 afterEach(() => { removeReactHost(view.root, view.host); vi.unstubAllGlobals() })
-it('moves only the document column when comment visibility changes', () => {
+it.each(['180ms', '.18s'])('moves the document using the CSS duration %s in milliseconds', (duration) => {
+  view.host.style.setProperty('--dur-base', duration)
   act(() => view.root.render(<Movement left={300} rail={false} />))
   expect(animate).not.toHaveBeenCalled()
   act(() => view.root.render(<Movement left={140} rail />))
