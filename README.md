@@ -39,6 +39,10 @@ the native identifier remains provisional. Platform build commands live in
 highlights, and author-tagged discussions. Markdown edits the original text. Accepting or rejecting
 a mark splices the source rather than serializing a rendered document.
 
+The magnifying-glass button or `Cmd+F` / `Ctrl+F` opens Find. Search the displayed document and
+comments in Read, the displayed translation in translated reading, or the full source in Markdown.
+Enter and Shift-Enter move between occurrences; Escape closes the floating panel.
+
 Select original text to comment, highlight it, or suggest deletion. Agents may append a signed
 reply to a discussion. Delete removes one comment; Resolve archives the discussion at the file
 tail, visible through Resolved. `Cmd+Z` undoes review actions.

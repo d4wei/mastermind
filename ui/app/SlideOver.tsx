@@ -5,13 +5,14 @@ import { CrossIcon } from '../icons'
 interface Props {
   title: string
   onClose: () => void
-  /** Selector of the invoking control, so its own click doesn't immediately re-close the panel. */
+  /** Outside controls, such as the invoking button, that must not dismiss this panel. */
   ignoreSelector?: string
   returnFocusSelector?: string
+  focusOnOpen?: boolean
   children: ReactNode
 }
 
-export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector, children }: Props) {
+export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector, focusOnOpen = true, children }: Props) {
   const t = useT()
   const panelRef = useRef<HTMLDivElement | null>(null)
 
@@ -23,7 +24,7 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector,
       document.querySelector<HTMLElement>(returnFocusSelector ?? ignoreSelector ?? '.topbar-overflow')
     // Let child composers take focus before choosing the panel’s first control.
     const frame = requestAnimationFrame(() => {
-      if (!panel?.contains(document.activeElement)) {
+      if (focusOnOpen && !panel?.contains(document.activeElement)) {
         panel?.querySelector<HTMLElement>('button:not(:disabled), input, textarea, select')?.focus({ preventScroll: true })
       }
     })
@@ -53,7 +54,7 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector,
         returnFocus?.focus({ preventScroll: true })
       }
     }
-  }, [onClose, ignoreSelector, returnFocusSelector])
+  }, [onClose, ignoreSelector, returnFocusSelector, focusOnOpen])
 
   return (
     <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}>

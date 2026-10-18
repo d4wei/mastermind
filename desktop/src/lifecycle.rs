@@ -48,8 +48,28 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
     let edit = SubmenuBuilder::new(app, "Edit");
     #[cfg(target_os = "macos")]
     let edit = edit.undo().redo().separator();
-    let edit = edit.cut().copy().paste().select_all().build()?;
+    let find =
+        tauri::menu::MenuItem::with_id(app, "find-document", "Find…", false, Some("CmdOrCtrl+F"))?;
+    let edit = edit
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .separator()
+        .item(&find)
+        .build()?;
     Menu::with_items(app, &[&application, &file, &edit])
+}
+
+#[tauri::command]
+pub fn set_find_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    if let Some(item) = app.menu().and_then(|menu| menu.get("find-document")) {
+        if let Some(item) = item.as_menuitem() {
+            item.set_enabled(enabled)
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
 }
 
 pub fn create_window(app: &tauri::AppHandle) {
@@ -95,6 +115,9 @@ pub fn create_window(app: &tauri::AppHandle) {
 }
 
 pub fn menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
+    if event.id().as_ref() == "find-document" {
+        let _ = app.emit("find-requested", ());
+    }
     if event.id().as_ref() == "open-files" {
         crate::opening::choose_files(app.clone());
     }

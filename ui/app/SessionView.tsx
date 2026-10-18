@@ -32,7 +32,7 @@ import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
 const SettingsPanel = lazy(() => import('../settings/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
-const FindBar = lazy(() => import('../review/FindBar').then((m) => ({ default: m.FindBar })))
+const FindPanel = lazy(() => import('../find/FindPanel').then((m) => ({ default: m.FindPanel })))
 const TranslatedView = lazy(() => import('../translate/TranslatedView').then((m) => ({ default: m.TranslatedView })))
 
 const MODE_CYCLE: Record<ViewMode, ViewMode> = { reading: 'source', source: 'reading' }
@@ -71,10 +71,20 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const narrow = smallWindow || reading.panel
   const [railOpen, setRailOpen] = useState(!narrow)
   useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
-  const closeRail = useCallback(() => setRailOpen(false), [])
-  const [panel, setPanel] = useState<'settings' | 'find' | 'resolved' | null>(null)
+  const findOpenedRail = useRef(false)
+  const closeRail = useCallback(() => { findOpenedRail.current = false; setRailOpen(false) }, [])
+  const revealFindComment = useCallback((spanIndex: number) => {
+    if (!railOpen) findOpenedRail.current = true
+    setRailOpen(true)
+    setActiveSpan(spanIndex)
+  }, [railOpen])
+  const restoreFindRail = useCallback(() => {
+    if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
+  }, [])
+  const [panel, setPanel] = useState<'settings' | 'resolved' | null>(null)
+  useEffect(() => { if (panel) window.dispatchEvent(new Event('mastermind-find-close')) }, [panel])
   const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
-  const togglePanel = useCallback((next: 'settings' | 'find' | 'resolved') => {
+  const togglePanel = useCallback((next: 'settings' | 'resolved') => {
     if (narrow) setRailOpen(false)
     setPanel((current) => current === next ? null : next)
   }, [narrow])
@@ -186,14 +196,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         e.preventDefault()
         const s = useDoc.getState()
         s.setMode(MODE_CYCLE[s.mode])
-        return
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
-        const s = useDoc.getState()
-        if (s.mode === 'reading') {
-          e.preventDefault()
-          togglePanel('find')
-        }
         return
       }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
@@ -339,6 +341,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
         railOpen={railOpen}
         onToggleRail={() => {
+          findOpenedRail.current = false
           setRailOpen((v) => !v)
           if (narrow) {
             setPanel(null)
@@ -357,11 +360,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           <SettingsPanel onClose={closePanel} />
         </Suspense>
       )}
-      {panel === 'find' && mode === 'reading' && !showTranslated && analysis && (
-        <Suspense fallback={null}>
-          <FindBar analysis={analysis} source={source} docRef={articleRef} onClose={closePanel} />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <FindPanel sessionId={sessionId} source={source} mode={showTranslated ? 'translated' : mode}
+          docRef={showTranslated ? translatedRef : articleRef} analysis={analysis}
+          onOpen={closePanel} onRevealComment={revealFindComment} onClose={restoreFindRail} />
+      </Suspense>
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
       <ConflictPanel />
       {translation.error && <Notice key={translation.error}>
@@ -423,7 +426,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (
         <div className="comments-panel">
-          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments">
+          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar" focusOnOpen={!findOpenedRail.current}>
             {commentRail}
           </SlideOver>
         </div>

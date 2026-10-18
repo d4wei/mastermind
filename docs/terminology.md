@@ -18,7 +18,7 @@ or data being discussed. Names must stand on their own without the development c
 | Source, as an editor mode | Markdown | Markdown |
 | Author tag, Name, in Settings | Your name | 你的名字 |
 | Prepared translation, in notices | Translation | 译文 |
-| Edits, as a review search filter | Suggested edits | 修改建议 |
+| Unaccepted edits | Suggested edits | 修改建议 |
 | Original thread, in resolved history | Discussion | 讨论 |
 | Use disk version | Use incoming | 采用外部版本 |
 | Compare versions | Needs attention | 需要处理 |
@@ -187,10 +187,10 @@ construct. Its kinds remain insertion, deletion, substitution, highlight, and co
 Use **suggested edit / 修改建议** for an unaccepted insertion, deletion, or replacement; in the
 protocol, proposed edit is an equivalent description rather than a different object.
 
-Use **Suggested edits / 修改建议** for the search filter over unaccepted edits.
+Use **Suggested edits / 修改建议** for unaccepted edits.
 Keep **Accept / 接受**, **Reject / 拒绝**, and **Suggest change / 建议修改** as actions.
 
-Example: “Find in suggested edits.” / “在修改建议中查找。”
+Example: “This document has two suggested edits.” / “此文档有两处修改建议。”
 Technical `suggestion` and `CriticKind` need no rename. A UI-only edit proposal and a CriticMarkup
 mark already stored in the file have different persistence states; the term suggestion does not
 establish whether either has been accepted.

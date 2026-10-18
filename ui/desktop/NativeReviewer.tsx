@@ -3,6 +3,7 @@ import { App } from '../app/App'
 import { navigate } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
+import { requestFind } from '../find/events'
 import { FileIcon, CrossIcon, AlertIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { nativeBridge } from './bridge'
@@ -69,6 +70,19 @@ export function NativeReviewer() {
       value: activePath ? `mastermind - ${activePath}` : 'mastermind',
     }).catch((error) => setError(String(error)))
   }, [activePath])
+  useEffect(() => {
+    void nativeBridge.invoke('set_find_enabled', { enabled: !!activePath && setupRequired === false && documentState.status === 'ready' })
+      .catch((error) => setError(String(error)))
+  }, [activePath, setupRequired, documentState.status])
+  useEffect(() => {
+    let disposed = false
+    let stop: (() => void) | undefined
+    void nativeBridge.listen('find-requested', requestFind).then((unlisten) => {
+      if (disposed) unlisten()
+      else stop = unlisten
+    }).catch((error) => setError(String(error)))
+    return () => { disposed = true; stop?.() }
+  }, [])
   const labels = fileLabels(files.map((file) => file.path))
   const configuredChinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
   const chinese = setupRequired !== false && previewLanguage ? previewLanguage === 'zh-CN' : configuredChinese

@@ -20,7 +20,7 @@ afterEach(() => { document.head.replaceChildren(); document.body.replaceChildren
 
 it('uses one visible hover fill on ordinary controls while keeping disabled and selected states distinct', () => {
   styles()
-  for (const name of ['btn-ghost', 'seg-btn', 'theme-chip', 'lang-trigger', 'find-nav', 'find-filter',
+  for (const name of ['btn-ghost', 'seg-btn', 'theme-chip', 'lang-trigger', 'find-nav',
     'native-open', 'native-file-close', 'native-file-pill']) {
     const button = document.createElement('button')
     button.className = `${name} test-hover`

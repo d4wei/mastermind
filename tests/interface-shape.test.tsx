@@ -11,7 +11,7 @@ function installStyles() {
   const style = document.createElement('style')
   // jsdom does not resolve custom properties; retain the actual selectors and cascade.
   style.textContent = ['ui/app/app.css', 'ui/desktop/native.css', 'ui/app/Notifications.css',
-    'ui/modes/reading/frontmatter.css'].map((file) => readFileSync(file, 'utf8')).join('\n')
+    'ui/modes/reading/frontmatter.css', 'ui/find/find.css'].map((file) => readFileSync(file, 'utf8')).join('\n')
     .replace(/var\((--radius-[a-z]+)\)/g, (_, name: string) => radii[name]!)
     .replaceAll('var(--space-unit)', '4px')
   document.head.append(style)

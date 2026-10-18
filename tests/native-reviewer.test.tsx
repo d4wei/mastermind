@@ -12,7 +12,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: mocks.id, needsAttention: () => false }), {
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: mocks.id, status: 'ready', needsAttention: () => false }), {
   getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [] }),
 }) }))
@@ -278,7 +278,7 @@ it('updates the native title and selected pill when the active document changes'
   mocks.id = '1'
   await mount()
   expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('second.md')
-  expect(mocks.invoke).toHaveBeenLastCalledWith('set_window_title', { value: 'mastermind - /second.md' })
+  expect(mocks.invoke.mock.calls.filter(([command]) => command === 'set_window_title').at(-1)).toEqual(['set_window_title', { value: 'mastermind - /second.md' }])
 })
 
 it.each([['0', '/d/1'], ['1', '/d/0']] as const)(
@@ -450,4 +450,20 @@ it.each([false, true])('fades the last file only if closing succeeds: %s', async
     }
     expect(host.inert).toBe(false)
   } finally { HTMLElement.prototype.animate = original }
+})
+
+
+it('disables native Find at home and forwards its menu event when a document is active', async () => {
+  await mount()
+  expect(mocks.invoke).toHaveBeenCalledWith('set_find_enabled', { enabled: false })
+  mocks.id = '0'
+  await mount()
+  expect(mocks.invoke).toHaveBeenCalledWith('set_find_enabled', { enabled: true })
+  const requested = vi.fn()
+  window.addEventListener('mastermind-find', requested)
+  try {
+    const listener = mocks.listen.mock.calls.find(([event]) => event === 'find-requested')![1]
+    act(() => listener())
+    expect(requested).toHaveBeenCalledTimes(1)
+  } finally { window.removeEventListener('mastermind-find', requested) }
 })

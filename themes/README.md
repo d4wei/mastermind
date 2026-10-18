@@ -33,8 +33,8 @@ the same CSS variables as the theme defaults.
   semantic roles. Dotted underlines, strikethrough, labels, and card linkage distinguish meaning
   even when a theme accent resembles a review color.
 - **Navigation:** Open, Source, Comments, More, file tabs, and secondary actions use neutral ink and
-  surfaces. The current outline tick uses the text-safe accent. Selected search filters use the
-  neutral selected-control treatment.
+  surfaces. The current outline tick uses the text-safe accent. Find matches and its Match case
+  control use neutral emphasis, independent of review colors.
 - **Selection and focus:** neutral selection fill and a neutral keyboard focus ring remain separate
   from review colors. Focus never substitutes for a selected state.
 - **Document content:** ordinary links retain underlines and neutral ink; task checkboxes are

@@ -65,6 +65,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             appearance::set_appearance,
             appearance::set_window_title,
+            lifecycle::set_find_enabled,
             opening::snapshot,
             opening::close_document,
             opening::choose_files,

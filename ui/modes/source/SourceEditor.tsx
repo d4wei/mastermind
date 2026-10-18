@@ -5,6 +5,7 @@ import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type Vi
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { useDoc } from '../../documents/store'
+import { attachSourceSearch, sourceSearchExtension } from '../../find/source'
 import { useNav } from '../../app/navStore'
 
 const CRITIC_CLASS: Record<string, string> = {
@@ -93,13 +94,16 @@ export function SourceEditor() {
             EditorView.lineWrapping,
             criticHighlighter,
             sourceTheme,
+            sourceSearchExtension,
           ],
         })
+    let searchBinding: ReturnType<typeof attachSourceSearch> | undefined
     const view = new EditorView({
       state,
       parent: host,
       dispatchTransactions(transactions, currentView) {
         if (ownsBuffer() && useDoc.getState().conflict && transactions.some((transaction) => transaction.docChanged)) return
+        for (const transaction of transactions) searchBinding?.mapSelection(transaction.changes)
         currentView.update(transactions)
         if (transactions.some((transaction) => transaction.docChanged) && ownsBuffer()) {
           useDoc.getState().setSourceFromEditor(currentView.state.doc.toString())
@@ -108,6 +112,7 @@ export function SourceEditor() {
       },
     })
 
+    searchBinding = attachSourceSearch(view, sessionId)
     view.dispatch({ effects: editing.reconfigure(editingState(useDoc.getState().conflict)) })
     const stop = useDoc.subscribe((state, previous) => {
       if (ownsBuffer() && state.conflict !== previous.conflict) {
@@ -134,6 +139,7 @@ export function SourceEditor() {
 
     const registeredScroller = useDoc.getState().scroller
     return () => {
+      searchBinding?.dispose()
       // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
       if (useDoc.getState().hasDocument(sessionId)) retainedStates.set(sessionId, { state: view.state, revision })
       if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)

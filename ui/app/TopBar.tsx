@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
-import { ChatIcon, CodeIcon, EyeIcon, GearIcon, HistoryIcon, LanguageIcon, MoreIcon } from '../icons'
+import { ChatIcon, SearchIcon, CodeIcon, EyeIcon, GearIcon, HistoryIcon, LanguageIcon, MoreIcon } from '../icons'
+import { requestFind } from '../find/events'
 import { useDoc } from '../documents/store'
 
 interface TopBarProps {
@@ -42,6 +43,8 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
 
   return (
     <header className="topbar" ref={headerRef}>
+      <button type="button" className="btn-ghost topbar-icon-btn topbar-find" onClick={requestFind}
+        aria-label={t('find')} title={`${t('find')} (${navigator.platform.startsWith('Mac') ? '⌘F' : 'Ctrl+F'})`}><SearchIcon /></button>
       <button type="button" className="btn-ghost topbar-icon-btn" onClick={() => setMode(destination)}
         aria-label={t(destination)} title={t(destination)}><ModeIcon /></button>
       {translation && mode === 'reading' && (

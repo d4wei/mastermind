@@ -198,7 +198,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
           }
         }}>
         {(selected ? card.thread.comments : card.thread.comments.slice(0, 1)).map((comment, messageIndex) =>
-          <div key={messageIndex} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
+          <div key={messageIndex} data-find-comment={spans.indexOf(comment.span)} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
             <div className="rail-message-header">
               {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
                 aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}

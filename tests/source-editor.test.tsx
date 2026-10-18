@@ -175,3 +175,27 @@ it('freezes editor mutations and undo without losing selection or text on confli
   expect(view.state.selection.main.from).toBe(2)
   expect(view.state.selection.main.to).toBe(4)
 })
+
+it('searches virtualized source with literal case-aware queries and restores selection without changing history', async () => {
+  const { useSourceSearch } = await import('../ui/find/source')
+  const { getSearchQuery, searchPanelOpen } = await import('@codemirror/search')
+  act(() => editor().dispatch({ changes: { from: 0, to: 5, insert: 'Review\n'.repeat(500) + 'review' }, selection: { anchor: 1, head: 3 } }))
+  const view = editor()
+  const adapter = useSourceSearch.getState().adapter!
+  const historyBefore = undoDepth(view.state)
+  const before = useDoc.getState().source
+  expect(adapter.matches('review', false)).toHaveLength(501)
+  expect(adapter.matches('review', true)).toEqual([{ from: 3500, to: 3506 }])
+  act(() => adapter.query('review', true))
+  expect(getSearchQuery(view.state).caseSensitive).toBe(true)
+  expect(searchPanelOpen(view.state)).toBe(true)
+  const scroll = vi.spyOn(EditorView, 'scrollIntoView')
+  act(() => adapter.select(adapter.matches('review', true)[0]!, null))
+  expect(scroll).toHaveBeenCalledWith(3500, expect.objectContaining({ y: 'nearest' }))
+  expect(useDoc.getState().source).toBe(before)
+  act(() => adapter.close())
+  expect(view.state.selection.main.from).toBe(1)
+  expect(view.state.selection.main.to).toBe(3)
+  expect(searchPanelOpen(view.state)).toBe(false)
+  expect(undoDepth(view.state)).toBe(historyBefore)
+})

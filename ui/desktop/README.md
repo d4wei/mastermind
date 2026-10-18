@@ -25,7 +25,8 @@ behavior.
 [notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
 
 `NativeReviewer.tsx` provides the square Open Markdown files action and horizontally scrolling
-file pills.
+file pills. The native Edit → Find entry forwards to the shared
+[Find controller](../find/README.md) and is disabled without a ready document.
 `file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
 full path remains in the native window title and the pill tooltip. On macOS, Tauri's overlay title
 bar hides the separate title strip, retains the traffic lights, and extends the theme behind the
