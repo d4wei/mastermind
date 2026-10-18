@@ -155,6 +155,58 @@ it('does not let a delayed reload replace edits made while reading disk', async 
   expect(store.getState().source).toBe('local')
 })
 
+it.each(['\n', '\r\n'])('refreshes an unchanged baseline version and saves a pending comment with %j endings', async (eol) => {
+  const original = `# Draft${eol}Body${eol}`
+  disks.set('A', { content: original, mtimeMs: 1, version: 'A-1' })
+  const store = createDocStore()
+  await store.getState().load('A')
+  const local = store.getState().source + '{>>@Alex: Check this.<<}\n'
+  store.getState().setSource(local)
+  const { history, externalVersion, revision } = store.getState()
+  disks.set('A', { content: original, mtimeMs: 1, version: 'A-metadata' })
+  store.getState().notifyDiskChange(1)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(store.getState()).toMatchObject({ source: local, savedSource: original.replaceAll('\r\n', '\n'),
+    version: 'A-metadata', conflict: false, diskChange: null, history, externalVersion, revision })
+  await vi.advanceTimersByTimeAsync(600)
+  expect(writes).toHaveLength(1)
+  expect(writes[0]).toMatchObject({ baseVersion: 'A-metadata', content: local.replaceAll('\n', eol) })
+  writes[0]!.pending.resolve({ mtimeMs: 2, version: 'A-saved' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(store.getState().savedSource).toBe(local)
+})
+
+it('retries a rejected stale version only while disk still matches the saved baseline', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('local comment')
+  const save = store.getState().autosave()
+  disks.set('A', { content: 'A', mtimeMs: 1, version: 'A-metadata' })
+  writes[0]!.pending.resolve(response({}, 409))
+  await save
+  await vi.advanceTimersByTimeAsync(600)
+  expect(writes).toHaveLength(2)
+  expect(writes[1]).toMatchObject({ content: 'local comment', baseVersion: 'A-metadata' })
+  disks.set('A', { content: 'external edit', mtimeMs: 2, version: 'A-external' })
+  writes[1]!.pending.resolve(response({}, 409))
+  await vi.advanceTimersByTimeAsync(600)
+  expect(writes).toHaveLength(2)
+  expect(store.getState()).toMatchObject({ conflict: true, source: 'local comment', savedSource: 'A',
+    diskChange: { content: 'external edit', version: 'A-external' } })
+})
+
+it('does not treat a line-ending change as unchanged disk content with a pending edit', async () => {
+  disks.set('A', { content: 'Body\r\n', mtimeMs: 1, version: 'A-1' })
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('Body\nComment\n')
+  disks.set('A', { content: 'Body\n', mtimeMs: 2, version: 'A-2' })
+  store.getState().notifyDiskChange(2)
+  await vi.advanceTimersByTimeAsync(600)
+  expect(store.getState().conflict).toBe(true)
+  expect(writes).toHaveLength(0)
+})
+
 it('rejects a delayed reload after local edits return to the captured source', async () => {
   const store = createDocStore()
   await store.getState().load('A')

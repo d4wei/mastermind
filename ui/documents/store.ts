@@ -175,6 +175,13 @@ export function createDocStore() {
       doc.pendingInvalidation = { mtimeMs: file.mtimeMs, deleted: false }
       return
     }
+    if (restoreEol(doc.savedSource, doc.eol) === file.content) {
+      // Metadata can change without changing the base text; keep local edits against the fresh token.
+      updateDocument(id, { mtimeMs: file.mtimeMs, version: file.version,
+        conflict: false, recoveryError: null, conflictDismissed: false, diskChange: null })
+      if (doc.source !== doc.savedSource) schedule(id)
+      return
+    }
     if (doc.source === doc.savedSource || restoreEol(doc.source, doc.eol) === file.content) {
       const normalized = normalizeToLf(file.content)
       updateDocument(id, { source: normalized, savedSource: normalized,

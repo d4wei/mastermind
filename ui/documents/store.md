@@ -24,9 +24,11 @@ There is no merge operation or comparison editor.
 
 Retry reads before attempting a write. Reading the acknowledged version clears a read failure and
 allows pending edits to save. Changed disk contents with local edits remain blocked. A fresh read
-matching the current buffer reconciles the file as saved. The native identity/version guard remains
-in force; different metadata is not silently ignored. A failed write may have partially changed the
-file, so it queues verification and retains the buffer rather than claiming rollback.
+matching the current buffer reconciles the file as saved. A fresh read matching the saved baseline,
+including its line endings, refreshes the version token and resumes saving pending edits without
+changing local text or undo history. Every write still checks that fresh token, so intervening disk
+changes reject the save. A failed write may have partially changed the file, so it queues verification
+and retains the buffer rather than claiming rollback.
 
 Save As obtains its destination from the native host. Cancellation and failure keep the original
 buffer. Success admits the new file and releases the original record, selecting the copy only if
