@@ -976,14 +976,18 @@ mark.critic-hl.critic-anchor:hover,
   font-size: var(--font-size-micro);
 }
 
-/* reading presets: self-illustrating glyph ToggleGroups (replace the sliders) */
+/* Preset glyphs illustrate choices within a full-width segmented selector. */
 .preset-seg {
-  width: max-content;
+  width: 100%;
 }
-.preset-seg .btn-icon {
-  width: var(--control-size);
-  height: var(--control-size);
+.preset-seg .seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--space-unit) * 8.5);
   padding: 0;
+  color: var(--color-text-muted);
 }
 .preset-seg .seg-btn[data-state='on'] {
   color: var(--color-text);

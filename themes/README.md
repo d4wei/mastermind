@@ -72,10 +72,12 @@ labels. Corner roles are shared across palettes:
 Chrome uses the Radix icon family in [icons.tsx](../ui/icons.tsx), with matching custom review
 strokes. Shared icon dimensions normalize document controls; the enclosed comment glyph uses a
 slightly smaller optical bound. Selection changes the surface rather than the glyph's weight.
-Icon-only buttons share `.btn-icon`: a square border box, centered glyph, no text-button padding,
+Single-icon buttons share `.btn-icon`: a square border box, centered glyph, no text-button padding,
 and no flex shrinking. Document controls use `--control-size`; inset controls use
 `--control-size-compact`. The outline tracker is a document-shaped navigation surface, not a single
-icon button.
+icon button. Segmented selectors retain full-width rectangular choices without `.btn-icon`.
+Letter-based symbols such as Find's Aa count as icons; their implementation as text does not change
+their role.
 
 Reading measure, margins, outline reservation, comment width, and gap are shared tokens. The
 [layout contract](../ui/app/layout.md) owns centering, panel fallback, scrolling, and movement.

@@ -59,12 +59,16 @@ it('keeps icon-only hover targets square without inherited text-button padding',
     for (const edge of ['Top', 'Right', 'Bottom', 'Left'] as const) expect(style[`padding${edge}`], classes).toBe('0px')
     expect(style.flexShrink, classes).toBe('0')
   }
-  document.body.innerHTML = '<div class="seg preset-seg"><button class="seg-btn btn-icon"></button></div>'
+})
+
+it('keeps segmented choices wide', () => {
+  installStyles()
+  document.body.innerHTML = '<div class="seg preset-seg"><button class="seg-btn"></button></div>'
   const preset = getComputedStyle(document.querySelector('button')!)
-  expect(preset.width).toBe('30px')
-  expect(preset.height).toBe('30px')
+  expect(getComputedStyle(document.querySelector('.preset-seg')!).width).toBe('100%')
+  expect(preset.flexGrow).toBe('1')
+  expect(preset.minHeight).toBe('calc(34px)')
   expect(preset.padding).toBe('0px')
-  expect(preset.flexShrink).toBe('0')
 })
 
 it('reserves counter space and groups compact Find controls without gaps', () => {

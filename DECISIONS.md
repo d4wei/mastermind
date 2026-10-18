@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-17 — Square sizing applies only to single-icon buttons
+
+**Ruled.** Narrow the icon-button rule below to simple, single-icon actions. Settings' segmented
+selectors retain their wide rectangular choices. Find's Aa symbol functions as a single icon and
+keeps its square control.
+
+**Beat:** applying square button geometry to every control that depicts its choice with a glyph.
+
 ## 2026-10-17 — Icon-only buttons have square interaction surfaces
 
 **Ruled.** Icon-only buttons share square hit and hover areas at standard or compact sizes. Text
