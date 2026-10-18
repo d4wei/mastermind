@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Navigator } from '../ui/app/Navigator'
 import { useNav } from '../ui/app/navStore'
+import { useDoc } from '../ui/documents/store'
 import { extractOutline } from '../ui/modes/reading/outline'
 import { parseMarkdown } from '../document/markdown/processor'
 
@@ -22,6 +23,7 @@ afterEach(() => {
   act(() => root.unmount())
   host.remove()
   useNav.setState({ outline: [], docEl: null, sourceHeadingTop: null })
+  useDoc.setState({ scroller: null })
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -34,6 +36,44 @@ it('opens on keyboard focus and dismisses with Escape without reopening', () => 
   act(() => host.querySelector<HTMLButtonElement>('.nav-outline button')!.focus())
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   expect(document.activeElement).toBe(trigger)
+  expect(host.querySelector('.nav-outline')).toBeNull()
+})
+it('navigates on every mouse selection when the trigger retains focus between openings', () => {
+  const navigate = vi.fn()
+  useDoc.setState({ scroller: navigate })
+  act(() => root.render(<Navigator />))
+  const nav = host.querySelector('nav')!
+  const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
+  for (let index = 0; index < 4; index++) {
+    act(() => nav.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+    const heading = host.querySelectorAll<HTMLButtonElement>('.nav-outline button')[index % 2]!
+    act(() => {
+      const defaultsAllowed = heading.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+      // WebKit mouse presses blur the previous control without focusing the clicked button.
+      if (defaultsAllowed && document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    })
+    act(() => { if (heading.isConnected) heading.click() })
+    expect(navigate).toHaveBeenCalledTimes(index + 1)
+    expect(navigate).toHaveBeenLastCalledWith(index % 2 === 0 ? 0 : 12, index % 2)
+    expect(document.activeElement).toBe(trigger)
+    expect(host.querySelector('.nav-outline')).toBeNull()
+  }
+})
+it('keeps keyboard heading activation and dismissal on focus leaving the outline', () => {
+  const navigate = vi.fn()
+  useDoc.setState({ scroller: navigate })
+  act(() => root.render(<Navigator />))
+  const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
+  act(() => trigger.focus())
+  const heading = host.querySelectorAll<HTMLButtonElement>('.nav-outline button')[1]!
+  act(() => heading.focus())
+  act(() => heading.click())
+  expect(navigate).toHaveBeenCalledWith(12, 1)
+  expect(document.activeElement).toBe(trigger)
+  act(() => trigger.click())
+  const outside = document.createElement('button')
+  host.append(outside)
+  act(() => outside.focus())
   expect(host.querySelector('.nav-outline')).toBeNull()
 })
 it('tracks the active heading as the document scrolls', () => {

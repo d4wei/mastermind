@@ -125,6 +125,10 @@ export function Navigator() {
       <ul className="nav-outline">
         {items.map((item, index) => <li key={item.offset}>
           <button type="button" onClick={() => go(item.offset, index)} title={item.text}
+            onMouseDown={(event) => {
+              // Keep WebKit's button blur from dismissing the popup before its click runs.
+              if (event.button === 0) event.preventDefault()
+            }}
             aria-current={item.offset === active.offset ? 'location' : undefined}
             style={barStyle(item)}>
             <span className="outline-list-tick" aria-hidden="true" />
