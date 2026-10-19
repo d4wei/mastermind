@@ -4,6 +4,19 @@ pub use mastermind_launch_check::protocol::{
 };
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
+pub const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown"];
+
+pub fn require_markdown(path: &std::path::Path) -> Result<(), FileError> {
+    if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| {
+        MARKDOWN_EXTENSIONS.iter().any(|allowed| extension.eq_ignore_ascii_case(allowed))
+    }) {
+        return Ok(());
+    }
+    Err(FileError::new(
+        400, "not_markdown", "Choose a Markdown file (.md or .markdown).",
+    ))
+}
+
 #[derive(Default)]
 pub struct Documents {
     pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
@@ -111,9 +124,12 @@ impl Documents {
             })?
             .to_owned();
         if self.files.contains_key(&canonical) {
+            require_markdown(std::path::Path::new(path))?;
             return Ok((display, "already_open"));
         }
         let snapshot = crate::files::read(&canonical)?;
+        require_markdown(std::path::Path::new(path))?;
+        require_markdown(&canonical)?;
         self.files.insert(canonical, Some(snapshot));
         self.order.insert(self.next_id, display.clone());
         self.next_id += 1;
@@ -126,6 +142,28 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn only_markdown_documents_enter_the_registry() {
+        let fixture = Fixture::new();
+        let names = [
+            "valid.md", "UPPER.MD", "long.markdown", "mixed.Markdown",
+            "notebook.html", "notes.txt", "README", "fake.md.html",
+        ];
+        for name in names { fs::write(fixture.0.join(name), "# Text").unwrap(); }
+        let mut docs = Documents::default();
+        let result = docs.admit(fixture.request(&names));
+        assert!(result.results[..4].iter().all(|result| result.status == "opened"));
+        assert!(result.results[4..].iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+        assert_eq!(docs.order.len(), 4);
+        #[cfg(unix)] {
+            std::os::unix::fs::symlink(fixture.0.join("notebook.html"), fixture.0.join("alias.md")).unwrap();
+            std::os::unix::fs::symlink(fixture.0.join("valid.md"), fixture.0.join("alias.html")).unwrap();
+            let result = docs.admit(fixture.request(&["alias.md", "alias.html"]));
+            assert!(result.results.iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+            assert_eq!(docs.order.len(), 4);
+        }
+    }
     struct Fixture(PathBuf);
     impl Fixture {
         fn new() -> Self {
@@ -157,14 +195,14 @@ mod tests {
     #[test]
     fn language_hints_belong_to_admitted_documents_and_end_on_close() {
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("a"), "a").unwrap();
+        fs::write(fixture.0.join("a.md"), "a.md").unwrap();
         let mut docs = Documents::default();
-        let mut request = fixture.request(&["a", "missing"]);
+        let mut request = fixture.request(&["a.md", "missing.md"]);
         request.language = Some("fr".into());
         docs.admit(request);
         assert_eq!(docs.languages.len(), 1);
         assert_eq!(docs.languages[&0], "fr");
-        let mut request = fixture.request(&["a"]);
+        let mut request = fixture.request(&["a.md"]);
         request.language = Some("zh-CN".into());
         docs.admit(request);
         assert_eq!(docs.languages[&0], "fr");
@@ -175,23 +213,23 @@ mod tests {
     #[test]
     fn closing_preserves_ids_and_reopening_allocates_a_fresh_one() {
         let fixture = Fixture::new();
-        for name in ["a", "b", "c"] {
+        for name in ["a.md", "b.md", "c.md"] {
             fs::write(fixture.0.join(name), name).unwrap();
         }
         let mut docs = Documents::default();
-        docs.admit(fixture.request(&["a", "b", "c"]));
+        docs.admit(fixture.request(&["a.md", "b.md", "c.md"]));
         docs.close(1, Some(1), docs.activation_revision);
         assert_eq!(docs.active_id, Some(2));
         assert!(!docs.order.contains_key(&1));
         assert_eq!(
             docs.order[&2],
-            fs::canonicalize(fixture.0.join("c"))
+            fs::canonicalize(fixture.0.join("c.md"))
                 .unwrap()
                 .to_str()
                 .unwrap()
         );
-        assert_eq!(fs::read_to_string(fixture.0.join("b")).unwrap(), "b");
-        docs.admit(fixture.request(&["b"]));
+        assert_eq!(fs::read_to_string(fixture.0.join("b.md")).unwrap(), "b.md");
+        docs.admit(fixture.request(&["b.md"]));
         assert_eq!(docs.active_id, Some(3));
         assert_eq!(docs.order.keys().copied().collect::<Vec<_>>(), [0, 2, 3]);
         docs.close(0, Some(2), docs.activation_revision);
@@ -207,13 +245,13 @@ mod tests {
     #[test]
     fn closing_does_not_override_a_concurrent_open_request() {
         let fixture = Fixture::new();
-        for name in ["a", "b", "c"] {
+        for name in ["a.md", "b.md", "c.md"] {
             fs::write(fixture.0.join(name), name).unwrap();
         }
         let mut docs = Documents::default();
-        docs.admit(fixture.request(&["a", "b"]));
+        docs.admit(fixture.request(&["a.md", "b.md"]));
         let revision = docs.activation_revision;
-        docs.admit(fixture.request(&["c"]));
+        docs.admit(fixture.request(&["c.md"]));
         docs.close(0, Some(0), revision);
         assert_eq!(docs.active_id, Some(2));
     }
@@ -222,8 +260,8 @@ mod tests {
     #[test]
     fn identity_distinguishes_files_with_identical_content() {
         let fixture = Fixture::new();
-        let a = fixture.0.join("a");
-        let b = fixture.0.join("b");
+        let a = fixture.0.join("a.md");
+        let b = fixture.0.join("b.md");
         fs::write(&a, b"same").unwrap();
         fs::write(&b, b"same").unwrap();
         let original = fs::File::open(&a).unwrap();
@@ -241,15 +279,15 @@ mod tests {
     fn retains_exact_bytes_and_existing_snapshot() {
         let fixture = Fixture::new();
         let original = b"# Review\r\n\r\n{>>@Alex: Keep this.<<}\r\n";
-        fs::write(fixture.0.join("file"), original).unwrap();
+        fs::write(fixture.0.join("file.md"), original).unwrap();
         let mut docs = Documents::default();
         assert_eq!(
-            docs.admit(fixture.request(&["file"])).results[0].status,
+            docs.admit(fixture.request(&["file.md"])).results[0].status,
             "opened"
         );
-        fs::write(fixture.0.join("file"), b"external change").unwrap();
+        fs::write(fixture.0.join("file.md"), b"external change").unwrap();
         assert_eq!(
-            docs.admit(fixture.request(&["file"])).results[0].status,
+            docs.admit(fixture.request(&["file.md"])).results[0].status,
             "already_open"
         );
         assert_eq!(
@@ -263,10 +301,10 @@ mod tests {
     #[test]
     fn partial_failure_and_aliases_keep_order() {
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("a"), "first").unwrap();
-        fs::write(fixture.0.join("b"), "second").unwrap();
+        fs::write(fixture.0.join("a.md"), "first").unwrap();
+        fs::write(fixture.0.join("b.md"), "second").unwrap();
         let mut docs = Documents::default();
-        let result = docs.admit(fixture.request(&["a", "missing", "./a", "b"]));
+        let result = docs.admit(fixture.request(&["a.md", "missing.md", "./a.md", "b.md"]));
         assert_eq!(
             result
                 .results
@@ -276,8 +314,8 @@ mod tests {
             ["opened", "error", "already_open", "opened"]
         );
         assert_eq!(docs.order.len(), 2);
-        assert_eq!(PathBuf::from(&docs.order[&0]).file_name().unwrap(), "a");
-        assert_eq!(PathBuf::from(&docs.order[&1]).file_name().unwrap(), "b");
+        assert_eq!(PathBuf::from(&docs.order[&0]).file_name().unwrap(), "a.md");
+        assert_eq!(PathBuf::from(&docs.order[&1]).file_name().unwrap(), "b.md");
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
     }
@@ -285,11 +323,11 @@ mod tests {
     #[test]
     fn mixed_admission_serializes_file_error_codes_and_messages_in_order() {
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("a"), b"original\r\n").unwrap();
-        let large = fs::File::create(fixture.0.join("large")).unwrap();
+        fs::write(fixture.0.join("a.md"), b"original\r\n").unwrap();
+        let large = fs::File::create(fixture.0.join("large.md")).unwrap();
         large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
         let mut docs = Documents::default();
-        let response = docs.admit(fixture.request(&["missing", "a", ".", "large"]));
+        let response = docs.admit(fixture.request(&["missing.md", "a.md", ".", "large.md"]));
         let encoded = serde_json::to_value(response).unwrap();
         for (index, code) in [
             (0, "file_not_found"),
@@ -315,17 +353,17 @@ mod tests {
     #[test]
     fn first_success_selects_its_existing_order_index() {
         let fixture = Fixture::new();
-        for name in ["a", "b", "c", "d"] {
+        for name in ["a.md", "b.md", "c.md", "d.md"] {
             fs::write(fixture.0.join(name), name).unwrap();
         }
         let mut docs = Documents::default();
-        docs.admit(fixture.request(&["a", "b"]));
-        let result = docs.admit(fixture.request(&["missing", "./b", "c", "a"]));
+        docs.admit(fixture.request(&["a.md", "b.md"]));
+        let result = docs.admit(fixture.request(&["missing.md", "./b.md", "c.md", "a.md"]));
         assert_eq!(result.results[1].status, "already_open");
         assert_eq!(docs.active_id, Some(1));
         assert_eq!(docs.activation_revision, 2);
 
-        let result = docs.admit(fixture.request(&["missing", "d", "b"]));
+        let result = docs.admit(fixture.request(&["missing.md", "d.md", "b.md"]));
         assert_eq!(result.results[1].status, "opened");
         assert_eq!(docs.active_id, Some(3));
         assert_eq!(docs.activation_revision, 3);
@@ -335,26 +373,26 @@ mod tests {
     #[test]
     fn failures_and_invalid_requests_retain_selection_and_snapshot() {
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("a"), "first").unwrap();
-        fs::write(fixture.0.join("b"), "second").unwrap();
+        fs::write(fixture.0.join("a.md"), "first").unwrap();
+        fs::write(fixture.0.join("b.md"), "second").unwrap();
         let mut docs = Documents::default();
-        docs.admit(fixture.request(&["a", "b"]));
+        docs.admit(fixture.request(&["a.md", "b.md"]));
         docs.opening_errors.push("graphical opening error".into());
-        docs.admit(fixture.request(&["b"]));
-        let canonical = fs::canonicalize(fixture.0.join("b")).unwrap();
+        docs.admit(fixture.request(&["b.md"]));
+        let canonical = fs::canonicalize(fixture.0.join("b.md")).unwrap();
         let snapshot = docs.files[&canonical].as_ref().unwrap().clone();
-        fs::remove_file(fixture.0.join("b")).unwrap();
+        fs::remove_file(fixture.0.join("b.md")).unwrap();
 
-        let result = docs.admit(fixture.request(&["b", "missing", "."]));
+        let result = docs.admit(fixture.request(&["b.md", "missing.md", "."]));
         assert!(result.results.iter().all(|r| r.status == "error"));
         assert_eq!(docs.active_id, Some(1));
         assert_eq!(docs.activation_revision, 2);
-        let mut wrong_version = fixture.request(&["a"]);
+        let mut wrong_version = fixture.request(&["a.md"]);
         wrong_version.version += 1;
         for request in [
             wrong_version,
             fixture.request(&[]),
-            fixture.request(&vec!["a"; MAX_FILES + 1]),
+            fixture.request(&vec!["a.md"; MAX_FILES + 1]),
             Request {
                 language: None,
                 version: VERSION,
@@ -376,9 +414,9 @@ mod tests {
     #[test]
     fn invalid_envelopes_admit_nothing() {
         let fixture = Fixture::new();
-        fs::write(fixture.0.join("a"), "first").unwrap();
+        fs::write(fixture.0.join("a.md"), "first").unwrap();
         let mut docs = Documents::default();
-        let mut request = fixture.request(&["a"]);
+        let mut request = fixture.request(&["a.md"]);
         request.version = VERSION + 1;
         assert_eq!(
             docs.admit(request).error.as_deref(),
@@ -402,9 +440,9 @@ mod tests {
     fn non_regular_and_missing_files_do_not_create_documents() {
         let fixture = Fixture::new();
         let mut docs = Documents::default();
-        let result = docs.admit(fixture.request(&[".", "missing"]));
+        let result = docs.admit(fixture.request(&[".", "missing.md"]));
         assert!(result.results.iter().all(|r| r.status == "error"));
-        assert!(!fixture.0.join("missing").exists());
+        assert!(!fixture.0.join("missing.md").exists());
         assert!(docs.files.is_empty());
         assert_eq!(docs.active_id, None);
         assert_eq!(docs.activation_revision, 0);

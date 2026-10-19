@@ -34,10 +34,10 @@ describe('highlight tokenizer', () => {
 
   it('classifies JS keywords, strings, numbers, comments', () => {
     const code = 'const n = 42 // note\nconst s = "hi"'
-    expect(typeOf(code, 'const')).toBe('keyword')
-    expect(typeOf(code, '42')).toBe('number')
-    expect(typeOf(code, '// note')).toBe('comment')
-    expect(typeOf(code, '"hi"')).toBe('string')
+    expect(typeOf(code, 'const', 'js')).toBe('keyword')
+    expect(typeOf(code, '42', 'js')).toBe('number')
+    expect(typeOf(code, '// note', 'js')).toBe('comment')
+    expect(typeOf(code, '"hi"', 'js')).toBe('string')
   })
 
   it('marks call targets as functions and members as properties', () => {
@@ -83,11 +83,13 @@ describe('highlight tokenizer', () => {
     expect(toks.some((t) => t.type === 'comment' && t.value.includes('# tail'))).toBe(true)
   })
 
-  it('unknown language still colors strings and comments via the clike fallback', () => {
-    const toks = highlight('return "x"; /* c */', 'unrecognized-language')
-    expect(toks.some((t) => t.type === 'string')).toBe(true)
-    expect(toks.some((t) => t.type === 'comment')).toBe(true)
-    expect(toks.find((t) => t.value === 'return')?.type).toBe('keyword')
+  it.each([undefined, 'text', 'plaintext', 'yaml', 'unrecognized-language'])('leaves %s code plain rather than guessing a grammar', (language) => {
+    const code = 'return "x"; /* c */\r\nname: value # note\r\n'
+    expect(highlight(code, language)).toEqual([{ type: 'text', value: code }])
+  })
+
+  it('honors case-insensitive fence aliases', () => {
+    expect(highlight('const n = 42', 'TypeScript')).toEqual(highlight('const n = 42', 'ts'))
   })
 })
 

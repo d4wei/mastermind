@@ -2,8 +2,15 @@
 
 `files.rs` owns bounded, versioned reads and guarded writes. `document_io.rs` accepts document IDs
 from the admitted path registry; webview commands cannot name an arbitrary write destination.
-Admission canonicalizes paths, so an opened symlink and its target share one document. The first
-webview read receives the admitted snapshot even if the path changed or disappeared after opening
+Admission accepts `.md` and `.markdown`, case-insensitively, on both the selected path and canonical
+target. Non-Markdown files return `not_markdown` without entering the registry. The picker filters
+these extensions; CLI, document events, and drops use the same admission rule. Save As rejects an
+unsupported extension before creating a file. These checks identify document types by filename,
+not by guessing from content.
+
+Admission canonicalizes paths, so an opened Markdown symlink and its target share one document.
+The first webview read receives the admitted snapshot even if the path changed or disappeared after
+opening
 was acknowledged. Subscribing after the document loads triggers a fresh read, retaining that base
 and surfacing subsequent disk changes. Delivering the initial snapshot releases its host copy.
 

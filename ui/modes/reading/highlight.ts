@@ -80,9 +80,9 @@ const ALIAS: Record<string, string> = {
   swift: 'clike', scala: 'clike', dart: 'clike', php: 'clike', cs: 'clike', 'c#': 'clike',
 }
 
-function specFor(lang: string | undefined): LangSpec {
-  const key = lang ? (ALIAS[lang.toLowerCase()] ?? 'clike') : 'clike'
-  return SPECS[key] ?? SPECS.clike!
+function specFor(lang: string | undefined): LangSpec | undefined {
+  const key = lang ? ALIAS[lang.toLowerCase()] : undefined
+  return key ? SPECS[key] : undefined
 }
 
 const ID_START = /[A-Za-z_$]/
@@ -92,6 +92,7 @@ const SEP = new Set([';', '|', '&', '(', '{', '\n', '`'])
 
 export function highlight(code: string, lang?: string): HlToken[] {
   const spec = specFor(lang)
+  if (!spec) return code ? [{ type: 'text', value: code }] : []
   const out: HlToken[] = []
   const push = (type: TokenType, value: string): void => {
     if (!value) return

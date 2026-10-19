@@ -15,6 +15,9 @@ const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 export async function createPreview(file: string, themesRoot: string): Promise<Hono> {
   const real = await fs.realpath(file)
   if (!(await fs.stat(real)).isFile()) throw new Error('preview requires a regular file')
+  if (![file, real].every((name) => /\.(md|markdown)$/i.test(name))) {
+    throw new Error('Choose a Markdown file (.md or .markdown).')
+  }
   const target = { path: real }
   const app = new Hono()
   let config = structuredClone(DEFAULT_CONFIG)

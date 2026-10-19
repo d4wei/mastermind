@@ -1,8 +1,9 @@
 # Native launcher protocol
 
-The repository launcher forwards `open -- FILE...` and `setup --suggest JSON_OBJECT` to the native
-app. Opening resolves relative paths against the invoking process's working directory, starts or
-reuses one local host, and reports admission without waiting for onboarding or review completion.
+The repository launcher forwards `open [--language CODE] -- FILE...` and
+`setup --suggest JSON_OBJECT` to the native app. Opening resolves relative paths against the
+invoking process's directory, starts or reuses one local host, and reports admission without
+waiting for onboarding or review completion.
 The Windows console companion preserves command output without attaching a console to the GUI.
 
 `protocol.rs` owns the version, frame and request bounds, strict request envelopes, and reply
@@ -12,10 +13,13 @@ OS user; endpoint existence does not authorize reading arbitrary files.
 
 For a valid opening request, results retain input order and distinguish `opened`, `already_open`,
 and `error`. Admission checks existing regular files, obtains an initial versioned snapshot, and
-registers canonical identity before success. It does not require a Markdown extension. Aliases
-reuse the document. Reopening retains the document's buffer, undo, and recovery state. One file's
+registers canonical identity before success. Selected paths and their canonical targets must have
+a Markdown extension; [file access](files.md) owns the supported extensions. Markdown aliases reuse
+the document. Reopening retains the document's buffer, undo, and recovery state. One file's
 failure does not prevent other valid files from opening. See [opening](opening.md) and
 [file access](files.md) for activation, graphical requests, and filesystem limits.
+
+The optional initial reading-language hint follows [translation discovery](translations.md).
 
 Stdout contains one JSON reply; diagnostics go to stderr. Replies carry file admission metadata,
 not document contents or feedback. Exit status is zero for a fully successful operation, one for

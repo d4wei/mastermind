@@ -18,6 +18,14 @@ import { scanMarkdown } from '../../../document/markdown/scan'
 import type { CriticSpan } from '../../../document/critic/types'
 import { DiamondIcon } from '../../icons'
 import { Frontmatter } from './Frontmatter'
+import { useT } from '../../i18n'
+
+function TableScroll({ children }: { children: ReactNode }) {
+  const t = useT()
+  return <div className="md-table-scroll" role="region" aria-label={t('table')} tabIndex={0}>
+    {children}
+  </div>
+}
 
 export interface RenderCtx {
   source: string
@@ -313,7 +321,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
         return a ? { textAlign: ALIGN_STYLE[a] } : undefined
       }
       return (
-        <table key={key} {...posAttrs(node)}>
+        <TableScroll key={key}><table {...posAttrs(node)}>
           {head && (
             <thead>
               <tr>
@@ -336,7 +344,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></TableScroll>
       )
     }
     case 'thematicBreak':

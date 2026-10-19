@@ -485,7 +485,7 @@ button:disabled {
 .md-root h4 { font-size: var(--md-h4-size); }
 .md-root h5 { font-size: var(--md-h5-size); }
 .md-root h6 { font-size: var(--md-h6-size); color: var(--color-text-muted); }
-.md-root :is(p, ul, ol, blockquote, table, pre) {
+.md-root :is(p, ul, ol, blockquote, .md-table-scroll, pre) {
   margin: 0 0 var(--md-block-gap);
 }
 .md-root .md-frontmatter + :is(h1, h2, h3, h4, h5, h6),
@@ -648,11 +648,19 @@ button:disabled {
   margin: calc(var(--space-unit) * 8) 0;
 }
 
+.md-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .md-root table {
   border-collapse: collapse;
   width: 100%;
   font-size: inherit;
 }
+
+@media print { .md-table-scroll { overflow: visible; } }
 
 .md-root th {
   font-family: var(--font-body);

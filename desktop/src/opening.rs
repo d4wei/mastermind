@@ -143,7 +143,7 @@ pub fn open(app: &tauri::AppHandle, paths: Vec<Result<PathBuf, String>>) {
 
 #[tauri::command]
 pub fn choose_files(app: tauri::AppHandle) {
-    let mut dialog = app.dialog().file();
+    let mut dialog = app.dialog().file().add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS);
     if let Some(window) = app.get_webview_window("main") {
         dialog = dialog.set_parent(&window);
     }

@@ -16,14 +16,6 @@ The [README](README.md) describes the current application;
 Use this entry shape:
 
 ```
-## 2026-10-18 — Opening language is a session presentation hint
-
-**Ruled.** `open --language CODE -- FILE...` may suggest an initial prepared reading translation.
-Use it only when a matching artifact is valid and the reader has not chosen a version for that
-open document. Otherwise show Original. It neither changes preferences nor gates opening.
-
-**Beat:** turning the agent's reading hint into a saved preference or a translation prerequisite.
-
 ## YYYY-MM-DD — <the ruling, stated as settled fact>
 
 **<Ruled | Measured | Ratified>** (<optional external pointer>). <why, in a clause.>
@@ -36,6 +28,21 @@ open document. Otherwise show Original. It neither changes preferences nor gates
 - Omit the pointer when the entry's own commit contains all necessary provenance.
 
 * * *
+
+## 2026-10-18 — Documents must have Markdown extensions
+
+**Ruled.** Admit only `.md` and `.markdown` files, case-insensitively, through every opening route.
+Check both selected and canonical filenames, and keep Save As within the same boundary.
+
+**Beat:** accepting arbitrary text files or relying on the graphical picker to enforce file types.
+
+## 2026-10-18 — Opening language is a session presentation hint
+
+**Ruled.** `open --language CODE -- FILE...` may suggest an initial prepared reading translation.
+Use it only when a matching artifact is valid and the reader has not chosen a version for that
+open document. Otherwise show Original. It neither changes preferences nor gates opening.
+
+**Beat:** turning the agent's reading hint into a saved preference or a translation prerequisite.
 
 ## 2026-10-18 — File overflow uses a plain list
 

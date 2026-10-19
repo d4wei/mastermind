@@ -4,6 +4,7 @@ Run `npm run dev -- /absolute/path/document.md`. The command starts a foreground
 Vite, then prints the `/d/preview` URL. `--port` selects the API port. Stop both with Ctrl-C.
 
 The preview grants file access only to the existing document explicitly selected at startup. It
+requires `.md` or `.markdown` on both the selected path and canonical target, case-insensitively. It
 reads prepared translations beside that document and saves accepted changes with an opaque base
 version. Browser settings exist in memory for the lifetime of the process. No daemon, personal
 configuration file, workspace browsing, draft creation, rename, or agent installation is provided.

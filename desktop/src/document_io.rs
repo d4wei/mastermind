@@ -135,6 +135,7 @@ fn save_registered_copy(
 ) -> Result<Value, FileError> {
     let mut docs = docs.lock().unwrap();
     let original = admitted(&docs, id)?;
+    crate::admission::require_markdown(&path)?;
     files::create_copy(&path, content)?;
     let (canonical, _) = docs.open(path.to_str().ok_or_else(|| {
         FileError::new(
@@ -175,6 +176,7 @@ fn save_close_copy(
     content: &str,
 ) -> Result<Value, FileError> {
     serialized_write(docs, id, |_| {
+        crate::admission::require_markdown(&path)?;
         files::create_copy(&path, content)?;
         let saved = files::read(&path)?;
         if saved.content() != content {
@@ -197,7 +199,7 @@ pub async fn save_document_copy(
 ) -> Result<Option<Value>, FileError> {
     let docs = docs.inner().clone();
     let path = admitted(&docs.lock().unwrap(), &id)?;
-    let mut dialog = app.dialog().file().set_file_name(format!(
+    let mut dialog = app.dialog().file().add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS).set_file_name(format!(
         "{}-copy.md",
         path.file_stem().unwrap_or_default().to_string_lossy()
     ));
@@ -314,6 +316,9 @@ mod tests {
         let revision = docs.activation_revision;
         let docs = Mutex::new(docs);
         assert!(save_registered_copy(&docs, "0", original.clone(), "local").is_err());
+        let html = dir.join("copy.html");
+        assert_eq!(save_registered_copy(&docs, "0", html.clone(), "local").unwrap_err().error, "not_markdown");
+        assert!(!html.exists());
         assert_eq!(docs.lock().unwrap().order.len(), 1);
         let result = save_registered_copy(&docs, "0", copy.clone(), "local").unwrap();
         assert_eq!(result["meta"]["sessionId"], "1");
@@ -342,6 +347,9 @@ mod tests {
         let revision = docs.activation_revision;
         let docs = Mutex::new(docs);
         assert!(save_close_copy(&docs, "0", original.clone(), "local").is_err());
+        let html = dir.join("copy.html");
+        assert_eq!(save_close_copy(&docs, "0", html.clone(), "local").unwrap_err().error, "not_markdown");
+        assert!(!html.exists());
         let saved = save_close_copy(&docs, "0", copy.clone(), "local\r\n").unwrap();
         assert_eq!(saved["file"]["content"], "local\r\n");
         assert_eq!(fs::read_to_string(original).unwrap(), "original");

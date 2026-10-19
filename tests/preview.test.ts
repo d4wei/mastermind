@@ -22,6 +22,24 @@ function request(url: string, method = 'GET', body?: object, headers: Record<str
   })
 }
 
+it('admits only Markdown extensions, including the canonical target', async () => {
+  for (const name of ['upper.MD', 'long.Markdown']) {
+    const target = path.join(dir, name)
+    await fs.writeFile(target, '# Heading')
+    await expect(createPreview(target, path.resolve('themes'))).resolves.toBeDefined()
+  }
+  for (const name of ['notebook.html', 'notes.txt', 'README']) {
+    const target = path.join(dir, name)
+    await fs.writeFile(target, '# Heading')
+    await expect(createPreview(target, path.resolve('themes'))).rejects.toThrow('Markdown file')
+  }
+  if (process.platform !== 'win32') {
+    const alias = path.join(dir, 'alias.md')
+    await fs.symlink(path.join(dir, 'notebook.html'), alias)
+    await expect(createPreview(alias, path.resolve('themes'))).rejects.toThrow('Markdown file')
+  }
+})
+
 it('rejects hostile hosts and cross-origin saves without changing the selected file', async () => {
   expect((await request('/api/sessions/preview/file', 'GET', undefined, { host: 'evil.example' })).status).toBe(403)
   expect((await request('/api/sessions/preview/file', 'PUT', {}, { origin: 'https://evil.example' })).status).toBe(403)
