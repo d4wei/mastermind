@@ -3,8 +3,9 @@
 Both `html` and `body` paint the active theme's background. The native host also synchronizes its
 under-page surface through the [theme appearance adapter](../theme/appearance.md).
 
-`TopBar` places standalone document controls at the top right. The Read/Markdown button shows the
-mode it opens. Translation and active-comment controls appear where applicable; the overflow menu
+`TopBar` places standalone document controls at the top right. In the desktop app, `ToolbarTarget`
+portals them into the native file row so file pills use the remaining flex space. The Read/Markdown
+button shows the mode it opens. Translation and active-comment controls appear where applicable; the overflow menu
 contains Resolved and Settings. Resolved remains reachable without active comments. Radix supplies
 menu focus, keyboard navigation, and dismissal. The native host owns the file pills and full-path
 window title; the document controls do not repeat the filename. On macOS the file toolbar shares

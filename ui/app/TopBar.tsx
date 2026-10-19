@@ -1,4 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useContext, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { ToolbarTarget } from './ToolbarTarget'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { ChatIcon, SearchIcon, CodeIcon, EyeIcon, GearIcon, HistoryIcon, LanguageIcon, MoreIcon } from '../icons'
@@ -21,6 +23,7 @@ interface TopBarProps {
 
 export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation, resolved, settings }: TopBarProps) {
   const t = useT()
+  const target = useContext(ToolbarTarget)
   const openingPanel = useRef(false)
   const headerRef = useRef<HTMLElement | null>(null)
   const mode = useDoc((s) => s.mode)
@@ -39,9 +42,9 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
       ro.disconnect()
       document.documentElement.style.removeProperty('--bar-h')
     }
-  }, [])
+  }, [target])
 
-  return (
+  const controls = (
     <header className="topbar" ref={headerRef}>
       <button type="button" className="btn-ghost btn-icon topbar-icon-btn topbar-find" onClick={requestFind}
         aria-label={t('find')} title={`${t('find')} (${navigator.platform.startsWith('Mac') ? '⌘F' : 'Ctrl+F'})`}><SearchIcon /></button>
@@ -82,4 +85,5 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, translation,
       </DropdownMenu.Root>}
     </header>
   )
+  return target ? createPortal(controls, target) : controls
 }

@@ -595,6 +595,23 @@ lights were clearly visible against Carbon. The automation capture indicator cov
 in screenshots, so that contrast observation comes from the user's direct inspection. Mint and
 Slate have not received the same inactive-control check.
 
+### File overflow — 2026-10-18
+
+The overflow change was checked in a disposable macOS release-bundle copy with separate endpoint,
+preferences, and application identity. One, three, and twelve files were checked at 1100 px;
+thirty files at 1100 and 760 px; fifty at 560 px. Fixtures mixed short names, long Chinese names,
+and repeated basenames. Find, Markdown, translation, comments, and More controls were present in
+reading mode. The current translation control is still an icon; long language labels need another
+native check when the document-level language menu ships.
+
+The active pill remained visible on switching and resize. Selecting the last file by End and Enter
+revealed its pill and dismissed the list. Closing a background file kept the list open, retained
+the active document, and focused the next close button. The fifty-file list stayed within the
+window height and scrolled to the keyboard target. Markdown mode and Command-F remained usable;
+Find dismissed the open file list. Unit tests cover the full count/width range calculation and
+blocked closes, close-dialog dismissal, localized labels, and focus behavior. These observations
+are not a complete native count-by-width matrix or a sustained resource benchmark.
+
 ### Remaining hardening and distribution checks
 
 Tauri is adopted as the application host. These remaining checks bound release claims; they do not

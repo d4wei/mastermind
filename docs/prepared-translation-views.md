@@ -32,7 +32,9 @@ Keep one row with file pills, a counted overflow menu, and the labeled language 
 document controls. Reserve the controls' actual width and show only the pills that fit. Keep the
 active file visible without reordering the underlying file list.
 
-The overflow menu is a plain list of open files, without search. Show which file is active and let
+The overflow menu is a plain list of open files, without search. Use the active row background
+without a checkmark. Keep close inside each row's shared hover surface, and use a compact width
+with truncated labels and full-path tooltips. Let
 the reader select or close a file. Preserve file order and disambiguate duplicate names. A long
 list may scroll within the available window height; keyboard focus must reveal its current item.
 
@@ -43,12 +45,12 @@ app stress-test result.
 A single available reading version needs no picker. Language names use their native names;
 Interface language controls surrounding labels. Regional variants must remain distinguishable.
 
-### Existing overflow and required stress test
+### Overflow implementation and remaining language checks
 
-The current file strip scrolls horizontally and reveals the active pill on selection. The native
-row reserves fixed right padding while document controls are positioned separately. That reserve
-does not measure a new text language button. Existing native reviewer tests primarily exercise one
-or two files; the inspected coverage does not establish many-file geometry or reachability.
+The file overflow is implemented independently of translation discovery. Its contract lives in
+[the native adapter](../ui/desktop/README.md). The document controls now occupy the same flex row,
+so a future labeled language menu consumes actual measured space instead of a fixed reserve.
+The translation picker and multi-language discovery remain the subsequent build steps.
 
 Before shipping the chosen layout, run a native matrix with 1, 3, 12, 30, and 50 disposable files;
 short names, long CJK names, and duplicate basenames; and wide, medium, and minimum supported window

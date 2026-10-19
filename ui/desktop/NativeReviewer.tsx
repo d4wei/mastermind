@@ -4,8 +4,9 @@ import { navigate } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 import { requestFind } from '../find/events'
-import { FileIcon, CrossIcon, AlertIcon } from '../icons'
-import { fileLabels } from './file-labels'
+import { FileIcon } from '../icons'
+import { FileTabs, type OpenDocument } from './FileTabs'
+import { ToolbarTarget } from '../app/ToolbarTarget'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
 import { confirmClose } from './confirm-close'
@@ -14,8 +15,6 @@ import { releaseDrafts } from '../review/drafts'
 import { Notifications, Notice, Notification } from '../app/Notifications'
 import { createHomeMotion } from './home-motion'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
-
-interface OpenDocument { id: string; path: string }
 
 interface OpeningSnapshot {
   files: OpenDocument[]
@@ -40,7 +39,7 @@ export function NativeReviewer() {
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
   const documentState = useDoc()
   const id = documentState.sessionId
-  const pills = useRef<HTMLElement>(null)
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const homeMotion = useRef<ReturnType<typeof createHomeMotion> | null>(null)
   const atHome = files.length === 0 && setupRequired === false
   const homeReady = useRef(false)
@@ -53,18 +52,7 @@ export function NativeReviewer() {
     homeReady.current = atHome
     homeMotion.current?.show(atHome)
   }, [atHome])
-  const focusAfterClose = useRef<string | null | undefined>(undefined)
   const activePath = id === null ? undefined : files.find((file) => file.id === id)?.path
-  useEffect(() => {
-    pills.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-  }, [activePath])
-  useEffect(() => {
-    if (focusAfterClose.current === undefined || focusAfterClose.current !== id) return
-    const target = pills.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')
-      ?? document.querySelector<HTMLButtonElement>('.native-open')
-    target?.focus()
-    focusAfterClose.current = undefined
-  }, [id, files])
   useEffect(() => {
     void nativeBridge.invoke<void>('set_window_title', {
       value: activePath ? `mastermind - ${activePath}` : 'mastermind',
@@ -83,7 +71,6 @@ export function NativeReviewer() {
     }).catch((error) => setError(String(error)))
     return () => { disposed = true; stop?.() }
   }, [])
-  const labels = fileLabels(files.map((file) => file.path))
   const configuredChinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
   const chinese = setupRequired !== false && previewLanguage ? previewLanguage === 'zh-CN' : configuredChinese
   useEffect(() => {
@@ -160,16 +147,16 @@ export function NativeReviewer() {
   const dismissOpeningErrors = (): void => {
     void nativeBridge.invoke<void>('dismiss_opening_errors').catch((error) => setError(String(error)))
   }
-  const closeFile = (file: OpenDocument): void => {
-    if (closingFile.current) return
+  const closeFile = (file: OpenDocument): Promise<boolean> => {
+    if (closingFile.current) return Promise.resolve(false)
     closingFile.current = true
     const root = document.getElementById('root')!
     root.inert = true
-    fileCloseCompletion.current = (async () => {
+    const completion = (async () => {
       try {
         let snapshot: OpeningSnapshot | undefined
         const allowed = await confirmClose(useDoc.getState(), [file.id], (id) => navigate(`/d/${id}`))
-        if (!allowed) return
+        if (!allowed) return false
         const closed = await useDoc.getState().closeDocument(file.id, async () => {
           snapshot = await nativeBridge.invoke<OpeningSnapshot>('close_document', {
             id: Number(file.id), activeId: id === null ? null : Number(id),
@@ -180,18 +167,19 @@ export function NativeReviewer() {
         if (!closed) {
           setError(chinese ? '文件状态再次变化，请重试关闭。' : 'The file changed again. Please try closing it again.')
           navigate(`/d/${file.id}`)
-          return
+          return false
         }
         releaseDrafts(file.id)
-        focusAfterClose.current = snapshot!.active_id === null ? null : String(snapshot!.active_id)
         activationRevision.current = snapshot!.activation_revision
         setFiles(snapshot!.files)
         setError('')
         navigate(snapshot!.active_id === null ? '/' : `/d/${snapshot!.active_id}`)
-
-      } catch (error) { setError(String(error)) }
+        return true
+      } catch (error) { setError(String(error)); return false }
       finally { closingFile.current = false; root.inert = closingWindow.current; fileCloseCompletion.current = null }
     })()
+    fileCloseCompletion.current = completion.then(() => {})
+    return completion
   }
   const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
   return <Notifications>
@@ -200,20 +188,10 @@ export function NativeReviewer() {
         aria-label={openLabel} title={openLabel}><FileIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
-      <nav ref={pills} data-tauri-drag-region className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
-        {files.map((file, index) => <div key={file.id}
-          className={`native-file-pill${id === file.id ? ' active' : ''}`}>
-          <button type="button" className="native-file-select"
-            aria-current={id === file.id ? 'page' : undefined}
-            title={file.path} onClick={() => navigate(`/d/${file.id}`)}>{labels[index]}</button>
-          {documentState.needsAttention(file.id) && <button type="button" className="native-file-attention btn-ghost btn-icon"
-            aria-label={`${labels[index]} · ${chinese ? '需要处理' : 'Needs attention'}`}
-            onClick={() => { navigate(`/d/${file.id}`); if (id === file.id) void documentState.openConflict() }}><AlertIcon /></button>}
-          <button type="button" className="native-file-close btn-icon" onClick={() => closeFile(file)}
-            aria-label={`${chinese ? '关闭' : 'Close'} ${labels[index]}`}
-            title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></button>
-        </div>)}
-      </nav>
+      <FileTabs files={files} activeId={id} chinese={chinese} needsAttention={documentState.needsAttention}
+        onSelect={(fileId) => navigate(`/d/${fileId}`)}
+        onAttention={(fileId) => { if (id === fileId) void documentState.openConflict() }} onClose={closeFile} />
+      <div className="native-document-controls" ref={setToolbarTarget} />
     </div>
       {openingErrors.length > 0 && <Notification error onDismiss={dismissOpeningErrors}>
         <ul>{openingErrors.map((message, index) => <li key={index}>{message}</li>)}</ul>
@@ -225,7 +203,7 @@ export function NativeReviewer() {
         </button>
       </Notice>}
     <CloseDialog />
-    <App native onboarding={setupRequired === false ? undefined : setup
+    <ToolbarTarget.Provider value={toolbarTarget}><App native onboarding={setupRequired === false ? undefined : setup
       ? <NativeSetup snapshot={setup} onLanguagePreview={setPreviewLanguage}
         onConfirmationStarted={(completion) => {
           setupConfirmation.current = completion
@@ -239,6 +217,6 @@ export function NativeReviewer() {
         {chinese ? '正在加载设置…' : 'Loading setup…'}
       </div>} home={<div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
-    </div>} />
+    </div>} /></ToolbarTarget.Provider>
   </Notifications>
 }

@@ -35,6 +35,7 @@ const setup = () => ({ completed: true, revision: 0,
 const other = (command: string) => command === 'setup_snapshot' ? setup() : undefined
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)

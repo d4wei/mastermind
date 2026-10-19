@@ -3,11 +3,9 @@
   flex: none;
   z-index: var(--z-topbar);
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: calc(var(--space-unit) * 2);
   padding: var(--bar-gap);
-  padding-right: calc(var(--space-unit) * 45);
   background: var(--color-bg);
   color: var(--color-text);
 }
@@ -28,14 +26,14 @@
   gap: var(--space-unit);
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  position: relative;
 }
 .native-file-pill {
   display: flex;
   align-items: center;
-  flex: none;
-  max-width: calc(var(--space-unit) * 65);
+  flex: 0 1 var(--file-tab-width);
+  min-width: 0;
+  max-width: var(--file-tab-width);
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-muted);
@@ -48,6 +46,7 @@
   font-size: var(--font-size-sm);
 }
 .native-file-select {
+  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -137,3 +136,42 @@
   color: inherit;
 }
 .native-wordmark-row { display: inline-block; }
+
+.native-document-controls { flex: none; }
+.native-document-controls .topbar { position: static; }
+.native-file-measure { position: absolute; visibility: hidden; display: flex; width: max-content; pointer-events: none; }
+.native-file-size { width: var(--file-tab-width); }
+.native-file-overflow {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-unit);
+  height: var(--control-size);
+  padding: 0 calc(var(--space-unit) * 2);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.native-file-list {
+  z-index: var(--z-overlay);
+  width: var(--file-menu-width);
+  max-width: var(--radix-popover-content-available-width);
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-unit);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  font-family: var(--font-ui);
+}
+.native-file-list-title {
+  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 2.5);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+.native-file-entry { max-width: none; width: 100%; }
+.native-file-entry .native-file-select { text-align: left; }

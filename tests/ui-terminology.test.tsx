@@ -13,6 +13,7 @@ import { createDocStore, useDoc } from '../ui/documents/store'
 import { Navigator } from '../ui/app/Navigator'
 import { useNav } from '../ui/app/navStore'
 import { TopBar } from '../ui/app/TopBar'
+import { ToolbarTarget } from '../ui/app/ToolbarTarget'
 
 vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 const initialConfig = useConfig.getState()
@@ -89,4 +90,19 @@ it('retains outline navigation to existing-file source offsets', () => {
   expect(scroller).toHaveBeenCalledWith(12, 1)
   expect(host.querySelector('.nav-seg')).toBeNull()
   useNav.setState({ outline: [], docEl: null })
+})
+
+it('places native document controls in the file row while retaining their actions', () => {
+  useConfig.setState({ config })
+  const target = document.createElement('div')
+  document.body.append(target)
+  const setMode = vi.fn()
+  useDoc.setState({ mode: 'reading', setMode })
+  try {
+    act(() => root.render(<ToolbarTarget.Provider value={target}><TopBar /></ToolbarTarget.Provider>))
+    expect(host.querySelector('.topbar')).toBeNull()
+    expect(target.querySelector('.topbar')).not.toBeNull()
+    act(() => target.querySelector<HTMLButtonElement>('[aria-label="Markdown"]')!.click())
+    expect(setMode).toHaveBeenCalledWith('source')
+  } finally { target.remove() }
 })

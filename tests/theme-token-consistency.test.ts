@@ -14,6 +14,7 @@ const uiCss = uiSources.filter(({ name }) => name.endsWith('.css')).map(({ sourc
 const uiDefaults = declarations(uiCss)
 const references = (source: string) => [...source.matchAll(/var\((--[a-z0-9-]+)|['"](--[a-z0-9-]+)['"]/g)].map((match) => (match[1] ?? match[2])!)
 const runtimeTokens = new Set([
+  '--radix-popover-content-available-width', '--radix-popover-content-available-height',
   ...COLOR_TOKS.map((token) => `--code-${token}`), '--heading-count', '--heading-depth',
 ])
 

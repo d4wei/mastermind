@@ -24,8 +24,24 @@ behavior.
 
 [notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
 
-`NativeReviewer.tsx` provides the square Open Markdown files action and horizontally scrolling
-file pills. The native Edit → Find entry forwards to the shared
+`NativeReviewer.tsx` provides the square Open Markdown files action and `FileTabs.tsx` fits a
+consecutive run of file pills beside the document controls. `ToolbarTarget` places those controls
+in the native flex row, so their actual width determines the available file space. The active file
+stays visible without reordering files; long labels truncate and retain a full-path tooltip.
+
+The counted overflow opens a plain list of all open files. Its only active indicator is the row
+background. Each row includes its close and, when needed, attention buttons within its hover
+surface. Selecting dismisses the list and focuses the selected pill. Closing keeps the list open
+and focuses the next close button at the same position, or the previous one at the end. If closing
+requires confirmation, the list dismisses before the close dialog opens. Blocked closes retain
+the document. Escape returns focus to the overflow control; outside interaction keeps its target.
+
+The list uses the installed Radix Popover for placement and dismissal because each row contains
+separate selection and close actions. Its height is bounded by the available viewport. Up/Down,
+Home/End, and Tab reach every file and its actions; focused rows scroll into view. Find and the file
+list dismiss each other. `file-window.ts` owns only the visible range calculation.
+
+The native Edit → Find entry forwards to the shared
 [Find controller](../find/README.md) and is disabled without a ready document.
 `file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
 full path remains in the native window title and the pill tooltip. On macOS, Tauri's overlay title
