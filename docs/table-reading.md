@@ -14,7 +14,8 @@ Comments sit beside the prose column, so there is no unused space immediately to
 In the normal state, the table's viewport matches the body width and scrolls horizontally. Fade
 content at an edge only while more content is hidden beyond that edge. At the leftmost position,
 the left fade disappears; at the rightmost position, the right fade disappears. Keep the scrollbar
-usable and outside the faded area.
+usable and outside the faded area. Hide the scrollbar whenever there is no horizontal overflow,
+including in the expanded state. Its disappearance must not shift the prose below the table.
 
 An explicit Expand table action widens that viewport to the window's safe content bounds. Comments
 and the progress tracker fade away without changing the surrounding prose layout. The table stays
@@ -22,6 +23,11 @@ at the same vertical position, with the same height. Prose above and below remai
 Collapse table or Escape restores the normal viewport, its previous horizontal scroll position,
 and the prior visibility of the comments and progress tracker. Return keyboard focus to the table
 control. Hidden controls must also leave keyboard navigation and the accessibility tree.
+
+Place one quiet, square icon button just above the table viewport's upper-right corner. Use expand
+and collapse icons with tooltips and accessible names, without duplicative visible text labels.
+Keep the control outside table cells so it cannot obscure their content or intercept selection.
+It remains discoverable without hovering; hover and keyboard focus provide stronger emphasis.
 
 ## Stable table geometry
 
