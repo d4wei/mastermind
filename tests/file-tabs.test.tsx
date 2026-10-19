@@ -8,6 +8,7 @@ import { useClosePrompt } from '../ui/desktop/CloseDialog'
 let host: HTMLDivElement
 let root: Root
 let width: number
+let pillWidths: number[]
 let resize: () => void
 let files: OpenDocument[]
 let select = vi.fn<(id: string) => void>()
@@ -15,13 +16,13 @@ let close = vi.fn<(id: string) => void>()
 let blocked: boolean
 let chinese: boolean
 beforeEach(() => {
-  width = 400; blocked = false; chinese = false
+  width = 400; pillWidths = []; blocked = false; chinese = false
   files = Array.from({ length: 12 }, (_,i) => ({ id: String(i), path: `/folder-${i}/review.md` }))
   select = vi.fn(); close = vi.fn()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { constructor(private callback: () => void) {} observe(element: HTMLElement) { if (element.classList.contains('native-file-pills')) resize = this.callback } unobserve() {} disconnect() {} })
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-    return { width: this.classList.contains('native-file-pills') ? width : this.classList.contains('native-file-size') ? 160 : 50,
+    return { width: this.classList.contains('native-file-pills') ? width : this.classList.contains('native-file-size') ? pillWidths[[...this.parentElement!.querySelectorAll('.native-file-size')].indexOf(this)] ?? 160 : 50,
       height: 30, top: 0, left: 0, right: 400, bottom: 30, x: 0, y: 0, toJSON: () => ({}) }
   })
   HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -105,4 +106,17 @@ it('labels the list and close controls in Chinese', async () => {
   await mount(); await open()
   expect(menu().getAttribute('aria-label')).toBe('打开的文件')
   expect(rows()[0]!.querySelector('.native-file-close')!.getAttribute('aria-label')).toBe('关闭 folder-0/review.md')
+})
+
+it('fits short labels by their measured widths and recomputes when they grow', async () => {
+  files = files.slice(0, 3)
+  pillWidths = [90, 100, 110]
+  width = 320
+  await mount()
+  expect(host.querySelectorAll('.native-file-pill')).toHaveLength(3)
+  expect(host.querySelector('button.native-file-overflow')).toBeNull()
+  expect(host.querySelector('.native-file-measure button')).toBeNull()
+  await act(async () => { pillWidths = [160, 160, 160]; resize() })
+  expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
+  expect(host.querySelector('button.native-file-overflow')?.textContent).toContain('+2')
 })

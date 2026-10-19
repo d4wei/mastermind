@@ -28,7 +28,7 @@
   --dur-slow: 300ms;
 
   --find-input-width: 12rem;
-  --file-tab-width: 10rem;
+  --file-tab-max-width: 10rem;
   --file-menu-width: 15rem;
   --control-size: calc(var(--space-unit) * 7.5);
   --control-size-compact: calc(var(--space-unit) * 6);

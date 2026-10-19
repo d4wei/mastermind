@@ -27,7 +27,11 @@ behavior.
 `NativeReviewer.tsx` provides the square Open Markdown files action and `FileTabs.tsx` fits a
 consecutive run of file pills beside the document controls. `ToolbarTarget` places those controls
 in the native flex row, so their actual width determines the available file space. The active file
-stays visible without reordering files; long labels truncate and retain a full-path tooltip.
+stays visible without reordering files. Pills use their content width up to the shared maximum;
+labels align left and retain a full-path tooltip when truncated. An inert measurement copy uses the
+same label, close, and attention geometry. Resize observation tracks each pill and the available
+strip width, including font changes. Overflow fitting uses those widths and the counter's actual
+digit count; short names do not reserve the maximum width.
 
 The counted overflow opens a plain list of all open files. Its only active indicator is the row
 background. Each row includes its close and, when needed, attention buttons within its hover

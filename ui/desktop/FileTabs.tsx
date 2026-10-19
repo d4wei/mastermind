@@ -21,7 +21,7 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   const measure = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
-  const [geometry, setGeometry] = useState({ width: Infinity, pill: 0, overflow: 0, gap: 0 })
+  const [geometry, setGeometry] = useState({ width: Infinity, widths: [] as number[], overflowWidths: [] as number[], gap: 0 })
   const [open, setOpen] = useState(false)
   const pendingFocus = useRef<{ id: string; index: number; menu: boolean } | null>(null)
   const selecting = useRef(false)
@@ -29,8 +29,11 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   const closePrompt = useClosePrompt((state) => state.prompt)
   const labels = fileLabels(files.map((file) => file.path))
   const activeIndex = Math.max(0, files.findIndex((file) => file.id === activeId))
-  const { start, end } = fileWindow(files.length, activeIndex, geometry.width,
-    geometry.pill, geometry.overflow, geometry.gap)
+  const measurementKey = JSON.stringify(files.map((file, index) => [file.id, labels[index], needsAttention(file.id)]))
+  const overflowDigits = String(files.length).length
+  const widths = geometry.widths.length === files.length ? geometry.widths : files.map(() => 0)
+  const { start, end } = fileWindow(widths, activeIndex, geometry.width,
+    geometry.overflowWidths, geometry.gap)
   const hidden = files.length - (end - start)
 
   useLayoutEffect(() => {
@@ -38,18 +41,21 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
     const sizes = measure.current!
     const update = () => {
       const next = { width: element.getBoundingClientRect().width,
-        pill: sizes.children[0]!.getBoundingClientRect().width,
-        overflow: sizes.children[1]!.getBoundingClientRect().width,
+        widths: [...sizes.querySelectorAll('.native-file-size')].map((item) => item.getBoundingClientRect().width),
+        overflowWidths: [...sizes.querySelectorAll('.native-file-overflow')].map((item) => item.getBoundingClientRect().width),
         gap: parseFloat(getComputedStyle(element).columnGap) || 0 }
-      if (!next.width || !next.pill) return
-      setGeometry((old) => Object.keys(next).every((key) => old[key as keyof typeof old] === next[key as keyof typeof next]) ? old : next)
+      if (!next.width || next.widths.some((size) => !size)) return
+      setGeometry((old) => old.width === next.width && old.gap === next.gap
+        && old.widths.length === next.widths.length && old.widths.every((size, index) => size === next.widths[index])
+        && old.overflowWidths.length === next.overflowWidths.length
+        && old.overflowWidths.every((size, index) => size === next.overflowWidths[index]) ? old : next)
     }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(element)
-    observer.observe(sizes)
+    for (const item of sizes.children) observer.observe(item)
     return () => observer.disconnect()
-  }, [])
+  }, [measurementKey])
 
   useEffect(() => {
     const dismiss = () => { selecting.current = true; setOpen(false) }
@@ -91,17 +97,20 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
     setOpen(false)
     onSelect(id)
   }
-  const row = (file: OpenDocument, index: number, menu: boolean) => <div key={file.id}
-    className={`native-file-pill${menu ? ' native-file-entry' : ''}${activeId === file.id ? ' active' : ''}`}>
-    <button type="button" className="native-file-select" aria-current={activeId === file.id ? 'page' : undefined}
-      title={file.path} onClick={() => select(file.id)}>{labels[index]}</button>
-    {needsAttention(file.id) && <button type="button" className="native-file-attention btn-ghost btn-icon"
+  const row = (file: OpenDocument, index: number, menu: boolean, measuring = false) => {
+    const Control = measuring ? 'span' : 'button'
+    return <div key={file.id}
+    className={`${measuring ? 'native-file-size' : 'native-file-pill'}${menu ? ' native-file-entry' : ''}${activeId === file.id ? ' active' : ''}`}>
+    <Control type={measuring ? undefined : "button"} className="native-file-select" aria-current={!measuring && activeId === file.id ? 'page' : undefined}
+      title={file.path} onClick={measuring ? undefined : () => select(file.id)}>{labels[index]}</Control>
+    {needsAttention(file.id) && <Control type={measuring ? undefined : "button"} className="native-file-attention btn-ghost btn-icon"
       aria-label={`${labels[index]} · ${chinese ? '需要处理' : 'Needs attention'}`}
-      onClick={() => { select(file.id); onAttention(file.id) }}><AlertIcon /></button>}
-    <button type="button" className="native-file-close btn-icon" onClick={() => { void close(file, menu) }}
+      onClick={measuring ? undefined : () => { select(file.id); onAttention(file.id) }}><AlertIcon /></Control>}
+    <Control type={measuring ? undefined : "button"} className="native-file-close btn-icon" onClick={measuring ? undefined : () => { void close(file, menu) }}
       aria-label={`${chinese ? '关闭' : 'Close'} ${labels[index]}`}
-      title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></button>
+      title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></Control>
   </div>
+  }
   const move = (event: KeyboardEvent) => {
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
     const target = (event.target as HTMLElement).closest('.native-file-entry')
@@ -117,8 +126,9 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   const label = chinese ? `全部 ${files.length} 个打开的文件` : `All ${files.length} open files`
   return <nav ref={bar} data-tauri-drag-region className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
     <div ref={measure} className="native-file-measure" aria-hidden inert>
-      <span className="native-file-size" />
-      <span className="native-file-overflow">+{files.length}<ChevronDownIcon /></span>
+      {files.map((file, index) => row(file, index, false, true))}
+      {Array.from({ length: overflowDigits }, (_, index) => <span key={index} className="native-file-overflow">
+        +{'9'.repeat(index + 1)}<ChevronDownIcon /></span>)}
     </div>
     {files.slice(start, end).map((file, index) => row(file, start + index, false))}
     <Popover.Root open={open && files.length > 0} onOpenChange={setOpen} modal={false}>
