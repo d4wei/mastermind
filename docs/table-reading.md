@@ -1,43 +1,63 @@
 ---
 status: living
 updated: 2026-10-19
-exit: Choose and ship a wide-table presentation, then graduate its contract beside the renderer.
+exit: Confirm and ship the table expansion design, then graduate its contract beside the renderer.
 ---
 
 # Reading wide tables
 
-Horizontal scrolling recovers hidden content but still makes long prose cells difficult to compare.
-The reading width is appropriate for paragraphs, not necessarily for a table with several columns.
+Horizontal scrolling recovers hidden content but makes prose-heavy tables difficult to compare.
+Comments sit beside the prose column, so there is no unused space immediately to its right.
 
-## Recommended first step: wide tables within the page
+## Proposed interaction
 
-Let a wide table use available page margins while paragraphs retain their preferred reading width.
-Keep a safe inset from the outline and window edge. An open comment rail still owns its space;
-tables must not cover it or force it away. Smaller tables should not expand unnecessarily.
+In the normal state, the table's viewport matches the body width and scrolls horizontally. Fade
+content at an edge only while more content is hidden beyond that edge. At the leftmost position,
+the left fade disappears; at the rightmost position, the right fade disappears. Keep the scrollbar
+usable and outside the faded area.
 
-Wrap long identifiers at safe visual boundaries without changing the source or shrinking the type.
-Keep horizontal scrolling as the fallback when the available width is insufficient. Add subtle
-edge shadows only on sides with hidden content, and keep a usable scrollbar. The shadows explain
-continuation; they do not replace the extra reading space.
+An explicit Expand table action widens that viewport to the window's safe content bounds. Comments
+and the progress tracker fade away without changing the surrounding prose layout. The table stays
+at the same vertical position, with the same height. Prose above and below remains in place.
+Collapse table or Escape restores the normal viewport, its previous horizontal scroll position,
+and the prior visibility of the comments and progress tracker. Return keyboard focus to the table
+control. Hidden controls must also leave keyboard navigation and the accessibility tree.
 
-Carbon's [table guidance][carbon] recommends giving dense tables more page width. Applying that to
-Markdown is a design proposal here, not a requirement to copy an application data grid.
+## Stable table geometry
 
-## Alternative: a dedicated table view
+Use one rendered table in both states. Determine its column widths independently of the normal
+viewport and retain those widths during expansion and collapse. Preserve font size, cell padding,
+text wrapping, row heights, source anchors, and selection. Animate the viewport's horizontal
+position and width; do not scale text or interpolate column widths.
 
-An explicit Expand table action could give a table the full content area, with a clear return to
-the same place in the document. This offers more space when comments or a narrow prose column
-constrain the page, at the cost of an extra interaction and temporarily losing surrounding prose.
+Stable geometry does not mean unbounded max-content sizing: a paragraph in one cell must not make
+an enormous single-line column. Choose readable column widths against the expanded space, allowing
+long content to wrap. A table that still exceeds that space remains horizontally scrollable in
+both states. Small tables keep their natural size and need no expansion control.
 
-Keep header labels visible within this view. Preserve semantic table cells and exact source
-mapping; commenting must still target the original document. Avoid duplicating the live table DOM
-with competing source anchors. This alternative needs a design decision before implementation.
+The initial preview uses a fixed column allocation to isolate the transition. Production column
+sizing still needs validation with real documents, long identifiers, and Chinese prose. Window
+resizing is a separate layout change and may require recalculating widths; switching table states
+must not trigger that recalculation.
 
-## Boundaries and validation
+## Transition and return
 
-Do not automatically collapse columns, transpose tables into cards, infer a special first column,
-or shrink text to fit. Those choices can obscure comparisons or assign meaning not present in the
-Markdown. Compare layouts using narrow windows, long prose cells, long code identifiers, and open
-comments. Verify both Chinese and English text, selection, search, and table comments before ship.
+Fade the side UI away as expansion begins. Reveal it again after collapse has cleared its space.
+Preserve the page's vertical scroll position. While expanding, retain the current horizontal offset
+where valid and smoothly clamp it where the wider viewport removes overflow. Restore the saved
+normal offset during collapse. Rapid reversals should continue from the current geometry rather
+than restart from an endpoint. Reduced motion switches states without geometric animation.
 
-[carbon]: https://v10.carbondesignsystem.com/components/data-table/usage/
+## Remaining interaction question
+
+Reviewing a table must retain exact source mapping. Decide how opening a discussion or composing a
+comment behaves while expanded: a temporary comment overlay could preserve the table width, while
+returning to the normal view would restore the existing anchored cards. The preview explores the
+reading transition only; it does not settle this review interaction.
+
+## Verification before implementation ships
+
+Check narrow and wide windows, short and long tables, long prose and identifiers, and English and
+Chinese text. Verify edge fades at both ends, scroll restoration from the middle and far end,
+rapid reversals, reduced motion, keyboard return, window resizing, selection, search, and comments.
+Measure column widths and row heights before and after toggling to detect unwanted reflow.

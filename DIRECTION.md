@@ -28,9 +28,9 @@ entry that has already resolved.
 
 ## 2026-10-19 — Wide-table reading
 
-**Open question.** Horizontal scrolling restores access but leaves prose-heavy tables difficult
-to compare. [The proposal](docs/table-reading.md) compares using page margins with a dedicated
-table view, while preserving comments and exact source mapping.
+**Open question.** [The proposal](docs/table-reading.md) explores expanding a table's viewport
+while keeping its column geometry stable and temporarily hiding comments and the progress tracker.
+Confirm the transition and how review interactions work in the expanded state.
 
 **Exit:** choose a presentation, verify it with narrow windows and open comments, and graduate
 the implemented contract beside the renderer.
