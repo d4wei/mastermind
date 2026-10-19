@@ -26,6 +26,15 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-19 — Wide-table reading
+
+**Open question.** Horizontal scrolling restores access but leaves prose-heavy tables difficult
+to compare. [The proposal](docs/table-reading.md) compares using page margins with a dedicated
+table view, while preserving comments and exact source mapping.
+
+**Exit:** choose a presentation, verify it with narrow windows and open comments, and graduate
+the implemented contract beside the renderer.
+
 ## 2026-10-18 — Agent-requested file closing
 
 **Bet.** Let the bundled skill close files as well as open them, so completed reviews need not

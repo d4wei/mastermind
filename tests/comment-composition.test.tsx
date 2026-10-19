@@ -38,6 +38,7 @@ async function compose(action = 'Comment') {
   act(() => root.render(<Harness />))
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('span')!)
+  window.getSelection()!.removeAllRanges()
   window.getSelection()!.addRange(range)
   act(() => document.dispatchEvent(new Event('selectionchange')))
   await act(async () => vi.advanceTimersByTimeAsync(120))
@@ -148,4 +149,68 @@ it('keeps change drafts during IME and blocks unchanged, invalid, or paused subm
   expect(textarea.readOnly).toBe(true)
   act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
   expect(edit).not.toHaveBeenCalled()
+})
+
+
+it.each(['Comment', 'Suggest change'])('keeps %s open when an earlier selection check fires after entry', async (action) => {
+  await compose()
+  act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
+  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((button) => button.textContent === action)!.click())
+  const textarea = host.querySelector('textarea')!
+  act(() => {
+    window.getSelection()!.removeAllRanges()
+    document.dispatchEvent(new Event('selectionchange'))
+    inputValue(textarea, 'Draft survives pending selection work')
+  })
+  await act(async () => vi.advanceTimersByTimeAsync(300))
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe('Draft survives pending selection work')
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  await compose(action)
+  expect(host.querySelector('textarea')).not.toBeNull()
+  expect(edit).not.toHaveBeenCalled()
+})
+
+it('does not enter a hidden composer from an exiting toolbar', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  await compose()
+  act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
+  act(() => {
+    window.getSelection()!.removeAllRanges()
+    document.dispatchEvent(new Event('selectionchange'))
+  })
+  await act(async () => vi.advanceTimersByTimeAsync(120))
+  const button = host.querySelector<HTMLButtonElement>('.sel-toolbar button')!
+  act(() => button.click())
+  await act(async () => vi.advanceTimersByTimeAsync(120))
+  expect(host.querySelector('textarea')).toBeNull()
+  await compose()
+  expect(host.querySelector('textarea')).not.toBeNull()
+})
+
+it('captures the latest selection when an action beats the selection debounce', async () => {
+  await compose()
+  act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
+  const range = document.createRange()
+  const text = host.querySelector('span')!.firstChild!
+  range.setStart(text, 0); range.setEnd(text, 4)
+  act(() => {
+    window.getSelection()!.removeAllRanges()
+    window.getSelection()!.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+  })
+  act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((button) => button.textContent === 'Suggest change')!.click())
+  expect(host.querySelector('textarea')!.value).toBe('Pass')
+})
+
+it('Escape cancels a pending selection check without reviving the toolbar', async () => {
+  await compose()
+  act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
+  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  await act(async () => vi.advanceTimersByTimeAsync(300))
+  expect(host.querySelector('.sel-toolbar')).toBeNull()
+  await compose()
+  expect(host.querySelector('textarea')).not.toBeNull()
 })

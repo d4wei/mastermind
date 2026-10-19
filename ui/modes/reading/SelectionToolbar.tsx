@@ -42,38 +42,46 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
   const selectedRange = useRef<Range | null>(null)
+  const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cancelSelectionCheck = (): void => {
+    if (selectionTimer.current !== null) clearTimeout(selectionTimer.current)
+    selectionTimer.current = null
+  }
+  const dismiss = (): void => {
+    cancelSelectionCheck()
+    composingRef.current = false
+    setComposing(null)
+    setComment('')
+    setReplacements([])
+    setActive(null)
+  }
+  const readSelection = (): Active | null => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null
+    const range = sel.getRangeAt(0)
+    if (!containerRef.current?.contains(range.commonAncestorContainer)) return null
+    const res = rangeToSourceRanges(range, source, spans)
+    if ('error' in res) return null
+    selectedRange.current = range.cloneRange()
+    const rect = range.getBoundingClientRect()
+    return { source, ranges: res.ranges, rect: { top: rect.top, left: rect.left, width: rect.width } }
+  }
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null
     const onSelectionChange = (): void => {
+      cancelSelectionCheck()
       if (composingRef.current) return
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => {
-        const sel = window.getSelection()
-        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-          setActive(null)
-          return
-        }
-        const range = sel.getRangeAt(0)
-        const container = containerRef.current
-        if (!container || !container.contains(range.commonAncestorContainer)) {
-          setActive(null)
-          return
-        }
-        const res = rangeToSourceRanges(range, source, spans)
-        if ('error' in res) {
-          setActive(null)
-          return
-        }
-        selectedRange.current = range.cloneRange()
-        const rect = range.getBoundingClientRect()
-        setActive({ source, ranges: res.ranges, rect: { top: rect.top, left: rect.left, width: rect.width } })
+      selectionTimer.current = setTimeout(() => {
+        selectionTimer.current = null
+        // Focus entering a composer may collapse the browser selection after this check was queued.
+        if (composingRef.current) return
+        setActive(readSelection())
       }, 120)
     }
     document.addEventListener('selectionchange', onSelectionChange)
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange)
-      if (timer) clearTimeout(timer)
+      cancelSelectionCheck()
     }
   }, [containerRef, source, spans])
 
@@ -83,9 +91,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       if (e.key === 'Escape') {
         // Leave Escape to active settings or dialog overlays.
         if (document.querySelector('.settings-panel, .close-dialog[open]')) return
-        setComposing(null)
-        setComment('')
-        setActive(null)
+        dismiss()
       }
     }
     let raf = 0
@@ -119,7 +125,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     !!active && replacements.some((text, index) => text !== active.ranges[index]?.text)
   useDraftGuard('selection', t(composing === 'change' ? 'suggestChange' : 'comment'), meaningful,
     () => { requestAnimationFrame(() => toolbarRef.current?.querySelector('textarea')?.focus()) },
-    () => { setComment(''); setReplacements([]); setComposing(null); setActive(null) })
+    dismiss)
 
   // Preserve the last position while the toolbar exits.
   const present = usePresence(!!active, EXIT_MS)
@@ -136,13 +142,20 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const view = active ?? lastActive.current
   if (!present.mounted || !view) return null
 
+  const begin = (kind: 'comment' | 'change'): void => {
+    if (!active || present.exiting || readOnly) return
+    const target = selectionTimer.current !== null ? readSelection() ?? active : active
+    cancelSelectionCheck()
+    setActive(target)
+    composingRef.current = true
+    if (kind === 'change') setReplacements(target.ranges.map((range) => range.text))
+    setComposing(kind)
+  }
   const finish = (edits: TextEdit[]): void => {
     if (readOnly) return
     onEdit(edits)
     window.getSelection()?.removeAllRanges()
-    setActive(null)
-    setComposing(null)
-    setComment('')
+    dismiss()
   }
   const changes = composing === 'change' ? changeEdits(view.ranges, replacements) : []
   const canSubmit = source === view.source && !readOnly && (composing === 'comment' ? !!comment.trim() : !!changes?.length)
@@ -154,9 +167,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit()
     else if (e.key === 'Escape') {
-      setComposing(null)
-      setComment('')
-      setActive(null)
+      dismiss()
     }
     e.stopPropagation()
   }
@@ -175,11 +186,11 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     >
       {!composing ? (
         <>
-          <button type="button" disabled={readOnly} onClick={() => setComposing('comment')}>
+          <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('comment')}>
             <ChatIcon width={13} height={13} />
             {t('comment')}
           </button>
-          <button type="button" disabled={readOnly} onClick={() => { setReplacements(view.ranges.map((range) => range.text)); setComposing('change') }}>
+          <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('change')}>
             <PencilIcon width={13} height={13} />
             {t('suggestChange')}
           </button>
@@ -213,7 +224,11 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
             {changes === null && <p role="alert">{t('changeInvalid')}</p>}
           </>}
           <div className="sel-composer-actions">
-            <button type="button" onClick={() => setComposing(null)}>
+            <button type="button" onClick={() => {
+              cancelSelectionCheck()
+              composingRef.current = false
+              setComposing(null)
+            }}>
               {t('cancel')}
             </button>
             <button type="button" className="btn-primary btn-compact" disabled={!canSubmit} onClick={submit}>

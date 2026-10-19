@@ -42,3 +42,10 @@ comment/deletion edits, reparsing, and exact accept/reject splices together.
 
 `tests/formatted-selection.test.tsx` checks complete and partial formatted selections against the
 real renderer, reparsing, and exact deletion acceptance/rejection, including retained CRLF.
+
+The selection toolbar debounces browser selection changes until a composer owns its captured
+anchor. Entering or dismissing a composer cancels pending checks; delayed checks also verify that
+no composer has taken ownership. Actions flush a pending valid selection so rapid reselection uses
+the latest passage. A toolbar retained only for its exit animation cannot start a new composer.
+Escape dismisses pending work as well as the visible controls. Draft text remains intact across
+focus changes, scrolling, and source updates; submission still requires the captured source.
