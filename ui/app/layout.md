@@ -24,9 +24,10 @@ panels clear that space. Outline navigation also accounts for the current toolba
 styles omit controls and their reserved space. Keeping controls at the top avoids browser hosts
 that overlay an input near the bottom of the viewport.
 
-`Navigator` shows a compact heading-tick strip with the current section highlighted. Inactive bars
-shorten at every heading depth; the active section always has the longest bar. Both outline surfaces
-use uniform thickness and square ends. The popup aligns bars in a fixed left column and indents only
+`Navigator` shows a compact heading-tick strip when the document has at least two headings, with
+the current section highlighted. Inactive bars shorten at every heading depth; the active section
+always has the longest bar. Both outline surfaces use uniform thickness and square ends. The popup
+aligns bars in a fixed left column and indents only
 heading labels, so changing the active section does not shift the text. Hover, focus,
 or a click opens its scrollable heading list without moving the document. Escape, outside clicks,
 and leaving the unfocused control dismiss the list. Selecting a heading scrolls to its source

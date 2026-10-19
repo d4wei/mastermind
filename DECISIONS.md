@@ -29,6 +29,13 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-18 — Outline requires at least two headings
+
+**Ruled.** Keep the outline/progress control hidden when a document has fewer than two headings.
+A title alone does not need section navigation; do not reserve outline space in that case.
+
+**Beat:** displaying a single-section control solely because the document is long.
+
 ## 2026-10-18 — Documents must have Markdown extensions
 
 **Ruled.** Admit only `.md` and `.markdown` files, case-insensitively, through every opening route.

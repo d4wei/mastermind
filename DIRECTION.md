@@ -26,13 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-18 — Outline visibility for a single heading
-
-**Open question.** The outline hides below two headings, so a long document with only a title has
-no progress control. Decide whether a single section should still show the control.
-
-**Exit:** Settle the visibility rule and align navigation, layout reservation, and their tests.
-
 ## 2026-10-18 — Agent-requested file closing
 
 **Bet.** Let the bundled skill close files as well as open them, so completed reviews need not
