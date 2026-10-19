@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { DEFAULT_CONFIG } from '../../ui/settings/defaults'
 import { readSessionFile, writeSessionFile } from './files'
-import { readPreparedTranslation, validLanguageCode } from '../translation/prepared-translations'
+import { readPreparedTranslation, listPreparedTranslations, validLanguageCode } from '../translation/prepared-translations'
 import { serveFile } from './static'
 import { scanThemes } from '../../themes/discovery'
 
@@ -44,6 +44,10 @@ export async function createPreview(file: string, themesRoot: string): Promise<H
     const result = await writeSessionFile(target, body.content, body.baseVersion)
     return result.ok ? c.json({ mtimeMs: result.mtimeMs, version: result.version }) : c.json({ error: 'file changed on disk', currentMtimeMs: result.currentMtimeMs }, 409)
   })
+  app.get('/api/sessions/preview/translations', async (c) => {
+    try { return c.json(await listPreparedTranslations(real, (await readSessionFile(real)).content)) }
+    catch { return c.json([]) }
+  })
   app.get('/api/sessions/preview/translation', async (c) => {
     const lang = c.req.query('targetLang') ?? ''
     if (!validLanguageCode(lang)) return c.json({ error: 'invalid targetLang' }, 400)
@@ -58,11 +62,15 @@ export async function createPreview(file: string, themesRoot: string): Promise<H
     let running = true
     stream.onAbort(() => { running = false })
     let previous = ''
+    let translations = ''
     while (running) {
       try {
         const file = await readSessionFile(real)
         if (previous && previous !== file.version) await stream.writeSSE({ event: 'file-changed', data: JSON.stringify(file) })
         previous = file.version
+        const next = JSON.stringify(await listPreparedTranslations(real, file.content))
+        if (translations && translations !== next) await stream.writeSSE({ event: 'translations-changed', data: '{}' })
+        translations = next
       } catch { await stream.writeSSE({ event: 'file-deleted', data: '{}' }) }
       await stream.sleep(500)
     }

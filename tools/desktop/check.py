@@ -108,8 +108,7 @@ try:
                   for result in response['results'][1:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
         preferences = root.parent / (root.name + '-preferences.json')
-        code, setup = suggest(root, {'authorTag': 'Agent', 'uiLang': 'zh-CN',
-                                     'translationLanguage': None})
+        code, setup = suggest(root, {'authorTag': 'Agent', 'uiLang': 'zh-CN'})
         check('separate setup accepts valid suggestions without saving preferences',
               code == 0 and setup['pid'] == pid and setup['onboarding_needed'] is True and
               set(setup['setup_results'].values()) == {'accepted'} and not preferences.exists())
@@ -117,12 +116,12 @@ try:
         check('invalid setup values reject the whole request without saving',
               code == 2 and invalid_setup['error'] == 'invalid_setup_field:uiLang' and
               not preferences.exists())
-        preferences.write_text(json.dumps({'translationLanguage': None}), encoding='utf-8')
-        code, setup = suggest(root, {'authorTag': 'Agent', 'translationLanguage': 'zh-CN'})
-        check('saved Original only defeats a later agent suggestion', code == 0 and
-              setup['setup_results'] == {'authorTag': 'accepted', 'translationLanguage': 'ignored'})
+        preferences.write_text(json.dumps({'uiLang': 'en'}), encoding='utf-8')
+        code, setup = suggest(root, {'authorTag': 'Agent', 'uiLang': 'zh-CN'})
+        check('saved Interface language defeats a later agent suggestion', code == 0 and
+              setup['setup_results'] == {'authorTag': 'accepted', 'uiLang': 'ignored'})
         preferences.write_text(json.dumps({'onboardingCompleted': True, 'authorTag': 'Confirmed',
-                                          'uiLang': 'en', 'translationLanguage': None}), encoding='utf-8')
+                                          'uiLang': 'en'}), encoding='utf-8')
         code, completed, _ = invoke(root, [files / 'a.md'])
         check('admission reports persisted setup completion', code == 0 and
               completed['onboarding_needed'] is False)

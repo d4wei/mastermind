@@ -146,6 +146,7 @@ mod tests {
         let docs = Mutex::new(Documents::default());
         let request = || {
             Operation::Open(Request {
+                language: None,
                 version: VERSION,
                 paths: vec![path.to_str().unwrap().into()],
             })
@@ -157,7 +158,7 @@ mod tests {
         assert_eq!(response.onboarding_needed, None);
         assert_eq!(response.results[0].status, "already_open");
         assert!(response.error.is_none());
-        std::fs::write(&preferences, b"{\"onboardingCompleted\":true,\"authorTag\":\"Reader\",\"uiLang\":\"en\",\"translationLanguage\":null}").unwrap();
+        std::fs::write(&preferences, b"{\"onboardingCompleted\":true,\"authorTag\":\"Reader\",\"uiLang\":\"en\"}").unwrap();
         assert_eq!(
             dispatch(request(), &docs, &setup).onboarding_needed,
             Some(false)

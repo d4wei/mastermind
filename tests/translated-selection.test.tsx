@@ -1,3 +1,5 @@
+import { installHost } from '../ui/app/host'
+import { fakeHost } from './helpers/host'
 // @vitest-environment jsdom
 import { act, useRef } from 'react'
 import type { Root } from 'react-dom/client'
@@ -30,7 +32,8 @@ beforeEach(async () => {
   const projection = await prepareTranslation(source)
   artifact = { version: 1, sourceHash: projection.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: projection.blocks.filter((block) => block.translatable).map((block, index) => ({ id: block.id, text: index ? 'Second translation' : quote })) }
-  useConfig.setState({ config: { ...initialConfig.config!, translationLanguage: 'zh-CN' } })
+  useConfig.setState({ config: { ...initialConfig.config! } })
+  installHost(fakeHost({ translation: async () => artifact }))
   useDoc.setState({ ...initial, sessionId: 'A', source, savedSource: source, queueAutosave: vi.fn() })
   useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', active: true, artifact, error: null })
   ;({ host, root } = createReactHost())
@@ -38,6 +41,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   removeReactHost(root, host); useDoc.setState(initial); useConfig.setState(initialConfig); useTranslation.getState().reset()
+  installHost(null)
   window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals()
 })
 function select(crossBlock = false) {
@@ -92,7 +96,7 @@ it.each(['navigation', 'narrative', 'target'])('rejects a composer captured befo
   act(() => {
     if (change === 'navigation') useDoc.setState({ sessionId: 'B' })
     if (change === 'narrative') useDoc.setState({ source: 'Changed prose.' })
-    if (change === 'target') useConfig.setState({ config: { ...useConfig.getState().config!, translationLanguage: 'ja' } })
+    if (change === 'target') useTranslation.setState({ targetLang: 'ja' })
   })
   const before = useDoc.getState().source
   act(() => submit.click())
@@ -129,4 +133,13 @@ it('preserves the translated-comment draft across IME cancellation without submi
   expect(useDoc.getState().source).toBe(source)
   act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(host.querySelector('textarea')).toBeNull()
+})
+
+it('rejects a replaced on-disk artifact even before its change event arrives', async () => {
+  const submit = compose()
+  installHost(fakeHost({ translation: async () => ({ ...artifact,
+    blocks: artifact.blocks.map((block) => ({ ...block, text: 'Replacement text' })) }) }))
+  act(() => submit.click())
+  await vi.waitFor(() => expect(host.querySelector('[role="alert"]')).not.toBeNull())
+  expect(useDoc.getState().source).toBe(source)
 })

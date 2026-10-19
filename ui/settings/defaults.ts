@@ -12,5 +12,4 @@ export const DEFAULT_CONFIG: MastermindConfig = {
   monoFont: 'geist',
   codeTheme: 'none',
   uiLang: 'en',
-  translationLanguage: null,
 }

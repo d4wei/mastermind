@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-const FIELDS: [&str; 3] = ["authorTag", "uiLang", "translationLanguage"];
+const FIELDS: [&str; 2] = ["authorTag", "uiLang"];
 const COMPLETED: &str = "onboardingCompleted";
 const MAX_AUTHOR_UTF16_UNITS: usize = 64;
 const GIT_NAME_OUTPUT_BYTES: usize = 4096;
@@ -52,7 +52,6 @@ fn validate(fields: &Map<String, Value>, complete: bool) -> Result<Map<String, V
                 .as_str()
                 .is_some_and(|name| usable_name(&normalize_name(name))),
             "uiLang" => matches!(value.as_str(), Some("en" | "zh-CN")),
-            "translationLanguage" => value.is_null() || value.as_str().is_some_and(language_code),
             _ => false,
         };
         if !valid {
@@ -119,12 +118,6 @@ fn git_default_name(raw: &str) -> String {
     }
 }
 
-fn language_code(code: &str) -> bool {
-    let mut bytes = code.bytes();
-    bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
-        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-}
-
 fn git_name() -> String {
     use std::process::{Command, Stdio};
     let mut command = Command::new("git");
@@ -186,7 +179,10 @@ impl Setup {
     }
 
     fn read_raw(&self) -> Result<Option<Value>, String> {
-        let raw = read_preferences_file(self.path.clone())?;
+        let mut raw = read_preferences_file(self.path.clone())?;
+        if let Some(object) = raw.as_mut().and_then(Value::as_object_mut) {
+            object.remove("translationLanguage");
+        }
         if raw.as_ref().is_some_and(|value| !value.is_object()) {
             return Err("invalid_preferences".into());
         }
@@ -249,7 +245,7 @@ impl Setup {
         } else {
             state.git_name.get_or_insert_with(git_name).clone()
         };
-        let defaults = json!({"authorTag":name,"uiLang":state.ui_default.as_deref().unwrap_or("en"),"translationLanguage":null});
+        let defaults = json!({"authorTag":name,"uiLang":state.ui_default.as_deref().unwrap_or("en")});
         let values = FIELDS
             .into_iter()
             .map(|key| {
@@ -358,7 +354,7 @@ impl Setup {
 
     pub fn patch_preferences(&self, patch: Value) -> Result<(), String> {
         let patch = patch.as_object().ok_or("invalid_preferences")?;
-        if patch.contains_key(COMPLETED) {
+        if patch.contains_key(COMPLETED) || patch.contains_key("translationLanguage") {
             return Err("invalid_preferences".into());
         }
         let setup_fields: Map<String, Value> = patch
@@ -474,7 +470,19 @@ mod tests {
         }
     }
     fn values() -> Value {
-        json!({"authorTag":" @Reader ","uiLang":"zh-CN","translationLanguage":null})
+        json!({"authorTag":" @Reader ","uiLang":"zh-CN"})
+    }
+
+    #[test]
+    fn retired_translation_preference_is_not_exposed_or_written_back() {
+        let fixture = Fixture::new();
+        let setup = fixture.setup();
+        std::fs::write(&setup.path, json!({"translationLanguage":"fr","theme":"sepia"}).to_string()).unwrap();
+        assert_eq!(setup.read_preferences().unwrap().unwrap(), json!({"theme":"sepia"}));
+        assert!(setup.patch_preferences(json!({"translationLanguage":"fr"})).is_err());
+        setup.patch_preferences(json!({"uiLang":"en"})).unwrap();
+        let saved: Value = serde_json::from_str(&std::fs::read_to_string(&setup.path).unwrap()).unwrap();
+        assert_eq!(saved, json!({"theme":"sepia","uiLang":"en"}));
     }
 
     #[test]
@@ -485,10 +493,10 @@ mod tests {
         assert!(!snapshot.completed);
         assert_eq!(snapshot.values["authorTag"], "Default name");
         assert_eq!(snapshot.values["uiLang"], "zh-CN");
-        assert_eq!(snapshot.values["translationLanguage"], Value::Null);
+        assert!(!snapshot.values.contains_key("translationLanguage"));
         assert!(snapshot.saved.values().all(|saved| !saved));
         let result = setup.suggest(suggestions(
-            json!({"authorTag":"Agent","translationLanguage":"zh-CN"}),
+            json!({"authorTag":"Agent"}),
         ));
         assert_eq!(result.setup_results.unwrap()["authorTag"], "accepted");
         let snapshot = setup.protect(vec!["authorTag".into()]).unwrap();
@@ -505,23 +513,23 @@ mod tests {
     }
 
     #[test]
-    fn saved_fields_win_including_explicit_original_only_without_saving_defaults() {
+    fn saved_fields_win_without_saving_defaults() {
         let fixture = Fixture::new();
         let setup = fixture.setup();
         setup
-            .patch_preferences(json!({"translationLanguage":null,"theme":"serif"}))
+            .patch_preferences(json!({"uiLang":"en","theme":"serif"}))
             .unwrap();
         let response = setup.suggest(suggestions(
-            json!({"authorTag":"Agent","translationLanguage":"zh-CN"}),
+            json!({"authorTag":"Agent","uiLang":"zh-CN"}),
         ));
         let results = response.setup_results.unwrap();
         assert_eq!(results["authorTag"], "accepted");
-        assert_eq!(results["translationLanguage"], "ignored");
+        assert_eq!(results["uiLang"], "ignored");
         let snapshot = setup.snapshot(None).unwrap();
-        assert!(snapshot.saved["translationLanguage"]);
+        assert!(snapshot.saved["uiLang"]);
         assert!(!snapshot.saved["authorTag"]);
         let raw = setup.read_preferences().unwrap().unwrap();
-        assert_eq!(raw, json!({"theme":"serif","translationLanguage":null}));
+        assert_eq!(raw, json!({"theme":"serif","uiLang":"en"}));
         assert!(setup.onboarding_needed().unwrap());
     }
 
@@ -557,12 +565,12 @@ mod tests {
         assert_eq!(snapshot.values["authorTag"], "Reader");
         assert_eq!(
             setup.read_preferences().unwrap().unwrap(),
-            json!({"fontSize":20,"authorTag":"Reader","uiLang":"zh-CN","translationLanguage":null,"onboardingCompleted":true})
+            json!({"fontSize":20,"authorTag":"Reader","uiLang":"zh-CN","onboardingCompleted":true})
         );
         let fresh = fixture.setup();
         assert!(!fresh.onboarding_needed().unwrap());
         let response = fresh.suggest(suggestions(
-            json!({"authorTag":"Agent","uiLang":"en","translationLanguage":"fr"}),
+            json!({"authorTag":"Agent","uiLang":"en"}),
         ));
         assert!(
             response
@@ -628,10 +636,8 @@ mod tests {
             json!({"authorTag":" "}),
             json!({"authorTag":"@Reader"}),
             json!({"uiLang":"unsupported"}),
-            json!({"translationLanguage":false}),
             json!({"onboardingCompleted":"true"}),
             json!({"onboardingCompleted":true}),
-            json!({"onboardingCompleted":true,"authorTag":"Reader","uiLang":"en"}),
         ] {
             let bytes = serde_json::to_vec(&invalid).unwrap();
             std::fs::write(&setup.path, &bytes).unwrap();
@@ -745,7 +751,7 @@ mod tests {
         );
         let snapshot = setup.snapshot(None).unwrap();
         assert!(!snapshot.saved["authorTag"]);
-        assert!(!snapshot.saved["translationLanguage"]);
+        assert!(!snapshot.saved.contains_key("translationLanguage"));
         assert!(snapshot.saved["uiLang"]);
         assert!(!snapshot.completed);
     }

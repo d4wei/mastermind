@@ -49,6 +49,7 @@ export function SessionView({ sessionId }: { sessionId: string }) {
 }
 
 function DocumentView({ sessionId }: { sessionId: string }) {
+  const loadedSessionId = useDoc((s) => s.sessionId)
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
@@ -101,9 +102,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     setRailOpen(true)
   }, [narrow])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
-  const translationLanguage = useConfig((s) => s.config?.translationLanguage) ?? null
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const translation = useTranslation()
+  const translationLanguage = translation.targetLang
   const retainedTranslation = useRef<{ sessionId: string; targetLang: string; artifact: NonNullable<typeof translation.artifact> } | null>(null)
   if (translation.artifact && translation.sessionId === sessionId && translation.targetLang === translationLanguage) {
     retainedTranslation.current = { sessionId, targetLang: translation.artifact.targetLang, artifact: translation.artifact }
@@ -115,14 +116,14 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     captured?.sessionId === sessionId && captured.targetLang === translationLanguage ? captured.artifact : null) ?? translatedDraft?.artifact
   const transActive = translation.active && translation.sessionId === sessionId &&
     translation.source === source && translation.targetLang === translationLanguage
-  useEffect(() => { void useTranslation.getState().synchronize() }, [sessionId, source, translationLanguage])
-  const transLoading = useTranslation((s) => s.loading)
+  useEffect(() => {
+    if (loadedSessionId === sessionId && status === 'ready') void useTranslation.getState().synchronize()
+  }, [sessionId, source, status, loadedSessionId])
 
   useEffect(() => {
     void load(sessionId)
     setActiveSpan(null)
     setHoveredSpan(null)
-    useTranslation.getState().reset()
   }, [sessionId, load])
 
   useEffect(() => {
@@ -133,12 +134,20 @@ function DocumentView({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     if (status !== 'ready') return
-    return requireReviewerHost().subscribe(sessionId, (event) => {
+    let translationRefresh: ReturnType<typeof setTimeout> | undefined
+    const refreshTranslations = () => {
+      clearTimeout(translationRefresh)
+      translationRefresh = setTimeout(() => { void useTranslation.getState().synchronize() }, 50)
+    }
+    const unsubscribe = requireReviewerHost().subscribe(sessionId, (event) => {
+      if (event === 'translations') { refreshTranslations(); return }
       if (event === 'config') { void useConfig.getState().load(); return }
       if (useDoc.getState().sessionId === sessionId) {
+        refreshTranslations()
         useDoc.getState().notifyDiskChange(0, event === 'deleted')
       }
     })
+    return () => { unsubscribe(); clearTimeout(translationRefresh) }
   }, [sessionId, status])
 
   const showTranslated = mode === 'reading' && transActive
@@ -348,12 +357,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           }
         }}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
-        translation={translationLanguage ? {
-          label: transActive ? t('original') : translationLanguage,
-          active: transActive,
-          loading: transLoading,
-          onToggle: () => void useTranslation.getState().toggle(),
-        } : undefined}
       />
       {panel === 'settings' && (
         <Suspense fallback={null}>
@@ -368,7 +371,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
       <ConflictPanel />
       {translation.error && <Notice key={translation.error}>
-        {t(translation.error === 'missing' ? 'preparedMissing' : translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
+        {t(translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </Notice>}
       <DocumentScroll>
         <div ref={reading.ref} className={`doc-shell${inlineRail ? ' with-rail' : ''}`}

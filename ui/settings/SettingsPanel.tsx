@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { usableAuthorName } from '../../document/author'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
-import { LangSelect } from './LangSelect'
 import { useT, type MsgKey } from '../i18n'
 import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme } from '../theme/codeThemes'
@@ -136,11 +135,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
             </div>
-          </div>
-          <div className="settings-row">
-            <span title={t('translationLanguageHint')}>{t('translationLanguage')}</span>
-            <LangSelect label={t('translationLanguage')} value={config.translationLanguage}
-              onChange={(translationLanguage) => patch({ translationLanguage })} />
           </div>
         </section>
 

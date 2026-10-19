@@ -120,3 +120,9 @@ it('fits short labels by their measured widths and recomputes when they grow', a
   expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
   expect(host.querySelector('button.native-file-overflow')?.textContent).toContain('+2')
 })
+
+it('dismisses the file list when the language menu opens', async () => {
+  await mount(); await open()
+  await act(async () => window.dispatchEvent(new Event('mastermind-language-open')))
+  expect(menu()).toBeNull()
+})

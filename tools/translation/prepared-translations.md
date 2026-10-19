@@ -26,3 +26,9 @@ The CLI requires both language codes:
 plan; adding `--save` consumes the complete artifact JSON on stdin. The wrapper invokes the built
 Node helper directly. Review opening is independent of artifact availability and always returns
 without a completion wait.
+
+Discovery lists independently valid targets without a separate index. The browser preview rejects
+redirected directories, symbolic links, mismatched filename/target identities, and oversized files.
+The native equivalent and watch lifecycle are documented in
+[`desktop/src/translations.md`](../../desktop/src/translations.md). The UI validates every returned
+artifact against the live buffer before offering or displaying it.

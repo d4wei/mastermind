@@ -19,6 +19,7 @@ pub struct Snapshot {
 struct OpenDocument {
     id: String,
     path: String,
+    language: Option<String>,
 }
 
 impl Snapshot {
@@ -31,6 +32,7 @@ impl Snapshot {
                 .map(|(id, path)| OpenDocument {
                     id: id.to_string(),
                     path: path.clone(),
+                    language: docs.languages.get(id).cloned(),
                 })
                 .collect(),
             activation_revision: docs.activation_revision,
@@ -102,6 +104,7 @@ fn admit_graphical(docs: &mut Documents, paths: Vec<Result<PathBuf, String>>) {
         .collect::<Vec<_>>();
     if !paths.is_empty() {
         let request = Request {
+            language: None,
             version: VERSION,
             paths,
         };

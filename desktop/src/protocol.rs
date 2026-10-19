@@ -9,6 +9,8 @@ pub const MAX_FILES: usize = 64;
 pub struct Request {
     pub version: u32,
     pub paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -93,7 +95,7 @@ mod tests {
         ));
         assert!(matches!(
             serde_json::from_value::<Operation>(
-                serde_json::json!({"version":VERSION,"setup":{"translationLanguage":null}})
+                serde_json::json!({"version":VERSION,"setup":{"uiLang":"en"}})
             )
             .unwrap(),
             Operation::Setup(_)
@@ -117,4 +119,11 @@ mod tests {
             .is_err()
         );
     }
+}
+
+pub fn language_code(code: &str) -> bool {
+    let mut bytes = code.bytes();
+    !code.is_empty() && code.len() <= 64
+        && bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }

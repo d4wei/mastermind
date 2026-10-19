@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, savePreparedTranslation, readPreparedTranslation, translationFile } from '../tools/translation/prepared-translations'
+import { planTranslation, savePreparedTranslation, readPreparedTranslation, listPreparedTranslations, translationFile } from '../tools/translation/prepared-translations'
 
 let dir: string
 let file: string
@@ -96,4 +96,20 @@ it.each(['write', 'rename'])('preserves the previous artifact and cleans tempora
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', replacement)).rejects.toThrow(`injected artifact ${operation} failure`)
   expect(await fs.readFile(artifactPath)).toEqual(previousBytes)
   expect(await fs.readdir(path.dirname(artifactPath))).toEqual([path.basename(artifactPath)])
+})
+
+it('discovers targets independently and ignores foreign, malformed and redirected artifacts', async () => {
+  file = await fs.realpath(file)
+  expect(await listPreparedTranslations(file, source)).toEqual([])
+  const artifact = await artifactFor()
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
+  const french = { ...artifact, targetLang: 'fr' }
+  await savePreparedTranslation(file, source, 'en', 'fr', french)
+  await fs.writeFile(translationFile(file, 'ja'), 'invalid')
+  await fs.writeFile(translationFile(file, 'de'), JSON.stringify({ ...artifact, targetLang: 'es' }))
+  if (process.platform !== 'win32') await fs.symlink(translationFile(file, 'fr'), translationFile(file, 'it'))
+  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['fr', 'zh-CN'])
+  expect(await listPreparedTranslations(file, 'Changed source')).toEqual([])
+  await fs.unlink(translationFile(file, 'fr'))
+  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
 })

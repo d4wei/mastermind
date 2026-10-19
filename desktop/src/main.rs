@@ -3,6 +3,7 @@
 mod admission;
 mod appearance;
 mod document_io;
+mod translations;
 mod endpoint;
 mod files;
 mod launcher;
@@ -76,6 +77,7 @@ fn main() {
             document_io::save_document_copy,
             document_io::watch_document,
             document_io::read_translation,
+            document_io::list_translations,
             setup::setup_snapshot,
             setup::protect_setup_fields,
             setup::confirm_setup,

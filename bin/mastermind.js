@@ -7,7 +7,7 @@ import path from 'node:path'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 if (!['open', 'setup', 'translate-blocks'].includes(args[0])) {
-  console.error('Usage: mastermind open -- FILE... | mastermind setup [--suggest JSON] | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save]')
+  console.error('Usage: mastermind open [--language CODE] -- FILE... | mastermind setup [--suggest JSON] | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save]')
   process.exit(2)
 }
 let command

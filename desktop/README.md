@@ -26,8 +26,9 @@ releases.
 
 `main.rs` assembles the native states and command handlers. `launcher.rs` handles command parsing
 and local transport startup; `opening.rs` owns the admitted-document snapshot; `document_io.rs`
-serves admitted document operations and watches; `lifecycle.rs` creates the window and dispatches
-menus, close requests, and application events. Setup uses preference persistence directly.
+serves admitted document operations and watches. [Translation discovery](src/translations.md)
+offers available reading versions; `lifecycle.rs` creates the window and dispatches menus, close
+requests, and application events. Setup uses preference persistence directly.
 `appearance.rs` applies the rendered theme's background and native light/dark appearance;
 the [theme adapter](../ui/theme/appearance.md) owns its color source and synchronization timing.
 

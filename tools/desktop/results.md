@@ -612,6 +612,27 @@ Find dismissed the open file list. Unit tests cover the full count/width range c
 blocked closes, close-dialog dismissal, localized labels, and focus behavior. These observations
 are not a complete native count-by-width matrix or a sustained resource benchmark.
 
+### 2026-10-18 — Document reading languages
+
+A disposable native instance opened a prepared Chinese version through `open --language zh-CN`.
+The labeled menu switched to French and Portuguese (Brazil). Markdown view showed the original;
+returning to reading restored French, and Find matched a French passage. Reopening with another
+language hint did not replace the reader's choice. Switching files retained their separate choices.
+
+An original-only document had no picker. Creating its previously absent translations directory
+and a valid artifact made the menu appear without reopening. Selecting and then removing that
+artifact returned to Original with a dismissible notification. The process harness passed with
+the reduced onboarding fields. Rust and UI tests cover malformed artifacts, independent targets,
+freshness, replacement during a draft, submission rereads, and late responses.
+
+The toolbar was exercised with 1, 3, 12, 30, and 50 disposable files, including duplicate basenames
+and long Chinese names. Checks included approximately 1100-, 760-, and 560-point widths, with the
+long Portuguese label; the active pill, close button, and document controls remained accessible.
+The 50-file list exposed paths and disambiguated names; Home/End navigation reached the first and
+last documents. Find and the language menu dismissed each other. These are sampled native checks,
+not every count-by-width interaction or a sustained resource measurement. Windows interaction with
+the new picker has not been run.
+
 ### Remaining hardening and distribution checks
 
 Tauri is adopted as the application host. These remaining checks bound release claims; they do not

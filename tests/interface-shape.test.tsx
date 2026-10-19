@@ -25,9 +25,9 @@ it('gives peer controls and floating surfaces consistent corners', () => {
   installStyles()
   const groups = [
     ['btn-primary', 'btn-ghost', 'settings-input', 'theme-chip', 'native-open', 'native-file-pill'],
-    ['reader-menu', 'rail-card', 'sel-toolbar', 'slide-over', 'lang-menu', 'outline-popover',
+    ['reader-menu', 'rail-card', 'sel-toolbar', 'slide-over', 'outline-popover',
       'find-bar', 'notification'],
-    ['reader-menu-item', 'lang-option', 'native-file-close'],
+    ['reader-menu-item', 'native-file-close'],
   ]
   for (const [index, names] of groups.entries()) {
     const expected = [radii['--radius-md'], radii['--radius-lg'], radii['--radius-xs']][index]

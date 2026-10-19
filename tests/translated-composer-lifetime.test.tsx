@@ -26,13 +26,14 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.stubGlobal('crypto', webcrypto)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', source, savedSource: source, load: vi.fn().mockResolvedValue(undefined) })
-  useConfig.setState({ config: { ...config.config!, translationLanguage: 'zh-CN' } })
+  useConfig.setState({ config: { ...config.config! } })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   await act(async () => root.render(<SessionView sessionId="A" />))
   const prepared = await prepareTranslation(source)
   const artifact: PreparedTranslation = { version: 1, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id, text: '你好。' })) }
-  await act(async () => useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', active: true, artifact }))
+  installHost(fakeHost({ translations: async () => [artifact] }))
+  await act(async () => useTranslation.getState().select('zh-CN'))
   const text = host.querySelector('[data-trans-block-id]')!.firstChild!
   const range = document.createRange(); range.selectNodeContents(text)
   range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 50 } as DOMRect)
@@ -46,13 +47,16 @@ beforeEach(async () => {
   })
 })
 afterEach(() => {
-  act(() => root.unmount()); releaseDrafts('A'); host.remove(); useDoc.setState(initial); useConfig.setState(config); useTranslation.getState().reset()
+  act(() => root.unmount()); releaseDrafts('A'); host.remove(); useDoc.setState(initial); useConfig.setState(config); useTranslation.getState().release('A')
   window.getSelection()?.removeAllRanges(); vi.unstubAllGlobals(); installHost(null)
 })
 it.each(['comment', 'narrative'])('retains the composer draft through a %s update', async (kind) => {
   const changed = kind === 'comment' ? 'Hello.{>>@claude: another comment<<}' : 'Changed prose.'
   await act(async () => { useDoc.setState({ source: changed }); await useTranslation.getState().synchronize() })
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
+  await act(async () => {
+    await vi.waitFor(() => expect(useTranslation.getState().source).toBe(changed))
+  })
   expect(useTranslation.getState().active).toBe(kind === 'comment')
   if (kind === 'narrative') expect(host.querySelector('.sel-composer [role="alert"]')).not.toBeNull()
 })

@@ -28,13 +28,18 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
         }
         return Ok(request);
     }
-    if args.len() < 3 || args[0] != "open" || args[1] != "--" || args.len() - 2 > MAX_FILES {
-        return Err(io::Error::other(
-            "usage: mastermind-launch-check open -- FILE...",
-        ));
+    let (offset, language) = if args.get(1).is_some_and(|arg| arg == "--language") {
+        let language = args.get(2).and_then(|arg| arg.to_str())
+            .filter(|code| mastermind_launch_check::protocol::language_code(code))
+            .ok_or_else(|| io::Error::other("invalid_language"))?;
+        (4, Some(language.to_owned()))
+    } else { (2, None) };
+    if args.first().is_none_or(|arg| arg != "open") || args.get(offset - 1).is_none_or(|arg| arg != "--")
+        || args.len() <= offset || args.len() - offset > MAX_FILES {
+        return Err(io::Error::other("usage: mastermind-launch-check open [--language CODE] -- FILE..."));
     }
     let cwd = std::env::current_dir()?;
-    let paths = args[2..]
+    let paths = args[offset..]
         .iter()
         .map(|arg| {
             let path = cwd.join(arg);
@@ -44,6 +49,7 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
         })
         .collect::<io::Result<Vec<_>>>()?;
     let request = Request {
+        language,
         version: VERSION,
         paths,
     };
@@ -121,19 +127,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn setup_cli_is_separate_from_open_and_preserves_explicit_null() {
+    fn opening_language_is_optional_and_does_not_consume_a_file_path() {
+        let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
+        let Operation::Open(open) = request(args(&["open", "--language", "zh-CN", "--", "one.md", "two.md"])).unwrap() else { panic!("expected open"); };
+        assert_eq!(open.language.as_deref(), Some("zh-CN"));
+        assert_eq!(open.paths.len(), 2);
+        let Operation::Open(open) = request(args(&["open", "--", "--language"])).unwrap() else { panic!("expected open"); };
+        assert!(open.language.is_none());
+        assert!(open.paths[0].ends_with("--language"));
+        for args in [args(&["open", "--language", "../fr", "--", "file.md"]), args(&["open", "--language", "fr", "--"])] {
+            assert!(request(args).is_err());
+        }
+    }
+
+    #[test]
+    fn setup_cli_is_separate_from_open() {
         let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
         let Operation::Setup(request) = request(args(&[
             "setup",
             "--suggest",
-            "{\"authorTag\":\"Reader\",\"translationLanguage\":null}",
+            "{\"authorTag\":\"Reader\",\"uiLang\":\"en\"}",
         ]))
         .unwrap() else {
             panic!("expected setup request");
         };
         assert_eq!(
-            request.setup["translationLanguage"],
-            serde_json::Value::Null
+            request.setup["uiLang"],
+            "en"
         );
         assert!(super::request(args(&["open", "--name", "Reader", "--", "file.md"])).is_err());
         assert!(super::request(args(&["setup", "--suggest", "[]"])).is_err());

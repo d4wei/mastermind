@@ -1,3 +1,4 @@
+import { useTranslation } from '../translate/translationStore'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate } from '../app/route'
@@ -94,6 +95,7 @@ export function NativeReviewer() {
             await homeMotion.current?.leave(true)
             if (disposed) return
           }
+          for (const file of snapshot.files) if (file.language) useTranslation.getState().hint(file.id, file.language)
           setFiles(snapshot.files)
           setOpeningErrors(snapshot.opening_errors)
           if (snapshot.activation_revision > activationRevision.current) {
@@ -170,6 +172,7 @@ export function NativeReviewer() {
           return false
         }
         releaseDrafts(file.id)
+        useTranslation.getState().release(file.id)
         activationRevision.current = snapshot!.activation_revision
         setFiles(snapshot!.files)
         setError('')

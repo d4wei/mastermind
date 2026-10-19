@@ -153,29 +153,23 @@ def check_setup(session, path, namespace, preferences, initial):
           lambda: 'What should we call you?' in text(session, '.native-setup'))
     assert not command(session, 'POST', '/elements',
                        {'using': 'css selector', 'value': 'article.md-root, .cm-content'})
-    first = suggest_setup({'authorTag': 'Alex', 'uiLang': 'en',
-                           'translationLanguage': 'zh-CN'}, namespace)
+    first = suggest_setup({'authorTag': 'Alex', 'uiLang': 'en'}, namespace)
     assert first['pid'] == initial['pid'] and first['onboarding_needed'] is True, first
     assert first['setup_results'] == dict.fromkeys(
-        ['authorTag', 'uiLang', 'translationLanguage'], 'accepted'), first
+        ['authorTag', 'uiLang'], 'accepted'), first
     until('agent suggestions appear without saving preferences',
-          lambda: property_value(session, '.native-setup-name', 'value') == 'Alex' and
-          '简体中文' in text(session, '.native-setup .lang-trigger'))
+          lambda: property_value(session, '.native-setup-name', 'value') == 'Alex')
     assert not preferences.exists(), 'Unconfirmed suggestions wrote preferences'
 
     replace_text(session, '.native-setup-name', 'Morgan')
-    click(session, '.native-setup-original')
     repeated = admit([path], namespace, ['already_open'])
     assert repeated['pid'] == initial['pid'] and repeated['onboarding_needed'] is True, repeated
     until('repeat opening does not restart the edited setup form',
-          lambda: property_value(session, '.native-setup-name', 'value') == 'Morgan' and
-          attribute(session, '.native-setup-original', 'aria-pressed') == 'true')
-    replacement = suggest_setup({'authorTag': 'Replacement', 'uiLang': 'en',
-                                 'translationLanguage': 'zh-CN'}, namespace)
+          lambda: property_value(session, '.native-setup-name', 'value') == 'Morgan')
+    replacement = suggest_setup({'authorTag': 'Replacement', 'uiLang': 'en'}, namespace)
     assert replacement['setup_results'] == {
-        'authorTag': 'ignored', 'uiLang': 'accepted', 'translationLanguage': 'ignored'}, replacement
+        'authorTag': 'ignored', 'uiLang': 'accepted'}, replacement
     assert property_value(session, '.native-setup-name', 'value') == 'Morgan'
-    assert attribute(session, '.native-setup-original', 'aria-pressed') == 'true'
     assert not preferences.exists(), 'Opening or editing an unconfirmed form wrote preferences'
 
     preferences.mkdir(parents=True)
@@ -191,13 +185,12 @@ def check_setup(session, path, namespace, preferences, initial):
     saved = json.loads(preferences.read_text(encoding='utf-8'))
     assert saved['onboardingCompleted'] is True, saved
     assert saved['authorTag'] == 'Morgan' and saved['uiLang'] == 'en', saved
-    assert 'translationLanguage' in saved and saved['translationLanguage'] is None, saved
+    assert 'translationLanguage' not in saved, saved
     before = preferences.read_bytes()
-    final = suggest_setup({'authorTag': 'Later', 'uiLang': 'zh-CN',
-                           'translationLanguage': 'zh-CN'}, namespace)
+    final = suggest_setup({'authorTag': 'Later', 'uiLang': 'zh-CN'}, namespace)
     assert final['onboarding_needed'] is False, final
     assert final['setup_results'] == dict.fromkeys(
-        ['authorTag', 'uiLang', 'translationLanguage'], 'ignored'), final
+        ['authorTag', 'uiLang'], 'ignored'), final
     reopened = admit([path], namespace, ['already_open'])
     assert reopened['onboarding_needed'] is False, reopened
     assert preferences.read_bytes() == before, 'Agent requests changed confirmed preferences'

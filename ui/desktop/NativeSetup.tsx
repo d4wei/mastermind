@@ -2,14 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { usableAuthorName } from '../../document/author'
 import { useConfig } from '../app/configStore'
 import { useT } from '../i18n'
-import { LangSelect } from '../settings/LangSelect'
 import { useCompositionGuard } from '../util/composition'
 import { nativeBridge } from './bridge'
 
 export interface SetupValues {
   authorTag: string
   uiLang: 'en' | 'zh-CN'
-  translationLanguage: string | null
 }
 export type SetupField = keyof SetupValues
 export interface SetupSnapshot {
@@ -52,8 +50,6 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
     setValues((current) => ({
       authorTag: edited.current.has('authorTag') ? current.authorTag : snapshot.values.authorTag,
       uiLang: edited.current.has('uiLang') ? current.uiLang : snapshot.values.uiLang,
-      translationLanguage: edited.current.has('translationLanguage')
-        ? current.translationLanguage : snapshot.values.translationLanguage,
     }))
   }, [snapshot])
   const protect = (field: SetupField): void => {
@@ -90,9 +86,6 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
       composition.onCompositionStart()
       composingInput.current = event.target as Node
       if (event.target instanceof HTMLInputElement && event.target.name === 'authorTag') protect('authorTag')
-      else if (event.target instanceof HTMLElement && event.target.closest('[data-setup-field="translationLanguage"]')) {
-        protect('translationLanguage')
-      }
     }} onCompositionEndCapture={() => {
       composingInput.current = null
       composition.onCompositionEnd()
@@ -100,7 +93,7 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
       composingInput.current = null
       composition.onBlur()
     }} onPointerDown={() => { compositionSubmit.current = false }} onKeyDownCapture={(event) => {
-      // Removing a focused search field can skip both compositionend and blur.
+      // Unmounting a composing input can skip both compositionend and blur.
       if (composingInput.current && !composingInput.current.isConnected) {
         composingInput.current = null
         composition.onBlur()
@@ -139,16 +132,6 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
                 setValues((current) => ({ ...current, uiLang }))
               }}>{uiLang === 'en' ? 'English' : '简体中文'}</button>)}
           </div>
-        </div>
-        <div className="native-setup-field" data-setup-field="translationLanguage"
-          onInput={() => protect('translationLanguage')}>
-          <span>{chinese ? '译文语言' : 'Translation language'}</span>
-          <LangSelect label={t('translationLanguage')} value={values.translationLanguage}
-            uiLang={values.uiLang}
-            onChange={(translationLanguage) => {
-              protect('translationLanguage')
-              setValues((current) => ({ ...current, translationLanguage }))
-            }} />
         </div>
         <button className="btn-primary" type="submit" disabled={!name}>
           {saving ? (chinese ? '正在保存…' : 'Saving…') : (chinese ? '开始审阅' : 'Start reviewing')}

@@ -8,6 +8,7 @@ use std::{collections::BTreeMap, fs, path::PathBuf};
 pub struct Documents {
     pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
     pub order: BTreeMap<usize, String>,
+    pub languages: BTreeMap<usize, String>,
     pub next_id: usize,
     pub activation_revision: u64,
     pub active_id: Option<usize>,
@@ -18,6 +19,9 @@ impl Documents {
     pub fn admit(&mut self, request: Request) -> Response {
         if request.version != VERSION {
             return Response::error("incompatible_version");
+        }
+        if request.language.as_ref().is_some_and(|code| !mastermind_launch_check::protocol::language_code(code)) {
+            return Response::error("invalid_language");
         }
         if request.paths.is_empty()
             || request.paths.len() > MAX_FILES
@@ -48,6 +52,15 @@ impl Documents {
                 },
             })
             .collect();
+        if let Some(language) = request.language {
+            for result in &results {
+                if let Some(canonical) = &result.canonical {
+                    if let Some((&id, _)) = self.order.iter().find(|(_, path)| *path == canonical) {
+                        self.languages.entry(id).or_insert_with(|| language.clone());
+                    }
+                }
+            }
+        }
         if let Some(canonical) = results.iter().find_map(|result| result.canonical.as_ref()) {
             self.active_id = self
                 .order
@@ -70,6 +83,7 @@ impl Documents {
             return;
         };
         self.files.remove(&PathBuf::from(path));
+        self.languages.remove(&id);
         if activation_revision == self.activation_revision {
             self.active_id = active_id;
         }
@@ -125,6 +139,7 @@ mod tests {
         }
         fn request(&self, names: &[&str]) -> Request {
             Request {
+                language: None,
                 version: VERSION,
                 paths: names
                     .iter()
@@ -137,6 +152,24 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn language_hints_belong_to_admitted_documents_and_end_on_close() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a"), "a").unwrap();
+        let mut docs = Documents::default();
+        let mut request = fixture.request(&["a", "missing"]);
+        request.language = Some("fr".into());
+        docs.admit(request);
+        assert_eq!(docs.languages.len(), 1);
+        assert_eq!(docs.languages[&0], "fr");
+        let mut request = fixture.request(&["a"]);
+        request.language = Some("zh-CN".into());
+        docs.admit(request);
+        assert_eq!(docs.languages[&0], "fr");
+        docs.close(0, None, docs.activation_revision);
+        assert!(docs.languages.is_empty());
     }
 
     #[test]
@@ -323,6 +356,7 @@ mod tests {
             fixture.request(&[]),
             fixture.request(&vec!["a"; MAX_FILES + 1]),
             Request {
+                language: None,
                 version: VERSION,
                 paths: vec!["relative".into()],
             },
@@ -351,6 +385,7 @@ mod tests {
             Some("incompatible_version")
         );
         let request = Request {
+            language: None,
             version: VERSION,
             paths: vec!["relative".into()],
         };

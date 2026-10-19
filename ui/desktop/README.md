@@ -2,9 +2,9 @@
 
 `main.tsx` installs the native host before mounting the existing React reviewer. `host.ts` adapts
 Tauri commands to `app/host.ts`; failures become host-level conflict, missing, or failure results.
-The document store does not interpret native command envelopes or HTTP statuses. Prepared translations still pass through the shared TypeScript freshness
-and source-mapping checks. Theme assets are bundled, and preferences use the native application
-config directory.
+The document store does not interpret native command envelopes or HTTP statuses. Prepared
+translations pass through the shared TypeScript freshness and source-mapping checks. Theme assets
+are bundled, and preferences use the native application config directory.
 
 The optional host appearance operation connects loaded theme colors to the native background
 surface and light/dark appearance. Its [theme adapter](../theme/appearance.md) owns conversion and
@@ -76,8 +76,8 @@ The browser entry point retains its own unload prompt and localhost adapter.
 The native host owns saved-field presence, transient suggestions, and completion; its
 [setup contract](../../desktop/src/setup.md) defines the commands. Local edits are
 protected immediately while native protection is pending. Language preview does not save settings.
-Name validation uses the shared author parser so new comments retain their attribution. Translation
-language uses the same searchable picker as Settings, including its Original only choice.
+Name validation uses the shared author parser so new comments retain their attribution. Reading
+language is selected per document through the [translation menu](../translate/README.md).
 
 The reviewer stays unmounted until confirmation succeeds and saved configuration reloads. App-level
 configuration loading waits for that gate, avoiding an older load overwriting confirmed choices.

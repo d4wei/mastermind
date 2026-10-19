@@ -9,11 +9,11 @@ frame limit, ownership checks, and deadlines. The native command sends the latte
 mastermind-launch-check setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
 ```
 
-The Windows command uses `mastermind-launch-console.exe` with the same arguments. Only `authorTag`,
-`uiLang`, and `translationLanguage` are accepted. Name and Interface language cannot be null;
-Translation language null means Original only. Unknown fields, an empty suggestion, and invalid
-values reject the whole request before mutation. Valid fields report `accepted` or `ignored` in
-`setup_results`. Saved fields, protected fields, and completed setup ignore agent suggestions.
+The Windows command uses `mastermind-launch-console.exe` with the same arguments. Only `authorTag`
+and `uiLang` are accepted. Name and Interface language cannot be null. Unknown fields, an empty
+suggestion, and invalid values reject the whole request before mutation. Valid fields report
+`accepted` or `ignored` in `setup_results`. Saved fields, protected fields, and completed setup
+ignore agent suggestions.
 Suggestions never write preferences and disappear when the host exits.
 
 Successful opening and setup replies report actual `onboarding_needed`. When preferences cannot
@@ -27,14 +27,14 @@ supplied by the GUI when that field is neither saved nor suggested. It retains t
 other command responses. `protect_setup_fields({fields})` retains protection for the host lifetime.
 The GUI also protects local edits immediately while that command is pending.
 
-`confirm_setup({values})` requires all three fields. It reads the current saved object, preserves
+`confirm_setup({values})` requires both fields. It reads the current saved object, preserves
 unrelated settings, and makes one atomic preference replacement containing the confirmed values
 and `onboardingCompleted: true`. Only successful replacement changes transient state or completion.
 Failure leaves suggestions, protection, and revision available for retry. Malformed preferences
-are reported without overwriting them; completion true requires all three usable saved choices.
+are reported without overwriting them; completion true requires both usable saved choices.
 
 Presence of each choice key in the saved JSON is its saved metadata. Computed defaults are absent;
-an explicitly saved null translation remains present. Ordinary `write_preferences({patch})` merges
+ordinary `write_preferences({patch})` merges
 only patched fields into the saved object. It cannot change completion. Reads do not persist merged
 defaults. Commands share the setup mutex and the existing blocking-work gate; no filesystem work or
 Git lookup runs on the event loop. Preference byte bounds and the atomic writer remain in
@@ -42,11 +42,11 @@ Git lookup runs on the event loop. Preference byte bounds and the atomic writer 
 
 Name is trimmed and an initial @ removed, matching Settings. Its allowed characters and UTF-16
 length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces and
-Chinese names remain valid. Interface language accepts the existing supported codes. Translation
-language accepts null or the existing language-code syntax. The initial Name uses global Git
+Chinese names remain valid. Interface language accepts the existing supported codes. The initial
+Name uses global Git
 configuration only, with bounded subprocess time and output; unusable or unavailable results use
 `reviewer`. Git defaults replace forbidden author characters and stop at the author length bound.
-A repository-local identity is never consulted. Translation defaults to Original only.
+A repository-local identity is never consulted.
 
 `MM_LAUNCH_CHECK_PREFERENCES` is a trusted test-harness override naming an absolute preference
 file. A relative override rejects startup. Without it, preferences use the existing native app
@@ -54,7 +54,11 @@ config directory's `reviewer.json`. Process checks use disposable files so saved
 completion never depend on the developer's preferences. This does not settle production storage
 or application identity.
 
-Rust tests check defaults, per-field presence, explicit Original only, protected edits, strict
+Rust tests check defaults, per-field presence, protected edits, strict
 validation, source-compatible names, atomic confirmation failure/retry, ordinary patches, and
 restart behavior. Process harnesses check separate setup responses and truthful admission state;
 the installed reviewer harness exercises human confirmation and its recovery flow.
+
+The retired `translationLanguage` field is ignored when reading existing preferences and rejected
+in new patches and setup suggestions. A subsequent write drops it while preserving other settings.
+Reading language belongs to the document session, not native preferences.

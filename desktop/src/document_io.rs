@@ -23,7 +23,7 @@ impl FileWatch {
             if docs
                 .files
                 .keys()
-                .any(|path| path.parent() == Some(parent.as_path()))
+                .any(|path| crate::translations::watch_paths(path).contains(parent))
             {
                 return true;
             }
@@ -156,6 +156,7 @@ fn save_registered_copy(
     // Preserve the activation revision: a save picker must not steal later navigation.
     let old_id = id.parse::<usize>().unwrap();
     docs.order.remove(&old_id);
+    docs.languages.remove(&old_id);
     docs.files.remove(&original);
     if docs.active_id == Some(old_id) {
         docs.active_id = Some(copy_id);
@@ -246,14 +247,13 @@ pub async fn watch_document(
         .run(move || {
             let docs = docs.lock().unwrap();
             let path = admitted(&docs, &id).map_err(|e| e.error)?;
-            let parent = path.parent().unwrap().to_owned();
             let mut watch = watch.lock().unwrap();
-            if !watch.parents.contains(&parent) {
-                watch
-                    .watcher
-                    .watch(&parent, RecursiveMode::NonRecursive)
-                    .map_err(|e| e.to_string())?;
-                watch.parents.insert(parent);
+            for parent in crate::translations::watch_paths(&path) {
+                if !watch.parents.contains(&parent) {
+                    watch.watcher.watch(&parent, RecursiveMode::NonRecursive)
+                        .map_err(|e| e.to_string())?;
+                    watch.parents.insert(parent);
+                }
             }
             Ok(())
         })
@@ -279,36 +279,17 @@ fn read_registered_translation(
     id: &str,
     target_lang: &str,
 ) -> Result<Value, FileError> {
-    if target_lang.is_empty()
-        || !target_lang.starts_with(|c: char| c.is_ascii_alphabetic())
-        || !target_lang
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        return Err(FileError::new(
-            400,
-            "invalid_language",
-            "The translation language is invalid.",
-        ));
-    }
     let path = admitted(&docs.lock().unwrap(), id)?;
-    let artifact = path
-        .parent()
-        .unwrap()
-        .join(".mastermind/translations")
-        .join(format!(
-            "{}.{}.json",
-            path.file_name().unwrap().to_string_lossy(),
-            target_lang
-        ));
-    let raw = files::read(&artifact)?;
-    serde_json::from_str(&raw.content()).map_err(|_| {
-        FileError::new(
-            409,
-            "invalid_translation",
-            "The translation artifact is not valid JSON.",
-        )
-    })
+    crate::translations::read(&path, target_lang)
+}
+
+#[tauri::command]
+pub async fn list_translations(id: String, docs: State<'_>) -> Result<Vec<Value>, FileError> {
+    let docs = docs.inner().clone();
+    crate::worker::blocking_work().run(move || {
+        let path = admitted(&docs.lock().unwrap(), &id)?;
+        crate::translations::list(&path)
+    }).await.map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
 }
 
 #[cfg(test)]
@@ -326,6 +307,7 @@ mod tests {
         fs::write(&original, "original").unwrap();
         let mut docs = Documents::default();
         docs.admit(Request {
+            language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -353,6 +335,7 @@ mod tests {
         fs::write(&original, "original").unwrap();
         let mut docs = Documents::default();
         docs.admit(Request {
+            language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -426,6 +409,7 @@ mod tests {
         let mut docs = Documents::default();
         assert_eq!(
             docs.admit(Request {
+                language: None,
                 version: VERSION,
                 paths: vec![path.to_str().unwrap().into()]
             })

@@ -15,7 +15,6 @@ export interface MastermindConfig {
   codeTheme: string
   uiLang: 'en' | 'zh-CN'
   /** Optional personal language code for prepared reading translations. */
-  translationLanguage: string | null
 }
 
 export type ClientConfig = MastermindConfig

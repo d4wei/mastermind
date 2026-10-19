@@ -43,6 +43,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     getFile,
     putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),
     saveCopy: (id, content, forClose = false) => invoke('save_document_copy', { id, content, forClose }),
+    translations: (id) => invoke('list_translations', { id }),
     translation: (id, targetLang) => invoke('read_translation', { id, targetLang }),
     config,
     updateConfig(patch) {
@@ -61,6 +62,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
       const invalidate = (): void => {
         if (closed) return
         listener('changed')
+        void invoke('watch_document', { id }).catch(() => {})
       }
       const poll = (): void => { if (!pendingReads.has(id)) invalidate() }
       // Subscribe before watching, then revalidate to cover changes during registration.

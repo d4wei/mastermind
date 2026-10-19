@@ -21,8 +21,8 @@ each against a fresh endpoint and host. Python records its monotonic time immedi
 spawning the normal CLI, then stops when short polling observes the matching complete trace. It
 checks the normal admission reply independently: one newly opened document and the trace's host
 PID. Each host exits before the next trial; document bytes must remain unchanged.
-Each trial uses disposable preferences with completed setup, English controls, and Original only.
-This measures opening after initial setup and does not read or change personal native preferences.
+Each trial uses disposable preferences with completed setup, English controls, and original-source
+reading. This measures opening after setup and does not read or change personal native preferences.
 
 The metric is **launcher invocation to observed document-layout readiness after two frames**.
 It includes process spawn and loader work, native startup, admission, reviewer loading and mounting,

@@ -12,7 +12,7 @@ or data being discussed. Names must stand on their own without the development c
 
 | Earlier wording | Canonical public wording | 简体中文 |
 | --- | --- | --- |
-| Comfort language | Translation language | 译文语言 |
+| Comfort language, Translation language preference | Reading language | 阅读语言 |
 | UI language | Interface language | 界面语言 |
 | Repo language | Project language | 项目语言 |
 | Source, as an editor mode | Markdown | Markdown |
@@ -39,23 +39,18 @@ policy; it is not a document's detected language.
 Evidence: [preferences][preferences], [settings][settings], [translation format][translation],
 [language rulings][decisions], and [open repository configuration][direction].
 
-### Personal translation preference
+### Reading language
 
-`translationLanguage` selects an available translation; `null` means original-only reading.
-It does not generate a translation or change labels and menus.
-
-Use **Translation language / 译文语言** for the personal preference that selects an available
-translation. Keep it distinct from the original document's language and the interface language.
-
-Example: “Translation language: 简体中文.” Helper: “Use available translations in this language.”
-Use **Original only / 仅原文** for the null option instead of a contextless Off.
-Preference persistence is defined in [the native setup contract][preferences].
+Use **Reading language / 阅读语言** for the document menu. Its choices are **Original / 原文**
+and the native names of available translations. Regional variants remain distinguishable.
+This is a per-document session choice, not a saved preference or a translation request.
+The agent prepares requested languages; the app offers only versions that pass freshness checks.
 
 ### Interface language
 
 `uiLang` controls labels and notices independently of document content.
 Use **Interface language / 界面语言** for labels and menus.
-Example: “Interface language: English. Translation language: 简体中文.”
+Example: “Interface language: English. Reading language: 简体中文.”
 The technical phrase UI language and existing `uiLang` key remain understandable; no key rename is
 needed merely to spell out its UI label.
 
@@ -68,8 +63,8 @@ Use **Original language / 原文语言** in explanations and retain **source lan
 translation operation; they do not assert that every passage in a file uses one language.
 
 Example: “Translate this document from English to 简体中文.” A translation's target language can differ
-from another reader's personal preference. `targetLang` therefore remains distinct from the
-personal `translationLanguage` setting.
+from another reader's selected reading version. `targetLang` identifies the artifact's language,
+not a global personal setting.
 
 ### Repository communication policy
 
@@ -405,7 +400,7 @@ The remaining terms below retain their ordinary meanings in context.
 | Navigation | File, Folder, Files, Recent, Outline, Filename, Selection |
 | Status | Loading, Saving, Saved, Unsaved changes, Missing file, Save failed |
 | Preferences | Settings, Appearance, Theme, Font size, Line height, System default |
-| Language chooser | Search languages, No matching language, Custom language code |
+| Language menu | Reading language, Original, native language names |
 | Markdown | Heading, Paragraph, List item, Table, Code block, Frontmatter, Callout |
 | Source mechanics | Parser, Renderer, Source offset, UTF-16 range, Source splice, Line ending |
 | Storage mechanics | File watcher, Disk read/write, Atomic replacement, Version token |

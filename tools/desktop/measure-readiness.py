@@ -54,7 +54,7 @@ def trial(binary, fixture, root):
     output = root / 'ready.json'
     preferences = root / 'preferences.json'
     preferences.write_text(json.dumps({'onboardingCompleted': True, 'authorTag': 'Readiness',
-                                      'uiLang': 'en', 'translationLanguage': None}), encoding='utf-8')
+                                      'uiLang': 'en'}), encoding='utf-8')
     config = {'nonce': nonce, 'target': str(fixture), 'output': str(output)}
     environment = dict(os.environ, MM_LAUNCH_CHECK_DIR=str(root / 'runtime'),
                        MM_LAUNCH_CHECK_PREFERENCES=str(preferences),

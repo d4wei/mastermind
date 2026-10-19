@@ -1,8 +1,8 @@
+import { requireReviewerHost } from '../app/host'
 import { useDraftGuard, useDraftState } from '../review/drafts'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
 import { useDoc } from '../documents/store'
-import { useConfig } from '../app/configStore'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { documentViewport } from '../util/scroll'
@@ -63,8 +63,13 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const current = useDoc.getState()
       const translated = useTranslation.getState()
       if (current.sessionId !== sessionId || !translated.active || translated.artifact !== capturedArtifact ||
-        translated.targetLang !== capturedArtifact.targetLang || useConfig.getState().config?.translationLanguage !== capturedArtifact.targetLang ||
+        translated.targetLang !== capturedArtifact.targetLang ||
         !(await matchPreparedTranslation(current.source, capturedArtifact))) {
+        setError(true); return
+      }
+      const latestArtifact = await matchPreparedTranslation(current.source,
+        await requireReviewerHost().translation(sessionId, capturedArtifact.targetLang))
+      if (!latestArtifact || JSON.stringify(latestArtifact) !== JSON.stringify(capturedArtifact)) {
         setError(true); return
       }
       const edit = await translatedCommentEdit(current.source, { blockId: selection.blockId,
@@ -72,11 +77,11 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const latest = useDoc.getState()
       if (latest.conflict || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
         useTranslation.getState().artifact !== capturedArtifact || !useTranslation.getState().active ||
-        useConfig.getState().config?.translationLanguage !== capturedArtifact.targetLang) { setError(true); return }
+        useTranslation.getState().targetLang !== capturedArtifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])
       window.getSelection()?.removeAllRanges()
       close()
-    } finally { busy.current = false; setSubmitting(false) }
+    } catch { setError(true) } finally { busy.current = false; setSubmitting(false) }
   }
   const composer = useRef<HTMLDivElement>(null)
   useDraftGuard('translated', t('comment'), composing && !!body.trim(),

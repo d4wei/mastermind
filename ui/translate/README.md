@@ -1,34 +1,35 @@
 # Prepared reading translations
 
-The browser reads a complete prepared artifact through `getPreparedTranslation`; it does not ask
-for generation. The Translation language preference (`translationLanguage`) chooses the target,
-with `null` selecting original-only reading. The artifact supplies its source language. Repository
-language discovery remains separate.
+The language menu offers Original and the valid prepared translations for the current document.
+It appears only when a translation is available. Labels use native language names with regional
+qualifiers; Interface language controls surrounding copy. The menu uses Radix keyboard navigation,
+focus return, and outside dismissal. Find and the file list dismiss it; opening it closes Find
+and the file list. Long names truncate in the toolbar and remain readable in the menu and tooltip.
 
-`translationStore.ts` keeps request generation, document, target, and validated source together.
-Every loaded artifact is checked by the shared snapshot matcher against the current buffer, even
-when disk still contains an older version. Navigation and target changes discard prior artifacts.
-Source changes hide the translated view until validation completes: review annotations can reuse
-an artifact, while changed translation input falls back to original with a visible reason. A late
-response cannot restore a previous document or target. Missing, stale, or invalid artifacts never
-become a partially translated current view.
+`translationStore.ts` owns reading choices per open document for the app session. Opening defaults
+to Original. `open --language CODE -- FILE...` supplies a presentation hint: use a matching valid
+artifact once, unless the reader has already chosen a version. A missing artifact leaves Original;
+its later arrival does not switch the reader. Closing forgets the choice. Markdown view always
+shows the original source; returning to reading retains the current valid translation.
 
-`TranslatedView.tsx` renders the shared translation projection with current source block identities
-and preserves literal blocks. Its Markdown renderer receives no mutation handler. Existing comments
-remain accessible in their authored language below the translated text.
+The host discovers artifacts beside the admitted document. Native directory watches and periodic
+revalidation cover creation, replacement, deletion, and missed events; discovery never generates
+text. `translationStore.ts` validates every candidate against the current buffer independently,
+including before selection. Request generations discard late results for old documents or choices.
+Review-only source changes preserve artifact identity. Narrative changes hide translated prose
+until validation and fall back to Original with a dismissible notice if the selection is stale.
+A failed background discovery on Original does not warn or block reading.
 
-`TranslatedSelection.tsx` accepts a selection inside one translated block. The composer captures
-its exact visible text and target language; submission revalidates the document and artifact before
-asking the shared comment helper for a current source splice. The splice uses the ordinary review
-undo/autosave path. It does not alter translated prose. `CommentBody.tsx` decodes the shared comment
-payload for literal quote and authored-body display, including in the resolved archive view.
+`TranslatedView.tsx` renders the shared projection, preserves literal blocks, and has no mutation
+handler. Existing comments remain in their authored language. Find searches the displayed version.
 
-The composer is mounted beside the transient translated prose subtree. Its identity follows the
-document, translation fingerprint, and target, so annotation-only revalidation retains typed drafts.
-A translation-input mismatch preserves the draft with a stale-selection warning and refuses
-submission; toggling back to original, changing language, or navigating closes that translated
-composer.
+`TranslatedSelection.tsx` captures one block's exact passage, language, and artifact. Submission
+rereads the artifact and revalidates the current source, selected language, and captured passage
+before producing an exact comment splice in the original Markdown. It uses ordinary undo/autosave
+and never edits translated prose. A replaced artifact cannot silently rebind an unfinished quote:
+the draft stays available with a stale-selection warning. Annotation-only validation reuses the
+same artifact object.
 
-An open translated comment captures its artifact and exact selected passage. A newer artifact
-retains the draft but disables submission against the old selection; it never silently rebinds the
-comment to different translated text.
+Changing reading versions with an unfinished review draft uses the existing Cancel / Discard draft
+policy. Cancel focuses the draft; discard must be chosen before switching. Navigation retains drafts
+through the shared draft store. Persistence across app restarts remains deferred.

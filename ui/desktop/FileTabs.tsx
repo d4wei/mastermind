@@ -5,7 +5,7 @@ import { fileLabels } from './file-labels'
 import { fileWindow } from './file-window'
 import { useClosePrompt } from './CloseDialog'
 
-export interface OpenDocument { id: string; path: string }
+export interface OpenDocument { language?: string; id: string; path: string }
 interface FileTabsProps {
   files: OpenDocument[]
   activeId: string | null
@@ -60,7 +60,11 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   useEffect(() => {
     const dismiss = () => { selecting.current = true; setOpen(false) }
     window.addEventListener('mastermind-find', dismiss)
-    return () => window.removeEventListener('mastermind-find', dismiss)
+    window.addEventListener('mastermind-language-open', dismiss)
+    return () => {
+      window.removeEventListener('mastermind-find', dismiss)
+      window.removeEventListener('mastermind-language-open', dismiss)
+    }
   }, [])
   useLayoutEffect(() => {
     if (closePrompt) { selecting.current = true; setOpen(false) }
@@ -131,7 +135,7 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
         +{'9'.repeat(index + 1)}<ChevronDownIcon /></span>)}
     </div>
     {files.slice(start, end).map((file, index) => row(file, start + index, false))}
-    <Popover.Root open={open && files.length > 0} onOpenChange={setOpen} modal={false}>
+    <Popover.Root open={open && files.length > 0} onOpenChange={(next) => { setOpen(next); if (next) window.dispatchEvent(new Event('mastermind-files-open')) }} modal={false}>
       {(hidden > 0 || open) && <Popover.Trigger asChild>
         <button ref={trigger} type="button" className="native-file-overflow btn-ghost" aria-label={label}
           title={chinese ? '打开的文件' : 'Open files'}>+{hidden}<ChevronDownIcon /></button>

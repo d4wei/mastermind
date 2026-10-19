@@ -14,9 +14,9 @@ vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(
 ) }))
 const snapshot = (values: Partial<SetupSnapshot['values']> = {}, completed = false): SetupSnapshot => ({
   completed, revision: 0,
-  values: { authorTag: 'Alex', uiLang: 'en', translationLanguage: null, ...values },
-  saved: { authorTag: false, uiLang: false, translationLanguage: false },
-  protected: { authorTag: false, uiLang: false, translationLanguage: false },
+  values: { authorTag: 'Alex', uiLang: 'en', ...values },
+  saved: { authorTag: false, uiLang: false },
+  protected: { authorTag: false, uiLang: false },
 })
 let host: HTMLDivElement
 let root: Root
@@ -50,12 +50,12 @@ it('previews language without persisting and confirms all choices before advanci
   await mount()
   await act(async () => host.querySelector<HTMLButtonElement>('[name="uiLang"][value="zh-CN"]')!.click())
   expect(host.textContent).toContain('怎么称呼你？')
-  expect(host.textContent).toContain('译文语言')
+  expect(host.textContent).not.toContain('译文语言')
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
   expect(mocks.invoke).not.toHaveBeenCalledWith('write_preferences', expect.anything())
   await act(async () => submit())
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', {
-    values: { authorTag: 'Alex', uiLang: 'zh-CN', translationLanguage: null },
+    values: { authorTag: 'Alex', uiLang: 'zh-CN' },
   })
   expect(mocks.load).toHaveBeenCalledOnce()
   expect(mocks.confirmed).toHaveBeenCalledOnce()
@@ -76,26 +76,13 @@ it('retains local edits against suggestions while protection IPC is pending', as
     ? new Promise<void>((resolve) => { release = resolve }) : Promise.resolve(snapshot({}, true)))
   await mount()
   act(() => editName('Local name'))
-  await mount(snapshot({ authorTag: 'Later agent', uiLang: 'zh-CN', translationLanguage: 'fr' }))
+  await mount(snapshot({ authorTag: 'Later agent', uiLang: 'zh-CN' }))
   expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Local name')
   expect(host.textContent).toContain('怎么称呼你？')
   expect(mocks.invoke).toHaveBeenCalledWith('protect_setup_fields', { fields: ['authorTag'] })
   await act(async () => release())
   await mount(snapshot({ authorTag: 'Another agent', uiLang: 'en' }))
   expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('Local name')
-})
-
-it('retains an explicit Original only edit when later suggestions arrive', async () => {
-  await mount(snapshot({ translationLanguage: 'fr' }))
-  await act(async () => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
-  await act(async () => host.querySelector('[role="option"]')!.dispatchEvent(
-    new MouseEvent('mousedown', { bubbles: true })))
-  await mount(snapshot({ translationLanguage: 'zh-CN' }))
-  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
-  await act(async () => submit())
-  expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: {
-    authorTag: 'Alex', uiLang: 'en', translationLanguage: null,
-  } })
 })
 
 it('keeps the form and edited values after a failed save and supports retry', async () => {
@@ -169,13 +156,13 @@ it('allows an intentional pointer submission after IME Enter and cleans up its r
   } finally { vi.useRealTimers() }
 })
 
-it('renders saved setup choices including explicit Original only without changing them', async () => {
-  const saved = snapshot({ authorTag: 'Saved reader', uiLang: 'zh-CN', translationLanguage: null })
-  saved.saved = { authorTag: true, uiLang: true, translationLanguage: true }
+it('renders saved setup choices without translation preferences', async () => {
+  const saved = snapshot({ authorTag: 'Saved reader', uiLang: 'zh-CN' })
+  saved.saved = { authorTag: true, uiLang: true }
   await mount(saved)
   expect(host.querySelector<HTMLInputElement>('[name="authorTag"]')!.value).toBe('Saved reader')
   expect(host.querySelector('[name="uiLang"][value="zh-CN"]')!.getAttribute('aria-pressed')).toBe('true')
-  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
+  expect(host.querySelector('.lang-trigger')).toBeNull()
   expect(mocks.invoke).not.toHaveBeenCalled()
   await act(async () => submit())
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: saved.values })
@@ -194,60 +181,6 @@ it.each(['en', 'zh-CN'] as const)('explains an unusable Name in %s and clears fe
   expect(input.getAttribute('aria-invalid')).toBe('false')
   await act(async () => submit())
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: {
-    authorTag: '李 明', uiLang, translationLanguage: null,
+    authorTag: '李 明', uiLang,
   } })
-})
-
-it.each(['active', 'native', 'legacy'] as const)('keeps language search and setup unsubmitted on IME Enter: %s', async (kind) => {
-  await mount()
-  await act(async () => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
-  const input = host.querySelector<HTMLInputElement>('.lang-search')!
-  await act(async () => {
-    if (kind !== 'native') input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }))
-    if (kind === 'legacy') input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
-    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true,
-      isComposing: kind === 'native', keyCode: kind === 'legacy' ? 229 : 13 })
-    input.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(false)
-    await Promise.resolve()
-    submit()
-  })
-  expect(host.querySelector('.lang-search')).toBe(input)
-  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
-  expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
-  if (kind !== 'native') {
-    expect(mocks.invoke).toHaveBeenCalledWith('protect_setup_fields', { fields: ['translationLanguage'] })
-  }
-  act(() => input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })))
-  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })))
-  expect(host.querySelector('.lang-search')).toBeNull()
-})
-
-it('protects translation on composition start before input or protection IPC completes', async () => {
-  let release!: () => void
-  mocks.invoke.mockImplementation((command: string) => command === 'protect_setup_fields'
-    ? new Promise<void>((resolve) => { release = resolve }) : Promise.resolve(snapshot({}, true)))
-  await mount()
-  await act(async () => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
-  const input = host.querySelector<HTMLInputElement>('.lang-search')!
-  act(() => input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
-  expect(mocks.invoke).toHaveBeenCalledWith('protect_setup_fields', { fields: ['translationLanguage'] })
-  await mount(snapshot({ translationLanguage: 'fr' }))
-  expect(host.querySelector('.lang-trigger')!.textContent).toMatch(/Original only|仅原文/)
-  await act(async () => release())
-})
-
-it('does not leave the setup composition guard active after search detaches without blur', async () => {
-  await mount()
-  await act(async () => host.querySelector<HTMLButtonElement>('.lang-trigger')!.click())
-  const input = host.querySelector<HTMLInputElement>('.lang-search')!
-  act(() => input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
-  act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })))
-  expect(host.querySelector('.lang-search')).toBeNull()
-  await act(async () => {
-    host.querySelector('[name="authorTag"]')!.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    submit()
-  })
-  expect(mocks.confirmed).toHaveBeenCalledOnce()
 })

@@ -6,7 +6,6 @@
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.8125rem;
   --font-size-micro: 0.6875rem;
-  --font-size-nano: 0.625rem;
   --lh-title: 1.2;
   --lh-snug: 1.4;
   --lh-body: 1.6;
@@ -29,6 +28,7 @@
 
   --find-input-width: 12rem;
   --file-tab-max-width: 10rem;
+  --language-trigger-max-width: 10rem;
   --file-menu-width: 15rem;
   --control-size: calc(var(--space-unit) * 7.5);
   --control-size-compact: calc(var(--space-unit) * 6);

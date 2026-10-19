@@ -28,6 +28,7 @@ claim or unconditional overwrite fallback is made. A failed response leaves the 
 available for recovery and retry.
 
 Notify watches parent directories so replacing an individual file preserves the directory watch.
+Prepared artifact directories share this lifecycle; see [translation discovery](translations.md).
 Events invalidate the active document; a versioned read decides whether content changed. Read-only
 access events are ignored. Watch errors also invalidate. The UI revalidates on focus and at
 intervals even when watch registration succeeds; failed registration uses a faster interval.

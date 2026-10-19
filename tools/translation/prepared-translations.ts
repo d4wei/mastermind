@@ -4,7 +4,7 @@ import path from 'node:path'
 import { matchPreparedTranslation, prepareTranslation, type PreparedTranslation } from '../../document/translation'
 
 export function validLanguageCode(code: string): boolean {
-  return /^[A-Za-z][A-Za-z0-9_-]*$/.test(code)
+  return code.length <= 64 && /^[A-Za-z][A-Za-z0-9_-]*$/.test(code)
 }
 
 export function translationFile(realPath: string, targetLang: string): string {
@@ -54,4 +54,31 @@ export async function readPreparedTranslation(realPath: string, source: string, 
   }
   const artifact = await matchPreparedTranslation(source, input)
   return artifact?.targetLang === targetLang ? { status: 'ready', artifact } : { status: 'stale' }
+}
+
+/** Discovery is confined to artifacts beside the admitted source, without following redirects. */
+export async function listPreparedTranslations(realPath: string, source: string): Promise<PreparedTranslation[]> {
+  const directory = path.dirname(translationFile(realPath, 'en'))
+  try {
+    if (await fs.realpath(directory) !== directory) return []
+    const prefix = `${path.basename(realPath)}.`
+    const files = (await fs.readdir(directory)).sort()
+    const artifacts: PreparedTranslation[] = []
+    let bytes = 0
+    for (const name of files) {
+      if (!name.startsWith(prefix) || !name.endsWith('.json')) continue
+      const language = name.slice(prefix.length, -5)
+      if (!validLanguageCode(language)) continue
+      try {
+        const file = path.join(directory, name)
+        const metadata = await fs.lstat(file)
+        if (!metadata.isFile() || metadata.size > 16 * 1024 * 1024 || await fs.realpath(file) !== file) continue
+        bytes += metadata.size
+        if (bytes > 32 * 1024 * 1024 || artifacts.length === 64) break
+        const result = await readPreparedTranslation(realPath, source, language)
+        if (result.status === 'ready') artifacts.push(result.artifact)
+      } catch { /* One unreadable artifact must not hide other languages. */ }
+    }
+    return artifacts
+  } catch { return [] }
 }

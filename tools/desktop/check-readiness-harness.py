@@ -37,7 +37,7 @@ class OwnershipTests(unittest.TestCase):
                 self.assertEqual(preferences.parent, root)
                 self.assertEqual(json.loads(preferences.read_bytes()), {
                     'onboardingCompleted': True, 'authorTag': 'Readiness',
-                    'uiLang': 'en', 'translationLanguage': None,
+                    'uiLang': 'en',
                 })
                 config = json.loads(environment['MM_LAUNCH_CHECK_READY_TRACE'])
                 Path(config['output']).write_text(json.dumps({

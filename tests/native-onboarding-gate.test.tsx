@@ -13,6 +13,7 @@ vi.mock('../ui/app/navStore', () => ({ useNav: (selector: (state: unknown) => un
 vi.mock('../ui/app/Navigator', () => ({ Navigator: () => null, useIsNarrow: () => false }))
 vi.mock('../ui/app/SessionView', () => ({ SessionView: () => <article>Retained document</article> }))
 vi.mock('../ui/documents/documentLifecycle', () => ({ registerDocumentLifecycle: () => () => {} }))
+vi.mock('../ui/desktop/CloseDialog', () => ({ CloseDialog: () => null }))
 vi.mock('../ui/theme/ThemeProvider', () => ({ ThemeEffects: () => null }))
 
 beforeEach(() => { mocks.home = false; mocks.load.mockReset().mockResolvedValue(undefined) })

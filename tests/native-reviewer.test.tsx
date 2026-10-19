@@ -28,9 +28,9 @@ const snapshot = (revision = 0, activeId: number | null = null, errors: string[]
   active_id: activeId, opening_errors: errors,
 })
 const setup = () => ({ completed: true, revision: 0,
-  values: { authorTag: 'Alex', uiLang: 'en', translationLanguage: null },
-  saved: { authorTag: true, uiLang: true, translationLanguage: true },
-  protected: { authorTag: false, uiLang: false, translationLanguage: false },
+  values: { authorTag: 'Alex', uiLang: 'en' },
+  saved: { authorTag: true, uiLang: true },
+  protected: { authorTag: false, uiLang: false },
 })
 const other = (command: string) => command === 'setup_snapshot' ? setup() : undefined
 beforeEach(() => {

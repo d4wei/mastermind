@@ -1,3 +1,4 @@
+import { CloseDialog } from '../desktop/CloseDialog'
 import { Notifications, Notice } from './Notifications'
 import { APP_NAME } from './constants'
 import { Fragment, useEffect, type ReactNode } from 'react'
@@ -32,6 +33,7 @@ export function App({ home, onboarding, native = false }: {
     <Tooltip.Provider delayDuration={500} skipDelayDuration={300}>
       <NotificationHost>
       <ThemeEffects />
+      {!native && <CloseDialog />}
       {onboarding ?? <>
         {route.kind === 'doc' && (
           <AppFrame>

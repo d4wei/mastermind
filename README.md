@@ -25,8 +25,8 @@ node bin/mastermind.js open -- plan.md
 ```
 
 The macOS build creates `desktop/target/release/bundle/macos/mastermind.app`. Open files through
-the app's native picker or the repository launcher. The first launch asks for your name, Interface
-language, and optional Translation language. Files opened during setup remain available afterward.
+the app's native picker or the repository launcher. The first launch asks for your name and
+Interface language. Files opened during setup remain available afterward.
 
 Public packaging and installed command identity remain undecided; the npm project is private and
 the native identifier remains provisional. Platform build commands live in
@@ -54,9 +54,10 @@ Closing the app waits for saves; failures retain recoverable text and block the 
 
 ## Optional translated reading
 
-Choose a Translation language in Settings when you want translated reading. The agent preparing
-the document supplies a fresh complete translation for each preparation pass using its existing
-context. The app reads that local artifact; opening the original never waits for translation.
+Use the document's Reading language menu to choose among prepared translations. The preparing
+agent chooses useful languages from session context; explicit requests override that choice,
+including requests for several languages or none. Original always opens immediately. The app
+checks translation freshness and writes review feedback into the original Markdown file.
 
 Comments, highlights, and resolved history do not invalidate a translation. Changes to prose or
 proposed edits do. A stale or missing translation falls back to the original. Comments on translated

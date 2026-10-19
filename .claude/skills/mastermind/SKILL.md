@@ -27,10 +27,11 @@ returns with feedback, reread the files; do not infer approval from admission.
 ## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.
-Do not start a translation listener or delegate to a separate translator. Use the user's requested
-translation language from the request or known session context. If none is known, open the original
-without translation. Supply the source language explicitly; do not infer it from the language of a
-newly added comment.
+Do not start a translation listener or delegate to a separate translator. Explicit user requests
+override your discretion, including requests for several languages or no translation. Otherwise
+use the active session's language and context to decide whether translation helps and which
+languages to prepare. If none is useful, open the original. Supply the source language explicitly;
+do not infer it from the language of a newly added comment.
 
 Build the standalone utility with `npm run build` in the checkout before preparation.
 For each preparation pass, translate the complete document afresh. Read it as a whole, including
@@ -64,8 +65,12 @@ Submit it through stdin:
 ```sh
 node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
   --source-lang en --target-lang zh-CN --save < prepared.json
-node /path/to/mastermind/bin/mastermind.js open -- plan.md
+node /path/to/mastermind/bin/mastermind.js open --language zh-CN -- plan.md
 ```
+
+Repeat preparation and saving for each requested target language. Artifacts coexist per target.
+The optional `--language` opening hint selects a valid prepared version once; it never changes saved
+settings or overrides a reader's existing choice. The menu also lets readers choose Original.
 
 A changed source or invalid/incomplete artifact is rejected as a whole. Reread the current document
 and prepare again; do not patch identifiers until stale output passes. Translation failures leave
@@ -80,10 +85,9 @@ When requested, suggest known values with a separate operation:
 node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
 ```
 
-Supported fields are `authorTag`, `uiLang` (`en` or `zh-CN`), and `translationLanguage` (a language
-code or null for Original only). Suggestions are transient and cannot overwrite saved or actively
-edited choices. Do not force a questionnaire before opening. People confirm their Name and language
-choices graphically and change them later in Settings.
+Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions are transient and
+cannot overwrite saved or actively edited choices. Do not force a questionnaire before opening.
+People confirm their Name and Interface language graphically and change them later in Settings.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; optional translation follows the same preparation

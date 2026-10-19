@@ -1,122 +1,131 @@
 import { fakeHost } from './helpers/host'
-import { installHost, HostError, type HostFailure, type ReviewerHost } from '../ui/app/host'
+import { installHost } from '../ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createTranslationStore, type TranslationSnapshot } from '../ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 let snapshot: TranslationSnapshot
-beforeEach(() => { snapshot = { sessionId: 'A', source: 'Hello world.', targetLang: 'zh-CN' } })
-afterEach(() => { installHost(null); vi.unstubAllGlobals() })
-async function artifact(source = snapshot.source, targetLang = 'zh-CN'): Promise<PreparedTranslation> {
+let artifacts: unknown[]
+let reads: ReturnType<typeof vi.fn<(id: string) => Promise<unknown[]>>>
+beforeEach(() => {
+  snapshot = { sessionId: 'A', source: 'Hello world.' }
+  artifacts = []
+  reads = vi.fn(async () => artifacts)
+  installHost(fakeHost({ translations: reads }))
+})
+afterEach(() => installHost(null))
+async function artifact(targetLang = 'zh-CN', source = snapshot.source): Promise<PreparedTranslation> {
   const prepared = await prepareTranslation(source)
   return { version: 1, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang,
-    blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id, text: '你好世界。' })) }
+    blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id, text: 'Translated text.' })) }
 }
-function installTranslation(translation: ReviewerHost['translation']) { installHost(fakeHost({ translation })) }
-function deferred() { let resolve!: (value: unknown) => void; const promise = new Promise<unknown>((r) => { resolve = r }); return { promise, resolve } }
+function deferred() { let resolve!: (value: unknown[]) => void; const promise = new Promise<unknown[]>((r) => { resolve = r }); return { promise, resolve } }
 
-it('loads one complete prepared artifact through the host without generating translations', async () => {
-  const prepared = await artifact()
-  const readTranslation = vi.fn().mockResolvedValue(prepared)
-  installTranslation(readTranslation)
+it('starts with original and discovers languages independently without generation', async () => {
+  artifacts = [await artifact(), await artifact('fr'), { invalid: true }, await artifact('ja', 'Old prose')]
   const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  expect(readTranslation).toHaveBeenCalledTimes(1)
-  expect(readTranslation).toHaveBeenCalledWith('A', 'zh-CN')
-  expect(store.getState().active).toBe(true)
-})
-it.each<HostFailure>(['missing', 'conflict', 'failure'])('falls back to original after %s with no retained artifact', async (kind) => {
-  installTranslation(vi.fn().mockRejectedValue(new HostError(kind, 'unavailable')))
-  const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  expect(store.getState().active).toBe(false)
-  expect(store.getState().artifact).toBeNull()
-  expect(store.getState().loading).toBe(false)
-  expect(store.getState().error).toBe(kind === 'missing' ? 'missing' : kind === 'conflict' ? 'stale' : 'unavailable')
-})
-it('retains prepared narrative across comments and highlights but invalidates prose and suggestions', async () => {
-  const prepared = await artifact()
-  const readTranslation = vi.fn().mockResolvedValue(prepared); installTranslation(readTranslation)
-  const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  snapshot.source = '{==Hello==} world.{>>@Da Wei: 中文评论<<}'
   await store.getState().synchronize()
-  expect(store.getState().active).toBe(true)
-  expect(readTranslation).toHaveBeenCalledTimes(1)
+  expect(store.getState().active).toBe(false)
+  expect(store.getState().available.map((a) => a.targetLang)).toEqual(['fr', 'zh-CN'])
+  await store.getState().select('fr')
+  expect(store.getState().artifact?.targetLang).toBe('fr')
+  expect(reads).toHaveBeenCalledWith('A')
+})
+it('retains independent choices per open file and forgets a closed file', async () => {
+  artifacts = [await artifact(), await artifact('fr')]
+  const store = createTranslationStore(() => snapshot)
+  await store.getState().select('fr')
+  snapshot.sessionId = 'B'; await store.getState().synchronize()
+  expect(store.getState().active).toBe(false)
+  await store.getState().select('zh-CN')
+  snapshot.sessionId = 'A'; await store.getState().synchronize()
+  expect(store.getState().targetLang).toBe('fr')
+  store.getState().release('A'); await store.getState().synchronize()
+  expect(store.getState().targetLang).toBeNull()
+})
+it('keeps a selected artifact identity across annotations but invalidates narrative', async () => {
+  artifacts = [await artifact()]
+  const store = createTranslationStore(() => snapshot)
+  await store.getState().select('zh-CN')
+  const captured = store.getState().artifact
+  snapshot.source = '{==Hello==} world.{>>@Alex: note<<}'
+  await store.getState().synchronize()
+  expect(store.getState().artifact).toBe(captured)
   snapshot.source = 'Hello {++new++} world.'
   await store.getState().synchronize()
   expect(store.getState().active).toBe(false)
-  expect(store.getState().artifact).toBeNull()
   expect(store.getState().error).toBe('stale')
+  expect(store.getState().targetLang).toBeNull()
 })
-it.each(['navigation', 'language', 'edit'])('rejects a slow load after %s', async (change) => {
-  const prepared = await artifact()
-  const pending = deferred(); installTranslation(vi.fn().mockReturnValue(pending.promise))
+it('discovers creation, replacement and deletion without silently switching original', async () => {
   const store = createTranslationStore(() => snapshot)
-  const load = store.getState().toggle()
-  snapshot = change === 'navigation' ? { ...snapshot, sessionId: 'B' }
-    : change === 'language' ? { ...snapshot, targetLang: 'ja' } : { ...snapshot, source: 'Changed prose.' }
   await store.getState().synchronize()
-  pending.resolve(prepared); await load
+  expect(store.getState().available).toEqual([])
+  artifacts = [await artifact()]; await store.getState().synchronize()
   expect(store.getState().active).toBe(false)
-  expect(store.getState().artifact).toBeNull()
-  expect(store.getState().loading).toBe(false)
-})
-it('validates against comments added while the artifact request is in flight', async () => {
-  const prepared = await artifact()
-  const pending = deferred(); installTranslation(vi.fn().mockReturnValue(pending.promise))
-  const store = createTranslationStore(() => snapshot)
-  const load = store.getState().toggle()
-  snapshot.source += '{>>@Da Wei: note<<}'
+  await store.getState().select('zh-CN')
+  const captured = store.getState().artifact!
+  artifacts = [{ ...captured, blocks: captured.blocks.map((block) => ({ ...block, text: 'New translation' })) }]
   await store.getState().synchronize()
-  pending.resolve(prepared); await load
+  expect(store.getState().artifact).not.toBe(captured)
+  artifacts = []; await store.getState().synchronize()
+  expect(store.getState().active).toBe(false)
+  expect(store.getState().error).toBe('stale')
+  artifacts = [captured]; await store.getState().synchronize()
+  expect(store.getState().active).toBe(false)
+})
+it('applies a valid hint once, without overriding an explicit original choice', async () => {
+  artifacts = [await artifact()]
+  const store = createTranslationStore(() => snapshot)
+  store.getState().hint('A', 'zh-CN'); await store.getState().synchronize()
+  expect(store.getState().targetLang).toBe('zh-CN')
+  await store.getState().select(null)
+  store.getState().hint('A', 'fr'); await store.getState().synchronize()
+  expect(store.getState().active).toBe(false)
+})
+it('ignores unavailable hints and does not auto-switch when that artifact arrives', async () => {
+  const store = createTranslationStore(() => snapshot)
+  store.getState().hint('A', 'zh-CN'); await store.getState().synchronize()
+  expect(store.getState().error).toBeNull()
+  artifacts = [await artifact()]; await store.getState().synchronize()
+  expect(store.getState().active).toBe(false)
+})
+it('late discovery cannot replace a newer document or choice', async () => {
+  const prepared = await artifact()
+  const pending = deferred(); reads.mockReturnValueOnce(pending.promise)
+  const store = createTranslationStore(() => snapshot)
+  const first = store.getState().select('zh-CN')
+  snapshot.sessionId = 'B'; artifacts = [await artifact('fr')]
+  await store.getState().select('fr')
+  pending.resolve([prepared]); await first
+  expect(store.getState().sessionId).toBe('B')
+  expect(store.getState().targetLang).toBe('fr')
+})
+it('validates the latest source when an artifact arrives during editing', async () => {
+  const prepared = await artifact()
+  const pending = deferred(); reads.mockReturnValueOnce(pending.promise)
+  const store = createTranslationStore(() => snapshot)
+  const loading = store.getState().select('zh-CN')
+  snapshot.source += '{>>@Alex: note<<}'
+  pending.resolve([prepared]); await loading
   expect(store.getState().active).toBe(true)
   expect(store.getState().source).toBe(snapshot.source)
 })
-it.each(['target', 'blocks'])('rejects an artifact whose %s does not match', async (mismatch) => {
-  const prepared = await artifact()
-  installTranslation(vi.fn().mockResolvedValue(mismatch === 'target' ? { ...prepared, targetLang: 'ja' } : { ...prepared, blocks: [] }))
+it('source edits while original is selected do not cause warnings', async () => {
+  artifacts = [await artifact()]
   const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  expect(store.getState().active).toBe(false)
-  expect(store.getState().error).toBe('stale')
-})
-it('does not issue requests when translation is disabled', async () => {
-  snapshot.targetLang = null
-  const readTranslation = vi.fn(); installTranslation(readTranslation)
-  const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  expect(readTranslation).not.toHaveBeenCalled()
-})
-
-it('keeps the latest document artifact when requests complete in reverse order', async () => {
-  const prepared = await artifact()
-  const first = deferred(); const second = deferred()
-  installTranslation(vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise))
-  const store = createTranslationStore(() => snapshot)
-  const a = store.getState().toggle()
-  snapshot = { ...snapshot, sessionId: 'B' }
   await store.getState().synchronize()
-  const b = store.getState().toggle()
-  second.resolve(prepared); await b
-  expect(store.getState().sessionId).toBe('B')
-  expect(store.getState().active).toBe(true)
-  first.resolve({ ...prepared, blocks: [] }); await a
-  expect(store.getState().sessionId).toBe('B')
-  expect(store.getState().active).toBe(true)
+  snapshot.source = 'Changed.'; await store.getState().synchronize()
   expect(store.getState().error).toBeNull()
+  expect(store.getState().available).toEqual([])
 })
-
-it('stays original after toggling off and then changing annotations or narrative', async () => {
-  installTranslation(vi.fn().mockResolvedValue(await artifact()))
+it('discovery failures only notify when a displayed translation is lost', async () => {
   const store = createTranslationStore(() => snapshot)
-  await store.getState().toggle()
-  await store.getState().toggle()
-  snapshot.source += '{>>@Da Wei: note<<}'
+  reads.mockRejectedValueOnce(new Error('Unavailable'))
   await store.getState().synchronize()
-  expect(store.getState().active).toBe(false)
   expect(store.getState().error).toBeNull()
-  snapshot.source = 'New prose.'
+  artifacts = [await artifact()]; await store.getState().select('zh-CN')
+  reads.mockRejectedValueOnce(new Error('Unavailable'))
   await store.getState().synchronize()
+  expect(store.getState().error).toBe('unavailable')
   expect(store.getState().active).toBe(false)
-  expect(store.getState().error).toBeNull()
 })
