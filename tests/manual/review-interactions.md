@@ -212,3 +212,21 @@ Rose comments plum; insertion and deletion keep their separate meanings.
 - Print a document containing comments, insertions, deletions, highlights, and colored code from
   both a light and dark theme. The print palette remains light with distinct review roles and
   neutral code ink.
+
+## Wide tables
+
+Use disposable tables with long prose, Chinese text, long identifiers, and comments in cells.
+Compare narrow and wide windows. Small tables should have no expansion control. A wide table should
+scroll inside the prose width, with fades only at edges that hide content.
+
+Expand from the middle and far end, then collapse. Cell widths, wraps, table height, and the prose
+below must stay fixed; collapse restores the original horizontal offset. Comments and outline fade
+away while expanded and return afterward. When the expanded content fits, no scrollbar remains.
+An unbreakable value wider than the window must still be reachable by horizontal scrolling.
+
+Reverse a transition quickly, resize during it, and repeat with reduced motion. Tab to the icon and
+use Escape to collapse. Search for text in a clipped column; it must scroll into view. Select table
+text and open a comment or suggestion; scrolling must keep its composer aligned. Activate an
+existing comment: the table collapses and the matching reply field receives focus. Change documents
+or reading modes while expanded and check that the outline and comments return. Print must omit
+expansion controls and expose the table.

@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-19 — Expand table viewports without reflowing cells
+
+**Ruled.** Wide tables scroll within the prose width and can explicitly expand to the window's
+content bounds, temporarily hiding comments and the outline. Expansion changes only the clipping
+viewport: column widths, wrapping, and row heights remain stable. Edge fades indicate hidden content;
+controls use icons with accessible labels. A fitting expanded table has no horizontal scrollbar.
+
+**Beat:** permanently widening prose, overlapping the comment rail, or reflowing cells during the
+transition, which makes comparison and visual tracking harder.
+
 ## 2026-10-18 — Outline requires at least two headings
 
 **Ruled.** Keep the outline/progress control hidden when a document has fewer than two headings.

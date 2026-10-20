@@ -97,6 +97,15 @@ export function clearMatches(): void {
 
 export function revealMatch(range: Range, panel: HTMLElement | null): void {
   const element = range.startContainer.parentElement
+  const table = element?.closest<HTMLElement>('.md-table-scroll')
+  if (table) {
+    const match = range.getBoundingClientRect()
+    const bounds = table.getBoundingClientRect()
+    if (match.left < bounds.left) table.scrollLeft += match.left - bounds.left
+    else if (match.right > bounds.right) {
+      table.scrollLeft += Math.min(match.right - bounds.right, match.left - bounds.left)
+    }
+  }
   const scroller = element?.closest<HTMLElement>('.slide-over-body, .document-scroll')
   if (!scroller) return
   const rect = range.getBoundingClientRect()

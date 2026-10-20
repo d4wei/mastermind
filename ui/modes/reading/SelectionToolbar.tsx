@@ -110,13 +110,15 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     const scrollTarget = documentViewport().target
     if (active) {
       window.addEventListener('keydown', onKey)
-      scrollTarget.addEventListener('scroll', onScroll, { passive: true })
+      scrollTarget.addEventListener('scroll', onScroll, { passive: true, capture: true })
       window.addEventListener(READING_LAYOUT_EVENT, onScroll)
+      window.addEventListener('mastermind-table-layout', onScroll)
     }
     return () => {
       window.removeEventListener('keydown', onKey)
-      scrollTarget.removeEventListener('scroll', onScroll)
+      scrollTarget.removeEventListener('scroll', onScroll, true)
       window.removeEventListener(READING_LAYOUT_EVENT, onScroll)
+      window.removeEventListener('mastermind-table-layout', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [active])

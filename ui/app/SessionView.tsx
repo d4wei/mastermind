@@ -1,3 +1,5 @@
+import type { TextEdit } from '../../document/types'
+import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { DraftScope, useDraftFocus, pendingDrafts, draftValue } from '../review/drafts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DocumentScroll } from './DocumentScroll'
@@ -58,7 +60,12 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const externalVersion = useDoc((s) => s.externalVersion)
   const readOnly = useDoc((s) => s.conflict)
   const load = useDoc((s) => s.load)
-  const applyEdits = useDoc((s) => s.applyEdits)
+  const applyDocEdits = useDoc((s) => s.applyEdits)
+  const { collapse: collapseTable, hidden: tableExpanded } = useTableExpansion()
+  const applyEdits = useCallback((edits: TextEdit[]) => {
+    collapseTable()
+    applyDocEdits(edits)
+  }, [collapseTable, applyDocEdits])
 
   const t = useT()
   const articleRef = useRef<HTMLElement | null>(null)
@@ -75,10 +82,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const findOpenedRail = useRef(false)
   const closeRail = useCallback(() => { findOpenedRail.current = false; setRailOpen(false) }, [])
   const revealFindComment = useCallback((spanIndex: number) => {
+    collapseTable()
     if (!railOpen) findOpenedRail.current = true
     setRailOpen(true)
     setActiveSpan(spanIndex)
-  }, [railOpen])
+  }, [railOpen, collapseTable])
   const restoreFindRail = useCallback(() => {
     if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
   }, [])
@@ -98,9 +106,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [draftFocus, sessionId])
   const closePanel = useCallback(() => setPanel(null), [])
   const openRail = useCallback(() => {
+    collapseTable()
     if (narrow) setPanel(null)
     setRailOpen(true)
-  }, [narrow])
+  }, [narrow, collapseTable])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const translation = useTranslation()
@@ -350,6 +359,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
         railOpen={railOpen}
         onToggleRail={() => {
+          collapseTable()
           findOpenedRail.current = false
           setRailOpen((v) => !v)
           if (narrow) {
@@ -428,7 +438,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         </div>
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (
-        <div className="comments-panel">
+        <div className="comments-panel" inert={tableExpanded} aria-hidden={tableExpanded}
+          data-table-hidden={tableExpanded}>
           <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar" focusOnOpen={!findOpenedRail.current}>
             {commentRail}
           </SlideOver>

@@ -1,5 +1,7 @@
 import type { ComponentType, SVGProps } from 'react'
 import {
+  EnterFullScreenIcon,
+  ExitFullScreenIcon,
   GearIcon as RGearIcon,
   ChatBubbleIcon,
   ExclamationTriangleIcon,
@@ -21,12 +23,7 @@ import {
 
 type IconProps = SVGProps<SVGSVGElement>
 
-/**
- * The app's icon set. Chrome glyphs come from @radix-ui/react-icons (15px grid,
- * currentColor); the few Radix lacks (folder, language-swap, the comment
- * diamond, the pending dot, the highlighter) stay hand-drawn at 1.5px stroke.
- * Every icon is decorative (aria-hidden) — labels/tooltips carry the meaning.
- */
+/** Icons are decorative; their controls supply accessible names and tooltips. */
 function radix(Icon: ComponentType<any>, size: number) {
   return function RadixGlyph(props: IconProps) {
     return <Icon width={size} height={size} aria-hidden focusable={false} {...props} />
@@ -50,6 +47,8 @@ function base(props: IconProps, size = 14): IconProps {
 }
 
 /* ---- Radix chrome glyphs ---- */
+export const ExpandIcon = radix(EnterFullScreenIcon, 14)
+export const CollapseIcon = radix(ExitFullScreenIcon, 14)
 export const GearIcon = radix(RGearIcon, 14)
 export const ChatIcon = radix(ChatBubbleIcon, 14)
 export const AlertIcon = radix(ExclamationTriangleIcon, 14)

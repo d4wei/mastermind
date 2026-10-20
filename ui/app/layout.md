@@ -46,8 +46,10 @@ the outline strip. The rail reserves its card width and gap, with no unused flex
 Comments use the shared dismissible panel below the small-window breakpoint or when the inline
 layout cannot preserve the minimum reading measure at the selected font size. The panel starts
 closed and opens from the comments control or a document mark. Cards flow vertically inside it.
-Wide layouts retain document-aligned cards. Settings, resolved history, and panel comments share
-the overlay area.
+Wide layouts retain document-aligned cards. Expanded
+tables temporarily hide this rail and the outline without changing their layout reservations; see
+[table viewports](../modes/reading/rendering.md#table-viewports). Settings, resolved history, and panel
+comments share the overlay area.
 
 Changing inline comment visibility animates only horizontal displacement of the document column.
 The comment rail fades in independently at its measured anchors.

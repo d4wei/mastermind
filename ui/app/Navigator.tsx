@@ -1,3 +1,4 @@
+import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
 import { documentViewport, readingLine, scrollToOffset } from '../util/scroll'
@@ -21,6 +22,7 @@ export function useIsNarrow(): boolean {
 }
 
 export function Navigator() {
+  const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
   const items = useNav((s) => s.outline)
   const docEl = useNav((s) => s.docEl)
@@ -110,7 +112,7 @@ export function Navigator() {
     setOpen(false)
   }
 
-  return <nav className="compact-outline" ref={container} aria-label={t('outline')}
+  return <nav className="compact-outline" inert={tableExpanded} aria-hidden={tableExpanded || undefined} data-table-hidden={tableExpanded} ref={container} aria-label={t('outline')}
     onPointerEnter={(event) => { if (event.pointerType !== 'touch') setOpen(true) }}
     onPointerLeave={() => { if (!container.current?.contains(document.activeElement)) setOpen(false) }}
     onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>

@@ -1,6 +1,8 @@
 import { useConfig } from '../app/configStore'
 const en = {
   table: 'Table',
+  expandTable: 'Expand table',
+  collapseTable: 'Collapse table',
   editingPaused: 'Editing paused while this file needs attention.',
   showNotification: 'Show notification',
   needsAttention: 'Needs attention',
@@ -121,6 +123,8 @@ export type MsgKey = keyof typeof en
 
 const zhCN: Record<MsgKey, string> = {
   table: '表格',
+  expandTable: '展开表格',
+  collapseTable: '收起表格',
   editingPaused: '文件需要处理，编辑已暂停。',
   showNotification: '查看通知',
   needsAttention: '需要处理',

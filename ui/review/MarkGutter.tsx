@@ -1,3 +1,4 @@
+import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { documentViewport, scrollToSpan } from '../util/scroll'
 
@@ -25,6 +26,7 @@ const KIND_CLASS: Record<MarkTick['kind'], string> = {
 }
 
 export function MarkGutter({ docRef, marks, version }: Props) {
+  const { hidden: tableExpanded } = useTableExpansion()
   const [ticks, setTicks] = useState<PlacedTick[]>([])
   const thumbRef = useRef<HTMLDivElement>(null)
   const metrics = useRef({ articleTop: 0, articleHeight: 1 })
@@ -91,7 +93,7 @@ export function MarkGutter({ docRef, marks, version }: Props) {
 
   return (
     <div
-      className="mark-gutter"
+      className="mark-gutter" inert={tableExpanded} data-table-hidden={tableExpanded}
       aria-hidden
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect()

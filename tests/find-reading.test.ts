@@ -81,3 +81,21 @@ it('updates registered highlight membership and removes every old range on close
     expect(registry.size).toBe(0)
   } finally { vi.unstubAllGlobals() }
 })
+
+it('reveals a match in an offscreen table column without changing the document scroll position', () => {
+  const scroller = document.createElement('div'); scroller.className = 'document-scroll'
+  const tableScroll = document.createElement('div'); tableScroll.className = 'md-table-scroll'
+  const cell = document.createElement('span'); cell.textContent = 'Fallback'
+  scroller.append(tableScroll); tableScroll.append(cell)
+  const range = document.createRange(); range.selectNodeContents(cell)
+  scroller.getBoundingClientRect = () => ({ top: 40, bottom: 600 } as DOMRect)
+  tableScroll.getBoundingClientRect = () => ({ left: 100, right: 700 } as DOMRect)
+  range.getBoundingClientRect = () => ({ left: 850, right: 950, top: 200, bottom: 220 } as DOMRect)
+  scroller.scrollTop = 200
+  revealMatch(range, null)
+  expect(tableScroll.scrollLeft).toBe(250)
+  expect(scroller.scrollTop).toBe(200)
+  range.getBoundingClientRect = () => ({ left: 50, right: 150, top: 200, bottom: 220 } as DOMRect)
+  revealMatch(range, null)
+  expect(tableScroll.scrollLeft).toBe(200)
+})

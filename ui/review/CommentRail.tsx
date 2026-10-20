@@ -1,3 +1,4 @@
+import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useDraftGuard, useDraftState } from './drafts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DropdownMenu } from 'radix-ui'
@@ -40,6 +41,7 @@ function threadKey(thread: ThreadItem, anchorText: string): string {
 
 export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, hoveredSpan,
   onHover, onActivate, onEdit, replyRequest, onReplyHandled, readOnly = false }: Props) {
+  const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
   const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
@@ -174,7 +176,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
 
   const orphaned = Object.entries(drafts).filter(([key, text]) => text.trim() && !cards.some((card) => card.key === key))
   if (!cards.length && !orphaned.length) return null
-  return <div ref={railRef} className="rail" style={{ height: railHeight || undefined }}>
+  return <div ref={railRef} className="rail" inert={tableExpanded} aria-hidden={tableExpanded || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.map((card, index) => {
       const selected = activeSpan === card.spanIndex

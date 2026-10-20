@@ -10,6 +10,7 @@ import { Navigator } from './Navigator'
 import { useNav } from './navStore'
 import { useRoute } from './route'
 import { registerDocumentLifecycle } from '../documents/documentLifecycle'
+import { TableExpansionProvider } from '../modes/reading/TableExpansion'
 import { SessionView } from './SessionView'
 
 export function App({ home, onboarding, native = false }: {
@@ -56,10 +57,10 @@ function AppFrame({
   const outlineCount = useNav((s) => s.outline.length)
   const navPresent = outlineCount >= 2
   return (
-    <>
+    <TableExpansionProvider>
       {navPresent && <Navigator />}
       <div className="app-content">{children}</div>
-    </>
+    </TableExpansionProvider>
   )
 }
 
