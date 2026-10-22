@@ -23,10 +23,15 @@ interface Props {
   containerRef: Ref<HTMLElement>
 }
 
-/** Offsets inside a block index its displayed text; removing them keeps them from posing as document offsets. */
-function withoutPositions(node: Node): void {
-  delete node.position
-  if ('children' in node && Array.isArray(node.children)) node.children.forEach(withoutPositions)
+/**
+ * Offsets inside a block index its displayed text; a copy without them keeps them from posing as
+ * document offsets. The copy leaves the analysis's own trees, which may be one object, intact.
+ */
+function withoutPositions<T extends Node>(node: T): T {
+  const { position: _, ...rest } = node
+  return 'children' in node && Array.isArray(node.children)
+    ? { ...rest, children: node.children.map(withoutPositions) } as unknown as T
+    : rest as T
 }
 
 function TransBlock({ block, translated }: { block: TranslationBlock; translated?: string }) {
@@ -34,8 +39,7 @@ function TransBlock({ block, translated }: { block: TranslationBlock; translated
   const shown = translated ?? block.text
   const analysis = useMemo(() => {
     const result = analyzeMarkdown(shown)
-    withoutPositions(result.tree)
-    return result
+    return { ...result, tree: withoutPositions(result.tree) }
   }, [shown])
   // A heading block carries its source offset so outline navigation finds it as in the original.
   return <div className="trans-block" data-ps={block.kind === 'heading' ? block.start : undefined}>
@@ -55,11 +59,12 @@ export function TranslatedView({ source, artifact, containerRef }: Props) {
     })
     return () => { cancelled = true }
   }, [source, artifact])
+  const comments = useMemo(() => analyzeMarkdown(source).items.flatMap((item) => item.type === 'thread' ? item.comments : []),
+    [source])
   if (!prepared || prepared.source !== source) return null
   const map = new Map(artifact.blocks.map((block) => [block.id, block.text]))
   const renderBlock = (block: TranslationBlock) => <TransBlock key={block.id} block={block}
     translated={block.translatable ? map.get(block.id) : undefined} />
-  const comments = analyzeMarkdown(source).items.flatMap((item) => item.type === 'thread' ? item.comments : [])
   return <>
     <article className="trans-view" ref={containerRef}>
       {calloutSections(prepared.blocks, (block) => sourceHeading(block)?.depth ?? null,

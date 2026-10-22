@@ -32,8 +32,9 @@ Retry cannot succeed; any edits already in the buffer stay pending so closing of
 `saveFailed` for other read and write failures. `missing` requires evidence: a deletion event or a
 host `missing` read result. Other read failures cannot distinguish a missing path from an
 unreadable one, so a missing diagnosis persists through them until a read succeeds. Reading back
-the held version resolves `readFailed` and `missing`; `changed` and `saveFailed` remain for Retry
-or Use incoming. A failed copy has its own `copyError` and does not change that diagnosis. Leaving
+the held version resolves `readFailed` and `missing` and leaves `changed` and `saveFailed` for Retry
+or Use incoming. A deletion event or a failed read replaces any diagnosis with `missing` or
+`readFailed`, which a later read of the held version then clears. A failed copy has its own `copyError` and does not change that diagnosis. Leaving
 recovery clears its dismissal and copy failure; a successful write also clears copy failure.
 Reading, copying, navigation, other documents, and closing remain available.
 

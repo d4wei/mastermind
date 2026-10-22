@@ -121,6 +121,11 @@ describe('native reviewer boundary', () => {
     expect(await host.config()).toEqual({ ...DEFAULT_CONFIG, theme: 'nacht' })
   })
 
+  it.each([' Reader', '@Reader', ' @ Reader '])('reads the hand-edited author name %j normalized', async (authorTag) => {
+    const host = createNativeHost({ invoke: vi.fn().mockResolvedValue({ authorTag }), listen: vi.fn() }, [])
+    expect((await host.config()).authorTag).toBe('Reader')
+  })
+
   it('serializes preference patches so concurrent controls do not erase each other', async () => {
     let saved: Record<string, unknown> | null = null
     const bridge: NativeBridge = {

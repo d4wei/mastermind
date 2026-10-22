@@ -27,12 +27,17 @@ export function configPatch(patch: object): Partial<MastermindConfig> | null {
   return accepted
 }
 
-/** Stored preferences may be hand-edited, so each unacceptable field falls back to its default alone. */
+/**
+ * Stored preferences may be hand-edited, so each unacceptable field falls back to its default alone.
+ * An author name is read normalized, as the native host normalizes it.
+ */
 export function storedConfig(saved: unknown): MastermindConfig {
   const config: Record<string, unknown> = { ...DEFAULT_CONFIG }
   if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
     for (const [key, value] of Object.entries(saved)) {
-      if (knownKey(key) && key !== 'version' && acceptsConfigValue(key, value)) config[key] = value
+      if (!knownKey(key) || key === 'version') continue
+      const accepted = key === 'authorTag' && typeof value === 'string' ? usableAuthorName(value) : value
+      if (accepted !== null && acceptsConfigValue(key, accepted)) config[key] = accepted
     }
   }
   return config as unknown as MastermindConfig

@@ -26,6 +26,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   edit.mockReset()
+  edit.mockReturnValue(true)
   selectionRect = { top: 100, left: 100, width: 40 } as DOMRect
   Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true, value: () => selectionRect })
   ;({ host, root } = createReactHost())
@@ -128,6 +129,18 @@ it('retains an unsubmitted comment when editing pauses and prevents submit', asy
   expect(textarea.value).toBe('Existing draft')
   act(() => root.render(<Harness />))
   expect(textarea.readOnly).toBe(false)
+})
+
+it('keeps the composed comment when its edit is refused', async () => {
+  const textarea = await compose()
+  edit.mockReturnValueOnce(false)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).toHaveBeenCalledTimes(1)
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe('Existing draft')
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).toHaveBeenCalledTimes(2)
+  expect(host.querySelector('textarea')).toBeNull()
 })
 
 it('prefills a replacement and submits a substitution, or a deletion when cleared', async () => {

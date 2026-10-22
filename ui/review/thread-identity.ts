@@ -30,6 +30,26 @@ export function refreshThread(ref: ThreadRef, source: string, cards: readonly Lo
   return ref.source === source && ref.start === next.start && ref.unique === next.unique ? ref : next
 }
 
+/**
+ * Re-anchors every draft to `source`, keeping the array when nothing moved. A draft loses its
+ * reference when its discussion is gone or an earlier draft already holds it, and is dropped then
+ * unless it has text.
+ */
+export function refreshReplies(drafts: ReplyDraft[], source: string, cards: readonly Located[]): ReplyDraft[] {
+  const held = new Set<number>()
+  let changed = false
+  const next = drafts.flatMap((draft) => {
+    if (!draft.thread) return [draft]
+    let thread = refreshThread(draft.thread, source, cards)
+    if (thread && held.has(thread.start)) thread = null
+    if (thread) held.add(thread.start)
+    if (thread === draft.thread) return [draft]
+    changed = true
+    return thread || draft.text.trim() ? [{ ...draft, thread }] : []
+  })
+  return changed ? next : drafts
+}
+
 /** The offset after `edits`, or null when an edit replaces the character at `offset`. */
 function mapOffset(offset: number, edits: readonly TextEdit[]): number | null {
   let shift = 0

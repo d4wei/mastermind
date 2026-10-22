@@ -14,8 +14,10 @@ no draft is implicitly submitted or included in a saved Markdown copy.
 
 Selection drafts retain their source snapshot and cannot submit against changed source offsets.
 Replies retain their thread identity and start offset, and belong to the document view rather than
-the comments rail, so edits made while the narrow comments panel is closed still reach them. Review
-edits carry a reply exactly. After a change of unknown shape, such as an external edit, a reply
+the comments rail, so edits made while the narrow comments panel is closed still reach them. The
+document view also re-anchors them to each new analysis, whether or not the rail is mounted, so the
+uniqueness they record describes the source the next change starts from. Review edits carry a reply
+exactly. After a change of unknown shape, such as an external edit, a reply
 follows its discussion to the offset on which both alignments of the changed region agree, or else
 by identity alone when that identity was unique before the change and still is. A reply whose
 target is ambiguous or gone remains copyable in the comments rail, with a Discard draft control; it

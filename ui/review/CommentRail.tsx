@@ -32,7 +32,7 @@ interface Props {
   onActivate: (spanIndex: number | null) => void
   /** Returns whether the edits applied; the owner rebases `drafts` through those that did. */
   onEdit: (edits: TextEdit[]) => boolean
-  /** Unsent replies; their owner outlives the rail. */
+  /** Unsent replies; their owner outlives the rail and re-anchors them to each analysis. */
   drafts: readonly ReplyDraft[]
   onDraftsChange: (next: SetStateAction<ReplyDraft[]>) => void
 }
@@ -62,24 +62,6 @@ export function CommentRail({ analysis: { spans, threads: cards }, source, docRe
     }
     return { byCard, cardOf }
   }, [drafts, cards, source])
-  // Re-anchor drafts to the current source; one whose discussion is gone keeps its text, if any, unplaced.
-  useEffect(() => {
-    const anchored = new Map<number, ReplyDraft['thread']>()
-    for (const draft of drafts) {
-      if (!draft.thread) continue
-      const card = placedDrafts.cardOf.get(draft.id)
-      const thread = card ? threadRef(card, source, cards) : null
-      const same = thread && thread.source === draft.thread.source && thread.start === draft.thread.start &&
-        thread.unique === draft.thread.unique
-      if (!same) anchored.set(draft.id, thread)
-    }
-    if (!anchored.size) return
-    setDrafts((current) => current.flatMap((draft) => {
-      if (!anchored.has(draft.id)) return [draft]
-      const thread = anchored.get(draft.id)!
-      return thread || draft.text.trim() ? [{ ...draft, thread }] : []
-    }))
-  }, [drafts, source, cards, placedDrafts, setDrafts])
   const draftText = (card: ThreadCard) => placedDrafts.byCard.get(card.key)?.text ?? ''
   const setDraftText = (card: ThreadCard, text: string) => {
     const existing = placedDrafts.byCard.get(card.key)

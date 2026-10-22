@@ -21,7 +21,8 @@ interface Props {
   /** The analysis of `source`. */
   analysis: Pick<Analysis, 'plain' | 'spans'>
   authorTag: string
-  onEdit: (edits: TextEdit[]) => void
+  /** Returns whether the edits applied; a refused edit keeps the composed draft. */
+  onEdit: (edits: TextEdit[]) => boolean
 }
 
 interface Active {
@@ -173,8 +174,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     setComposing(kind)
   }
   const finish = (edits: TextEdit[]): void => {
-    if (readOnly) return
-    onEdit(edits)
+    if (readOnly || !onEdit(edits)) return
     window.getSelection()?.removeAllRanges()
     dismiss()
   }

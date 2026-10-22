@@ -10,6 +10,7 @@ import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
+import { releaseDrafts, useDrafts } from '../ui/review/drafts'
 import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
@@ -25,6 +26,11 @@ vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest
   rail.hovered = props.hoveredSpan
   rail.onHover = props.onHover
   return <div data-testid="rail" />
+} }))
+const toolbar = vi.hoisted(() => ({ onEdit: null as null | ((edits: TextEdit[]) => boolean) }))
+vi.mock('../ui/modes/reading/SelectionToolbar', () => ({ SelectionToolbar: (props: { onEdit: (edits: TextEdit[]) => boolean }) => {
+  toolbar.onEdit = props.onEdit
+  return null
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
 const nav = vi.hoisted(() => ({ props: null as null | import('../ui/app/Navigator').NavigatorProps }))
@@ -212,6 +218,25 @@ it('rebases the selection and reply drafts exactly through edits made in the doc
   expect(edited).toBe(`a ${discussion} b ${discussion}`)
   expect(rail.active).toBe(0)
   expect(rail.drafts.map((draft) => draft.thread && [draft.thread.source, draft.thread.start])).toEqual([[edited, 2]])
+})
+
+it('orphans a reply draft rather than move it to a lookalike added while the rail was closed', () => {
+  const discussion = '{==teh==}{>>@me: typo<<}'
+  const source = `Para one ${discussion} end.\n\nPara two teh here.\n`
+  render(source)
+  const cards = analyzeMarkdown(source).threads
+  act(() => rail.onDraftsChange!([{ id: 1, thread: threadRef(cards[0]!, source, cards), text: 'my reply' }]))
+  act(() => host.querySelector<HTMLButtonElement>('.topbar-comments')!.click())
+  expect(host.querySelector('[data-testid="rail"]')).toBeNull()
+  try {
+    const at = source.indexOf('teh here')
+    act(() => { expect(toolbar.onEdit!([{ from: at, to: at + 3, insert: discussion }])).toBe(true) })
+    // An external change removes the original discussion, leaving only its lookalike.
+    const external = useDoc.getState().source.replace(`Para one ${discussion} end.`, 'Para one teh end.')
+    act(() => useDoc.setState({ source: external, savedSource: external }))
+    const drafts = useDrafts.getState().documents.get('A')!.values.get('replies') as ReplyDraft[]
+    expect(drafts.map((draft) => [draft.thread, draft.text])).toEqual([[null, 'my reply']])
+  } finally { releaseDrafts('A') }
 })
 
 it('keeps the selected discussion when Escape closes the outline popover', () => {

@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, savePreparedTranslation, readPreparedTranslation, listPreparedTranslations, translationFile } from '../tools/translation/prepared-translations'
+import { planTranslation, savePreparedTranslation, listPreparedTranslations, translationFile } from '../tools/translation/prepared-translations'
 
 let dir: string
 let file: string
@@ -29,7 +29,7 @@ it('emits all current blocks on every preparation pass regardless of earlier art
   expect(second.blocks).toEqual(first.blocks)
   expect(second.blocks.some((b) => !b.translatable)).toBe(true)
   expect(second.blocks.filter((b) => b.translatable)).toHaveLength(2)
-  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'ready', artifact })
+  expect(await listPreparedTranslations(file, source)).toEqual([artifact])
 })
 
 it('replaces an artifact atomically without carrying earlier translations into the result', async () => {
@@ -55,7 +55,7 @@ it.each(['partial', 'stale', 'wrong-language', 'legacy'])('rejects a %s artifact
   }
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', invalid[kind])).rejects.toThrow()
   expect(await fs.readFile(translationFile(file, 'zh-CN'))).toEqual(previous)
-  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'ready', artifact: valid })
+  expect(await listPreparedTranslations(file, source)).toEqual([valid])
 })
 
 it('rejects a source change while saving the translation and leaves the earlier artifact intact', async () => {
@@ -115,13 +115,12 @@ it('discovers targets independently and ignores foreign, malformed and redirecte
   expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
 })
 
-it.runIf(process.platform !== 'win32')('reads a FIFO or a link to a device as stale without blocking or reading it', async () => {
+it.runIf(process.platform !== 'win32')('skips a FIFO or a link to a device without blocking or reading it', async () => {
   const artifact = await artifactFor()
   await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
   execFileSync('mkfifo', [translationFile(file, 'de')])
   await fs.symlink('/dev/zero', translationFile(file, 'fr'))
   await fs.symlink(translationFile(file, 'zh-CN'), translationFile(file, 'ja'))
-  for (const lang of ['de', 'fr', 'ja']) expect(await readPreparedTranslation(file, source, lang)).toEqual({ status: 'stale' })
   expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
 })
 
@@ -133,7 +132,6 @@ it.runIf(process.platform !== 'win32')('refuses to read or save through a redire
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow('must not be a symbolic link')
   expect(await fs.readdir(elsewhere)).toEqual([])
   await fs.writeFile(path.join(elsewhere, path.basename(translationFile(file, 'zh-CN'))), JSON.stringify(await artifactFor()))
-  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'stale' })
   expect(await listPreparedTranslations(file, source)).toEqual([])
 })
 
@@ -153,6 +151,5 @@ it('refuses a case-variant translations directory on a case-insensitive volume, 
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', artifact))
     .rejects.toThrow(`named exactly ${path.join(dir, '.mastermind', 'translations')}`)
   expect(await fs.readdir(path.join(dir, '.Mastermind', 'Translations'))).toEqual([])
-  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'stale' })
   expect(await listPreparedTranslations(file, source)).toEqual([])
 })

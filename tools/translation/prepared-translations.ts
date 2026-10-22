@@ -92,32 +92,18 @@ export async function savePreparedTranslation(realPath: string, source: string, 
   return { artifactPath, written: artifact.blocks.length }
 }
 
-type PreparedRead =
-  | { status: 'ready'; artifact: PreparedTranslation }
-  | { status: 'missing' }
-  | { status: 'stale' }
-
-async function matchArtifact(bytes: Buffer, source: string, targetLang: string): Promise<PreparedRead> {
+/** The artifact in `bytes` when it is current for `source` and names `targetLang`. */
+async function matchArtifact(bytes: Buffer, source: string, targetLang: string): Promise<PreparedTranslation | null> {
   let input: unknown
-  try { input = JSON.parse(bytes.toString('utf8')) } catch { return { status: 'stale' } }
+  try { input = JSON.parse(bytes.toString('utf8')) } catch { return null }
   const artifact = await matchPreparedTranslation(source, input)
-  return artifact?.targetLang === targetLang ? { status: 'ready', artifact } : { status: 'stale' }
+  return artifact?.targetLang === targetLang ? artifact : null
 }
 
-/** A redirected directory or an artifact that is not a bounded regular file reads as stale. */
-export async function readPreparedTranslation(realPath: string, source: string, targetLang: string): Promise<PreparedRead> {
-  const name = path.basename(translationFile(realPath, targetLang))
-  let bytes: Buffer | null
-  try {
-    const directory = await artifactDirectory(realPath)
-    bytes = directory ? await readArtifactBytes(path.join(directory, name)) : null
-  } catch (error) {
-    return { status: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'stale' }
-  }
-  return bytes ? matchArtifact(bytes, source, targetLang) : { status: 'stale' }
-}
-
-/** Discovery reads through the same guards as a single read, within a total byte and count budget. */
+/**
+ * Every current artifact beside the document, each read through the guards above within a total
+ * byte and count budget. A redirected directory lists nothing.
+ */
 export async function listPreparedTranslations(realPath: string, source: string): Promise<PreparedTranslation[]> {
   try {
     const directory = await artifactDirectory(realPath)
@@ -136,8 +122,8 @@ export async function listPreparedTranslations(realPath: string, source: string)
         if (!content) continue
         bytes += content.length
         if (bytes > DISCOVERY_BYTES) break
-        const result = await matchArtifact(content, source, language)
-        if (result.status === 'ready') artifacts.push(result.artifact)
+        const artifact = await matchArtifact(content, source, language)
+        if (artifact) artifacts.push(artifact)
       } catch { /* One unreadable artifact must not hide other languages. */ }
     }
     return artifacts

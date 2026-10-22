@@ -10,8 +10,8 @@ import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
-import { locateThread, rebaseReplies, rebaseThread, refreshThread, threadRef, type ReplyDraft,
-  type ThreadRef } from '../review/thread-identity'
+import { locateThread, rebaseReplies, rebaseThread, refreshReplies, refreshThread, threadRef,
+  type ReplyDraft, type ThreadRef } from '../review/thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { PreparedTranslation } from '../../document/translation'
 import { closeOverlay, openOverlay, useOverlay } from './overlayStore'
@@ -172,6 +172,13 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const [hoveredSpan, chooseHovered, rebaseHovered] = useThreadChoice(cards, source)
   // Owned here rather than by the rail, which is unmounted while the narrow comments panel is closed.
   const [replyDrafts, setReplyDrafts] = useDraftState<ReplyDraft[]>('replies', [])
+  // Each analysis re-anchors the drafts, so their uniqueness describes the source the next change
+  // of unknown shape starts from. Without an analysis they wait for the next one.
+  useEffect(() => {
+    if (!cards) return
+    const next = refreshReplies(replyDrafts, source, cards)
+    if (next !== replyDrafts) setReplyDrafts(next)
+  }, [cards, source, replyDrafts, setReplyDrafts])
   /**
    * The one path for review edits: they apply only to the source they were computed from, and the
    * selected and hovered discussions and reply drafts follow them exactly. Returns whether they applied.
@@ -186,7 +193,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     doc.applyEdits(edits)
     return true
   }, [sessionId, collapseTable, rebaseActive, rebaseHovered, setReplyDrafts])
-  const applyEdits = useCallback((edits: TextEdit[]) => { applyReviewEdits(edits, source) }, [applyReviewEdits, source])
+  const applyEdits = useCallback((edits: TextEdit[]) => applyReviewEdits(edits, source), [applyReviewEdits, source])
   const revealFindComment = useCallback((spanIndex: number) => {
     collapseTable()
     if (!railOpen) findOpenedRail.current = true

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /// <reference types="vite/client" />
-import { act, useRef, useState } from 'react'
+import { act, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import type { TextEdit } from '../document/types'
@@ -10,7 +10,7 @@ import { parseResolvedThreads } from '../document/review-archive'
 import * as reviewScroll from '../ui/util/scroll'
 import { CommentRail } from '../ui/review/CommentRail'
 import { DraftScope, pendingDrafts, releaseDrafts, useDraftState } from '../ui/review/drafts'
-import { rebaseReplies, type ReplyDraft } from '../ui/review/thread-identity'
+import { rebaseReplies, refreshReplies, type ReplyDraft } from '../ui/review/thread-identity'
 
 let host: HTMLDivElement
 let root: Root
@@ -22,8 +22,13 @@ function Harness({ request }: { request?: { spanIndex: number } }) {
   const [active, setActive] = useState<number | null>(null)
   const [drafts, setDrafts] = useDraftState<ReplyDraft[]>('replies', [])
   const source = store((state) => state.source)
-  const analysis = analyzeMarkdown(source)
+  const analysis = useMemo(() => analyzeMarkdown(source), [source])
   const docRef = useRef<HTMLElement>(null)
+  // Like the document view, the owner re-anchors drafts to each analysis.
+  useEffect(() => {
+    const next = refreshReplies(drafts, source, analysis.threads)
+    if (next !== drafts) setDrafts(next)
+  }, [drafts, source, analysis, setDrafts])
   const onEdit = (edits: TextEdit[]) => {
     if (!edit(edits)) return false
     setDrafts((current) => rebaseReplies(current, source, edits))
