@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
+import fs from 'node:fs/promises'
+import os from 'node:os'
 import path from 'node:path'
 import { scanThemes } from '../themes/discovery'
 import { COLOR_TOKS, CODE_THEMES } from '../ui/theme/codeThemes'
@@ -31,6 +33,17 @@ describe('theme token contract', () => {
         accent: tokens['--color-accent'] })
     }
   })
+
+  it.each([['a number', { name: 42 }], ['an empty string', { name: '' }], ['absent', {}]])(
+    'names a theme by its id when the declared name is %s', async (_label, json) => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-themes-'))
+      try {
+        await fs.mkdir(path.join(root, 'custom'))
+        await fs.writeFile(path.join(root, 'custom', 'theme.json'), JSON.stringify(json))
+        await fs.copyFile(path.join(themesRoot, 'grid', 'tokens.css'), path.join(root, 'custom', 'tokens.css'))
+        expect((await scanThemes(root)).map(({ id, name }) => ({ id, name }))).toEqual([{ id: 'custom', name: 'custom' }])
+      } finally { await fs.rm(root, { recursive: true, force: true }) }
+    })
 
   it.each(themeIds)('%s defines every consumed token without orphan palette tokens', (id) => {
     const tokens = themeTokens(id)

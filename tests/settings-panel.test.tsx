@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import type { Root } from 'react-dom/client'
-import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
+import { createReactHost, removeReactHost } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { ClientConfig } from '../ui/settings/types'
 import { useConfig } from '../ui/app/configStore'

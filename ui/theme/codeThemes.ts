@@ -1,6 +1,6 @@
 import type { HlToken } from '../modes/reading/highlight'
 
-export type ColorTok = Exclude<HlToken['type'], 'text'>
+type ColorTok = Exclude<HlToken['type'], 'text'>
 export const COLOR_TOKS: ColorTok[] = ['comment', 'keyword', 'string', 'number', 'function', 'property', 'constant']
 
 type Appearance = 'light' | 'dark'
@@ -40,8 +40,6 @@ export const CODE_THEMES: CodeTheme[] = [
     },
   },
 ]
-
-export const DEFAULT_CODE_THEME = 'none'
 
 export function codeThemeById(id: string | undefined): CodeTheme {
   return CODE_THEMES.find((c) => c.id === id) ?? CODE_THEMES[0]!

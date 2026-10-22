@@ -142,18 +142,6 @@ body {
   background: var(--color-control-hover);
 }
 
-/* slot-text rolling labels (SlotLabel): the lib makes the container an
-   inline-flex of clipped per-glyph cells. Keep those cells aligned to the
-   surrounding chrome text rather than the lib's default bottom alignment. */
-.seg-btn .slot-text,
-.btn-primary .slot-text,
-.notification .slot-text {
-  vertical-align: middle;
-}
-.notification .slot-text {
-  white-space: normal; /* notices can wrap; let the roll line break naturally */
-}
-
 .topbar-icon-btn.btn-icon {
   width: var(--control-size);
   height: var(--control-size);
@@ -972,13 +960,6 @@ mark.critic-hl.critic-anchor:hover,
   padding-top: 0;
 }
 
-.settings-hint {
-  margin: 0 0 calc(var(--space-unit) * 2);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  line-height: var(--lh-snug);
-}
-
 .settings-body h4 {
   margin: 0 0 calc(var(--space-unit) * 2);
   font-size: var(--font-size-micro);
@@ -1002,7 +983,7 @@ mark.critic-hl.critic-anchor:hover,
 }
 /* Label line: text on the left, the mono current-value aligned to the right
    edge so values read down a clean column across the numeric rows. */
-.settings-row:not(.is-toggle) > span:first-child {
+.settings-row > span:first-child {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -1095,11 +1076,6 @@ mark.critic-hl.critic-anchor:hover,
   background: color-mix(in srgb, var(--color-text) 9%, var(--color-bg));
 }
 
-.settings-gear {
-  font-size: var(--font-size-body);
-  padding: calc(var(--space-unit) * 1.5);
-}
-
 input[type='range'] {
   accent-color: var(--color-text);
 }
@@ -1112,18 +1088,6 @@ input[type='checkbox'] {
 
 .trans-view {
   position: relative;
-}
-
-.trans-loading {
-  position: sticky;
-  top: var(--bar-clear);
-  z-index: var(--z-sticky);
-  display: inline-block;
-  background: var(--color-invert-bg);
-  color: var(--color-invert-text);
-  border-radius: var(--radius-lg);
-  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 3);
-  font-size: var(--font-size-sm);
 }
 
 .trans-block {
@@ -1173,9 +1137,6 @@ input[type='checkbox'] {
 }
 .mark-tick.tick-sub {
   background: var(--review-delete-border);
-}
-.mark-tick.tick-hl {
-  background: var(--review-highlight-border);
 }
 .mark-tick.tick-comment {
   background: var(--review-comment-anchor);

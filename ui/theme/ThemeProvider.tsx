@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
 import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
+import { prefersReducedMotion } from '../util/presence'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
 
 const TOKENS_LINK_ID = 'theme-tokens'
@@ -36,7 +37,7 @@ export function ThemeEffects() {
       return () => link?.removeEventListener('load', synchronize)
     }
 
-    const reduce = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reduce = prefersReducedMotion()
     let veil: HTMLDivElement | null = null
     if (!firstLoad && prev && prev !== id && !reduce) {
       veil = document.createElement('div')

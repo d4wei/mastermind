@@ -3,6 +3,7 @@ import { useConfig } from './configStore'
 import { DEFAULT_CONFIG } from '../settings/defaults'
 import { useNav } from './navStore'
 import { READING_LAYOUT_EVENT, readingSpace, type ReadingSpace } from './reading-space'
+import { prefersReducedMotion } from '../util/presence'
 
 export function useReadingSpace() {
   const [element, ref] = useState<HTMLDivElement | null>(null)
@@ -48,7 +49,7 @@ export function useReadingMovement(element: HTMLDivElement | null, left: number 
     notify()
     // Ref state can still hold the removed document shell during the closing render's layout effects.
     if (!element?.isConnected || left === undefined || !old || old.rail === rail || old.left === left ||
-      !element.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+      !element.animate || prefersReducedMotion()) return
     const css = getComputedStyle(element)
     const duration = css.getPropertyValue('--dur-base').trim()
     const durationMs = parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000)

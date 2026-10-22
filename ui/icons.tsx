@@ -7,8 +7,6 @@ import {
   ExclamationTriangleIcon,
   CheckIcon as RCheckIcon,
   DotsHorizontalIcon,
-  ChevronRightIcon,
-  ChevronLeftIcon as RChevronLeftIcon,
   ChevronUpIcon as RChevronUpIcon,
   ChevronDownIcon as RChevronDownIcon,
   FileIcon as RFileIcon,
@@ -54,9 +52,6 @@ export const ChatIcon = radix(ChatBubbleIcon, 14)
 export const AlertIcon = radix(ExclamationTriangleIcon, 14)
 export const CheckIcon = radix(RCheckIcon, 14)
 export const MoreIcon = radix(DotsHorizontalIcon, 15)
-/** A right-pointing chevron; CSS rotates it 90° when its row is expanded. */
-export const ChevronIcon = radix(ChevronRightIcon, 14)
-export const ChevronLeftIcon = radix(RChevronLeftIcon, 14)
 export const ChevronUpIcon = radix(RChevronUpIcon, 13)
 export const ChevronDownIcon = radix(RChevronDownIcon, 13)
 export const FileIcon = radix(RFileIcon, 14)
@@ -71,17 +66,6 @@ export const CodeIcon = radix(RCodeIcon, 14)
 export const LanguageIcon = radix(RGlobeIcon, 14)
 
 /* ---- hand-drawn glyphs Radix lacks ---- */
-
-export function OutlineIcon(props: IconProps) {
-  return (
-    <svg {...base(props, 14)}>
-      <circle cx="3.1" cy="4" r="0.85" fill="currentColor" stroke="none" />
-      <circle cx="3.1" cy="8" r="0.85" fill="currentColor" stroke="none" />
-      <circle cx="3.1" cy="12" r="0.85" fill="currentColor" stroke="none" />
-      <path d="M6 4h7.5M6 8h7.5M6 12h7.5" />
-    </svg>
-  )
-}
 
 export function DiamondIcon(props: IconProps) {
   return (

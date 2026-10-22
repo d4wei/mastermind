@@ -38,9 +38,6 @@ export const MONO_FONTS: MonoFont[] = [
   { id: 'ubuntu', name: 'Ubuntu Sans Mono', family: 'Ubuntu Sans Mono' },
 ]
 
-export const DEFAULT_FONT_PRESET = 'grid'
-export const DEFAULT_MONO = 'geist'
-
 export function fontPresetById(id: string | undefined): FontPreset {
   return FONT_PRESETS.find((s) => s.id === id) ?? FONT_PRESETS[0]!
 }
