@@ -79,13 +79,15 @@ it('refuses hidden syntax gaps not accounted for by complete positioned wrappers
   expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
 })
 
-it('maps only the exact pieces around an existing review mark in formatted text', () => {
+it('maps the exact pieces on both sides of an existing review mark in formatted text', () => {
   const source = 'Before **bold** {==already==}{>>note<<} after.'
   const { host, spans } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
-  // The piece before the mark crosses formatting into text the renderer leaves unpositioned.
-  expect(rangeToSourceRanges(range, source, spans)).toEqual({ ranges: [{ from: 39, to: 46, text: ' after.' }] })
+  expect(rangeToSourceRanges(range, source, spans)).toEqual({ ranges: [
+    { from: 0, to: 16, text: 'Before **bold** ' },
+    { from: 39, to: 46, text: ' after.' },
+  ] })
 })
 
 it('retains unique-substring mapping within one formatted text leaf containing an entity', () => {

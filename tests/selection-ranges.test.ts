@@ -101,6 +101,16 @@ describe('selections across rendered review marks', () => {
     expect(mapped).toEqual({ ranges: [{ from: 0, to: 6, text: 'Alpha ' }, { from: 28, to: 34, text: ' gamma' }] })
   })
 
+  it('maps text beside a mark by exact offsets where the substring fallback would refuse', () => {
+    // The entity changes the paragraph's rendered length, and both pieces recur inside the mark.
+    const source = 'Alpha {++beta *Alpha &amp; gamma*++} gamma'
+    const { host, spans } = renderMarkdown(source)
+    expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, spans)).toEqual({ ranges: [
+      { from: 0, to: 6, text: 'Alpha ' },
+      { from: 36, to: 42, text: ' gamma' },
+    ] })
+  })
+
   it('refuses a selection entirely inside an insertion', () => {
     const source = 'Alpha {++beta++} gamma'
     const { host, spans } = renderMarkdown(source)

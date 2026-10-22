@@ -32,6 +32,14 @@ function textOf(node: Node): string {
   return s
 }
 
+function textPieces(tree: Node): { value: string; from: number; to: number }[] {
+  return (collect(tree, 'text') as unknown as { value: string; position?: Node['position'] }[]).map((t) => ({
+    value: t.value,
+    from: t.position!.start.offset!,
+    to: t.position!.end.offset!,
+  }))
+}
+
 describe('criticTransform via analyzeMarkdown', () => {
   it('wraps the five kinds into typed nodes', () => {
     const { tree } = analyzeMarkdown('A {++ins++} B {--del--} C {~~old~>new~~} D {==hl==} E {>>note<<} F')
@@ -138,6 +146,52 @@ describe('criticTransform via analyzeMarkdown', () => {
     const comment = collect(tree, 'criticComment')[0] as CriticCommentNode
     expect(comment.data.raw).toBe('{>>line one\r\n> line two<<}')
     expect(comment.data.content).toBe('line one\r\nline two')
+  })
+
+  it('positions the text pieces around each mark kind at their exact source offsets', () => {
+    const source = 'A {++ins++} B {--del--} C {>>note<<} D {~~old~>new~~} E'
+    const { tree } = analyzeMarkdown(source)
+    const pieces = textPieces(tree)
+    expect(pieces).toEqual([
+      { value: 'A ', from: 0, to: 2 },
+      { value: 'ins', from: 5, to: 8 },
+      { value: ' B ', from: 11, to: 14 },
+      { value: 'del', from: 17, to: 20 },
+      { value: ' C ', from: 23, to: 26 },
+      { value: ' D ', from: 36, to: 39 },
+      { value: ' E', from: 53, to: 55 },
+    ])
+    for (const piece of pieces) expect(source.slice(piece.from, piece.to)).toBe(piece.value)
+  })
+
+  it('positions a piece after a mark inside emphasis', () => {
+    const source = 'x *lead {++mid++} tail* y'
+    const { tree } = analyzeMarkdown(source)
+    const emphasis = collect(tree, 'emphasis')[0]!
+    expect(textPieces(emphasis)).toEqual([
+      { value: 'lead ', from: 3, to: 8 },
+      { value: 'mid', from: 11, to: 14 },
+      { value: ' tail', from: 17, to: 22 },
+    ])
+  })
+
+  it('positions literal delimiters of a mark split across formatting depths', () => {
+    const source = '*a {++b* c++}'
+    const { tree, spans } = analyzeMarkdown(source)
+    expect(spans).toHaveLength(1)
+    expect(collect(tree, 'criticInsert')).toHaveLength(0)
+    const pieces = textPieces(tree)
+    expect(pieces.map((p) => p.value).join('')).toBe('a {++b c++}')
+    for (const piece of pieces) expect(source.slice(piece.from, piece.to)).toBe(piece.value)
+    expect(pieces).toContainEqual({ value: '{++', from: 3, to: 6 })
+    expect(pieces).toContainEqual({ value: '++}', from: 10, to: 13 })
+  })
+
+  it('leaves pieces unpositioned when decoding changed the text node length', () => {
+    const { tree } = analyzeMarkdown('AT&amp;T {++ins++} after')
+    const texts = collect(tree, 'text') as unknown as { value: string; position?: unknown }[]
+    expect(texts.map((t) => t.value)).toEqual(['AT&T ', 'ins', ' after'])
+    for (const text of texts) expect(text.position).toBeUndefined()
   })
 
   it('plain documents pass through untouched', () => {

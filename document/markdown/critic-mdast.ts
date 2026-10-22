@@ -44,13 +44,16 @@ type WrapKind = 'ins' | 'del' | 'highlight'
 
 /* ---- value segmentation -------------------------------------------------- */
 
-type Seg =
+type SegShape =
   | { t: 'plain'; value: string }
   | { t: 'open'; kind: WrapKind }
   | { t: 'close'; kind: WrapKind }
   | { t: 'atom' }
 
-function buildSegmenter(s: Sentinels): { re: RegExp; classify: (m: string) => Seg } {
+/** `at` is the segment's offset within its text node's value. */
+type Seg = SegShape & { at: number }
+
+function buildSegmenter(s: Sentinels): { re: RegExp; classify: (m: string) => SegShape } {
   const o = s.open
   const c = s.close
   const [n0, n1] = s.neutral
@@ -67,7 +70,7 @@ function buildSegmenter(s: Sentinels): { re: RegExp; classify: (m: string) => Se
     ].join('|'),
     'g',
   )
-  const byChar = new Map<string, Seg>([
+  const byChar = new Map<string, SegShape>([
     [o.ins, { t: 'open', kind: 'ins' }],
     [o.del, { t: 'open', kind: 'del' }],
     [o.highlight, { t: 'open', kind: 'highlight' }],
@@ -80,7 +83,7 @@ function buildSegmenter(s: Sentinels): { re: RegExp; classify: (m: string) => Se
   return { re, classify: (m) => byChar.get(m[0]!)! }
 }
 
-function segmentValue(value: string, seg: { re: RegExp; classify: (m: string) => Seg }): Seg[] | null {
+function segmentValue(value: string, seg: { re: RegExp; classify: (m: string) => SegShape }): Seg[] | null {
   seg.re.lastIndex = 0
   if (!seg.re.test(value)) return null
   seg.re.lastIndex = 0
@@ -88,11 +91,11 @@ function segmentValue(value: string, seg: { re: RegExp; classify: (m: string) =>
   let last = 0
   let m: RegExpExecArray | null
   while ((m = seg.re.exec(value)) !== null) {
-    if (m.index > last) out.push({ t: 'plain', value: value.slice(last, m.index) })
-    out.push(seg.classify(m[0]))
+    if (m.index > last) out.push({ t: 'plain', value: value.slice(last, m.index), at: last })
+    out.push({ ...seg.classify(m[0]), at: m.index })
     last = m.index + m[0].length
   }
-  if (last < value.length) out.push({ t: 'plain', value: value.slice(last) })
+  if (last < value.length) out.push({ t: 'plain', value: value.slice(last), at: last })
   return out
 }
 
@@ -103,15 +106,34 @@ interface Streams {
   atoms: CriticSpan[]
 }
 
-function synthPosition(span: CriticSpan) {
+function offsetPosition(start: number, end: number) {
   return {
-    start: { line: 0, column: 0, offset: span.start },
-    end: { line: 0, column: 0, offset: span.end },
+    start: { line: 0, column: 0, offset: start },
+    end: { line: 0, column: 0, offset: end },
   }
 }
 
-function textNode(value: string): PhrasingContent {
-  return { type: 'text', value } as PhrasingContent
+function synthPosition(span: CriticSpan) {
+  return offsetPosition(span.start, span.end)
+}
+
+/**
+ * Source offset of a masked text node's value index 0, when value indices map
+ * one for one onto the source. Masking preserves length, so the node's own
+ * offsets are exact; a value shorter than its source extent has decoded
+ * entities or escapes or dropped container prefixes.
+ */
+function valueOrigin(node: Node, value: string): number | undefined {
+  const start = node.position?.start.offset
+  const end = node.position?.end.offset
+  if (start === undefined || end === undefined) return undefined
+  return end - start === value.length ? start : undefined
+}
+
+function textNode(value: string, origin?: number, at = 0): PhrasingContent {
+  const node = { type: 'text', value } as PhrasingContent
+  if (origin !== undefined) node.position = offsetPosition(origin + at, origin + at + value.length)
+  return node
 }
 
 function makeAtom(span: CriticSpan, original: string): PhrasingContent {
@@ -151,6 +173,11 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
  * where its parent's walk reaches it, so the per-kind cursors advance in
  * document order across depths. Mismatched pairings (delimiters at different
  * tree depths) degrade to literal delimiter text.
+ *
+ * Wrappers and atoms take their span's offsets. Text pieces split from a
+ * masked text node, literal delimiters included, take offsets within that
+ * node when `valueOrigin` finds an exact mapping, and stay unpositioned
+ * otherwise.
  */
 export function criticTransform(
   tree: Root,
@@ -180,7 +207,7 @@ export function criticTransform(
     }
 
     const out: PhrasingContent[] = []
-    let frame: { kind: WrapKind; span: CriticSpan; acc: PhrasingContent[] } | null = null
+    let frame: { kind: WrapKind; span: CriticSpan; acc: PhrasingContent[]; literal: PhrasingContent } | null = null
 
     const emit = (node: PhrasingContent): void => {
       if (frame) frame.acc.push(node)
@@ -191,7 +218,7 @@ export function criticTransform(
       if (!frame) return
       const open = frame
       frame = null
-      emit(textNode(OPEN_TEXT[open.kind]))
+      emit(open.literal)
       for (const n of open.acc) emit(n)
     }
 
@@ -202,26 +229,28 @@ export function criticTransform(
         emit(child as PhrasingContent)
         continue
       }
+      const origin = valueOrigin(child, (child as { value: string }).value)
       for (const s of segs) {
         switch (s.t) {
           case 'plain':
-            emit(textNode(s.value))
+            emit(textNode(s.value, origin, s.at))
             break
           case 'open': {
             // Marks never nest, so an open frame's closer lies at another depth.
             restoreFrame()
             const span = streams.byKind[s.kind][cursors[s.kind]]
+            const literal = textNode(OPEN_TEXT[s.kind], origin, s.at)
             if (!span) {
-              emit(textNode(OPEN_TEXT[s.kind]))
+              emit(literal)
               break
             }
             cursors[s.kind]++
-            frame = { kind: s.kind, span, acc: [] }
+            frame = { kind: s.kind, span, acc: [], literal }
             break
           }
           case 'close': {
             if (!frame || frame.kind !== s.kind) {
-              emit(textNode(CLOSE_TEXT[s.kind]))
+              emit(textNode(CLOSE_TEXT[s.kind], origin, s.at))
               break
             }
             const done = frame

@@ -32,9 +32,10 @@ A selection confined to one text leaf within formatting keeps its exact text ran
 unique-substring fallback when rendered entities change that leaf's length.
 A selection that crosses only part of a formatting wrapper is refused, so a mark cannot strand an
 opening or closing delimiter. Splitting those partial selections into several ranges is deferred.
-A piece beside a review mark that crosses formatting can be refused: the renderer leaves text split
-around a mark unpositioned, so such a piece falls back to the unique-substring rule, which a
-formatting wrapper cannot satisfy.
+Text the renderer splits around a review mark keeps exact offsets when its parsed text node's value
+spans exactly its source; a node whose entities or escapes decode, or whose container prefixes are
+dropped, leaves its pieces unpositioned, and they fall back to the unique-substring rule, which a
+piece crossing a formatting wrapper cannot satisfy.
 
 A complete inline-code selection includes the source backticks in its range. CriticMarkup wraps
 that range, so the anchor and comment delimiters stay outside code. Rendered code may normalize
