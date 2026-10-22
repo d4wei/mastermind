@@ -264,6 +264,43 @@ describe('span association across tree depths', () => {
     const { tree } = analyzeMarkdown(source)
     expect(textOf(tree)).toBe('{++a x++} b')
   })
+
+  it.each([
+    ['x {==p*q==}{>>c<<} {==r*s==}{>>d<<}', 'x {==pq==} {==rs==}', ['{>>c<<}', '{>>d<<}']],
+    ['{++d*c++}{++c*b++}', '{++dc++}{++cb++}', []],
+  ])('leaves a closer literal when the open frame belongs to another span: %j', (source, text, comments) => {
+    const { tree } = analyzeMarkdown(source)
+    for (const type of ['criticInsert', 'criticHighlight']) expect(collect(tree, type)).toEqual([])
+    expect(textOf(tree)).toBe(text)
+    expect(spanSources(source, 'criticComment')).toEqual(comments)
+  })
+
+  it('keeps later wrappers paired after closers that matched no frame', () => {
+    const source = '{++d*c++}{++c*b++} {++e++} *{++f++}*'
+    expect(spanSources(source, 'criticInsert')).toEqual(['{++e++}', '{++f++}'])
+  })
+})
+
+describe('autolink attributes', () => {
+  it.each([
+    ['see https://x.com/a{>>note<<}', 'https://x.com/a{>>note<<}', 'criticComment', '{>>note<<}'],
+    ['see <http://x.y/{++a++}> z', 'http://x.y/{++a++}', 'criticInsert', '{++a++}'],
+    ['see http://x.y/{++a++} z', 'http://x.y/{++a++}', 'criticInsert', '{++a++}'],
+    ['Visit www.example.com{++/docs++} now', 'http://www.example.com{++/docs++}', 'criticInsert', '{++/docs++}'],
+    ['see https://x.com/\u{1F600}{++a++} z', 'https://x.com/\u{1F600}{++a++}', 'criticInsert', '{++a++}'],
+  ])('restores the source URL and keeps the mark in the link text: %j', (source, url, type, mark) => {
+    const { tree, spans } = analyzeMarkdown(source)
+    const link = collect(tree, 'link')[0] as unknown as { url: string; title: string | null }
+    expect(link.url).toBe(url)
+    const wrappers = collect(link as unknown as Node, type) as (CriticWrapNode | CriticCommentNode)[]
+    expect(wrappers.map((node) => { const span = spans[node.data.spanIndex]!; return source.slice(span.start, span.end) })).toEqual([mark])
+  })
+
+  it('restores a URL whose mark opens outside the link as literal source', () => {
+    const { tree } = analyzeMarkdown('{++http://x.y/++} z')
+    expect((collect(tree, 'link')[0] as unknown as { url: string }).url).toBe('http://x.y/++}')
+    expect(JSON.stringify(tree)).not.toMatch(/[\ue000-\ue0ff]/)
+  })
 })
 
 describe('opaque link destinations and image text', () => {

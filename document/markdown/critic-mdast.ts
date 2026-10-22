@@ -1,6 +1,7 @@
 import type { Parent, PhrasingContent, Root } from 'mdast'
 import type { Node } from 'unist'
-import type { Sentinels } from '../critic/mask'
+import { visit } from 'unist-util-visit'
+import { maskSource, type Sentinels } from '../critic/mask'
 // Container prefixes belong to the enclosing Markdown node, not displayed atom content.
 import { stripLinePrefixes } from '../critic/scanner'
 import type { CriticSpan } from '../critic/types'
@@ -168,16 +169,19 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
  * content between them, and neutralized regions become criticSub /
  * criticComment atoms whose content is read from the ORIGINAL source.
  *
- * Span association is by document order per kind — the Nth open-run of a
- * kind pairs with the Nth span of that kind. Each nested parent is processed
- * where its parent's walk reaches it, so the per-kind cursors advance in
- * document order across depths. Mismatched pairings (delimiters at different
- * tree depths) degrade to literal delimiter text.
+ * Span association is by document order per kind: the Nth open-run of a
+ * kind belongs to the Nth span of that kind, and so does the Nth close-run.
+ * Each nested parent is processed where its parent's walk reaches it, so the
+ * per-kind cursors advance in document order across depths. A close-run
+ * becomes a wrapper only when the open frame at its own depth belongs to the
+ * same span; any other delimiter stays literal text, so a mark whose
+ * delimiters land at different tree depths never borrows another span.
  *
  * Wrappers and atoms take their span's offsets. Text pieces split from a
  * masked text node, literal delimiters included, take offsets within that
  * node when `valueOrigin` finds an exact mapping, and stay unpositioned
- * otherwise.
+ * otherwise. Link and image attributes are then restored from the source
+ * (`restoreAttributeSources`).
  */
 export function criticTransform(
   tree: Root,
@@ -195,6 +199,7 @@ export function criticTransform(
     atoms: spans.filter((s) => s.kind === 'sub' || s.kind === 'comment'),
   }
   const cursors = { ins: 0, del: 0, highlight: 0, atoms: 0 }
+  const closeCursors = { ins: 0, del: 0, highlight: 0 }
   const spanIndexOf = new Map<CriticSpan, number>()
   spans.forEach((s, i) => spanIndexOf.set(s, i))
 
@@ -249,7 +254,10 @@ export function criticTransform(
             break
           }
           case 'close': {
-            if (!frame || frame.kind !== s.kind) {
+            // Every close-run consumes its span's slot, paired or not, so later closers stay aligned.
+            const span = streams.byKind[s.kind][closeCursors[s.kind]++]
+            if (!frame || frame.span !== span) {
+              restoreFrame()
               emit(textNode(CLOSE_TEXT[s.kind], origin, s.at))
               break
             }
@@ -282,4 +290,49 @@ export function criticTransform(
   }
 
   processParent(tree)
+  restoreAttributeSources(tree, original, spans, sentinels)
+}
+
+const ATTRIBUTES = ['url', 'title', 'alt'] as const
+
+/**
+ * Rewrites every `url`, `title`, and `alt` that still carries sentinel code
+ * points with the original source characters. The scanner excludes link
+ * destinations and images, so only an autolink reaches here: its destination
+ * is its own text, where a mark renders as a wrapper while the URL keeps the
+ * delimiters literally. The attribute's sentinel-bearing tail is located in the
+ * masked slice of its node's source range; without a position or a match the
+ * sentinels are stripped.
+ */
+function restoreAttributeSources(
+  tree: Root,
+  original: string,
+  spans: readonly CriticSpan[],
+  sentinels: Sentinels,
+): void {
+  const codes = [...Object.values(sentinels.open), ...Object.values(sentinels.close), ...sentinels.neutral].join('')
+  const sentinel = new RegExp(`[${codes}]`, 'g')
+  let masked: string | undefined
+  visit(tree, (node) => {
+    const fields = node as unknown as Record<string, unknown>
+    for (const key of ATTRIBUTES) {
+      const value = fields[key]
+      if (typeof value !== 'string') continue
+      const first = value.search(sentinel)
+      if (first === -1) continue
+      fields[key] = restoreValue(value, first, node)
+    }
+  })
+
+  function restoreValue(value: string, first: number, node: Node): string {
+    const start = node.position?.start.offset
+    const end = node.position?.end.offset
+    if (start !== undefined && end !== undefined) {
+      masked ??= maskSource(original, spans, sentinels).masked
+      const tail = value.slice(first)
+      const at = masked.slice(start, end).lastIndexOf(tail)
+      if (at !== -1) return value.slice(0, first) + original.slice(start + at, start + at + tail.length)
+    }
+    return value.replace(sentinel, '')
+  }
 }

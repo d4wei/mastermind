@@ -10,8 +10,11 @@ const OPAQUE_TYPES = new Set(['code', 'inlineCode', 'html', 'yaml', 'image', 'im
  * fenced/indented code, inline code, raw HTML, YAML frontmatter, images and
  * image references whole (alt text is an attribute, not rendered prose), and
  * each link's destination — everything after its text, or the whole link when
- * it has no text. The tree must be the plain Markdown parse of the scanned
- * source, so positions come from the same syntax the renderer uses.
+ * it has no text. An autolink's destination is its own text, so at most its
+ * closing `>` is excluded and marks inside it stay active; `criticTransform`
+ * restores its URL from the source. The tree must be the plain Markdown parse
+ * of the scanned source, so positions come from the same syntax the renderer
+ * uses.
  */
 export function excludedRanges(tree: Node): Range[] {
   const out: Range[] = []

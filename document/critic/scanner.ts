@@ -43,8 +43,8 @@ function escapedAt(text: string, bracePos: number): boolean {
  *
  * Rules: both delimiters of a span sit inside one of the `within` windows
  * (sorted, non-overlapping; the whole text by default) and outside every
- * `exclude` range (code, html); `\{` defeats an opener; marks do not nest —
- * the first valid closer wins. Markdown block boundaries are the caller's
+ * `exclude` range (opaque source; see `excludedRanges`); `\{` defeats an
+ * opener; marks do not nest — the first valid closer wins. Markdown block boundaries are the caller's
  * windows: see `scanMarkdown`.
  */
 export function scan(

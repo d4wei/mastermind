@@ -4,9 +4,11 @@
 source positions and scans each paragraph, heading, and table cell (`textBlockRanges`) as its own
 window: both delimiters must fit inside one text block, and an unterminated opener never reaches
 past its block to hide a later mark. `excludedRanges` is the single authority for opaque source:
-code, HTML, frontmatter, images and image references, and link destinations. List and blockquote
-continuation lines are allowed when they belong to the same paragraph; crossing list items,
-headings, or cells is unsupported.
+code, HTML, frontmatter, images and image references, and link destinations. An autolink's
+destination is its own visible text, so marks there stay active; `criticTransform` restores the
+link's URL from the source with the delimiters literal. List and blockquote continuation lines are
+allowed when they belong to the same paragraph; crossing list items, headings, or cells is
+unsupported.
 
 Unsupported spans remain literal source and do not enter review actions, counts, source highlighting,
 or translation's annotation removal. The reading transform and document analysis use the same span
@@ -22,5 +24,4 @@ Markdown documents.
 
 `tests/critic-block-boundaries.test.ts` covers the cross-list failure pattern, all mark kinds,
 headings, table cells, LF/CRLF, valid continuation lines, unterminated openers before a valid mark,
-and neighboring edit splices. These cases
-characterize the supported boundary; they do not reconstruct the unavailable original trial file.
+and neighboring edit splices.
