@@ -58,7 +58,7 @@ describe('autosave', () => {
     const source = '---\r\ntitle: "Plan"\r\nitems: [one, two]\r\n---\r\n\r\n# Body\r\n'
     store = createDocStore()
     await load(source)
-    expect(await store.getState().autosave()).toBe(true)
+    expect(await store.getState().prepareToClose()).toBe(true)
     expect(putFile).not.toHaveBeenCalled()
     expect(store.getState().source).toBe(source.replaceAll('\r\n', '\n'))
   })
@@ -68,12 +68,12 @@ describe('autosave', () => {
     store = createDocStore()
     await load(prefix + '# Body\r\n')
     store.getState().setSource(store.getState().source + 'Accepted edit\n')
-    await store.getState().autosave()
+    await store.getState().prepareToClose()
     expect(putFile).toHaveBeenCalledWith('s1', prefix + '# Body\r\nAccepted edit\r\n', 'base')
   })
 
   it('does not schedule writes while a disk conflict is unresolved', async () => {
-    store.getState().notifyDiskChange(0, true)
+    store.getState().notifyDiskChange(true)
     store.getState().setSource('edit during conflict')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(putFile).not.toHaveBeenCalled()
@@ -83,7 +83,7 @@ describe('autosave', () => {
     putFile.mockRejectedValue(new Error('disk unavailable'))
     store.getState().setSource('accepted edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save', notice: null })
+    expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save' })
     expect(store.getState().savedSource).toBe('hello')
     expect(store.getState().source).toBe('accepted edit')
   })
@@ -93,7 +93,6 @@ describe('autosave', () => {
     store.getState().setSource('racing edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(store.getState().conflict).toBe(true)
-    expect(store.getState().notice).toBeNull()
   })
 
   it('retains the exact accepted buffer after saving', async () => {

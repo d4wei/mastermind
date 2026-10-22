@@ -24,6 +24,7 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   const [geometry, setGeometry] = useState({ width: Infinity, widths: [] as number[], overflowWidths: [] as number[], gap: 0 })
   const [open, setOpen] = useState(false)
   const pendingFocus = useRef<{ id: string; index: number; menu: boolean } | null>(null)
+  const closing = useRef(false)
   const selecting = useRef(false)
   const selectedFocus = useRef<string | null>(null)
   const closePrompt = useClosePrompt((state) => state.prompt)
@@ -91,9 +92,16 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   }, [activeId, open])
 
   const close = async (file: OpenDocument, menu: boolean) => {
-    if (pendingFocus.current) return
+    if (closing.current) return
+    closing.current = true
     pendingFocus.current = { id: file.id, index: files.indexOf(file), menu }
-    if (!await onClose(file)) pendingFocus.current = null
+    let closed = false
+    // Focus waits for the next active file, which may never load; the close guard ends with the close.
+    try { closed = await onClose(file) }
+    finally {
+      closing.current = false
+      if (!closed) pendingFocus.current = null
+    }
   }
   const select = (id: string) => {
     selectedFocus.current = id

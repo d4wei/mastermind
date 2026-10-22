@@ -1,7 +1,7 @@
 import { useTranslation } from '../translate/translationStore'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
-import { navigate } from '../app/route'
+import { navigate, useRoute } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useConfig } from '../app/configStore'
 import { requestFind } from '../find/events'
@@ -39,7 +39,9 @@ export function NativeReviewer() {
   const refreshSetup = useRef<() => Promise<void>>(async () => {})
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
   const documentState = useDoc()
-  const id = documentState.sessionId
+  // The route selects the file immediately; the store's document lags it while loading or after a failed load.
+  const route = useRoute()
+  const id = route.kind === 'doc' ? route.sessionId : null
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const homeMotion = useRef<ReturnType<typeof createHomeMotion> | null>(null)
   const atHome = files.length === 0 && setupRequired === false
@@ -117,7 +119,7 @@ export function NativeReviewer() {
       finally { refreshing = false }
     }
     refreshSetup.current = refresh
-    const revalidate = (): void => { useDoc.getState().notifyDiskChange(0) }
+    const revalidate = (): void => { useDoc.getState().notifyDiskChange() }
     window.addEventListener('focus', revalidate)
     void refresh()
     const timer = setInterval(() => { void refresh() }, 500)

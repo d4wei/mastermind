@@ -68,9 +68,6 @@
 .native-documents ~ .app-content:has(.topbar) { padding-top: 0; }
 @media print { .native-documents { display: none; } }
 
-.native-opening-errors { flex-basis: 100%; }
-.native-opening-errors ul { margin-block: calc(var(--space-unit) * 2); }
-
 .native-setup {
   overflow: auto;
   min-height: 0;

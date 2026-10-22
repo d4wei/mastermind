@@ -126,3 +126,25 @@ it('dismisses the file list when the language menu opens', async () => {
   await act(async () => window.dispatchEvent(new Event('mastermind-language-open')))
   expect(menu()).toBeNull()
 })
+
+it('accepts further closes when the next file never becomes active', async () => {
+  const closed: string[] = []
+  function Unloaded() {
+    const [list, setList] = useState(files.slice(0, 3))
+    const [active, setActive] = useState<string | null>('0')
+    return <FileTabs files={list} activeId={active} chinese={false} needsAttention={() => false}
+      onSelect={() => {}} onAttention={() => {}} onClose={async (file) => {
+        closed.push(file.id)
+        setList((old) => old.filter((item) => item.id !== file.id))
+        setActive(null)
+        return true
+      }} />
+  }
+  await act(async () => root.render(<Unloaded />))
+  const closeButton = (id: string) => host.querySelector<HTMLButtonElement>(
+    `.native-file-pill .native-file-close[title="Close /folder-${id}/review.md"]`)!
+  await act(async () => closeButton('0').click())
+  await act(async () => closeButton('1').click())
+  await act(async () => closeButton('2').click())
+  expect(closed).toEqual(['0', '1', '2'])
+})

@@ -1,4 +1,4 @@
-export interface CloseDocuments {
+interface CloseDocuments {
   prepareToClose(): Promise<boolean>
 }
 

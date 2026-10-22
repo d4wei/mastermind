@@ -36,20 +36,19 @@ export async function confirmClose(documents: DocStore, ids: string[] | undefine
   }
   if (!await finishSaves(documents, ids)) return null
   const allowed = new Map<string, number>()
-  let error: string | undefined
+  let copyFailed = false
   for (;;) {
     const pending = documents.pendingDocuments(ids).filter((doc) => allowed.get(doc.id) !== doc.revision)
     if (!pending.length) return allowed
-    const choice = await askToClose({ kind: 'save', names: pending.map((doc) => doc.name), error })
+    const choice = await askToClose({ kind: 'save', names: pending.map((doc) => doc.name), copyFailed })
     if (choice === 'cancel') { resume(pending[0]!.id); return null }
     if (choice === 'discard') {
       pending.forEach((doc) => allowed.set(doc.id, doc.revision))
     } else {
-      error = undefined
+      copyFailed = false
       for (const doc of pending) {
         if (!await documents.saveCopy(doc.id, true)) {
-          error = documents.pendingDocuments(ids).find((item) => item.id === doc.id)?.error === 'copy'
-            ? 'copy' : undefined
+          copyFailed = !!documents.pendingDocuments(ids).find((item) => item.id === doc.id)?.copyFailed
           break
         }
         allowed.set(doc.id, doc.revision)

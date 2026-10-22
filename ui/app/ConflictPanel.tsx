@@ -2,15 +2,12 @@ import { useState } from 'react'
 import { useT } from '../i18n'
 import { Notification } from './Notifications'
 import { AlertIcon } from '../icons'
-import { useDoc, type createDocStore, type RecoveryError } from '../documents/store'
+import { useDoc, type createDocStore } from '../documents/store'
 import { requireReviewerHost } from './host'
 import { navigate } from './route'
 import { transferDrafts } from '../review/drafts'
 
 interface Props { store?: ReturnType<typeof createDocStore> }
-const errorKeys = {
-  read: 'conflictReadFailed', save: 'conflictSaveFailed', changed: 'conflictStale',
-} as const satisfies Record<RecoveryError, string>
 
 export function ConflictPanel({ store = useDoc }: Props) {
   const state = store()
@@ -28,13 +25,12 @@ export function ConflictPanel({ store = useDoc }: Props) {
     if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
     if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
   }
-  const ioFailure = state.diskChange?.deleted || state.recoveryError === 'read' || state.recoveryError === 'save'
+  const ioFailure = !!state.diskChange?.deleted || state.recoveryError !== null
   const message = state.diskChange?.deleted ? 'conflictMissing' : state.recoveryError === 'read'
     ? 'conflictReadFailed' : state.recoveryError === 'save' ? 'conflictSaveFailed' : 'conflictNotice'
   return <Notification onDismiss={() => { setConfirmIncoming(false); state.closeConflict() }}>
     <strong>{state.meta?.displayName}</strong>
     <p>{t(message)}</p>
-    {state.recoveryError && !ioFailure && <p role="alert">{t(errorKeys[state.recoveryError])}</p>}
     {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
     {confirmIncoming && !ioFailure ? <>
       <p>{t('conflictDiscard')}</p>

@@ -68,7 +68,7 @@ describe('native reviewer boundary', () => {
     const store = createDocStore()
     await store.getState().load('0')
     store.getState().setSourceFromEditor('local\n')
-    expect(await store.getState().autosave()).toBe(false)
+    expect(await store.getState().prepareToClose()).toBe(false)
     expect(store.getState()).toMatchObject({
       source: 'local\n', savedSource: 'original\n', version: 'base',
       saving: false, conflict: true,
@@ -76,7 +76,6 @@ describe('native reviewer boundary', () => {
     expect(invoke).toHaveBeenCalledWith('write_document', {
       id: '0', content: 'local\r\n', baseVersion: 'base',
     })
-    expect(store.getState().notice).toBeNull()
     expect(store.getState().recoveryError).toBe(failure.conflict ? null : 'save')
   })
 

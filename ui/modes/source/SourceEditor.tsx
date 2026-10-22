@@ -105,6 +105,7 @@ export function SourceEditor() {
         if (ownsBuffer() && useDoc.getState().conflict && transactions.some((transaction) => transaction.docChanged)) return
         for (const transaction of transactions) searchBinding?.mapSelection(transaction.changes)
         currentView.update(transactions)
+        // Owned changes reach the store synchronously, so saves and navigation never flush the editor.
         if (transactions.some((transaction) => transaction.docChanged) && ownsBuffer()) {
           useDoc.getState().setSourceFromEditor(currentView.state.doc.toString())
           revision = useDoc.getState().revision
@@ -120,12 +121,6 @@ export function SourceEditor() {
       }
     })
 
-    const flush = (): void => {
-      const text = view.state.doc.toString()
-      if (ownsBuffer() && text !== useDoc.getState().source) useDoc.getState().setSourceFromEditor(text)
-    }
-    useDoc.getState().registerFlusher(flush)
-    const registeredFlusher = useDoc.getState().flushEditor
     const editorPosition = (offset: number): number => Math.min(Math.max(offset, 0), view.state.doc.length)
     const sourceHeadingTop = (offset: number): number =>
       view.documentTop + view.lineBlockAt(editorPosition(offset)).top
@@ -142,7 +137,6 @@ export function SourceEditor() {
       searchBinding?.dispose()
       // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
       if (useDoc.getState().hasDocument(sessionId)) retainedStates.set(sessionId, { state: view.state, revision })
-      if (useDoc.getState().flushEditor === registeredFlusher) useDoc.getState().registerFlusher(null)
       if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
       if (useNav.getState().sourceHeadingTop === sourceHeadingTop) useNav.setState({ sourceHeadingTop: null })
       stop()

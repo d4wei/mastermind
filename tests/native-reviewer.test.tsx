@@ -7,13 +7,16 @@ import { NativeReviewer } from '../ui/desktop/NativeReviewer'
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
   listen: vi.fn(), closeDocument: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
+  status: 'ready' as 'loading' | 'ready' | 'error',
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
-vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: mocks.id, status: 'ready', needsAttention: () => false }), {
-  getState: () => ({ notifyDiskChange: vi.fn(), hasPendingWrites: () => false,
+// The route names the active file; the store has no active document while one loads or after it fails.
+vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate,
+  useRoute: () => mocks.id === null ? { kind: 'home' } : { kind: 'doc', sessionId: mocks.id } }))
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: null, status: mocks.status, needsAttention: () => false }), {
+  getState: () => ({ notifyDiskChange: vi.fn(),
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [] }),
 }) }))
 vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
@@ -40,6 +43,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   mocks.id = null
+  mocks.status = 'ready'
   mocks.chinese = false
   mocks.navigate.mockReset()
   mocks.load.mockReset().mockResolvedValue(undefined)
@@ -301,6 +305,19 @@ it.each([['0', '/d/1'], ['1', '/d/0']] as const)(
     expect(host.querySelectorAll('.native-file-pill')).toHaveLength(1)
   },
 )
+
+it.each(['loading', 'error'] as const)('keeps the routed file selected when a background file closes while it is %s', async (status) => {
+  mocks.id = '1'
+  mocks.status = status
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot()
+    : command === 'close_document' ? { ...snapshot(1, 1), files: [snapshot().files[1]] }
+    : other(command))
+  await mount()
+  expect(host.querySelector('[aria-current="page"]')?.textContent).toBe('second.md')
+  await act(async () => button('Close first.md').click())
+  expect(mocks.invoke).toHaveBeenCalledWith('close_document', { id: 0, activeId: 1, activationRevision: 0 })
+  expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
+})
 
 it('returns home after the last file closes', async () => {
   mocks.id = '0'

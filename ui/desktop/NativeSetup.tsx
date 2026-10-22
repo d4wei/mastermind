@@ -5,11 +5,11 @@ import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { nativeBridge } from './bridge'
 
-export interface SetupValues {
+interface SetupValues {
   authorTag: string
   uiLang: 'en' | 'zh-CN'
 }
-export type SetupField = keyof SetupValues
+type SetupField = keyof SetupValues
 export interface SetupSnapshot {
   completed: boolean
   revision: number

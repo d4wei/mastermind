@@ -5,8 +5,8 @@ import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import './CloseDialog.css'
 
-export type CloseChoice = 'save' | 'discard' | 'cancel'
-interface Prompt { kind: 'draft' | 'save' | 'saving'; names: string[]; error?: string }
+type CloseChoice = 'save' | 'discard' | 'cancel'
+interface Prompt { kind: 'draft' | 'save' | 'saving'; names: string[]; copyFailed?: boolean }
 export const useClosePrompt = create<{ prompt: Prompt | null; choose: (choice: CloseChoice) => void }>(() => ({
   prompt: null, choose: () => {},
 }))
@@ -32,7 +32,7 @@ export function CloseDialog() {
       <h2 id="close-title">{t(prompt.kind === 'draft' ? 'closeDraftTitle' : prompt.kind === 'saving' ? 'closeSavingTitle' : 'closeSaveTitle')}</h2>
       <p>{t(prompt.kind === 'draft' ? 'closeDraftBody' : prompt.kind === 'saving' ? 'closeSavingBody' : 'closeSaveBody')}</p>
       <ul>{prompt.names.map((name, index) => <li key={index}>{name}</li>)}</ul>
-      {prompt.error && <p role="alert">{t('conflictCopyFailed')}</p>}
+      {prompt.copyFailed && <p role="alert">{t('conflictCopyFailed')}</p>}
       <div className="close-actions">
         {prompt.kind !== 'saving' && <button type="button" className="btn-ghost" onClick={() => choose('discard')}>
           {t(prompt.kind === 'draft' ? 'discardDrafts' : 'dontSave')}</button>}

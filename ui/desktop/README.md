@@ -60,7 +60,9 @@ Each pill has a separate, keyboard-accessible close button and an attention acti
 Closing and quitting use the
 [document recovery contract](../documents/store.md#closing-and-lifecycle).
 Editing and inventory activation pause during the close. The native result selects the next file,
-then the previous file, or home; background closes retain the current selection. Closed files
+then the previous file, or home; background closes retain the current selection. The route, not the
+document store, names the active file, so a file that is still loading or failed to load stays
+selected. A close whose next file never becomes active still releases the close guard. Closed files
 release their document, composer, and editor state. The
 [native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
 

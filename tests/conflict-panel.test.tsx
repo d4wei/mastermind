@@ -34,7 +34,7 @@ async function conflict() {
   await store.getState().load('A')
   store.getState().setSource('ONE\nmiddle\nlast\n')
   getFile.mockResolvedValue(file('one\nmiddle\nLAST\n', 'v2'))
-  store.getState().notifyDiskChange(1)
+  store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
   return store
 }
@@ -69,17 +69,40 @@ it('rejects a newer invalidation during an incoming read', async () => {
   const read = deferred<ReturnType<typeof file>>()
   getFile.mockReturnValueOnce(read.promise)
   const result = store.getState().useConflictDisk()
-  store.getState().notifyDiskChange(3)
+  store.getState().notifyDiskChange()
   read.resolve(file('one\nmiddle\nLAST\n', 'v2'))
   expect(await result).toBe(false)
   expect(putFile).not.toHaveBeenCalled()
   expect(store.getState().source).toBe('ONE\nmiddle\nlast\n')
 })
 
+it('presents the newer version when an invalidation rejects Use incoming', async () => {
+  const store = await conflict()
+  const read = deferred<ReturnType<typeof file>>()
+  getFile.mockReturnValueOnce(read.promise)
+  const result = store.getState().useConflictDisk()
+  store.getState().notifyDiskChange()
+  getFile.mockResolvedValue(file('newest\n', 'v3'))
+  read.resolve(file('one\nmiddle\nLAST\n', 'v2'))
+  expect(await result).toBe(false)
+  expect(store.getState()).toMatchObject({ conflict: true, saving: false, recoveryError: null, source: 'ONE\nmiddle\nlast\n' })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
+    expect(host.textContent).toContain('conflictNotice')
+    expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent))
+      .toEqual(['conflictSaveCopy', 'conflictUseDisk'])
+  } finally { act(() => root.unmount()); host.remove() }
+  expect(await store.getState().useConflictDisk()).toBe(true)
+  expect(store.getState().source).toBe('newest\n')
+})
+
 it('retains dismissal across invalidations and navigation without hiding file attention state', async () => {
   const store = await conflict()
   store.getState().closeConflict()
-  store.getState().notifyDiskChange(2)
+  store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState().conflictDismissed).toBe(true)
   getFile.mockResolvedValue(file('B', 'B1'))
@@ -117,7 +140,7 @@ it('switches to the admitted copy only after success, releasing the original buf
   expect(await closing).toBe(true)
   expect(store.getState()).toMatchObject({ sessionId: 'copy', conflict: false, source: 'ONE\nmiddle\nlast\n' })
   expect(store.getState().hasDocument('A')).toBe(false)
-  expect(store.getState().hasPendingWrites()).toBe(false)
+  expect(store.getState().pendingDocuments()).toEqual([])
 })
 
 it('shows dismissible corner recovery, requires discard confirmation, and has no comparison editor', async () => {
@@ -166,7 +189,7 @@ it('retries a failed write only after reading the acknowledged version', async (
   await store.getState().load('A')
   store.getState().setSource('local')
   putFile.mockRejectedValueOnce(new HostError('failure', 'permission denied'))
-  await store.getState().flushAll()
+  await store.getState().prepareToClose()
   expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save' })
   getFile.mockClear(); putFile.mockClear()
   expect(await store.getState().retryRecovery()).toBe(true)
@@ -184,7 +207,7 @@ it('reconciles a failed write whose complete buffer is already on disk', async (
     getFile.mockResolvedValue(file('local', 'v2'))
     throw new HostError('failure', 'readback failed')
   })
-  await store.getState().flushAll()
+  await store.getState().prepareToClose()
   expect(store.getState()).toMatchObject({ conflict: false, savedSource: 'local', version: 'v2' })
   expect(store.getState().pendingDocuments()).toEqual([])
   expect(putFile).toHaveBeenCalledOnce()
@@ -193,7 +216,7 @@ it('reconciles a failed write whose complete buffer is already on disk', async (
 it('keeps Retry available when saving a copy fails after a read failure', async () => {
   const store = await conflict()
   getFile.mockRejectedValue(new HostError('failure', 'permission denied'))
-  store.getState().notifyDiskChange(3)
+  store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
   saveCopy.mockRejectedValue(new Error('copy failed'))
   await store.getState().saveCopy()

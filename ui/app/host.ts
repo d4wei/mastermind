@@ -3,7 +3,7 @@ import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
 
 export type HostFailure = 'conflict' | 'missing' | 'failure'
-export type HostInvalidation = 'changed' | 'deleted' | 'config' | 'translations'
+type HostInvalidation = 'changed' | 'deleted' | 'config' | 'translations'
 
 export class HostError extends Error {
   constructor(public kind: HostFailure, message: string, public data?: unknown) {

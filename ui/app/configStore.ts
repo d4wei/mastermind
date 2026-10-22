@@ -14,6 +14,8 @@ interface ConfigState {
   update(patch: ConfigPatch): Promise<void>
 }
 
+let latestUpdate = 0
+
 export const useConfig = create<ConfigState>((set, get) => ({
   config: null,
   themes: [],
@@ -30,6 +32,8 @@ export const useConfig = create<ConfigState>((set, get) => ({
 
   async update(patch) {
     const host = requireReviewerHost()
+    // Only the newest update applies its outcome, so an earlier response cannot revert a later patch.
+    const request = ++latestUpdate
     set({ saveFailed: false })
     const current = get().config
     if (current) {
@@ -37,11 +41,11 @@ export const useConfig = create<ConfigState>((set, get) => ({
     }
     try {
       const config = await host.updateConfig(patch)
-      set({ config })
+      if (request === latestUpdate) set({ config })
     } catch {
-      await get()
-        .load()
-        .catch(() => {})
+      const persisted = await host.config().catch(() => null)
+      if (request !== latestUpdate) return
+      if (persisted) set({ config: persisted })
       set({ saveFailed: true })
     }
   },

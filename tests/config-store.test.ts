@@ -27,3 +27,17 @@ it('owns save failure feedback and restores persisted preferences before retry',
   await useConfig.getState().update({ fontSize: 19 })
   expect(useConfig.getState()).toMatchObject({ config: { fontSize: 19 }, saveFailed: false })
 })
+
+it('applies only the newest update response', async () => {
+  const responses: Array<(config: typeof DEFAULT_CONFIG) => void> = []
+  const updateConfig = vi.fn(() => new Promise<typeof DEFAULT_CONFIG>((resolve) => { responses.push(resolve) }))
+  installHost(fakeHost({ config: async () => DEFAULT_CONFIG, themes: async () => [], updateConfig }))
+  await useConfig.getState().load()
+  const first = useConfig.getState().update({ fontSize: 18 })
+  const second = useConfig.getState().update({ fontSize: 19 })
+  responses[1]!({ ...DEFAULT_CONFIG, fontSize: 19 })
+  await second
+  responses[0]!({ ...DEFAULT_CONFIG, fontSize: 18 })
+  await first
+  expect(useConfig.getState().config).toMatchObject({ fontSize: 19 })
+})

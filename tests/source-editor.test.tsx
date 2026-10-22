@@ -45,7 +45,7 @@ beforeEach(async () => {
     id, displayName: id, path: id,
   }) as never)
   vi.mocked(getFile).mockReset().mockImplementation(async (id) => ({
-    content: disk.get(id)!, version: `disk-${id}`, mtimeMs: 1,
+    content: disk.get(id)!, version: `${id}:${disk.get(id)}`, mtimeMs: 1,
   }))
   vi.mocked(putFile).mockReset().mockResolvedValue({ version: 'saved', mtimeMs: 2 })
   await useDoc.getState().load(a)
@@ -67,7 +67,6 @@ afterEach(() => {
 
 it('retains real CodeMirror undo and selection across A to B to A', async () => {
   const outgoing = editor()
-  const outgoingFlusher = useDoc.getState().flushEditor!
   act(() => outgoing.dispatch({ changes: { from: 5, insert: ' edited' },
     selection: { anchor: 2, head: 4 } }))
   expect(useDoc.getState().source).toBe('alpha edited')
@@ -75,10 +74,8 @@ it('retains real CodeMirror undo and selection across A to B to A', async () => 
   await act(async () => useDoc.getState().load(b))
   expect(editor()).not.toBe(outgoing)
   expect(outgoing.dom.isConnected).toBe(false)
-  const currentFlusher = useDoc.getState().flushEditor
-  act(() => outgoingFlusher())
+  act(() => outgoing.dispatch({ changes: { from: 0, insert: 'detached ' } }))
   expect(useDoc.getState().source).toBe('beta')
-  expect(useDoc.getState().flushEditor).toBe(currentFlusher)
   act(() => editor().dispatch({ changes: { from: 4, insert: ' B' } }))
   await act(async () => useDoc.getState().load(a))
   const restored = editor()
@@ -107,10 +104,13 @@ it('retains editor history through reading mode and binds a fresh transaction ad
   expect(useDoc.getState().externalVersion).toBe(originalVersion)
 })
 
-it('starts a fresh editor after external replacement and never revives the old buffer', () => {
+it('starts a fresh editor after external replacement and never revives the old buffer', async () => {
   act(() => editor().dispatch({ changes: { from: 0, insert: 'old ' } }))
   const outgoing = editor()
-  act(() => useDoc.getState().adoptDiskContent('external\r\n', 3, 'external-version'))
+  disk.set(a, 'external\r\n')
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  expect(useDoc.getState().conflict).toBe(true)
+  await act(async () => { expect(await useDoc.getState().useConflictDisk()).toBe(true) })
   expect(editor()).not.toBe(outgoing)
   expect(editor().state.doc.toString()).toBe('external\n')
   act(() => { expect(undo(editor())).toBe(false) })
@@ -134,9 +134,11 @@ it('invalidates retained history even when external edits return to the same sou
   expect(useDoc.getState().source).toBe('alpha edited')
 })
 
-it('navigates through editor geometry without requiring an off-screen line in the DOM', () => {
+it('navigates through editor geometry without requiring an off-screen line in the DOM', async () => {
   const scrollIntoView = vi.spyOn(EditorView, 'scrollIntoView')
-  act(() => useDoc.getState().adoptDiskContent('# First\r\n\r\n## Second\r\n', 4, 'headings'))
+  disk.set(a, '# First\r\n\r\n## Second\r\n')
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  expect(useDoc.getState().source).toBe('# First\n\n## Second\n')
   const view = editor()
   const offset = view.state.doc.toString().indexOf('## Second')
   vi.spyOn(view, 'documentTop', 'get').mockReturnValue(100)
@@ -166,7 +168,7 @@ it('discards editor undo when its document closes', async () => {
 it('freezes editor mutations and undo without losing selection or text on conflict', () => {
   const view = editor()
   act(() => view.dispatch({ changes: { from: 5, insert: ' local' }, selection: { anchor: 2, head: 4 } }))
-  act(() => useDoc.getState().notifyDiskChange(0, true))
+  act(() => useDoc.getState().notifyDiskChange(true))
   expect(view.contentDOM.getAttribute('contenteditable')).toBe('false')
   act(() => view.dispatch({ changes: { from: 0, insert: 'forbidden' } }))
   act(() => { undo(view) })
