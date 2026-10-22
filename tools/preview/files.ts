@@ -10,9 +10,7 @@ function identity(st: BigIntStats): string {
   return [st.dev, st.ino, st.size, st.mtimeNs, st.ctimeNs].join(':')
 }
 
-interface Snapshot { file: FileResponse; utf8: boolean }
-
-async function snapshot(handle: FileHandle, filePath: string): Promise<Snapshot> {
+async function snapshot(handle: FileHandle, filePath: string): Promise<FileResponse> {
   const before = await handle.stat({ bigint: true })
   if (!before.isFile()) throw new Error('not a regular file')
   const bytes = await handle.readFile()
@@ -22,15 +20,15 @@ async function snapshot(handle: FileHandle, filePath: string): Promise<Snapshot>
     throw new Error('file changed during read')
   }
   const hash = crypto.createHash('sha256').update(bytes).digest('hex')
-  return { file: { content: bytes.toString('utf8'), mtimeMs: Number(after.mtimeNs) / 1e6, version: `${identity(after)}:${hash}` },
-    utf8: isUtf8(bytes) }
+  return { content: bytes.toString('utf8'), mtimeMs: Number(after.mtimeNs) / 1e6, version: `${identity(after)}:${hash}`,
+    lossy: !isUtf8(bytes) }
 }
 
 /** Reads through one descriptor and rejects a changed or replaced file. */
 export async function readSessionFile(filePath: string): Promise<FileResponse> {
   const handle = await fs.open(filePath, 'r')
   try {
-    return (await snapshot(handle, filePath)).file
+    return await snapshot(handle, filePath)
   } finally {
     await handle.close()
   }
@@ -59,9 +57,8 @@ export async function writeSessionFile(session: FileTarget, content: string, bas
     }
     try {
       let base: FileResponse
-      let utf8: boolean
       try {
-        ({ file: base, utf8 } = await snapshot(handle, session.path))
+        base = await snapshot(handle, session.path)
       } catch {
         return { ok: false, currentMtimeMs: null }
       }
@@ -69,7 +66,7 @@ export async function writeSessionFile(session: FileTarget, content: string, bas
       if (content === base.content) return { ok: true, mtimeMs: base.mtimeMs, version: base.version }
       // The UI edits lossy-decoded text, so changed content would also rewrite every invalid
       // sequence the person never touched.
-      if (!utf8) return { ok: false, error: 'not_utf8' }
+      if (base.lossy) return { ok: false, error: 'not_utf8' }
       // Writing the opened inode preserves permissions and symlinks. A foreign writer can
       // still intervene after the checked snapshot; this is not an atomic filesystem CAS.
       const bytes = Buffer.from(content, 'utf8')

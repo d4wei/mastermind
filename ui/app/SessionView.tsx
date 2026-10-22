@@ -20,7 +20,7 @@ import { useTranslation } from '../translate/translationStore'
 import { TranslatedSelection } from '../translate/TranslatedSelection'
 import { requireReviewerHost } from './host'
 import { useConfig } from './configStore'
-import { useDoc, type ViewMode } from '../documents/store'
+import { editingLocked, useDoc, type ViewMode } from '../documents/store'
 import { parseResolvedThreads } from '../../document/review-archive'
 import { ResolvedThreads } from '../review/ResolvedThreads'
 import { Notice } from './Notifications'
@@ -85,7 +85,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const source = useDoc((s) => s.source)
   const mode = useDoc((s) => s.mode)
   const externalVersion = useDoc((s) => s.externalVersion)
-  const readOnly = useDoc((s) => s.conflict)
+  const readOnly = useDoc(editingLocked)
   const load = useDoc((s) => s.load)
   const applyDocEdits = useDoc((s) => s.applyEdits)
   const { collapse: collapseTable, hidden: tableExpanded } = useTableExpansion()
@@ -261,7 +261,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const undoDeletion = useCallback(
     (el: HTMLElement): boolean => {
       const span = analysis?.spans[Number(el.dataset.spanIndex)]
-      if (useDoc.getState().conflict || !span || span.kind !== 'del') return false
+      if (editingLocked(useDoc.getState()) || !span || span.kind !== 'del') return false
       applyEdits([rejectEdit(source, span)])
       return true
     },

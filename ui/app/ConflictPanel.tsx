@@ -13,18 +13,27 @@ export function ConflictPanel({ store = useDoc }: Props) {
   const state = store()
   const t = useT()
   const [confirmIncoming, setConfirmIncoming] = useState(false)
-  if (!state.conflict || state.saving) return null
+  if (state.saving || !state.conflict && !state.lossy) return null
+  const saveCopy = async () => {
+    const copyId = await state.saveCopy()
+    if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
+    if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
+  }
+  const saveCopyButton = requireReviewerHost().saveCopy && <button type="button" className="btn-primary"
+    onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>
+  // Lossiness persists until the file is read back as UTF-8, so its notice has no dismissal.
+  if (!state.conflict) return <Notification>
+    <strong>{state.meta?.displayName}</strong>
+    <p>{t('lossyNotice')}</p>
+    {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
+    <div className="conflict-actions">{saveCopyButton}</div>
+  </Notification>
   if (state.conflictDismissed) return <Notification compact>
     <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
       title={t('needsAttention')} onClick={() => void state.openConflict()}>
       <AlertIcon />
     </button>
   </Notification>
-  const saveCopy = async () => {
-    const copyId = await state.saveCopy()
-    if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
-    if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
-  }
   const ioFailure = !!state.diskChange?.deleted || state.recoveryError !== null
   const message = state.diskChange?.deleted ? 'conflictMissing' : state.recoveryError === 'read'
     ? 'conflictReadFailed' : state.recoveryError === 'save' ? 'conflictSaveFailed' : 'conflictNotice'
@@ -40,8 +49,7 @@ export function ConflictPanel({ store = useDoc }: Props) {
         <button type="button" className="btn-ghost" onClick={() => setConfirmIncoming(false)}>{t('cancel')}</button>
       </div>
     </> : <div className="conflict-actions">
-      {requireReviewerHost().saveCopy && <button type="button" className="btn-primary"
-        onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>}
+      {saveCopyButton}
       {ioFailure ? <button type="button" className="btn-ghost"
         onClick={() => void state.retryRecovery()}>{t('retry')}</button> :
         <button type="button" className="btn-ghost"

@@ -14,6 +14,17 @@ if its buffer changed during the request. Clean external changes reload automati
 undo, whose snapshots predate the external text. Unedited files are not written; ordinary writes
 restore the original line endings.
 
+## Files that are not valid UTF-8
+
+A host snapshot's `lossy` flag marks bytes that are not valid UTF-8; an absent flag reads as false.
+Such a document is read-only in place: editing entry points are no-ops, autosave never schedules,
+and the UI disables review actions and Markdown-mode typing through `editingLocked`, as for a
+conflict. Every read refreshes the flag, so a file rewritten as UTF-8 becomes editable again; a
+read of the version already held keeps a flag the host proved by refusing a write. That refusal
+(`notUtf8`) marks the record lossy instead of entering recovery, since the file is unchanged and
+Retry cannot succeed; any edits already in the buffer stay pending so closing offers Save As.
+`ConflictPanel` shows a persistent notice whose only action is Save As, which writes a UTF-8 copy.
+
 ## Recovery
 
 `conflict` pauses mutations for a file that cannot be safely written. `recoveryError` distinguishes

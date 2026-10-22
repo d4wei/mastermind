@@ -1,7 +1,8 @@
 # Native reviewer adapter
 
 `main.tsx` installs the native host before mounting the existing React reviewer. `host.ts` adapts
-Tauri commands to `app/host.ts`; failures become host-level conflict, missing, or failure results.
+Tauri commands to `app/host.ts`; failures become host-level conflict, missing, not-UTF-8, or failure
+results.
 The document store does not interpret native command envelopes or HTTP statuses. Prepared
 translations pass through the shared TypeScript freshness and source-mapping checks. Theme assets
 are bundled, and preferences use the native application config directory.

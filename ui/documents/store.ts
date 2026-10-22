@@ -33,6 +33,8 @@ export interface DocStore {
   status: 'loading' | 'ready' | 'error'
   error: string | null
   conflict: boolean
+  /** The file's bytes are not valid UTF-8; the document stays read-only in place and Save As writes a UTF-8 copy. */
+  lossy: boolean
   saving: boolean
   /** External buffer changes invalidate editor instances; editor input retains their history. */
   externalVersion: number
@@ -64,7 +66,7 @@ export interface DocStore {
 
 const documentKeys = [
   'meta', 'source', 'savedSource', 'eol', 'version', 'revision', 'conflictDismissed', 'recoveryError', 'copyError',
-  'mode', 'conflict', 'saving', 'history', 'diskChange',
+  'mode', 'conflict', 'lossy', 'saving', 'history', 'diskChange',
 ] as const satisfies readonly (keyof DocStore)[]
 
 type DocumentState = Pick<DocStore, typeof documentKeys[number]>
@@ -72,7 +74,7 @@ type DocumentState = Pick<DocStore, typeof documentKeys[number]>
 /** Published while no document is active, so commands cannot reach a departed record. */
 const releasedDocument: Omit<DocumentState, 'mode'> = {
   meta: null, source: '', savedSource: '', eol: 'lf', version: '', revision: 0,
-  conflictDismissed: false, recoveryError: null, copyError: false, conflict: false, saving: false,
+  conflictDismissed: false, recoveryError: null, copyError: false, conflict: false, lossy: false, saving: false,
   history: [], diskChange: null,
 }
 
@@ -85,6 +87,16 @@ interface DocumentRecord extends DocumentState {
   diskGeneration: number
   /** An invalidation received while saving; it is read once the operation settles. */
   pendingInvalidation?: { deleted: boolean }
+}
+
+/** Review actions, Markdown-mode typing, and autosave stop while a document is conflicted or lossy. */
+export function editingLocked(state: Pick<DocStore, 'conflict' | 'lossy'>): boolean {
+  return state.conflict || state.lossy
+}
+
+/** A read of the version already held cannot clear lossiness the host proved by refusing a write. */
+function readLossy(doc: DocumentRecord, file: FileResponse): boolean {
+  return !!file.lossy || (doc.lossy && file.version === doc.version)
 }
 
 function documentState(record: DocumentState): DocumentState {
@@ -114,7 +126,7 @@ export function createDocStore() {
   const schedule = (id: string): void => {
     clearAutosave(id)
     const record = documents.get(id)
-    if (!record) return
+    if (!record || record.lossy) return
     record.autosaveTimer = setTimeout(() => { record.autosaveTimer = undefined; void saveDocument(id) }, AUTOSAVE_MS)
   }
   const deferInvalidation = (doc: DocumentRecord, deleted: boolean): void => {
@@ -135,6 +147,7 @@ export function createDocStore() {
     if (!doc || doc.saving || doc.conflict) return false
     const { source, savedSource, eol, version } = doc
     if (source === savedSource) return true
+    if (doc.lossy) return false
     const content = restoreEol(source, eol)
     doc.diskGeneration++
     updateDocument(id, { saving: true })
@@ -147,6 +160,11 @@ export function createDocStore() {
       succeeded = true
       return true
     } catch (err) {
+      // The host refuses before writing, so the file is unchanged and retrying cannot succeed.
+      if (err instanceof HostError && err.kind === 'notUtf8') {
+        updateDocument(id, { lossy: true })
+        return false
+      }
       updateDocument(id, err instanceof HostError && err.kind === 'conflict'
         ? { conflict: true, recoveryError: null }
         : { conflict: true, recoveryError: 'save' })
@@ -172,7 +190,7 @@ export function createDocStore() {
     if (!doc) return
     if (doc.version === file.version) {
       const recoveredRead = doc.recoveryError === 'read'
-      updateDocument(id, { diskChange: null, ...(recoveredRead ? { conflict: false, recoveryError: null } : {}) })
+      updateDocument(id, { diskChange: null, lossy: readLossy(doc, file), ...(recoveredRead ? { conflict: false, recoveryError: null } : {}) })
       if (recoveredRead && doc.source !== doc.savedSource) schedule(id)
       return
     }
@@ -182,7 +200,8 @@ export function createDocStore() {
     }
     if (doc.diskSource === file.content) {
       // Metadata can change without changing the base text; keep local edits against the fresh token.
-      updateDocument(id, { version: file.version, conflict: false, recoveryError: null, diskChange: null })
+      updateDocument(id, { version: file.version, lossy: readLossy(doc, file), conflict: false, recoveryError: null,
+        diskChange: null })
       if (doc.source !== doc.savedSource) schedule(id)
       return
     }
@@ -190,7 +209,7 @@ export function createDocStore() {
       const normalized = normalizeToLf(file.content)
       doc.diskSource = file.content
       updateDocument(id, { source: normalized, savedSource: normalized,
-        eol: detectEol(file.content), version: file.version,
+        eol: detectEol(file.content), version: file.version, lossy: readLossy(doc, file),
         conflict: false, recoveryError: null, diskChange: null,
         // Review undo snapshots predate the external text; replaying one would overwrite it.
         history: normalized === doc.source ? doc.history : [] })
@@ -233,7 +252,7 @@ export function createDocStore() {
       const incoming = normalizeToLf(file.content)
       doc.diskSource = file.content
       updateDocument(id, { source: incoming, savedSource: incoming, eol: detectEol(file.content),
-        version: file.version, conflict: false, recoveryError: null, diskChange: null,
+        version: file.version, lossy: readLossy(doc, file), conflict: false, recoveryError: null, diskChange: null,
         // Adoption stays reversible so review undo can recover the discarded buffer.
         history: incoming === doc.source ? doc.history : [...doc.history.slice(-49), doc.source] })
       if (activeId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
@@ -326,7 +345,7 @@ export function createDocStore() {
           const normalized = normalizeToLf(file.content)
           const record: DocumentRecord = {
             ...releasedDocument, meta, source: normalized, savedSource: normalized, eol: detectEol(file.content),
-            diskSource: file.content, version: file.version, mode: get().mode, diskGeneration: 0,
+            diskSource: file.content, version: file.version, lossy: !!file.lossy, mode: get().mode, diskGeneration: 0,
           }
           documents.set(sessionId, record)
           set((s) => ({
@@ -343,7 +362,7 @@ export function createDocStore() {
       },
 
       setSource(source) {
-        if (get().conflict) return
+        if (editingLocked(get())) return
         set((s) => ({
           source,
           externalVersion: s.externalVersion + 1,
@@ -353,7 +372,7 @@ export function createDocStore() {
       },
 
       undo() {
-        if (get().conflict) return
+        if (editingLocked(get())) return
         const prev = get().history.at(-1)
         if (prev === undefined) return
         set((s) => ({ source: prev, history: s.history.slice(0, -1), externalVersion: s.externalVersion + 1 }))
@@ -361,13 +380,13 @@ export function createDocStore() {
       },
 
       setSourceFromEditor(source) {
-        if (get().conflict || source === get().source) return
+        if (editingLocked(get()) || source === get().source) return
         set({ source })
         get().queueAutosave()
       },
 
       applyEdits(edits) {
-        if (get().conflict) return
+        if (editingLocked(get())) return
         set((s) => ({
           source: applyTextEdits(s.source, edits),
           externalVersion: s.externalVersion + 1,
@@ -415,7 +434,7 @@ export function createDocStore() {
             if (doc.diskGeneration !== request) return false
             updateDocument(id, { saving: false })
             if (file.version === doc.version) {
-              updateDocument(id, { conflict: false, recoveryError: null, diskChange: null })
+              updateDocument(id, { lossy: readLossy(doc, file), conflict: false, recoveryError: null, diskChange: null })
             } else reconcileDisk(id, file)
             return !doc.conflict && await saveDocument(id)
           } catch (err) { retainReadFailure(id, err); return false }
@@ -439,7 +458,7 @@ export function createDocStore() {
             const source = normalizeToLf(copy.file.content)
             documents.set(copy.meta.sessionId, { ...doc, meta: copy.meta, source, savedSource: source,
               eol: detectEol(copy.file.content), diskSource: copy.file.content, version: copy.file.version,
-              conflict: false, conflictDismissed: false, recoveryError: null, copyError: false, saving: false,
+              lossy: !!copy.file.lossy, conflict: false, conflictDismissed: false, recoveryError: null, copyError: false, saving: false,
               diskChange: null, history: [], diskGeneration: 0,
               pendingInvalidation: undefined, write: undefined, recovery: undefined, autosaveTimer: undefined })
             doc.diskGeneration++

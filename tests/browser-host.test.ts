@@ -19,6 +19,13 @@ it('retains structured conflict responses for the document store', async () => {
     kind: 'conflict', data: { error: 'changed', version: 'disk' },
   } satisfies Partial<HostError>)
 })
+it('distinguishes a refused write to a file that is not valid UTF-8', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422,
+    json: async () => ({ error: 'not_utf8', message: 'The file is not valid UTF-8.' }) }))
+  await expect(createBrowserHost().putFile('preview', 'accepted', 'base')).rejects.toMatchObject({ kind: 'notUtf8' })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422, json: async () => ({ error: 'other' }) }))
+  await expect(createBrowserHost().putFile('preview', 'accepted', 'base')).rejects.toMatchObject({ kind: 'failure' })
+})
 it('reports non-JSON host failures as structured host failures', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable',
     json: async () => { throw new SyntaxError('invalid JSON') } }))

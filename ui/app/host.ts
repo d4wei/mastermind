@@ -2,7 +2,8 @@ import type { FileResponse, SessionMeta } from './hostTypes'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
 
-export type HostFailure = 'conflict' | 'missing' | 'failure'
+/** `notUtf8` is a refused write to a file whose bytes are not valid UTF-8. */
+export type HostFailure = 'conflict' | 'missing' | 'notUtf8' | 'failure'
 type HostInvalidation = 'changed' | 'deleted' | 'translations'
 
 export class HostError extends Error {

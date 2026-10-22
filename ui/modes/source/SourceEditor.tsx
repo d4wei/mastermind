@@ -4,7 +4,7 @@ import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
-import { useDoc } from '../../documents/store'
+import { editingLocked, useDoc } from '../../documents/store'
 import { attachSourceSearch, sourceSearchExtension } from '../../find/source'
 import { useNav, type SourceOutline } from '../../app/navStore'
 
@@ -88,7 +88,7 @@ export function SourceEditor() {
           doc: entry,
           extensions: [
             history(),
-            editing.of(editingState(useDoc.getState().conflict)),
+            editing.of(editingState(editingLocked(useDoc.getState()))),
             keymap.of([...defaultKeymap, ...historyKeymap]),
             markdown(),
             EditorView.lineWrapping,
@@ -102,7 +102,7 @@ export function SourceEditor() {
       state,
       parent: host,
       dispatchTransactions(transactions, currentView) {
-        if (ownsBuffer() && useDoc.getState().conflict && transactions.some((transaction) => transaction.docChanged)) return
+        if (ownsBuffer() && editingLocked(useDoc.getState()) && transactions.some((transaction) => transaction.docChanged)) return
         for (const transaction of transactions) searchBinding?.mapSelection(transaction.changes)
         currentView.update(transactions)
         // Owned changes reach the store synchronously, so saves and navigation never flush the editor.
@@ -114,10 +114,10 @@ export function SourceEditor() {
     })
 
     searchBinding = attachSourceSearch(view, sessionId)
-    view.dispatch({ effects: editing.reconfigure(editingState(useDoc.getState().conflict)) })
+    view.dispatch({ effects: editing.reconfigure(editingState(editingLocked(useDoc.getState()))) })
     const stop = useDoc.subscribe((state, previous) => {
-      if (ownsBuffer() && state.conflict !== previous.conflict) {
-        view.dispatch({ effects: editing.reconfigure(editingState(state.conflict)) })
+      if (ownsBuffer() && editingLocked(state) !== editingLocked(previous)) {
+        view.dispatch({ effects: editing.reconfigure(editingState(editingLocked(state))) })
       }
     })
 

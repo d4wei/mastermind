@@ -177,6 +177,17 @@ it('freezes editor mutations and undo without losing selection or text on confli
   expect(view.state.selection.main.to).toBe(4)
 })
 
+it('freezes Markdown-mode typing when a read reports the file is not valid UTF-8', async () => {
+  const view = editor()
+  vi.mocked(getFile).mockResolvedValueOnce({ content: 'alpha', version: 'lossy', mtimeMs: 2, lossy: true })
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  expect(useDoc.getState().lossy).toBe(true)
+  expect(view.contentDOM.getAttribute('contenteditable')).toBe('false')
+  act(() => view.dispatch({ changes: { from: 0, insert: 'forbidden' } }))
+  expect(view.state.doc.toString()).toBe('alpha')
+  expect(useDoc.getState().source).toBe('alpha')
+})
+
 it('searches virtualized source with literal case-aware queries and restores selection without changing history', async () => {
   const { useSourceSearch } = await import('../ui/find/source')
   const { getSearchQuery, searchPanelOpen } = await import('@codemirror/search')

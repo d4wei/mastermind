@@ -2,7 +2,7 @@ import { requireReviewerHost } from '../app/host'
 import { useDraftGuard, useDraftState } from '../review/drafts'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
-import { useDoc } from '../documents/store'
+import { editingLocked, useDoc } from '../documents/store'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { documentViewport, readingLine } from '../util/scroll'
@@ -87,7 +87,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const edit = await translatedCommentEdit(current.source, { blockId: selection.blockId,
         sourceHash: capturedArtifact.sourceHash, quote: selection.quote, language: capturedArtifact.targetLang, author: authorTag, body })
       const latest = useDoc.getState()
-      if (latest.conflict || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
+      if (editingLocked(latest) || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
         useTranslation.getState().artifact !== capturedArtifact || !useTranslation.getState().active ||
         useTranslation.getState().targetLang !== capturedArtifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])

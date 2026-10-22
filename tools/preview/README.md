@@ -8,11 +8,12 @@ directory. The command starts a foreground localhost API and Vite, then prints t
 The preview grants file access only to the existing document explicitly selected at startup. It
 requires `.md` or `.markdown` on both the selected path and canonical target, case-insensitively. It
 reads prepared translations beside that document and saves accepted changes with an opaque base
-version. Like the native host, it refuses changed content for a file that is not valid UTF-8 with a
-422 `not_utf8` error. Browser settings exist in memory for the lifetime of the process; an update
-accepts only known keys whose values have the default's type, and an author tag only when it is a
-usable author name. No daemon, personal configuration file, workspace
-browsing, draft creation, rename, or agent installation is provided.
+version. Like the native host, its file snapshot carries `lossy: true` when the bytes are not valid
+UTF-8, and it refuses changed content for such a file with a 422 `not_utf8` error. Browser
+settings exist in memory for the lifetime of the process; an update accepts only known keys whose
+values have the default's type, and an author tag only when it is a usable author name. No daemon,
+personal configuration file, workspace browsing, draft creation, rename, or agent installation is
+provided.
 
 The event stream reports a missing file once per disappearance, counting a path that no longer
 stats as a regular file, and the first successful read afterwards as changed, including when the

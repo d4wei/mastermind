@@ -11,7 +11,7 @@ import { serveFile } from './static'
 import { scanThemes } from '../../themes/discovery'
 
 // Status, code, and message match the native host's refusal of the same write.
-const NOT_UTF8_MESSAGE = 'The file is not valid UTF-8, so saving would change bytes outside your edits. Save a copy instead.'
+const NOT_UTF8_MESSAGE = 'The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.'
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 // Keyed by the union so a new interface language fails to compile until it is admitted here.
 const UI_LANGUAGES: Record<MastermindConfig['uiLang'], true> = { en: true, 'zh-CN': true }

@@ -43,12 +43,14 @@ describe('native reviewer boundary', () => {
     { status: 403, error: 'permission_denied', message: 'Permission denied' },
     { status: 409, error: 'file_changed', message: 'The file changed. Compare before saving.' },
     { status: 500, error: 'file_io_error', message: 'The disk operation failed' },
+    { status: 422, error: 'not_utf8', message: 'The file is not valid UTF-8.' },
   ])('preserves structured recovery status and code while displaying the readable message: $error',
     async (failure) => {
       const invoke = vi.fn().mockRejectedValue(failure)
       const host = createNativeHost({ invoke, listen: vi.fn() }, [])
       await expect(host.getFile('0')).rejects.toMatchObject({
-        kind: failure.status === 409 ? 'conflict' : failure.error === 'file_not_found' ? 'missing' : 'failure',
+        kind: failure.status === 409 ? 'conflict' : failure.error === 'file_not_found' ? 'missing'
+          : failure.error === 'not_utf8' ? 'notUtf8' : 'failure',
         message: failure.message, data: failure,
       })
       await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(HostError)

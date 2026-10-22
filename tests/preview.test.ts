@@ -83,15 +83,23 @@ it('requires a base version and rejects stale saves after a successful save', as
   expect(await fs.readFile(file, 'utf8')).toBe('saved')
 })
 
+it('reports lossy decoding only for a file that is not valid UTF-8', async () => {
+  expect(await (await request('/api/sessions/preview/file')).json()).toMatchObject({ lossy: false })
+  await fs.writeFile(file, Buffer.from([0x61, 0xff, 0x0a]))
+  expect(await (await request('/api/sessions/preview/file')).json()).toMatchObject({ content: 'a\uFFFD\n', lossy: true })
+})
+
 it('refuses a changed save to a file that is not valid UTF-8 and keeps an unchanged save a no-op', async () => {
   const bytes = Buffer.from([0x61, 0xff, 0x62, 0x0a])
   await fs.writeFile(file, bytes)
-  const base = await (await request('/api/sessions/preview/file')).json() as { content: string; version: string }
+  const base = await (await request('/api/sessions/preview/file')).json() as { content: string; version: string; lossy: boolean }
+  expect(base.lossy).toBe(true)
   const unchanged = await request('/api/sessions/preview/file', 'PUT', { content: base.content, baseVersion: base.version })
   expect(unchanged.status).toBe(200)
   const changed = await request('/api/sessions/preview/file', 'PUT', { content: `${base.content}edit`, baseVersion: base.version })
   expect(changed.status).toBe(422)
-  expect((await changed.json() as { error: string }).error).toBe('not_utf8')
+  expect(await changed.json()).toEqual({ error: 'not_utf8',
+    message: 'The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.' })
   expect(await fs.readFile(file)).toEqual(bytes)
 })
 
