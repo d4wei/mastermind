@@ -6,9 +6,15 @@ window: both delimiters must fit inside one text block, and an unterminated open
 past its block to hide a later mark. `excludedRanges` is the single authority for opaque source:
 code, HTML, frontmatter, images and image references, and link destinations. An autolink's
 destination is its own visible text, so marks there stay active; `criticTransform` restores the
-link's URL from the source with the delimiters literal. List and blockquote continuation lines are
-allowed when they belong to the same paragraph; crossing list items, headings, or cells is
-unsupported.
+link's URL from the source with the delimiters literal, searching the link's own source range or,
+for a GFM literal autolink the parser builds without a position, its nearest positioned ancestor's.
+When the masked URL tail is missing there, or recurs with different source, the delimiters are
+stripped from the URL instead. List and blockquote continuation lines are allowed when they belong
+to the same paragraph; crossing list items, headings, or cells is unsupported.
+
+Reference-link labels are not excluded. A mark inside the label of `[x][label]`, or a shortcut
+reference such as `[{++a++}]` with a matching definition, stays active, and once masked the label
+no longer matches its definition, so the reading view shows the brackets as text without the link.
 
 Unsupported spans remain literal source and do not enter review actions, counts, source highlighting,
 or translation's annotation removal. The reading transform and document analysis use the same span

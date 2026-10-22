@@ -221,8 +221,9 @@ pub async fn write_document(
 }
 
 /// Creates a new copy of an admitted document. A close copy leaves the registry untouched;
-/// otherwise the copy replaces the original's registry entry. Like other guarded saves, creation
-/// holds the write mutex and locks the registry only before and after disk I/O.
+/// otherwise the copy replaces the original's registry entry, or joins the registry alone when the
+/// original closed during creation. Like other guarded saves, creation holds the write mutex and
+/// locks the registry only before and after disk I/O.
 fn save_copy(
     docs: &Mutex<Documents>,
     id: &str,

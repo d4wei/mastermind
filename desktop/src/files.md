@@ -86,12 +86,17 @@ may remain and is never silently removed or overwritten on retry.
 An ordinary Save As also refuses, before creation, a destination still registered to another
 admitted document, such as one whose file was deleted, with `already_open`; the copy never merges
 into that document. The originating document's own deleted path is allowed, since the copy replaces
-its entry. On macOS and Windows the comparison ignores case, approximating their default volumes.
-After creation the check is repeated, the new file is admitted under a fresh ID with the snapshot
-creation verified, and the original document's registry entry is removed. The original disk file is
-untouched. This does not advance activation: the renderer switches only if the person still has the
-originating document selected. Unused watches are released. A failed creation or admission does
-not release the original document.
+its entry. On macOS and Windows the comparison ignores case, approximating their default volumes;
+it does not normalize Unicode, so on APFS a destination typed in another normalization form than an
+admitted document's deleted path (a composed versus a decomposed `café.md`) is not recognized as
+that path and the file can be registered twice. After creation the check is repeated, the new file
+is admitted under a fresh ID with the snapshot creation verified, and the original document's
+registry entry is removed. The original disk file is untouched. This does not advance activation:
+the renderer switches only if the person still has the originating document selected. The registry
+is unlocked during creation, so the originating document may close meanwhile; the copy then exists
+on disk and was chosen by the person, so it is admitted as an ordinary new document and the active
+document is unchanged. Unused watches are released. A failed creation or admission does not
+release the original document.
 
 When `forClose` is true, creation and readback use the same exclusive-copy path, but the new file
 is not admitted and the original registry entry stays intact. The renderer can complete its close

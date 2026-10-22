@@ -301,6 +301,13 @@ describe('autolink attributes', () => {
     expect((collect(tree, 'link')[0] as unknown as { url: string }).url).toBe('http://x.y/++}')
     expect(JSON.stringify(tree)).not.toMatch(/[\ue000-\ue0ff]/)
   })
+
+  it('restores an unpositioned literal autolink from its nearest positioned ancestor, stripping when ambiguous', () => {
+    const urls = (source: string) => collect(analyzeMarkdown(source).tree, 'link').map((node) => (node as unknown as { url: string }).url)
+    expect(urls('~>www.ex.com/{++a++} y')).toEqual(['http://www.ex.com/{++a++}'])
+    expect(urls('~>www.ex.com/{>>aa<<} ~>www.ex.com/{>>bb<<} ~>www.ex.com/{>>cc<<}'))
+      .toEqual(['http://www.ex.com/', 'http://www.ex.com/{>>bb<<}', 'http://www.ex.com/'])
+  })
 })
 
 describe('opaque link destinations and image text', () => {

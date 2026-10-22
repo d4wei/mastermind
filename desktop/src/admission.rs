@@ -198,7 +198,9 @@ impl Documents {
 
     /// Registers a created copy in place of `origin`. The destination is checked again because an
     /// admission can register the created file before this call. The activation revision is kept:
-    /// a save picker must not steal later navigation.
+    /// a save picker must not steal later navigation. The registry is unlocked during creation, so
+    /// `origin` may have closed meanwhile; the copy exists on disk and was chosen by the person, so
+    /// it is then admitted as an ordinary new document and the active document is left alone.
     pub(crate) fn replace_with_copy(
         &mut self,
         origin: usize,
@@ -206,9 +208,9 @@ impl Documents {
         snapshot: crate::files::Snapshot,
     ) -> Result<usize, FileError> {
         self.check_copy_destination(origin, &canonical)?;
-        self.remove(origin);
+        let replaces_origin = self.remove(origin).is_some();
         let id = self.insert(canonical, Some(snapshot));
-        if self.active_id == Some(origin) {
+        if replaces_origin && self.active_id == Some(origin) {
             self.active_id = Some(id);
         }
         Ok(id)
@@ -219,7 +221,11 @@ impl Documents {
 /// ignore case. Admitted paths carry their on-disk case from canonicalization, but a destination
 /// that does not exist yet keeps the case the person typed. Lowercasing approximates the volume's
 /// folding rules; on a case-sensitive volume it only refuses a name that differs from an open
-/// document's by case.
+/// document's by case. No Unicode normalization is applied, although APFS and HFS+ treat
+/// canonically equivalent names as one file: a typed destination in a different normalization
+/// form from an admitted path (such as a composed and a decomposed `café.md`) compares unequal,
+/// so a copy over an admitted document's deleted path in the other form can register that file
+/// twice.
 fn destination_key(path: &str) -> String {
     if cfg!(any(target_os = "macos", windows)) { path.to_lowercase() } else { path.to_owned() }
 }
@@ -305,6 +311,25 @@ mod tests {
         assert_eq!(docs.replace_with_copy(0, stale, snapshot).unwrap_err().error, "already_open");
         assert_eq!(docs.len(), 2);
         assert!(docs.get(0).unwrap().snapshot.is_some());
+    }
+
+    #[test]
+    fn a_copy_whose_origin_closed_during_creation_is_admitted_as_a_new_document() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a.md"), "a").unwrap();
+        fs::write(fixture.0.join("b.md"), "b").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a.md", "b.md"]));
+        docs.close(0, Some(0), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(1));
+        fs::write(fixture.0.join("copy.md"), "a").unwrap();
+        let destination = copy_destination(&fixture.0.join("copy.md")).unwrap();
+        let snapshot = crate::files::read(Path::new(&destination)).unwrap();
+        let revision = docs.activation_revision;
+        let id = docs.replace_with_copy(0, destination.clone(), snapshot).unwrap();
+        assert_eq!(docs.get(id).unwrap().path, destination);
+        assert_eq!(docs.len(), 2);
+        assert_eq!((docs.active_id, docs.activation_revision), (Some(1), revision));
     }
 
     #[cfg(any(target_os = "macos", windows))]

@@ -10,8 +10,10 @@ CriticMarkup structure before writing. It rereads the document before atomically
 artifact with a unique temporary-file rename. It does not merge previous entries, retain partial
 success, or swallow save failures. It checks each segment of `.mastermind/translations` beside the
 document's real folder without following links, creating a missing segment only after its parent
-passed, and refuses to save when a segment is a link, so nothing is created outside the folder. A
-case variant of an existing directory on a case-insensitive volume is the same directory. An unrelated document writer can still change the source after
+passed, and refuses to save when a segment is a link, so nothing is created outside the folder.
+Each segment's on-disk name must be exactly `.mastermind` and `translations`; a case variant on a
+case-insensitive volume is refused, as `desktop/src/translations.rs` refuses it, so the CLI never
+writes where the app will not read. An unrelated document writer can still change the source after
 that final check; this is not an atomic transaction across the document and artifact.
 
 Artifacts live beside their documents at `.mastermind/translations/<basename>.<target-code>.json`.
@@ -20,8 +22,8 @@ prepared text is a derived reading artifact, never a store for review feedback.
 
 `readPreparedTranslation` accepts only the current schema and validates again against the supplied
 source and requested target. It reports a ready artifact, missing artifact, or stale/invalid
-artifact. A redirected translations directory, a symbolic link, a FIFO, a device, or an oversized
-file reads as stale without its content being read.
+artifact. A redirected or case-variant translations directory, a symbolic link, a FIFO, a device,
+or an oversized file reads as stale without its content being read.
 Callers supply the current document source; UI callers also validate against their local buffer.
 No read generates text or queues agent work.
 

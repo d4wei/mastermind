@@ -78,3 +78,11 @@ it('resolves a relative file against INIT_CWD only when npm started the script',
   expect(previewArguments(['doc.md', '--port', '6000'], { ...env, npm_lifecycle_event: 'dev' }, '/here'))
     .toEqual({ file: path.resolve('/stale', 'doc.md'), port: 6000 })
 })
+
+it('rejects a positional beside --file and any port that is not decimal digits', () => {
+  expect(previewArguments(['--file', 'a.md'], {}, '/here')).toEqual({ file: path.resolve('/here', 'a.md'), port: 5199 })
+  expect(() => previewArguments(['--file', 'a.md', 'b.md'], {}, '/here')).toThrow('Usage')
+  for (const port of ['0x50', '1e3', '', ' 80', '+80', '0', '65536']) {
+    expect(() => previewArguments(['a.md', '--port', port], {}, '/here')).toThrow('invalid preview port')
+  }
+})

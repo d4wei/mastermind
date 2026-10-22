@@ -6,8 +6,9 @@ candidate artifacts, not a claim of freshness. The shared document matcher valid
 against the current UI buffer. A malformed target does not hide other targets.
 
 `translations.rs` checks language syntax, canonical containment, regular files, filename/target
-identity, per-file bounds, and bounded aggregate output. Redirected directories and artifact
-symlinks are rejected. Language and discovery limits live in the implementation; the source format
+identity, per-file bounds, and bounded aggregate output. Redirected directories, directories whose
+on-disk names differ from `.mastermind/translations` (such as a case variant on a case-insensitive
+volume), and artifact symlinks are rejected; the CLI applies the same rule. Language and discovery limits live in the implementation; the source format
 remains in `document/translation.ts`. `read_translation` supplies one fresh artifact for validating
 an exact captured quote before a comment is submitted.
 

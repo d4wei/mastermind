@@ -12,9 +12,11 @@ const OPAQUE_TYPES = new Set(['code', 'inlineCode', 'html', 'yaml', 'image', 'im
  * each link's destination — everything after its text, or the whole link when
  * it has no text. An autolink's destination is its own text, so at most its
  * closing `>` is excluded and marks inside it stay active; `criticTransform`
- * restores its URL from the source. The tree must be the plain Markdown parse
- * of the scanned source, so positions come from the same syntax the renderer
- * uses.
+ * restores its URL from the source of the link or, when the link has no
+ * position, of its nearest positioned ancestor, and strips the delimiters when
+ * the URL is missing from that source or ambiguous there. Reference-link
+ * labels are not excluded. The tree must be the plain Markdown parse of the
+ * scanned source, so positions come from the same syntax the renderer uses.
  */
 export function excludedRanges(tree: Node): Range[] {
   const out: Range[] = []

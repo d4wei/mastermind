@@ -1,6 +1,5 @@
 import type { Parent, PhrasingContent, Root } from 'mdast'
 import type { Node } from 'unist'
-import { visit } from 'unist-util-visit'
 import { maskSource, type Sentinels } from '../critic/mask'
 // Container prefixes belong to the enclosing Markdown node, not displayed atom content.
 import { stripLinePrefixes } from '../critic/scanner'
@@ -122,7 +121,9 @@ function synthPosition(span: CriticSpan) {
  * Source offset of a masked text node's value index 0, when value indices map
  * one for one onto the source. Masking preserves length, so the node's own
  * offsets are exact; a value shorter than its source extent has decoded
- * entities or escapes or dropped container prefixes.
+ * entities or escapes, or dropped source the parser does not keep in text:
+ * container prefixes, the indentation of continuation lines, and the spaces
+ * before a soft line break.
  */
 function valueOrigin(node: Node, value: string): number | undefined {
   const start = node.position?.start.offset
@@ -295,14 +296,28 @@ export function criticTransform(
 
 const ATTRIBUTES = ['url', 'title', 'alt'] as const
 
+interface SourceRange {
+  start: number
+  end: number
+}
+
+function sourceRange(node: Node): SourceRange | undefined {
+  const start = node.position?.start.offset
+  const end = node.position?.end.offset
+  return start === undefined || end === undefined ? undefined : { start, end }
+}
+
 /**
  * Rewrites every `url`, `title`, and `alt` that still carries sentinel code
  * points with the original source characters. The scanner excludes link
  * destinations and images, so only an autolink reaches here: its destination
  * is its own text, where a mark renders as a wrapper while the URL keeps the
  * delimiters literally. The attribute's sentinel-bearing tail is located in the
- * masked slice of its node's source range; without a position or a match the
- * sentinels are stripped.
+ * masked slice of its node's source range, or, for a GFM literal autolink that
+ * the parser builds without a position, of its nearest positioned ancestor's.
+ * The node's own range ends at the URL, so its last match is the tail; in an
+ * ancestor's range every match must restore to the same source. Without a
+ * range, a match, or a single restoration the sentinels are stripped.
  */
 function restoreAttributeSources(
   tree: Root,
@@ -313,26 +328,34 @@ function restoreAttributeSources(
   const codes = [...Object.values(sentinels.open), ...Object.values(sentinels.close), ...sentinels.neutral].join('')
   const sentinel = new RegExp(`[${codes}]`, 'g')
   let masked: string | undefined
-  visit(tree, (node) => {
+  walk(tree, undefined)
+
+  function walk(node: Node, ancestor: SourceRange | undefined): void {
     const fields = node as unknown as Record<string, unknown>
+    const own = sourceRange(node)
     for (const key of ATTRIBUTES) {
       const value = fields[key]
       if (typeof value !== 'string') continue
       const first = value.search(sentinel)
       if (first === -1) continue
-      fields[key] = restoreValue(value, first, node)
+      const tail = restoreTail(value.slice(first), own, ancestor)
+      fields[key] = value.slice(0, first) + (tail ?? value.slice(first).replace(sentinel, ''))
     }
-  })
+    for (const child of (node as Partial<Parent>).children ?? []) walk(child, own ?? ancestor)
+  }
 
-  function restoreValue(value: string, first: number, node: Node): string {
-    const start = node.position?.start.offset
-    const end = node.position?.end.offset
-    if (start !== undefined && end !== undefined) {
-      masked ??= maskSource(original, spans, sentinels).masked
-      const tail = value.slice(first)
-      const at = masked.slice(start, end).lastIndexOf(tail)
-      if (at !== -1) return value.slice(0, first) + original.slice(start + at, start + at + tail.length)
+  function restoreTail(tail: string, own: SourceRange | undefined, ancestor: SourceRange | undefined): string | undefined {
+    const range = own ?? ancestor
+    if (!range) return undefined
+    masked ??= maskSource(original, spans, sentinels).masked
+    const slice = masked.slice(range.start, range.end)
+    const restore = (at: number) => original.slice(range.start + at, range.start + at + tail.length)
+    if (own) {
+      const at = slice.lastIndexOf(tail)
+      return at === -1 ? undefined : restore(at)
     }
-    return value.replace(sentinel, '')
+    const restorations = new Set<string>()
+    for (let at = slice.indexOf(tail); at !== -1; at = slice.indexOf(tail, at + 1)) restorations.add(restore(at))
+    return restorations.size === 1 ? [...restorations][0] : undefined
   }
 }
