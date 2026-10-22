@@ -10,10 +10,11 @@ import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
-import { locateThread, rebaseReplies, rebaseThread, refreshThread, threadCards, threadRef, type ReplyDraft, type ThreadCard,
+import { locateThread, rebaseReplies, rebaseThread, refreshThread, threadRef, type ReplyDraft,
   type ThreadRef } from '../review/thread-identity'
+import type { ThreadCard } from '../../document/critic/types'
 import { useNav } from './navStore'
-import { MarkGutter, type MarkTick } from '../review/MarkGutter'
+import { MarkGutter } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../document/critic/scanner'
 import { useT } from '../i18n'
@@ -156,7 +157,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
     [status, source, mode, showTranslated],
   )
-  const cards = useMemo(() => analysis && threadCards(analysis.items, analysis.spans, source), [analysis, source])
+  const cards = analysis?.threads ?? null
   const [activeSpan, chooseActive, rebaseActive] = useThreadChoice(cards, source)
   const [hoveredSpan, chooseHovered, rebaseHovered] = useThreadChoice(cards, source)
   // Owned here rather than by the rail, which is unmounted while the narrow comments panel is closed.
@@ -223,24 +224,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       .filter((s) => s.kind === 'comment')
       .map((s) => parseAuthor(source.slice(s.innerStart, s.innerEnd)))
   }, [analysis, source])
-  const markTicks = useMemo<MarkTick[]>(() => {
-    if (!analysis) return []
-    const ticks: MarkTick[] = []
-    for (const item of analysis.items) {
-      if (item.type === 'suggestion') {
-        const idx = analysis.spans.indexOf(item.span)
-        if (idx >= 0) ticks.push({ spanIndex: idx, kind: item.span.kind as MarkTick['kind'] })
-      } else if (item.type === 'highlight') {
-        // Standalone highlights render as plain text and have no gutter target.
-      } else {
-        const anchor = item.anchor ?? item.comments[0]?.span
-        const idx = anchor ? analysis.spans.indexOf(anchor) : -1
-        if (idx >= 0) ticks.push({ spanIndex: idx, kind: 'comment' })
-      }
-    }
-    return ticks
-  }, [analysis])
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
@@ -359,8 +342,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const commentRail = analysis && (
     <CommentRail
       readOnly={readOnly}
-      items={analysis.items}
-      spans={analysis.spans}
+      analysis={analysis}
       source={source}
       docRef={articleRef}
       authorTag={authorTag}
@@ -425,10 +407,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
                 }}
                 onPointerLeave={() => chooseHovered(null)}>
                 <MarkdownView
-                  tree={analysis.tree}
+                  analysis={analysis}
                   ctx={{
                     source,
-                    reviewSpans: analysis.spans,
                     onEdit: (edit) => applyEdits([edit]),
                     highlightCode,
                     markLabels: {
@@ -482,12 +463,12 @@ function DocumentView({ sessionId }: { sessionId: string }) {
             readOnly={readOnly}
             containerRef={articleRef}
             source={source}
-            spans={analysis.spans}
+            analysis={analysis}
             authorTag={authorTag}
             onEdit={applyEdits}
           />
-          {markTicks.length > 0 && !showRail && (
-            <MarkGutter docRef={articleRef} marks={markTicks} />
+          {analysis.ticks.length > 0 && !showRail && (
+            <MarkGutter docRef={articleRef} marks={analysis.ticks} />
           )}
         </>
       )}

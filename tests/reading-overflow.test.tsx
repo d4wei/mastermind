@@ -31,9 +31,8 @@ it('contains table overflow in a keyboard-accessible region while retaining sour
 
 it('passes explicit fence languages to coloring without guessing for plain or unsupported blocks', () => {
   const source = '```TypeScript\nconst count = 3\n```\n\n```yaml\ncount: 3 # note\n```\n\n```\nreturn "hello"\n```'
-  const { tree } = analyzeMarkdown(source)
   const host = document.createElement('div')
-  host.innerHTML = renderToStaticMarkup(<MarkdownView tree={tree} ctx={{ source, highlightCode: true }} />)
+  host.innerHTML = renderToStaticMarkup(<MarkdownView analysis={analyzeMarkdown(source)} ctx={{ source, highlightCode: true }} />)
   const blocks = host.querySelectorAll('pre')
   expect(blocks[0]!.querySelector('.tok-keyword')?.textContent).toBe('const')
   expect(blocks[1]!.querySelector('.tok')).toBeNull()

@@ -60,7 +60,7 @@ function neutralizeRegion(chars: string[], start: number, end: number, neutral: 
   }
 }
 
-interface MaskResult {
+export interface MaskResult {
   masked: string
   sentinels: Sentinels
 }

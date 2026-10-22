@@ -12,14 +12,15 @@ import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
 import { placeCommentCards } from './rail-layout'
-import { locateThread, threadCards, threadRef, type ReplyDraft, type ThreadCard } from './thread-identity'
-import type { CriticSpan, ReviewItem } from '../../document/critic/types'
+import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
+import type { ThreadCard } from '../../document/critic/types'
+import type { Analysis } from '../../document/markdown/analyze'
 import type { TextEdit } from '../../document/types'
 
 interface Props {
   readOnly?: boolean
-  items: readonly ReviewItem[]
-  spans: readonly CriticSpan[]
+  analysis: Pick<Analysis, 'spans' | 'threads'>
+  /** The source `analysis` describes. */
   source: string
   docRef: RefObject<HTMLElement | null>
   authorTag: string
@@ -38,7 +39,7 @@ interface Props {
 
 const CARD_GAP = 8
 
-export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
+export function CommentRail({ analysis: { spans, threads: cards }, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
   onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false }: Props) {
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
@@ -51,7 +52,6 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   const selectedKey = useRef<string | null>(null)
-  const cards = useMemo(() => threadCards(items, spans, source), [items, spans, source])
   // Each draft follows its discussion's identity and position, never its ordinal among duplicates.
   const placedDrafts = useMemo(() => {
     const byCard = new Map<string, ReplyDraft>()
@@ -241,7 +241,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
           }
         }}>
         {(selected ? card.thread.comments : card.thread.comments.slice(0, 1)).map((comment, messageIndex) =>
-          <div key={messageIndex} data-find-comment={spans.indexOf(comment.span)} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
+          <div key={messageIndex} data-find-comment={card.messages[messageIndex]} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
             <div className="rail-message-header">
               {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
                 aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}

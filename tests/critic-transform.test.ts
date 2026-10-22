@@ -1,10 +1,7 @@
 import type { Parent } from 'mdast'
 import type { Node } from 'unist'
 import { describe, expect, it } from 'vitest'
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
-import { remarkCritic } from '../document/markdown/remark-critic'
-import type { CriticSpan } from '../document/critic/types'
+import golden from './critic-reading-trees.golden.json'
 import { applyTextEdits } from '../document/edits'
 import { rejectEdit } from '../document/critic/resolve'
 import { analyzeMarkdown } from '../document/markdown/analyze'
@@ -218,18 +215,14 @@ it('keeps each analysis tied to its exact source across marked and plain calls',
   expect(collect(last.tree, 'criticInsert')).toEqual([])
 })
 
-it('transforms interleaved parser calls using their own file state', () => {
-  const processor = unified().use(remarkParse).use(remarkCritic).freeze()
-  const first = { value: 'First {++addition++}.', data: { criticSpans: [] as CriticSpan[] } }
-  const second = { value: 'Second {--deletion--}.', data: { criticSpans: [] as CriticSpan[] } }
-  const firstTree = processor.parse(first)
-  const secondTree = processor.parse(second)
-  processor.runSync(firstTree, first)
-  processor.runSync(secondTree, second)
-  expect(textOf(collect(firstTree, 'criticInsert')[0]!)).toBe('addition')
-  expect(textOf(collect(secondTree, 'criticDelete')[0]!)).toBe('deletion')
-  expect(first.data.criticSpans.map((span) => first.value.slice(span.start, span.end))).toEqual(['{++addition++}'])
-  expect(second.data.criticSpans.map((span) => second.value.slice(span.start, span.end))).toEqual(['{--deletion--}'])
+// The golden records the reading trees for this file's inputs; the pipeline must reproduce them exactly.
+it.each(golden)('reproduces the reading tree recorded for %#', ({ source, tree }) => {
+  expect(JSON.parse(JSON.stringify(analyzeMarkdown(source).tree))).toEqual(tree)
+})
+
+it('reuses the plain parse as the reading tree when there are no marks', () => {
+  const { plain, tree } = analyzeMarkdown('# Plain\n\nA mark only in code: `{++code++}`.')
+  expect(tree).toBe(plain)
 })
 
 describe('span association across tree depths', () => {

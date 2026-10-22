@@ -1,23 +1,6 @@
 import { applyTextEdits } from '../../document/edits'
-import type { CriticSpan, ReviewItem } from '../../document/critic/types'
+import type { ThreadCard } from '../../document/critic/types'
 import type { TextEdit } from '../../document/types'
-
-type ThreadItem = Extract<ReviewItem, { type: 'thread' }>
-
-/** A discussion as the comment rail presents it. */
-export interface ThreadCard {
-  /** Anchor text and opening message; appending replies keeps it. */
-  identity: string
-  /** Render key: the identity plus its ordinal among identical discussions. */
-  key: string
-  start: number
-  /** Index of the anchor, or of the opening message when there is no anchor. */
-  spanIndex: number
-  /** Indexes of the anchor and every message. */
-  members: number[]
-  anchorText: string
-  thread: ThreadItem
-}
 
 /** A discussion located by its identity and its start offset in `source`. */
 export interface ThreadRef {
@@ -30,20 +13,6 @@ export interface ThreadRef {
 
 /** An unsent reply; `thread` becomes null once its discussion no longer exists. */
 export interface ReplyDraft { id: number; thread: ThreadRef | null; text: string }
-
-export function threadCards(items: readonly ReviewItem[], spans: readonly CriticSpan[], source: string): ThreadCard[] {
-  const seen = new Map<string, number>()
-  return items.filter((item): item is ThreadItem => item.type === 'thread').map((thread) => {
-    const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd) : ''
-    const first = thread.comments[0]
-    const identity = JSON.stringify([anchorText, first?.author ?? '', first?.body])
-    const ordinal = seen.get(identity) ?? 0
-    seen.set(identity, ordinal + 1)
-    const members = [...(thread.anchor ? [thread.anchor] : []), ...thread.comments.map((comment) => comment.span)]
-      .map((span) => spans.indexOf(span))
-    return { identity, key: `${identity}#${ordinal}`, start: thread.start, spanIndex: members[0]!, members, anchorText, thread }
-  })
-}
 
 type Located = Pick<ThreadCard, 'identity' | 'start'>
 

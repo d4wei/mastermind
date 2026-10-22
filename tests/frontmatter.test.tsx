@@ -13,9 +13,8 @@ import { metadataProperties } from '../ui/modes/reading/Frontmatter'
 const metadata = '---\ntitle: "{>>literal<<}"\nitems:\n  - one\n  - two\n---'
 
 function render(source: string): HTMLElement {
-  const { tree } = analyzeMarkdown(source)
   const root = document.createElement('article')
-  root.innerHTML = renderToStaticMarkup(<MarkdownView tree={tree} ctx={{ source }} />)
+  root.innerHTML = renderToStaticMarkup(<MarkdownView analysis={analyzeMarkdown(source)} ctx={{ source }} />)
   return root
 }
 
@@ -67,13 +66,13 @@ describe('YAML frontmatter', () => {
     const root = render(source)
     const metadataRange = document.createRange()
     metadataRange.selectNodeContents(root.querySelector('dd')!)
-    expect(rangeToSourceRanges(metadataRange, source, [])).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(metadataRange, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
     const body = root.querySelector('p')!
     const crossing = document.createRange()
     crossing.setStart(root.querySelector('dt')!.firstChild!, 0)
     const bodyText = document.createTreeWalker(body, NodeFilter.SHOW_TEXT).nextNode()!
     crossing.setEnd(bodyText, 4)
-    const mapped = rangeToSourceRanges(crossing, source, [])
+    const mapped = rangeToSourceRanges(crossing, source, analyzeMarkdown(source))
     expect(mapped).toEqual({ ranges: [{ from: prefix.length, to: prefix.length + 4, text: 'Body' }] })
     const { spans } = analyzeMarkdown(source)
     expect(spans).toHaveLength(1)
@@ -106,7 +105,7 @@ describe('YAML frontmatter', () => {
     const root = render(source)
     const range = document.createRange()
     range.selectNodeContents(root.querySelector('.md-frontmatter')!)
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
   })
 
   it('preserves metadata as an untranslated source block', async () => {

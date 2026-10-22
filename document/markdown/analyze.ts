@@ -1,21 +1,49 @@
 import type { Root } from 'mdast'
-import { group } from '../critic/scanner'
-import type { CriticSpan, ReviewItem } from '../critic/types'
-import { markdownProcessor } from './processor'
-import { remarkCritic } from './remark-critic'
+import { maskSource } from '../critic/mask'
+import { group, threadCards } from '../critic/scanner'
+import type { CriticSpan, ReviewItem, ThreadCard } from '../critic/types'
+import { criticTransform } from './critic-mdast'
+import { parseMarkdown } from './processor'
+import { scanMarkdownTree } from './scan'
 
-const criticProcessor = markdownProcessor().use(remarkCritic).freeze()
+/** A review mark the overview gutter points at: a suggestion, or a discussion's first span. */
+export interface MarkTick {
+  spanIndex: number
+  kind: 'ins' | 'del' | 'sub' | 'comment'
+}
 
+/** Everything Reading mode derives from one source; consumers index into it rather than recompute. */
 export interface Analysis {
+  /** The plain Markdown parse: review boundaries, exclusions, and selection mapping read it. */
+  plain: Root
+  /** The reading tree, with review marks as critic nodes; `plain` itself when there are no marks. */
   tree: Root
   spans: CriticSpan[]
   items: ReviewItem[]
+  threads: ThreadCard[]
+  ticks: MarkTick[]
 }
 
-/** Full Reading-mode pipeline: critic-aware tree + spans + grouped review items. */
-export function analyzeMarkdown(text: string): Analysis {
-  const file = { value: text, data: { criticSpans: [] as CriticSpan[] } }
-  const tree = criticProcessor.runSync(criticProcessor.parse(file), file) as Root
-  const spans = file.data.criticSpans
-  return { tree, spans, items: group(spans, text) }
+/**
+ * Parses the source once as plain Markdown to find its review marks, and once more with the marks
+ * masked, so that critic nodes replace them without changing the Markdown structure around them.
+ */
+export function analyzeMarkdown(source: string): Analysis {
+  const plain = parseMarkdown(source)
+  const spans = scanMarkdownTree(source, plain)
+  let tree = plain
+  if (spans.length > 0) {
+    const mask = maskSource(source, spans)
+    tree = parseMarkdown(mask.masked)
+    criticTransform(tree, source, spans, mask)
+  }
+  const items = group(spans, source)
+  const spanIndex = new Map(spans.map((span, index) => [span, index]))
+  const ticks = items.flatMap((item): MarkTick[] => {
+    // Standalone highlights render as plain text and have no gutter target.
+    if (item.type === 'highlight') return []
+    if (item.type === 'thread') return [{ spanIndex: spanIndex.get(item.anchor ?? item.comments[0]!.span)!, kind: 'comment' }]
+    return [{ spanIndex: spanIndex.get(item.span)!, kind: item.span.kind as MarkTick['kind'] }]
+  })
+  return { plain, tree, spans, items, threads: threadCards(items, spanIndex, source), ticks }
 }

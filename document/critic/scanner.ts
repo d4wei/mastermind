@@ -1,4 +1,4 @@
-import type { CommentEntry, CriticKind, CriticSpan, Range, ReviewItem } from './types'
+import type { CommentEntry, CriticKind, CriticSpan, Range, ReviewItem, ThreadCard, ThreadItem } from './types'
 
 const OPENERS: ReadonlyArray<readonly [string, CriticKind]> = [
   ['{++', 'ins'],
@@ -187,4 +187,21 @@ export function group(spans: readonly CriticSpan[], text: string): ReviewItem[] 
     i = run.next
   }
   return items
+}
+
+/** The discussions among `items`, in order; `spanIndex` maps each span of `items` to its index. */
+export function threadCards(items: readonly ReviewItem[], spanIndex: ReadonlyMap<CriticSpan, number>,
+  source: string): ThreadCard[] {
+  const seen = new Map<string, number>()
+  return items.filter((item): item is ThreadItem => item.type === 'thread').map((thread) => {
+    const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd) : ''
+    const first = thread.comments[0]
+    const identity = JSON.stringify([anchorText, first?.author ?? '', first?.body])
+    const ordinal = seen.get(identity) ?? 0
+    seen.set(identity, ordinal + 1)
+    const messages = thread.comments.map((comment) => spanIndex.get(comment.span)!)
+    const members = thread.anchor ? [spanIndex.get(thread.anchor)!, ...messages] : messages
+    return { identity, key: `${identity}#${ordinal}`, start: thread.start, spanIndex: members[0]!, members, messages,
+      anchorText, thread }
+  })
 }

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { READING_LAYOUT_EVENT } from '../ui/app/reading-space'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { DropdownMenu } from 'radix-ui'
+import { analyzeMarkdown } from '../document/markdown/analyze'
 
 let host: HTMLDivElement
 let root: Root
@@ -15,7 +16,7 @@ const rangeBounds = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundin
 function Harness({ readOnly = false, text = 'Passage', source = text, menu = false }: { readOnly?: boolean; text?: string; source?: string; menu?: boolean }) {
   const containerRef = useRef<HTMLElement>(null)
   return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe={text.length}>{text}</span></p></article></div>
-    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source={source} spans={[]} authorTag="reviewer" onEdit={edit} />
+    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source={source} analysis={analyzeMarkdown(source)} authorTag="reviewer" onEdit={edit} />
     {menu && <DropdownMenu.Root defaultOpen modal={false}><DropdownMenu.Trigger>More</DropdownMenu.Trigger>
       <DropdownMenu.Portal><DropdownMenu.Content><DropdownMenu.Item>Delete comment</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal>
     </DropdownMenu.Root>}</>

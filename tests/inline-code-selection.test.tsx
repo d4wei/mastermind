@@ -19,9 +19,10 @@ describe('reviewing inline code', () => {
   it.each(['`open -- docs/plan.md`', '``a ` b``', '` padded `', '`one\ntwo`'])(
     'puts the anchor outside the code delimiters: %s', (code) => {
       const source = `Try ${code} now.`
-      const { host, spans } = renderMarkdown(source)
+      const rendered = renderMarkdown(source)
+      const { host } = rendered
       const range = select(host.querySelector('code')!.firstChild!)
-      const mapped = rangeToSourceRanges(range, source, spans)
+      const mapped = rangeToSourceRanges(range, source, rendered)
       if (!('ranges' in mapped)) throw new Error(mapped.error)
       expect(mapped.ranges).toEqual([{ from: 4, to: 4 + code.length, text: code }])
       const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'Alex', 'Keep `open` focused.')!)
@@ -45,7 +46,7 @@ describe('reviewing inline code', () => {
     const { host } = renderMarkdown(source)
     const range = document.createRange()
     range.selectNode(host.querySelector('code')!)
-    const mapped = rangeToSourceRanges(range, source, [])
+    const mapped = rangeToSourceRanges(range, source, analyzeMarkdown(source))
     expect(mapped).toEqual({ ranges: [{ from: 4, to: 13, text: '`command`' }] })
   })
 
@@ -53,26 +54,26 @@ describe('reviewing inline code', () => {
     const source = 'Try `open -- docs/plan.md` now.'
     const { host } = renderMarkdown(source)
     const range = select(host.querySelector('code')!.firstChild!, 0, 4)
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
   })
 
   it('does not offer marks inside fenced code', () => {
     const source = '```sh\ncommand\n```'
     const { host } = renderMarkdown(source)
     const range = select(host.querySelector('code')!.firstChild!)
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
   })
 
   it('retains selected comments around code and does not nest marks around an existing anchor', () => {
     const source = '`command`'
     const { host } = renderMarkdown(source)
-    const mapped = rangeToSourceRanges(select(host.querySelector('code')!.firstChild!), source, [])
+    const mapped = rangeToSourceRanges(select(host.querySelector('code')!.firstChild!), source, analyzeMarkdown(source))
     if (!('ranges' in mapped)) throw new Error(mapped.error)
     const ranges = mapped.ranges
     const updated = applyTextEdits(source, commentEdits(source, ranges, 'Alex', 'Review this.')!)
     const next = renderMarkdown(updated)
     expect(next.spans).toHaveLength(2)
     const selection = select(next.host.querySelector('code')!.firstChild!)
-    expect(rangeToSourceRanges(selection, updated, next.spans)).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(selection, updated, next)).toEqual({ error: 'unmapped' })
   })
 })

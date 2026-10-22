@@ -1,11 +1,7 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { documentViewport, scrollToSpan } from '../util/scroll'
-
-export interface MarkTick {
-  spanIndex: number
-  kind: 'ins' | 'del' | 'sub' | 'comment'
-}
+import type { MarkTick } from '../../document/markdown/analyze'
 
 interface PlacedTick extends MarkTick {
   fraction: number // 0..1 down the document
@@ -13,7 +9,7 @@ interface PlacedTick extends MarkTick {
 
 interface Props {
   docRef: RefObject<HTMLElement | null>
-  marks: MarkTick[]
+  marks: readonly MarkTick[]
 }
 
 const KIND_CLASS: Record<MarkTick['kind'], string> = {

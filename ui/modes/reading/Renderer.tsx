@@ -12,17 +12,15 @@ import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../../../
 import { highlight } from './highlight'
 import { toggleTaskEdit } from '../../../document/markdown/tasklist'
 import type { TextEdit } from '../../../document/types'
-import { group } from '../../../document/critic/scanner'
-import { scanMarkdown } from '../../../document/markdown/scan'
-import type { CriticSpan } from '../../../document/critic/types'
+import type { Analysis } from '../../../document/markdown/analyze'
 import { DiamondIcon } from '../../icons'
 import { Frontmatter } from './Frontmatter'
 import { TableViewport } from './TableViewport'
 import { plainText } from './outline'
+import { calloutKind, calloutSections } from './callouts'
 
 interface RenderCtx {
   source: string
-  reviewSpans?: CriticSpan[]
   /** Absent → interactive affordances (task checkboxes) are disabled. */
   onEdit?: (edit: TextEdit) => void
   highlightCode?: boolean
@@ -358,57 +356,20 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
   }
 }
 
-export type CalloutKind = 'decisions' | 'questions' | 'todo' | 'risks'
-
-/** Classifies a heading's text as a callout kind, or null for an ordinary heading. */
-export function calloutKind(text: string): CalloutKind | null {
-  const s = text.trim().toLowerCase()
-  if (/^decisions?\b/.test(s)) return 'decisions'
-  if (/^open\s+questions?\b/.test(s)) return 'questions'
-  if (/^to-?dos?\b/.test(s)) return 'todo'
-  if (/^risks?\b/.test(s)) return 'risks'
-  return null
-}
-
-export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
+export function MarkdownView({ analysis, ctx }: { analysis: Pick<Analysis, 'tree' | 'threads'>; ctx: RenderCtx }) {
   const presentation = useMemo(() => {
-    const spans = ctx.reviewSpans ?? scanMarkdown(ctx.source)
     const anchoredHighlights = new Set<number>()
     const commentMarkers = new Set<number>()
-    for (const item of group(spans, ctx.source)) {
-      if (item.type !== 'thread') continue
-      if (item.anchor) anchoredHighlights.add(spans.indexOf(item.anchor))
-      else if (item.comments[0]) commentMarkers.add(spans.indexOf(item.comments[0].span))
-    }
+    for (const card of analysis.threads) (card.thread.anchor ? anchoredHighlights : commentMarkers).add(card.spanIndex)
     return { anchoredHighlights, commentMarkers }
-  }, [ctx.source, ctx.reviewSpans])
+  }, [analysis.threads])
   const presented = { ...ctx, ...presentation }
-  const children = tree.children
-  const out: ReactNode[] = []
-  let i = 0
-  while (i < children.length) {
-    const node = children[i]!
-    const kind = node.type === 'heading' ? calloutKind(plainText(node)) : null
-    if (node.type === 'heading' && kind) {
-      // A callout section runs until the next heading of equal or higher rank. Leave the wrapper
-      // unpositioned so review selections anchor to its inner blocks.
-      const depth = node.depth
-      let j = i + 1
-      while (j < children.length) {
-        const next = children[j]!
-        if (next.type === 'heading' && next.depth <= depth) break
-        j++
-      }
-      out.push(
-        <section key={i} className={`md-callout md-callout--${kind}`}>
-          {children.slice(i, j).map((b, bi) => renderBlock(b, bi, presented))}
-        </section>,
-      )
-      i = j
-    } else {
-      out.push(renderBlock(node, i, presented))
-      i++
-    }
-  }
-  return <>{out}</>
+  const sections = calloutSections(analysis.tree.children, (node) => node.type === 'heading' ? node.depth : null,
+    (node) => calloutKind(plainText(node)))
+  // Leave a callout's wrapper unpositioned so review selections anchor to its inner blocks.
+  return <>{sections.map((section) => section.kind
+    ? <section key={section.start} className={`md-callout md-callout--${section.kind}`}>
+      {section.items.map((b, bi) => renderBlock(b, bi, presented))}
+    </section>
+    : renderBlock(section.items[0], section.start, presented))}</>
 }

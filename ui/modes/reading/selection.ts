@@ -1,7 +1,7 @@
 import type { Node as MarkdownNode, Parent } from 'unist'
 import { visit } from 'unist-util-visit'
-import { parseMarkdown } from '../../../document/markdown/processor'
 import type { CriticSpan, Range as SourceRange } from '../../../document/critic/types'
+import type { Analysis } from '../../../document/markdown/analyze'
 import { excludedRanges } from '../../../document/markdown/exclusions'
 import type { TextEdit } from '../../../document/types'
 
@@ -306,9 +306,11 @@ function outsideMarks(sub: Range, block: HTMLElement): Range[] {
 
 /**
  * A block's sub-range excludes rendered review marks and nested blocks; the pieces that remain map
- * independently, and unmappable pieces are skipped while the others stay markable.
+ * independently, and unmappable pieces are skipped while the others stay markable. `analysis`
+ * describes `source`.
  */
-export function rangeToSourceRanges(range: Range, source: string, spans: readonly CriticSpan[]): MultiSelResult {
+export function rangeToSourceRanges(range: Range, source: string,
+  { plain, spans }: Pick<Analysis, 'plain' | 'spans'>): MultiSelResult {
   if (range.collapsed) return { error: 'empty' }
   if (range.toString().length === 0) return { error: 'empty' }
 
@@ -320,9 +322,8 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
   if (blocks.length === 0) return { error: 'unmapped' }
 
   const ranges: SelRange[] = []
-  const tree = parseMarkdown(source)
-  const opaque = excludedRanges(tree)
-  const positionedNodes = lazyPositionedNodes(tree)
+  const opaque = excludedRanges(plain)
+  const positionedNodes = lazyPositionedNodes(plain)
   for (const block of blocks) {
     const sub = block.ownerDocument.createRange()
     sub.selectNodeContents(block)

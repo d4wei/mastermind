@@ -1,6 +1,6 @@
 import type { Parent, PhrasingContent, Root } from 'mdast'
 import type { Node } from 'unist'
-import { maskSource, type Sentinels } from '../critic/mask'
+import type { MaskResult, Sentinels } from '../critic/mask'
 // Container prefixes belong to the enclosing Markdown node, not displayed atom content.
 import { stripLinePrefixes } from '../critic/scanner'
 import type { CriticSpan } from '../critic/types'
@@ -165,7 +165,7 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
 }
 
 /**
- * Rewrites a tree parsed from MASKED text: sentinel runs in text-node values
+ * Rewrites a tree parsed from `mask.masked`: sentinel runs in text-node values
  * become criticInsert/criticDelete/criticHighlight wrappers around the
  * content between them, and neutralized regions become criticSub /
  * criticComment atoms whose content is read from the ORIGINAL source.
@@ -184,13 +184,8 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
  * otherwise. Link and image attributes are then restored from the source
  * (`restoreAttributeSources`).
  */
-export function criticTransform(
-  tree: Root,
-  original: string,
-  spans: readonly CriticSpan[],
-  sentinels: Sentinels,
-): void {
-  const seg = buildSegmenter(sentinels)
+export function criticTransform(tree: Root, original: string, spans: readonly CriticSpan[], mask: MaskResult): void {
+  const seg = buildSegmenter(mask.sentinels)
   const streams: Streams = {
     byKind: {
       ins: spans.filter((s) => s.kind === 'ins'),
@@ -291,7 +286,7 @@ export function criticTransform(
   }
 
   processParent(tree)
-  restoreAttributeSources(tree, original, spans, sentinels)
+  restoreAttributeSources(tree, original, mask)
 }
 
 const ATTRIBUTES = ['url', 'title', 'alt'] as const
@@ -319,15 +314,9 @@ function sourceRange(node: Node): SourceRange | undefined {
  * ancestor's range every match must restore to the same source. Without a
  * range, a match, or a single restoration the sentinels are stripped.
  */
-function restoreAttributeSources(
-  tree: Root,
-  original: string,
-  spans: readonly CriticSpan[],
-  sentinels: Sentinels,
-): void {
+function restoreAttributeSources(tree: Root, original: string, { masked, sentinels }: MaskResult): void {
   const codes = [...Object.values(sentinels.open), ...Object.values(sentinels.close), ...sentinels.neutral].join('')
   const sentinel = new RegExp(`[${codes}]`, 'g')
-  let masked: string | undefined
   walk(tree, undefined)
 
   function walk(node: Node, ancestor: SourceRange | undefined): void {
@@ -347,7 +336,6 @@ function restoreAttributeSources(
   function restoreTail(tail: string, own: SourceRange | undefined, ancestor: SourceRange | undefined): string | undefined {
     const range = own ?? ancestor
     if (!range) return undefined
-    masked ??= maskSource(original, spans, sentinels).masked
     const slice = masked.slice(range.start, range.end)
     const restore = (at: number) => original.slice(range.start + at, range.start + at + tail.length)
     if (own) {

@@ -2,7 +2,7 @@ import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { escapeOwner } from '../../app/constants'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import type { CriticSpan } from '../../../document/critic/types'
+import type { Analysis } from '../../../document/markdown/analyze'
 import type { TextEdit } from '../../../document/types'
 import { useT } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
@@ -18,7 +18,8 @@ interface Props {
   readOnly?: boolean
   containerRef: RefObject<HTMLElement | null>
   source: string
-  spans: readonly CriticSpan[]
+  /** The analysis of `source`. */
+  analysis: Pick<Analysis, 'plain' | 'spans'>
   authorTag: string
   onEdit: (edits: TextEdit[]) => void
 }
@@ -30,7 +31,7 @@ interface Active {
   rect: { top: number; left: number; width: number }
 }
 
-export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdit, readOnly = false }: Props) {
+export function SelectionToolbar({ containerRef, source, analysis, authorTag, onEdit, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const [active, setActive] = useDraftState<Active | null>('selection:active', null)
@@ -63,7 +64,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null
     const range = sel.getRangeAt(0)
     if (!containerRef.current?.contains(range.commonAncestorContainer)) return null
-    const res = rangeToSourceRanges(range, source, spans)
+    const res = rangeToSourceRanges(range, source, analysis)
     if ('error' in res) return null
     selectedRange.current = range.cloneRange()
     const rect = range.getBoundingClientRect()
@@ -88,7 +89,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       document.removeEventListener('selectionchange', onSelectionChange)
       cancelSelectionCheck()
     }
-  }, [containerRef, source, spans])
+  }, [containerRef, source, analysis])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -149,7 +150,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const verify = (text: string, changes: readonly string[]): TextEdit[] | null => {
     if (!view) return []
     // The analysis spans describe only the current source; a stale view rescans its own.
-    const known = source === view.source ? spans : undefined
+    const known = source === view.source ? analysis.spans : undefined
     return composing === 'change' ? changeEdits(view.source, view.ranges, changes, known)
       : composing === 'comment' && text.trim() ? commentEdits(view.source, view.ranges, authorTag, text, known) : []
   }
@@ -159,7 +160,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const deferredComment = useDeferredValue(comment)
   const deferredReplacements = useDeferredValue(replacements)
   const edits = useMemo(() => verify(deferredComment, deferredReplacements),
-    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, source, spans, authorTag])
+    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, source, analysis, authorTag])
   if (!present.mounted || !view) return null
 
   const begin = (kind: 'comment' | 'change'): void => {

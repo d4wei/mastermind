@@ -5,7 +5,7 @@ import { MarkdownView } from '../../ui/modes/reading/Renderer'
 export function renderMarkdown(source: string) {
   const analysis = analyzeMarkdown(source)
   const host = document.createElement('article')
-  host.innerHTML = renderToStaticMarkup(<MarkdownView tree={analysis.tree} ctx={{ source }} />)
+  host.innerHTML = renderToStaticMarkup(<MarkdownView analysis={analysis} ctx={{ source }} />)
   return { host, ...analysis }
 }
 

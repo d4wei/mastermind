@@ -1,6 +1,10 @@
 # Reading presentation
 
-`Renderer.tsx` renders the parsed Markdown tree while retaining source offsets for review edits.
+`Renderer.tsx` renders the reading tree of one `analyzeMarkdown` result while retaining source
+offsets for review edits; it reads which marks anchor discussions from that analysis's thread
+cards rather than regrouping the source. A heading whose text names a callout opens a section that
+runs until the next heading of equal or higher rank; `callouts.ts` holds that grouping, which the
+translated view applies to source headings.
 Each table sits inside a labeled, keyboard-focusable horizontal scroll region. The table retains
 its header/cell semantics and source positions; overflow does not widen the reading column.
 

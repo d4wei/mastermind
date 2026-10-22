@@ -29,13 +29,14 @@ the existing source-splice helpers.
 
 Escape and clicks elsewhere in the article collapse selection; Escape that closes a panel, popover,
 or menu does not. Reply drafts stay with their discussions, including when switching or collapsing
-cards. `thread-identity.ts` identifies a discussion by its anchor text and opening message plus its
-start offset, which edits elsewhere shift; identical discussions are told apart by that offset, not
-by their order, only while the edits are known. Review edits carry the offset exactly; after an
-external change, a discussion with a duplicate is found only where the changed region's alignments
-agree on its offset. Appending a reply retains the selected card. Source changes that replace the
-opening message or anchor create a different card identity and clear a selection or hover on the old
-one. Resolve and deleting the opening message discard that discussion's draft, and posting the reply
+cards. Each analysis builds its thread cards once (`threadCards` beside `group`), carrying every
+member's span index; `thread-identity.ts` identifies a discussion by its anchor text and opening
+message plus its start offset, which edits elsewhere shift; identical discussions are told apart
+by that offset, not by their order, only while the edits are known. Review edits carry the offset
+exactly; after an external change, a discussion with a duplicate is found only where the changed
+region's alignments agree on its offset. Appending a reply retains the selected card. Source
+changes that replace the opening message or anchor create a different card identity and clear a
+selection or hover on the old one. Resolve and deleting the opening message discard that discussion's draft, and posting the reply
 clears it, once the edit applies; a refused edit keeps the draft.
 
 The reply textarea retains normal text-input semantics and its submission shortcut. Composition

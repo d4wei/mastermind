@@ -27,9 +27,9 @@ those wrappers' exact Markdown source, rather than comparing their syntax with p
 The DOM positions must match nodes from the existing Markdown parser, and each complete wrapper's
 rendered text must match its parsed text. Outside those wrappers, selected text maps to exact source
 slices and the slices must be contiguous: unaccounted source gaps are refused. Reference links and
-other unsupported rendered structures do not become guessed source ranges. Each mapping operation
-parses the source once for opaque ranges and lazily indexes that same tree for formatted blocks;
-the index is discarded after the operation.
+other unsupported rendered structures do not become guessed source ranges. A mapping operation
+never parses: it takes the plain tree from the current source's analysis for opaque ranges and
+lazily indexes that tree for formatted blocks; the index is discarded after the operation.
 
 A selection confined to one text leaf within formatting keeps its exact text range, including the
 windowed unique-substring fallback when rendered entities change that leaf's length.

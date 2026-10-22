@@ -12,7 +12,7 @@ import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archi
 import { SessionView } from '../ui/app/SessionView'
 import { useNav } from '../ui/app/navStore'
 import { Navigator } from '../ui/app/Navigator'
-import { threadCards, threadRef, type ReplyDraft } from '../ui/review/thread-identity'
+import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
 
@@ -197,8 +197,7 @@ it('rebases the selection and reply drafts exactly through edits made in the doc
   render(source)
   act(() => host.querySelector<HTMLElement>('.critic-anchor[data-span-index="1"]')!.click())
   expect(rail.active).toBe(1)
-  const { items, spans } = analyzeMarkdown(source)
-  const cards = threadCards(items, spans, source)
+  const cards = analyzeMarkdown(source).threads
   act(() => rail.onDraftsChange!([{ id: 1, thread: threadRef(cards[0]!, source, cards), text: 'mine' }]))
   // Each deletion rejected from the article; together they span the first discussion.
   act(() => host.querySelector<HTMLElement>('.critic-del')!.click())

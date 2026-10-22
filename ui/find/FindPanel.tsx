@@ -117,14 +117,11 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
     if (mode === 'source') { publish(adapter ? adapter.matches(query, caseSensitive) : []); return }
     const root = docRef.current
     const body: Result[] = root ? readingMatches(root, query, caseSensitive) : []
-    if (mode === 'reading' && analysis) for (const item of analysis.items) {
-      if (item.type !== 'thread') continue
-      const anchor = analysis.spans.indexOf(item.anchor ?? item.comments[0]!.span)
-      for (const comment of item.comments) {
-        const commentIndex = analysis.spans.indexOf(comment.span)
+    if (mode === 'reading' && analysis) for (const card of analysis.threads) {
+      card.thread.comments.forEach((comment, index) => {
         body.push(...textMatches(commentSearchText(comment.body), query, caseSensitive)
-          .map((match) => ({ ...match, comment: commentIndex, anchor })))
-      }
+          .map((match) => ({ ...match, comment: card.messages[index], anchor: card.spanIndex })))
+      })
     }
     publish(body)
   }, [open, query, caseSensitive, mode, adapter, docRef, analysis, source, revision])

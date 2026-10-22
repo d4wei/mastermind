@@ -17,10 +17,11 @@ it.each([
   'Alpha `` padded ` code `` echo.',
 ])('maps complete formatting in a paragraph to exact source: %s', (paragraph) => {
   const source = `# Selection\r\n\r\n${paragraph}\r\n`
-  const { host, spans } = renderMarkdown(source)
+  const rendered = renderMarkdown(source)
+  const { host } = rendered
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
-  const mapped = rangeToSourceRanges(range, source, spans)
+  const mapped = rangeToSourceRanges(range, source, rendered)
   const from = source.indexOf(paragraph)
   expect(mapped).toEqual({ ranges: [{ from, to: from + paragraph.length, text: paragraph }] })
   if (!('ranges' in mapped)) throw new Error(mapped.error)
@@ -41,7 +42,7 @@ it('includes complete formatting at both endpoint boundaries without broadening 
   const range = document.createRange()
   range.setStart(host.querySelector('strong span')!.firstChild!, 0)
   range.setEnd(host.querySelector('em span')!.firstChild!, 6)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [{
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [{
     from: 7, to: 28, text: '**bold** and *italic*',
   }] })
 })
@@ -55,7 +56,7 @@ it.each(['start', 'end'])('refuses a selection crossing a partial formatting wra
   const last = host.querySelector('p > span:last-child')!.firstChild!
   range.setStart(edge === 'start' ? bold : first, edge === 'start' ? 2 : 0)
   range.setEnd(edge === 'end' ? bold : last, edge === 'end' ? 2 : last.textContent!.length)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
 })
 
 it('keeps selections confined to formatted text and refuses partial inline code crossing', () => {
@@ -65,10 +66,10 @@ it('keeps selections confined to formatted text and refuses partial inline code 
   const bold = host.querySelector('strong span')!.firstChild!
   range.setStart(bold, 1)
   range.setEnd(bold, 4)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [{ from: 10, to: 13, text: 'rav' }] })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 10, to: 13, text: 'rav' }] })
   range.setStart(host.querySelector('p > span')!.firstChild!, 0)
   range.setEnd(host.querySelector('code')!.firstChild!, 2)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
 })
 
 it('refuses hidden syntax gaps not accounted for by complete positioned wrappers', () => {
@@ -76,15 +77,16 @@ it('refuses hidden syntax gaps not accounted for by complete positioned wrappers
   const { host } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
 })
 
 it('maps the exact pieces on both sides of an existing review mark in formatted text', () => {
   const source = 'Before **bold** {==already==}{>>note<<} after.'
-  const { host, spans } = renderMarkdown(source)
+  const rendered = renderMarkdown(source)
+  const { host } = rendered
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
-  expect(rangeToSourceRanges(range, source, spans)).toEqual({ ranges: [
+  expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [
     { from: 0, to: 16, text: 'Before **bold** ' },
     { from: 39, to: 46, text: ' after.' },
   ] })
@@ -97,7 +99,7 @@ it('retains unique-substring mapping within one formatted text leaf containing a
   const range = document.createRange()
   range.setStart(leaf, 0)
   range.setEnd(leaf, 5)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [{ from: 2, to: 7, text: 'bravo' }] })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 2, to: 7, text: 'bravo' }] })
 })
 
 it('does not use the substring fallback across a partial wrapper containing an entity', () => {
@@ -106,25 +108,25 @@ it('does not use the substring fallback across a partial wrapper containing an e
   const range = document.createRange()
   range.setStart(host.querySelector('strong span')!.firstChild!, 1)
   range.setEnd(host.querySelector('p > span:last-child')!.firstChild!, 6)
-  expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
+  expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
 })
 
-it('parses once per multi-block mapping operation and does not cache across operations', () => {
+it('maps a multi-block selection from the analysis without parsing', () => {
   const source = 'First **bold** paragraph.\n\nSecond *italic* paragraph.'
-  const { host } = renderMarkdown(source)
-  const paragraphs = host.querySelectorAll('p')
+  const rendered = renderMarkdown(source)
+  const paragraphs = rendered.host.querySelectorAll('p')
   const range = document.createRange()
   range.setStart(paragraphs[0]!, 0)
   range.setEnd(paragraphs[1]!, paragraphs[1]!.childNodes.length)
   const parse = vi.spyOn(processor, 'parseMarkdown')
   try {
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [
+    expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [
       { from: 0, to: 25, text: 'First **bold** paragraph.' },
       { from: 27, to: source.length, text: 'Second *italic* paragraph.' },
     ] })
-    expect(parse).toHaveBeenCalledTimes(1)
-    rangeToSourceRanges(range, source, [])
-    expect(parse).toHaveBeenCalledTimes(2)
+    expect(parse).not.toHaveBeenCalled()
+    analyzeMarkdown(source)
+    expect(parse).toHaveBeenCalled()
   } finally {
     parse.mockRestore()
   }

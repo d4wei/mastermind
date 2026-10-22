@@ -30,7 +30,7 @@ function Harness({ request }: { request?: { spanIndex: number } }) {
     store.getState().applyEdits(edits)
     return true
   }
-  return <><article ref={docRef} /><CommentRail source={source} items={analysis.items} spans={analysis.spans}
+  return <><article ref={docRef} /><CommentRail source={source} analysis={analysis}
     replyRequest={request} readOnly={store((state) => !!state.recovery)} docRef={docRef} authorTag="reviewer" activeSpan={active}
     onActivate={(index) => { activate(index); setActive(index) }} onEdit={onEdit} drafts={drafts} onDraftsChange={setDrafts} /></>
 }

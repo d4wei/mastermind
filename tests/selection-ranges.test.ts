@@ -5,6 +5,7 @@ import { rangeBetween } from './helpers/dom'
 import { renderMarkdown } from './helpers/markdown'
 import { applyTextEdits } from '../document/edits'
 import { analyzeMarkdown } from '../document/markdown/analyze'
+import { parseMarkdown } from '../document/markdown/processor'
 import { rangeToSourceRanges } from '../ui/modes/reading/selection'
 import { commentEdits } from '../ui/modes/reading/marks'
 
@@ -28,14 +29,14 @@ function build(): { root: HTMLElement; t0: Text; t1: Text } {
 describe('rangeToSourceRanges', () => {
   it('single-block selection yields one range', () => {
     const { t0 } = build()
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, [])
+    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, analyzeMarkdown(SOURCE))
     expect('ranges' in res && res.ranges).toEqual([{ from: 6, to: 15, text: 'paragraph' }])
   })
 
   it('cross-block selection yields one range per block (start→end, start→end point)', () => {
     const { t0, t1 } = build()
     // from "paragraph." in block 0 through "Second paragraph" in block 1
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t1, 16), SOURCE, [])
+    const res = rangeToSourceRanges(rangeBetween(t0, 6, t1, 16), SOURCE, analyzeMarkdown(SOURCE))
     if (!('ranges' in res)) throw new Error(`expected ranges, got ${res.error}`)
     expect(res.ranges).toEqual([
       { from: 6, to: 16, text: 'paragraph.' },
@@ -48,15 +49,15 @@ describe('rangeToSourceRanges', () => {
   it('hides (errors) only when nothing in the selection is markable', () => {
     const { t0 } = build()
     // a single-block selection sitting entirely inside an existing mark
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, [
+    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, { plain: parseMarkdown(SOURCE), spans: [
       { kind: 'highlight', start: 4, end: 16, innerStart: 6, innerEnd: 15 },
-    ])
+    ] })
     expect(res).toEqual({ error: 'unmapped' })
   })
 
   it('empty / collapsed selection is rejected', () => {
     const { t0 } = build()
-    expect(rangeToSourceRanges(rangeBetween(t0, 6, t0, 6), SOURCE, [])).toEqual({ error: 'empty' })
+    expect(rangeToSourceRanges(rangeBetween(t0, 6, t0, 6), SOURCE, analyzeMarkdown(SOURCE))).toEqual({ error: 'empty' })
   })
 })
 
@@ -73,10 +74,11 @@ function contents(element: Element): Range {
 describe('selections across rendered review marks', () => {
   it.each(['Alpha {++beta++} gamma', 'Alpha{>>c<<} gamma', 'Alpha {~~a~>b~~} gamma'])(
     'maps the text on either side of the mark: %s', (source) => {
-      const { host, spans } = renderMarkdown(source)
+      const rendered = renderMarkdown(source)
+      const { host } = rendered
       const before = source.slice(0, source.indexOf('{'))
       const after = source.slice(source.lastIndexOf('}') + 1)
-      expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, spans)).toEqual({ ranges: [
+      expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)).toEqual({ ranges: [
         { from: 0, to: before.length, text: before },
         { from: source.length - after.length, to: source.length, text: after },
       ] })
@@ -85,9 +87,10 @@ describe('selections across rendered review marks', () => {
 
   it('keeps the block containing a mark when the selection continues into the next block', () => {
     const source = 'Alpha {++beta++} gamma\n\nSecond paragraph.'
-    const { host, spans } = renderMarkdown(source)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
     const range = rangeBetween(textOf(host, 'p > span'), 0, textOf(host, 'p > span', 2), 6)
-    expect(rangeToSourceRanges(range, source, spans)).toEqual({ ranges: [
+    expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [
       { from: 0, to: 6, text: 'Alpha ' },
       { from: 16, to: 22, text: ' gamma' },
       { from: 24, to: 30, text: 'Second' },
@@ -96,16 +99,18 @@ describe('selections across rendered review marks', () => {
 
   it('drops whitespace-only pieces between adjacent marks', () => {
     const source = 'Alpha {++beta++} {--delta--} gamma'
-    const { host, spans } = renderMarkdown(source)
-    const mapped = rangeToSourceRanges(contents(host.querySelector('p')!), source, spans)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
+    const mapped = rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)
     expect(mapped).toEqual({ ranges: [{ from: 0, to: 6, text: 'Alpha ' }, { from: 28, to: 34, text: ' gamma' }] })
   })
 
   it('maps text beside a mark by exact offsets where the substring fallback would refuse', () => {
     // The entity changes the paragraph's rendered length, and both pieces recur inside the mark.
     const source = 'Alpha {++beta *Alpha &amp; gamma*++} gamma'
-    const { host, spans } = renderMarkdown(source)
-    expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, spans)).toEqual({ ranges: [
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
+    expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)).toEqual({ ranges: [
       { from: 0, to: 6, text: 'Alpha ' },
       { from: 36, to: 42, text: ' gamma' },
     ] })
@@ -113,9 +118,10 @@ describe('selections across rendered review marks', () => {
 
   it('refuses a selection entirely inside an insertion', () => {
     const source = 'Alpha {++beta++} gamma'
-    const { host, spans } = renderMarkdown(source)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
     const inserted = host.querySelector('ins')!.firstChild!.firstChild as Text
-    expect(rangeToSourceRanges(rangeBetween(inserted, 1, inserted, 3), source, spans)).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(rangeBetween(inserted, 1, inserted, 3), source, rendered)).toEqual({ error: 'unmapped' })
   })
 })
 
@@ -124,7 +130,7 @@ describe('selections across nested list items', () => {
     const source = '- parent item\n  - child item'
     const { host } = renderMarkdown(source)
     const range = rangeBetween(textOf(host, 'li > span'), 0, textOf(host, 'li li > span'), 5)
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [
+    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [
       { from: 2, to: 13, text: 'parent item' },
       { from: 18, to: 23, text: 'child' },
     ] })
@@ -134,7 +140,7 @@ describe('selections across nested list items', () => {
     const source = '- one\n  - one.a\n- two'
     const { host } = renderMarkdown(source)
     const range = rangeBetween(textOf(host, 'li > span'), 0, textOf(host, 'li > span', 2), 3)
-    expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [
+    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [
       { from: 2, to: 5, text: 'one' },
       { from: 10, to: 15, text: 'one.a' },
       { from: 18, to: 21, text: 'two' },
@@ -151,39 +157,41 @@ describe('substring fallback for leaves whose rendered length differs from sourc
     const { host } = renderMarkdown(source)
     const leaf = textOf(host, 'p > span, li > span')
     expect(leaf.data.startsWith(selected)).toBe(true)
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, selected.length), source, [])).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, selected.length), source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
   })
 
   it.each([
     ['\\*x\\*{>>c<<} and *x*', '*x*'],
     ['Tom &amp; Jerry{>>c<<} and [l](u "Tom & Jerry")', 'Tom & Jerry'],
   ])('bounds an unpositioned piece beside a mark to its own source: %s', (source, piece) => {
-    const { host, spans } = renderMarkdown(source)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
     const whole = document.createRange()
     whole.selectNodeContents(host.querySelector('p')!)
-    const result = rangeToSourceRanges(whole, source, spans)
+    const result = rangeToSourceRanges(whole, source, rendered)
     const ranges = 'ranges' in result ? result.ranges : []
-    expect(ranges.every((range) => range.text !== piece || range.to <= spans[0]!.start)).toBe(true)
+    expect(ranges.every((range) => range.text !== piece || range.to <= rendered.spans[0]!.start)).toBe(true)
     const leaf = textOf(host, 'p > span')
     expect(leaf.data).toBe(piece)
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, piece.length), source, spans)).toEqual({ error: 'unmapped' })
+    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, piece.length), source, rendered)).toEqual({ error: 'unmapped' })
   })
 
   it('maps text that occurs once in both the rendered leaf and its source', () => {
     const source = 'AT&amp;T rocks'
     const { host } = renderMarkdown(source)
     const leaf = textOf(host, 'p > span')
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 2), source, [])).toEqual({ ranges: [{ from: 0, to: 2, text: 'AT' }] })
-    expect(rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, [])).toEqual({ ranges: [{ from: 9, to: 14, text: 'rocks' }] })
+    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 2), source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 0, to: 2, text: 'AT' }] })
+    expect(rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 9, to: 14, text: 'rocks' }] })
   })
 })
 
 describe('comment round trip', () => {
   it('refuses a comment whose selected text would close the new highlight early', () => {
     const source = 'Type a ==} here.'
-    const { host, spans } = renderMarkdown(source)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
     const leaf = textOf(host, 'p > span')
-    const mapped = rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, spans)
+    const mapped = rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, rendered)
     if (!('ranges' in mapped)) throw new Error(mapped.error)
     expect(mapped.ranges).toEqual([{ from: 5, to: 10, text: 'a ==}' }])
     expect(commentEdits(source, mapped.ranges, 'me', 'hi')).toBeNull()
@@ -191,9 +199,10 @@ describe('comment round trip', () => {
 
   it('anchors a comment on ordinary selected text', () => {
     const source = 'Type a ==} here.'
-    const { host, spans } = renderMarkdown(source)
+    const rendered = renderMarkdown(source)
+    const { host } = rendered
     const leaf = textOf(host, 'p > span')
-    const mapped = rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 4), source, spans)
+    const mapped = rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 4), source, rendered)
     if (!('ranges' in mapped)) throw new Error(mapped.error)
     const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'me', 'hi')!)
     expect(updated).toBe('{==Type==}{>>@me: hi<<} a ==} here.')
