@@ -37,9 +37,3 @@ export type ReviewItem =
    * highlight ({==span==}{>>note<<}). start/end cover anchor + all comments.
    */
   | { type: 'thread'; anchor: CriticSpan | null; comments: CommentEntry[]; start: number; end: number }
-
-export interface ReviewCountsDetail {
-  comments: number
-  edits: number
-  highlights: number
-}

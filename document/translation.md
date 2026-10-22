@@ -24,8 +24,9 @@ included in the fingerprint. Translated characters are not aligned with source c
 the narrative fingerprint, and one `{id,text}` entry for each translatable block. Literal blocks are
 supplied by the current source instead. `matchPreparedTranslation` accepts unknown input and rejects
 wrong fields/types, missing or duplicate IDs, a different fingerprint, empty translations, and
-changed or malformed active CriticMarkup suggestion structure. Suggestion text may translate; mark
-kinds and order must remain. Suggestion discovery and literal exclusions reuse the same plain
+changed active CriticMarkup suggestion structure. Suggestion text may translate; mark kinds and
+order must remain, and so must the ordered literal delimiter tokens outside opaque source that pair
+with no active mark, so prose that mentions a delimiter stays translatable. Suggestion discovery and literal exclusions reuse the same plain
 Markdown tree for each exact block string; projected narrative and original source keep separate trees. Each translation must retain one block of the original outer kind,
 including Markdown heading/list syntax. Hidden HTML, fenced code, and incompatible block splitting
 are rejected; ordinary inline formatting remains allowed. The helper returns sanitized artifact data

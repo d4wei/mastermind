@@ -5,6 +5,8 @@ import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import { remarkCritic } from '../document/markdown/remark-critic'
 import type { CriticSpan } from '../document/critic/types'
+import { applyTextEdits } from '../document/edits'
+import { rejectEdit } from '../document/critic/resolve'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../document/markdown/critic-mdast'
 
@@ -174,4 +176,59 @@ it('transforms interleaved parser calls using their own file state', () => {
   expect(textOf(collect(secondTree, 'criticDelete')[0]!)).toBe('deletion')
   expect(first.data.criticSpans.map((span) => first.value.slice(span.start, span.end))).toEqual(['{++addition++}'])
   expect(second.data.criticSpans.map((span) => second.value.slice(span.start, span.end))).toEqual(['{--deletion--}'])
+})
+
+describe('span association across tree depths', () => {
+  function spanSources(source: string, type: string): string[] {
+    const { tree, spans } = analyzeMarkdown(source)
+    return collect(tree, type).map((node) => {
+      const span = spans[(node as CriticWrapNode | CriticCommentNode).data.spanIndex]!
+      return source.slice(span.start, span.end)
+    })
+  }
+
+  it.each([
+    ['{++x++} *{++y++}*', 'criticInsert', ['{++x++}', '{++y++}']],
+    ['{>>a<<} *{>>b<<}*', 'criticComment', ['{>>a<<}', '{>>b<<}']],
+    ['{--x--} [link {--y--}](u)', 'criticDelete', ['{--x--}', '{--y--}']],
+    ['*{++y++}* {++x++}', 'criticInsert', ['{++y++}', '{++x++}']],
+  ])('pairs each wrapper with its own span: %s', (source, type, expected) => {
+    expect(spanSources(source, type)).toEqual(expected)
+  })
+
+  it('rejects the clicked deletion rather than a nested sibling', () => {
+    const source = '{--x--} [link {--y--}](u)'
+    const { tree, spans } = analyzeMarkdown(source)
+    const first = collect(tree, 'criticDelete').find((node) => textOf(node) === 'x') as CriticWrapNode
+    const span = spans[first.data.spanIndex]!
+    expect(applyTextEdits(source, [rejectEdit(source, span)])).toBe('x [link {--y--}](u)')
+  })
+
+  it('keeps later wrappers paired after a mark whose closer sits at another depth', () => {
+    const source = '{++a *x++}* {++b++}'
+    expect(spanSources(source, 'criticInsert')).toEqual(['{++b++}'])
+    const { tree } = analyzeMarkdown(source)
+    expect(textOf(tree)).toBe('{++a x++} b')
+  })
+})
+
+describe('opaque link destinations and image text', () => {
+  it.each([
+    ['[t](http://a/{--b--})', 'http://a/{--b--}'],
+    ['![{++new++} alt](x.png)', '{++new++} alt'],
+    ['![{++new++} alt][ref]\n\n[ref]: x.png', '{++new++} alt'],
+  ])('leaves delimiters literal in %j', (source, literal) => {
+    const { tree, spans } = analyzeMarkdown(source)
+    expect(spans).toEqual([])
+    const values = collect(tree, 'link').map((node) => (node as unknown as { url: string }).url)
+      .concat(collect(tree, 'image').concat(collect(tree, 'imageReference')).map((node) => (node as unknown as { alt: string }).alt))
+    expect(values).toContain(literal)
+  })
+
+  it('still finds marks in link text', () => {
+    const source = '[{++new++} text](http://a/{--b--})'
+    const { tree, spans } = analyzeMarkdown(source)
+    expect(spans.map((span) => source.slice(span.start, span.end))).toEqual(['{++new++}'])
+    expect((collect(tree, 'link')[0] as unknown as { url: string }).url).toBe('http://a/{--b--}')
+  })
 })

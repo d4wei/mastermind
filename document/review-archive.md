@@ -12,8 +12,9 @@ Each record is independent:
 -->
 ```
 
-`context` is the highlight's exact inner source, or the surrounding paragraph source for a point
-comment with the discussion removed. `thread` is the exact original source from the anchor through
+`context` is the highlight's exact inner source, or for a point comment the source of the text
+block containing it (paragraph, heading, or table cell, as `textBlockRanges` finds them) with the
+discussion removed. `thread` is the exact original source from the anchor through
 the last adjacent comment. Original author tags and discussion bytes remain in `thread`; the parser
 derives an ordered author list for callers rather than duplicating it in the stored record.
 

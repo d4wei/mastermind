@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { applyTextEdits } from '../document/edits'
 import { detectEol, normalizeToLf, restoreEol } from '../document/eol'
 import { parseMarkdown } from '../document/markdown/processor'
-import { taskMarkerAt, toggleTaskEdit } from '../document/markdown/tasklist'
+import { toggleTaskEdit } from '../document/markdown/tasklist'
 
 describe('eol', () => {
   it('detects lf', () => {
@@ -10,6 +10,10 @@ describe('eol', () => {
   })
   it('detects crlf', () => {
     expect(detectEol('a\r\nb\r\n')).toBe('crlf')
+  })
+  it('counts consecutive bare newlines toward lf', () => {
+    expect(detectEol('a\r\nb\r\n\n\n\n\n')).toBe('lf')
+    expect(detectEol('a\r\nb\r\n\n\n')).toBe('crlf')
   })
   it('round-trips crlf', () => {
     const original = '# Hi\r\n\r\ntext\r\n'
@@ -57,8 +61,7 @@ describe('task list toggling', () => {
   it('finds markers for bullet, nested, and ordered task items', () => {
     const starts = itemStarts(doc)
     expect(starts).toHaveLength(4)
-    const states = starts.map((s) => taskMarkerAt(doc, s)?.checked)
-    expect(states).toEqual([false, true, false, false])
+    expect(starts.map((s) => toggleTaskEdit(doc, s)?.insert)).toEqual(['x', ' ', 'x', 'x'])
   })
 
   it('toggles unchecked → checked', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { maskSource, pickSentinels } from '../document/critic/mask'
+import { maskSource } from '../document/critic/mask'
 import { scan } from '../document/critic/scanner'
 
 describe('maskSource', () => {
@@ -62,11 +62,12 @@ describe('maskSource', () => {
     expect(masked).toContain(sentinels.neutral[1])
   })
 
-  it('pickSentinels throws only when every pool is exhausted', () => {
+  it('throws only when every sentinel pool is exhausted', () => {
     let everything = ''
     for (const base of [0xe000, 0xe010, 0xe020, 0xe030, 0xe040]) {
       for (let off = 0; off < 8; off++) everything += String.fromCharCode(base + off)
     }
-    expect(() => pickSentinels(everything)).toThrow()
+    expect(() => maskSource(everything, [])).toThrow()
+    expect(() => maskSource(everything.slice(0, -8), [])).not.toThrow()
   })
 })

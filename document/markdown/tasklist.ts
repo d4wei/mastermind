@@ -6,7 +6,7 @@ const MARKER_RE = /^([ \t]*(?:[-*+]|\d+[.)])[ \t]+\[)([ xX])\]/
  * Locate the GFM task marker (`[ ]`/`[x]`) of the list item starting at
  * `itemStart` in `source`. Returns the offset of the state character.
  */
-export function taskMarkerAt(source: string, itemStart: number): { offset: number; checked: boolean } | null {
+function taskMarkerAt(source: string, itemStart: number): { offset: number; checked: boolean } | null {
   const m = MARKER_RE.exec(source.slice(itemStart, itemStart + 256))
   if (!m || m[1] === undefined || m[2] === undefined) return null
   return { offset: itemStart + m[1].length, checked: m[2] !== ' ' }

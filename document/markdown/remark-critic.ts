@@ -7,10 +7,10 @@ import type { CriticSpan } from '../critic/types'
 import { criticTransform } from './critic-mdast'
 import { scanMarkdown } from './scan'
 
+/** Present only when the parsed source had marks and was masked. */
 interface CriticState {
   original: string
-  spans: CriticSpan[]
-  sentinels: Sentinels | null
+  sentinels: Sentinels
 }
 
 declare module 'vfile' {
@@ -33,22 +33,18 @@ export function remarkCritic(this: Processor): Transformer<Root> {
   if (typeof inner === 'function') {
     self.parser = (doc: string, file: VFile): Node => {
       const spans = scanMarkdown(doc)
-      const state: CriticState = { original: doc, spans, sentinels: null }
-      file.data.criticState = state
       file.data.criticSpans = spans
-      if (spans.length > 0) {
-        const { masked, sentinels } = maskSource(doc, spans)
-        state.sentinels = sentinels
-        return inner.call(self, masked, file)
-      }
-      return inner.call(self, doc, file)
+      file.data.criticState = undefined
+      if (spans.length === 0) return inner.call(self, doc, file)
+      const { masked, sentinels } = maskSource(doc, spans)
+      file.data.criticState = { original: doc, sentinels }
+      return inner.call(self, masked, file)
     }
   }
 
   return (tree, file) => {
     const state = file.data.criticState
-    if (state && state.spans.length > 0 && state.sentinels) {
-      criticTransform(tree, state.original, state.spans, state.sentinels)
-    }
+    const spans = file.data.criticSpans
+    if (state && spans) criticTransform(tree, state.original, spans, state.sentinels)
   }
 }

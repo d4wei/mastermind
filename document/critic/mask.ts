@@ -1,4 +1,4 @@
-import type { CriticSpan, Range } from './types'
+import type { CriticSpan } from './types'
 
 export interface Sentinels {
   /**
@@ -23,7 +23,7 @@ function sentinelsFromBase(base: number): Sentinels {
   }
 }
 
-export function pickSentinels(text: string): Sentinels {
+function pickSentinels(text: string): Sentinels {
   for (const base of BASES) {
     let clash = false
     for (let off = 0; off < POOL_SIZE && !clash; off++) {
@@ -34,17 +34,11 @@ export function pickSentinels(text: string): Sentinels {
   throw new Error('source uses every sentinel codepoint pool (PUA-heavy file) — cannot mask')
 }
 
-function isHighSurrogate(code: number): boolean {
-  return code >= 0xd800 && code <= 0xdbff
-}
-function isLowSurrogate(code: number): boolean {
-  return code >= 0xdc00 && code <= 0xdfff
-}
-
 /**
- * Neutralize [start, end): every char becomes `neutral` EXCEPT newlines and
- * each line's leading blockquote/indent prefix (`[ \t]*(> ?)*`), which must
- * survive so block structure parses identically.
+ * Neutralize [start, end): every UTF-16 code unit, both halves of a surrogate
+ * pair included, becomes `neutral` EXCEPT newlines and each line's leading
+ * blockquote/indent prefix (`[ \t]*(> ?)*`), which must survive so block
+ * structure parses identically.
  */
 function neutralizeRegion(chars: string[], start: number, end: number, neutral: string): void {
   let i = start
@@ -61,19 +55,12 @@ function neutralizeRegion(chars: string[], start: number, end: number, neutral: 
       }
       continue
     }
-    const code = c.charCodeAt(0)
-    if (isHighSurrogate(code) && i + 1 < end && isLowSurrogate(chars[i + 1]!.charCodeAt(0))) {
-      chars[i] = neutral
-      chars[i + 1] = neutral
-      i += 2
-      continue
-    }
     chars[i] = neutral
     i++
   }
 }
 
-export interface MaskResult {
+interface MaskResult {
   masked: string
   sentinels: Sentinels
 }
@@ -109,5 +96,3 @@ export function maskSource(text: string, spans: readonly CriticSpan[], sentinels
   }
   return { masked, sentinels: s }
 }
-
-export type { Range }

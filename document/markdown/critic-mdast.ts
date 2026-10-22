@@ -7,15 +7,15 @@ import type { CriticSpan } from '../critic/types'
 
 /* ---- custom mdast node shapes ------------------------------------------ */
 
-export interface CriticWrapData {
+interface CriticWrapData {
   spanIndex: number
 }
-export interface CriticSubData extends CriticWrapData {
+interface CriticSubData extends CriticWrapData {
   old: string
   new: string
   raw: string
 }
-export interface CriticCommentData extends CriticWrapData {
+interface CriticCommentData extends CriticWrapData {
   content: string
   raw: string
 }
@@ -34,7 +34,7 @@ export interface CriticCommentNode extends Node {
   data: CriticCommentData
 }
 
-export type CriticMdastNode = CriticWrapNode | CriticSubNode | CriticCommentNode
+type CriticMdastNode = CriticWrapNode | CriticSubNode | CriticCommentNode
 
 const WRAP_TYPE = { ins: 'criticInsert', del: 'criticDelete', highlight: 'criticHighlight' } as const
 const OPEN_TEXT = { ins: '{++', del: '{--', highlight: '{==' } as const
@@ -147,8 +147,10 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
  * criticComment atoms whose content is read from the ORIGINAL source.
  *
  * Span association is by document order per kind — the Nth open-run of a
- * kind pairs with the Nth span of that kind. Mismatched pairings (delimiters
- * at different tree depths) degrade to literal delimiter text.
+ * kind pairs with the Nth span of that kind. Each nested parent is processed
+ * where its parent's walk reaches it, so the per-kind cursors advance in
+ * document order across depths. Mismatched pairings (delimiters at different
+ * tree depths) degrade to literal delimiter text.
  */
 export function criticTransform(
   tree: Root,
@@ -170,15 +172,12 @@ export function criticTransform(
   spans.forEach((s, i) => spanIndexOf.set(s, i))
 
   const processParent = (parent: Parent): void => {
-    // depth-first so atoms nested inside emphasis/links resolve before this level pairs
-    for (const child of parent.children) {
-      if ((child as Parent).children) processParent(child as Parent)
+    const segmented = parent.children.map((ch) =>
+      ch.type === 'text' ? segmentValue((ch as { value: string }).value, seg) : null)
+    if (!segmented.some((segs) => segs !== null)) {
+      for (const child of parent.children) if ('children' in child) processParent(child)
+      return
     }
-
-    const hasSentinels = parent.children.some(
-      (ch) => ch.type === 'text' && segmentValue((ch as { value: string }).value, seg) !== null,
-    )
-    if (!hasSentinels) return
 
     const out: PhrasingContent[] = []
     let frame: { kind: WrapKind; span: CriticSpan; acc: PhrasingContent[] } | null = null
@@ -196,13 +195,10 @@ export function criticTransform(
       for (const n of open.acc) emit(n)
     }
 
-    for (const child of parent.children) {
-      if (child.type !== 'text') {
-        emit(child as PhrasingContent)
-        continue
-      }
-      const segs = segmentValue((child as { value: string }).value, seg)
+    for (const [index, child] of parent.children.entries()) {
+      const segs = segmented[index]
       if (!segs) {
+        if ('children' in child) processParent(child)
         emit(child as PhrasingContent)
         continue
       }
@@ -212,11 +208,8 @@ export function criticTransform(
             emit(textNode(s.value))
             break
           case 'open': {
-            if (frame) {
-              // nesting impossible by construction — render literally
-              emit(textNode(OPEN_TEXT[s.kind]))
-              break
-            }
+            // Marks never nest, so an open frame's closer lies at another depth.
+            restoreFrame()
             const span = streams.byKind[s.kind][cursors[s.kind]]
             if (!span) {
               emit(textNode(OPEN_TEXT[s.kind]))

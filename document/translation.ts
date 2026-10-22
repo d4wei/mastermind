@@ -1,7 +1,8 @@
 import { scanMarkdown, scanMarkdownTree } from './markdown/scan'
+import { usableAuthorName } from './author'
 import { segmentBlocks } from './blocks'
-import { parseAuthor } from './critic/scanner'
 import { applyTextEdits } from './edits'
+import { stringifyEscaped } from './escaped-json'
 import { excludedRanges } from './markdown/exclusions'
 import { parseMarkdown } from './markdown/processor'
 import { parseResolvedThreads } from './review-archive'
@@ -15,7 +16,7 @@ export interface TranslationBlock {
   start: number
   end: number
 }
-export interface TranslationProjection {
+interface TranslationProjection {
   sourceHash: string
   blocks: TranslationBlock[]
 }
@@ -76,18 +77,22 @@ export async function prepareTranslation(source: string): Promise<TranslationPro
   return { sourceHash, blocks }
 }
 
-function suggestionStructure(text: string): string[] | null {
+/**
+ * A block's suggestion signature: its active mark kinds in order, plus the
+ * ordered literal delimiter tokens outside opaque source that pair with no
+ * active mark. Null when the block carries comments or highlights.
+ */
+function suggestionStructure(text: string): string | null {
   const tree = parseMarkdown(text)
   const excluded = excludedRanges(tree)
   const spans = scanMarkdownTree(text, tree)
   if (spans.some((span) => span.kind === 'comment' || span.kind === 'highlight')) return null
-  const tokens = [...text.matchAll(/\{(?:\+\+|--|~~|==|>>)|(?:\+\+|--|~~|==|<<)\}/g)]
-    .filter((token) => !excluded.some((range) => token.index! >= range.start && token.index! < range.end))
-  if (tokens.length !== spans.length * 2 || tokens.some((token, index) => {
-    const span = spans[Math.floor(index / 2)]!
-    return token.index !== (index % 2 === 0 ? span.start : span.end - 3)
-  })) return null
-  return spans.map(({ kind }) => kind)
+  const delimiters = new Set(spans.flatMap((span) => [span.start, span.end - 3]))
+  const literals = [...text.matchAll(/\{(?:\+\+|--|~~|==|>>)|(?:\+\+|--|~~|==|<<)\}/g)]
+    .filter((token) => !delimiters.has(token.index) &&
+      !excluded.some((range) => token.index >= range.start && token.index < range.end))
+    .map((token) => token[0])
+  return JSON.stringify({ kinds: spans.map(({ kind }) => kind), literals })
 }
 
 export async function matchPreparedTranslation(source: string, artifact: unknown): Promise<PreparedTranslation | null> {
@@ -115,7 +120,7 @@ export async function matchPreparedTranslation(source: string, artifact: unknown
       !translatedBlocks[0]!.translatable) return null
     const sourceStructure = suggestionStructure(original.text)
     const translatedStructure = suggestionStructure(item.text)
-    if (!sourceStructure || !translatedStructure || JSON.stringify(sourceStructure) !== JSON.stringify(translatedStructure)) return null
+    if (!sourceStructure || sourceStructure !== translatedStructure) return null
     seen.add(item.id)
     translated.push({ id: item.id, text: item.text })
   }
@@ -123,7 +128,7 @@ export async function matchPreparedTranslation(source: string, artifact: unknown
     targetLang: value.targetLang, blocks: translated }
 }
 
-export interface TranslatedComment {
+interface TranslatedComment {
   language: string
   quote: string
   comment: string
@@ -131,8 +136,7 @@ export interface TranslatedComment {
 const COMMENT_PREFIX = 'translated-selection v1 '
 
 function encodeComment(comment: TranslatedComment): string {
-  return JSON.stringify(comment).replace(/"(?:[^"\\]|\\.)*"/g,
-    (string) => string.replace(/[{}<>`-]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`))
+  return stringifyEscaped(comment, /[{}<>`-]/g)
 }
 
 export function parseTranslatedComment(body: string): TranslatedComment | null {
@@ -150,7 +154,7 @@ export function parseTranslatedComment(body: string): TranslatedComment | null {
   }
 }
 
-export interface TranslatedCommentRequest {
+interface TranslatedCommentRequest {
   blockId: string
   sourceHash: string
   quote: string
@@ -160,8 +164,8 @@ export interface TranslatedCommentRequest {
 }
 
 export async function translatedCommentEdit(source: string, request: TranslatedCommentRequest): Promise<TextEdit | null> {
-  if (!LANGUAGE.test(request.language) || request.quote.length === 0 || request.author.trim() !== request.author ||
-    parseAuthor(`@${request.author}: note`).author !== request.author) return null
+  if (!LANGUAGE.test(request.language) || request.quote.length === 0 ||
+    usableAuthorName(request.author) !== request.author) return null
   const projection = await prepareTranslation(source)
   if (projection.sourceHash !== request.sourceHash) return null
   const block = projection.blocks.find((block) => block.id === request.blockId && block.translatable)

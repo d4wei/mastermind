@@ -1,4 +1,4 @@
-import type { CommentEntry, CriticKind, CriticSpan, Range, ReviewCountsDetail, ReviewItem } from './types'
+import type { CommentEntry, CriticKind, CriticSpan, Range, ReviewItem } from './types'
 
 const OPENERS: ReadonlyArray<readonly [string, CriticKind]> = [
   ['{++', 'ins'],
@@ -14,18 +14,6 @@ const CLOSERS: Record<CriticKind, string> = {
   sub: '~~}',
   highlight: '==}',
   comment: '<<}',
-}
-
-/** Start offsets of blank-line breaks (a span may not cross one). */
-function blankBreaks(text: string): number[] {
-  const out: number[] = []
-  const re = /\r?\n[ \t]*\r?\n/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    out.push(m.index)
-    re.lastIndex = m.index + 1 // overlapping blank runs all count
-  }
-  return out
 }
 
 function makeExcludeLookup(exclude: readonly Range[]): (pos: number) => Range | null {
@@ -53,21 +41,25 @@ function escapedAt(text: string, bracePos: number): boolean {
 /**
  * Scan raw text for CriticMarkup spans.
  *
- * Rules: delimiters must not sit inside `exclude` ranges (code, html); span
- * content may contain newlines but never a blank line; `\{` defeats an
- * opener; marks do not nest — the first valid closer wins.
+ * Rules: both delimiters of a span sit inside one of the `within` windows
+ * (sorted, non-overlapping; the whole text by default) and outside every
+ * `exclude` range (code, html); `\{` defeats an opener; marks do not nest —
+ * the first valid closer wins. Markdown block boundaries are the caller's
+ * windows: see `scanMarkdown`.
  */
-export function scan(text: string, exclude: readonly Range[] = []): CriticSpan[] {
+export function scan(
+  text: string,
+  exclude: readonly Range[] = [],
+  within: readonly Range[] = [{ start: 0, end: text.length }],
+): CriticSpan[] {
   const spans: CriticSpan[] = []
-  const breaks = blankBreaks(text)
   const excludeAt = makeExcludeLookup(exclude)
-  let breakIdx = 0
 
   const findToken = (token: string, from: number, limit: number): number => {
     let k = from
     while (k < limit) {
       const j = text.indexOf(token, k)
-      if (j === -1 || j >= limit) return -1
+      if (j === -1 || j + token.length > limit) return -1
       const ex = excludeAt(j)
       if (ex) {
         k = ex.end
@@ -78,62 +70,61 @@ export function scan(text: string, exclude: readonly Range[] = []): CriticSpan[]
     return -1
   }
 
-  let i = 0
-  while (i < text.length) {
-    const brace = text.indexOf('{', i)
-    if (brace === -1) break
-    i = brace
+  for (const { start, end: limit } of within) {
+    let i = start
+    while (i < limit) {
+      const brace = text.indexOf('{', i)
+      if (brace === -1 || brace >= limit) break
+      i = brace
 
-    const ex = excludeAt(i)
-    if (ex) {
-      i = ex.end
-      continue
-    }
-    if (escapedAt(text, i)) {
-      i += 1
-      continue
-    }
-
-    const opener = OPENERS.find(([tok]) => text.startsWith(tok, i))
-    if (!opener) {
-      i += 1
-      continue
-    }
-    const kind = opener[1]
-    const innerStart = i + 3
-
-    while (breakIdx < breaks.length && breaks[breakIdx]! < innerStart) breakIdx++
-    const limit = breakIdx < breaks.length ? breaks[breakIdx]! : text.length
-
-    if (kind === 'sub') {
-      const firstCloser = findToken(CLOSERS.sub, innerStart, limit)
-      const sep = findToken('~>', innerStart, limit)
-      if (firstCloser === -1 || sep === -1 || sep >= firstCloser) {
+      const ex = excludeAt(i)
+      if (ex) {
+        i = ex.end
+        continue
+      }
+      if (escapedAt(text, i)) {
         i += 1
         continue
       }
-      spans.push({
-        kind,
-        start: i,
-        end: firstCloser + 3,
-        innerStart,
-        innerEnd: firstCloser,
-        oldStart: innerStart,
-        oldEnd: sep,
-        newStart: sep + 2,
-        newEnd: firstCloser,
-      })
-      i = firstCloser + 3
-      continue
-    }
 
-    const closer = findToken(CLOSERS[kind], innerStart, limit)
-    if (closer === -1) {
-      i += 1
-      continue
+      const opener = OPENERS.find(([tok]) => text.startsWith(tok, i))
+      if (!opener) {
+        i += 1
+        continue
+      }
+      const kind = opener[1]
+      const innerStart = i + 3
+
+      if (kind === 'sub') {
+        const firstCloser = findToken(CLOSERS.sub, innerStart, limit)
+        const sep = findToken('~>', innerStart, limit)
+        if (firstCloser === -1 || sep === -1 || sep >= firstCloser) {
+          i += 1
+          continue
+        }
+        spans.push({
+          kind,
+          start: i,
+          end: firstCloser + 3,
+          innerStart,
+          innerEnd: firstCloser,
+          oldStart: innerStart,
+          oldEnd: sep,
+          newStart: sep + 2,
+          newEnd: firstCloser,
+        })
+        i = firstCloser + 3
+        continue
+      }
+
+      const closer = findToken(CLOSERS[kind], innerStart, limit)
+      if (closer === -1) {
+        i += 1
+        continue
+      }
+      spans.push({ kind, start: i, end: closer + 3, innerStart, innerEnd: closer })
+      i = closer + 3
     }
-    spans.push({ kind, start: i, end: closer + 3, innerStart, innerEnd: closer })
-    i = closer + 3
   }
   return spans
 }
@@ -160,6 +151,19 @@ function toEntry(span: CriticSpan, text: string): CommentEntry {
   return { span, author, body }
 }
 
+/** The run of comments starting at `spans[from]` whose marks abut, beginning at offset `at`. */
+function adjacentComments(spans: readonly CriticSpan[], from: number, at: number, text: string) {
+  const comments: CommentEntry[] = []
+  let next = from
+  let end = at
+  while (spans[next]?.kind === 'comment' && spans[next]!.start === end) {
+    comments.push(toEntry(spans[next]!, text))
+    end = spans[next]!.end
+    next++
+  }
+  return { comments, next, end }
+}
+
 /**
  * Group scanned spans into review items: ins/del/sub → suggestions;
  * `{==x==}{>>c<<}` → anchored thread; consecutive comments → one thread;
@@ -176,53 +180,11 @@ export function group(spans: readonly CriticSpan[], text: string): ReviewItem[] 
       i++
       continue
     }
-    if (s.kind === 'highlight') {
-      const next = spans[i + 1]
-      if (!(next && next.kind === 'comment' && next.start === s.end)) {
-        items.push({ type: 'highlight', span: s })
-        i++
-        continue
-      }
-      const comments: CommentEntry[] = []
-      let j = i + 1
-      let expectedStart = s.end
-      while (spans[j] && spans[j]!.kind === 'comment' && spans[j]!.start === expectedStart) {
-        comments.push(toEntry(spans[j]!, text))
-        expectedStart = spans[j]!.end
-        j++
-      }
-      items.push({ type: 'thread', anchor: s, comments, start: s.start, end: expectedStart })
-      i = j
-      continue
-    }
-    // orphan comment / thread start
-    const comments: CommentEntry[] = [toEntry(s, text)]
-    let j = i + 1
-    let expectedStart = s.end
-    while (spans[j] && spans[j]!.kind === 'comment' && spans[j]!.start === expectedStart) {
-      comments.push(toEntry(spans[j]!, text))
-      expectedStart = spans[j]!.end
-      j++
-    }
-    items.push({ type: 'thread', anchor: null, comments, start: s.start, end: expectedStart })
-    i = j
+    const anchor = s.kind === 'highlight' ? s : null
+    const run = adjacentComments(spans, anchor ? i + 1 : i, anchor ? s.end : s.start, text)
+    if (anchor && run.comments.length === 0) items.push({ type: 'highlight', span: s })
+    else items.push({ type: 'thread', anchor, comments: run.comments, start: s.start, end: run.end })
+    i = run.next
   }
   return items
-}
-
-/**
- * Counts for the review summary. Comments count every comment mark; edits
- * count ins+del+sub; highlights count only standalone highlights (an anchored
- * comment's highlight is the comment's anchor, not a separate annotation).
- */
-export function reviewCounts(items: readonly ReviewItem[]): ReviewCountsDetail {
-  let comments = 0
-  let edits = 0
-  let highlights = 0
-  for (const item of items) {
-    if (item.type === 'suggestion') edits++
-    else if (item.type === 'highlight') highlights++
-    else comments += item.comments.length
-  }
-  return { comments, edits, highlights }
 }

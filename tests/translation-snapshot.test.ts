@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { group, scan } from '../document/critic/scanner'
+import { group } from '../document/critic/scanner'
 import { applyTextEdits } from '../document/edits'
-import { codeRanges } from '../document/markdown/exclusions'
+import { scanMarkdown } from '../document/markdown/scan'
 import { resolveThreadEdits } from '../document/review-archive'
 import { matchPreparedTranslation, parseTranslatedComment, prepareTranslation, translatedCommentEdit, type PreparedTranslation } from '../document/translation'
 
@@ -32,7 +32,7 @@ describe('whole document translation projection', () => {
 
   it('keeps full-document snapshots valid across resolution and archive-only edits', async () => {
     const source = 'Text {==quote==}{>>@A: note<<}.\n'
-    const thread = group(scan(source, codeRanges(source)), source).find((item) => item.type === 'thread')!
+    const thread = group(scanMarkdown(source), source).find((item) => item.type === 'thread')!
     if (thread.type !== 'thread') throw new Error('missing thread')
     const resolved = applyTextEdits(source, resolveThreadEdits(source, thread))
     const original = await artifact(source)
@@ -79,6 +79,16 @@ describe('whole document translation projection', () => {
     for (const text of ['文字', '{~~旧~>新~~} {++添加++}', '{++未闭合', '{++添加++} {~~旧~>新~~} <<}',
       '{++outer {--nested--}++} {~~旧~>新~~}', '{++添加++} {~~旧~>新~~} {>>comment<<}',
     ]) expect(await matchPreparedTranslation(source, translated(text))).toBeNull()
+  })
+
+  it('accepts stray literal delimiters only when the translation keeps them in order', async () => {
+    const source = 'Hello world\n\nSee the {++ operator\n'
+    const complete = await artifact(source)
+    const translated = (text: string) => ({ ...complete, blocks: [complete.blocks[0]!, { id: 'b2', text }] })
+    expect(await matchPreparedTranslation(source, translated('参见 {++ 运算符'))).not.toBeNull()
+    for (const text of ['参见运算符', '参见 {++ 和 {-- 运算符', '参见 --} 运算符', '参见 {++新++} {++ 运算符']) {
+      expect(await matchPreparedTranslation(source, translated(text))).toBeNull()
+    }
   })
 
   it('shares a fingerprint between raw CRLF disk source and LF browser source with current offsets', async () => {
@@ -131,7 +141,7 @@ describe('translated selection point comments', () => {
       quote, language: 'zh-CN', author: 'Alice Smith', body })
     expect(edit).not.toBeNull()
     const updated = applyTextEdits(source, [edit!])
-    const items = group(scan(updated, codeRanges(updated)), updated)
+    const items = group(scanMarkdown(updated), updated)
     expect(items).toHaveLength(1)
     const thread = items[0]!
     if (thread.type !== 'thread') throw new Error('not a point comment')
@@ -149,7 +159,7 @@ describe('translated selection point comments', () => {
       quote: '原文', language: 'zh', author: '张 三', body: '意见' })
     expect(edit?.from).toBe(source.length)
     const updated = applyTextEdits(source, [edit!])
-    expect(scan(updated, codeRanges(updated)).map((span) => span.kind)).toEqual(['highlight', 'comment', 'comment'])
+    expect(scanMarkdown(updated).map((span) => span.kind)).toEqual(['highlight', 'comment', 'comment'])
   })
 
   it('accepts annotation-only changes while recomputing the current source boundary', async () => {
@@ -198,7 +208,7 @@ describe('translated selection point comments', () => {
       quote, language: 'zh', author: 'A', body: 'body ` text' })
     expect(edit).not.toBeNull()
     const updated = applyTextEdits(source, [edit!])
-    const span = scan(updated, codeRanges(updated))[0]!
+    const span = scanMarkdown(updated)[0]!
     expect(parseTranslatedComment(updated.slice(span.innerStart, span.innerEnd).replace(/^@A: /, ''))).toEqual({ language: 'zh', quote, comment: 'body ` text' })
   })
 

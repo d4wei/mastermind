@@ -3,18 +3,19 @@ import { group, parseAuthor, scan, stripLinePrefixes } from './critic/scanner'
 import type { Range, ReviewItem } from './critic/types'
 import { detectEol } from './eol'
 import { applyTextEdits } from './edits'
-import { scanMarkdown } from './markdown/scan'
+import { stringifyEscaped } from './escaped-json'
+import { scanMarkdown, textBlockRanges } from './markdown/scan'
 import { parseMarkdown } from './markdown/processor'
 import type { TextEdit } from './types'
 
 export type ReviewThread = Extract<ReviewItem, { type: 'thread' }>
-export interface ResolvedThread {
+interface ResolvedThread {
   context: string
   thread: string
   authors: Array<string | null>
   range: Range
 }
-export interface ArchiveDiagnostic {
+interface ArchiveDiagnostic {
   message: string
   range: Range
 }
@@ -87,19 +88,16 @@ export function deleteCommentEdits(source: string, thread: ReviewThread, comment
 
 function quotedContext(source: string, thread: ReviewThread): string {
   if (thread.anchor) return source.slice(thread.anchor.innerStart, thread.anchor.innerEnd)
-  const before = source.slice(0, thread.start)
-  const breaks = [...before.matchAll(/\r?\n[ \t]*\r?\n/g)]
-  const last = breaks.at(-1)
-  const start = last ? last.index! + last[0].length : 0
-  const after = source.slice(thread.end)
-  const boundary = /\r?\n[ \t]*\r?\n/.exec(after)
-  return source.slice(start, thread.start) + after.slice(0, boundary?.index ?? after.length)
+  const block = textBlockRanges(parseMarkdown(source))
+    .find(({ start, end }) => start <= thread.start && thread.start < end)
+  // A validated thread came from scanMarkdown, so a block contains it; never quote unrelated text.
+  if (!block) return ''
+  return source.slice(block.start, thread.start) + source.slice(thread.end, block.end)
 }
 
 function encodeRecord(record: Pick<ResolvedThread, 'context' | 'thread'>): string {
   // Escaped string values keep history opaque to agents whose scanners include HTML comments.
-  return JSON.stringify(record, null, 2).replace(/"(?:[^"\\]|\\.)*"/g,
-    (string) => string.replace(/[{}<>-]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`))
+  return stringifyEscaped(record, /[{}<>-]/g, 2)
 }
 
 export function resolveThreadEdits(source: string, thread: ReviewThread): TextEdit[] {

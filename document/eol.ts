@@ -4,7 +4,7 @@ export type Eol = 'lf' | 'crlf'
 export function detectEol(text: string): Eol {
   const crlf = (text.match(/\r\n/g) ?? []).length
   if (crlf === 0) return 'lf'
-  const lf = (text.match(/[^\r]\n|^\n/g) ?? []).length
+  const lf = (text.match(/\n/g) ?? []).length - crlf
   return crlf >= lf ? 'crlf' : 'lf'
 }
 

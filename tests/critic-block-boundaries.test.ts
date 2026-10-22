@@ -38,3 +38,11 @@ it.each([
   expect(spans).toHaveLength(1)
   expect(resolveAll(source, spans, 'accept')).toBe(source.replace('{++', '').replace('++}', ''))
 })
+
+it.each([
+  ['- a {>>oops\n- b {>>real<<}', '{>>real<<}'],
+  ['# T {++x\nPara {--real--} ++}', '{--real--}'],
+])('finds a valid mark after an unterminated opener in the previous block: %j', (source, mark) => {
+  const { spans } = analyzeMarkdown(source)
+  expect(spans.map((span) => source.slice(span.start, span.end))).toEqual([mark])
+})

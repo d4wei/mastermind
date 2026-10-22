@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { segmentBlocks } from '../document/blocks'
-import { group, reviewCounts, scan } from '../document/critic/scanner'
+import { group, scan } from '../document/critic/scanner'
 import { applyTextEdits } from '../document/edits'
-import { codeRanges } from '../document/markdown/exclusions'
+import { scanMarkdown } from '../document/markdown/scan'
 import { deleteCommentEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread } from '../document/review-archive'
 
 function threads(source: string): ReviewThread[] {
-  return group(scan(source, codeRanges(source)), source).filter((item): item is ReviewThread => item.type === 'thread')
+  return group(scanMarkdown(source), source).filter((item): item is ReviewThread => item.type === 'thread')
 }
 function resolve(source: string): string {
   return applyTextEdits(source, resolveThreadEdits(source, threads(source)[0]!))
@@ -24,7 +24,7 @@ describe('resolved discussion archive', () => {
     expect(parsed.entries[0]).toMatchObject({ context: 'quoted words',
       thread: '{==quoted words==}{>>@张 三: 说明<<}{>>@Alice Smith: reply<<}', authors: ['张 三', 'Alice Smith'] })
     expect(result.slice(parsed.entries[0]!.range.start, parsed.entries[0]!.range.end)).toMatch(/^<!-- mastermind:resolved-thread v1/)
-    expect(scan(result, codeRanges(result))).toEqual([])
+    expect(scanMarkdown(result)).toEqual([])
     expect(result.endsWith('\n')).toBe(true)
   })
 
@@ -33,11 +33,17 @@ describe('resolved discussion archive', () => {
     expect(parseResolvedThreads(result).entries[0]!.context).toBe('Context before  and after.')
   })
 
+  it('archives only the containing list item paragraph for a point comment', () => {
+    const result = resolve('- a\n- b {>>c<<}\n- d\n')
+    expect(result.startsWith('- a\n- b \n- d\n')).toBe(true)
+    expect(parseResolvedThreads(result).entries[0]!.context).toBe('b ')
+  })
+
   it('keeps attached suggestion syntax unchanged', () => {
     const source = 'A {++new++}{>>discussion<<} and {--old--} and {~~x~>y~~}.'
     const result = resolve(source)
     expect(result.startsWith('A {++new++} and {--old--} and {~~x~>y~~}.')).toBe(true)
-    expect(reviewCounts(group(scan(result, codeRanges(result)), result))).toEqual({ comments: 0, edits: 3, highlights: 0 })
+    expect(group(scanMarkdown(result), result).map((item) => item.type)).toEqual(['suggestion', 'suggestion', 'suggestion'])
   })
 
   it('escapes every mark type and HTML comment delimiter reversibly in string values', () => {

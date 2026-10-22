@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { group, parseAuthor, reviewCounts, scan } from '../document/critic/scanner'
+import { group, parseAuthor, scan } from '../document/critic/scanner'
 import type { CriticSpan } from '../document/critic/types'
-import { codeRanges } from '../document/markdown/exclusions'
+import { excludedRanges } from '../document/markdown/exclusions'
+import { parseMarkdown } from '../document/markdown/processor'
+import { scanMarkdown } from '../document/markdown/scan'
 
 function scanWithCode(text: string): CriticSpan[] {
-  return scan(text, codeRanges(text))
+  return scan(text, excludedRanges(parseMarkdown(text)))
 }
 
 function sliceOf(text: string, span: CriticSpan): string {
@@ -40,11 +42,18 @@ describe('scanner: the five marks', () => {
     expect(emptyOld.oldStart).toBe(emptyOld.oldEnd)
   })
 
-  it('multi-word and multi-line spans work; blank lines terminate', () => {
+  it('multi-word and multi-line spans work; text block boundaries terminate', () => {
     const ok = 'a {++spans two\nlines++} b'
-    expect(scan(ok)).toHaveLength(1)
+    expect(scanMarkdown(ok)).toHaveLength(1)
     const bad = 'a {++crosses a\n\nblank line++} b'
-    expect(scan(bad)).toHaveLength(0)
+    expect(scanMarkdown(bad)).toHaveLength(0)
+  })
+
+  it('confines raw spans to the given windows', () => {
+    const text = 'a {++one\n\ntwo++} {--three--}'
+    expect(scan(text).map((span) => span.kind)).toEqual(['ins', 'del'])
+    const windows = [{ start: 0, end: 8 }, { start: 10, end: text.length }]
+    expect(scan(text, [], windows).map((span) => text.slice(span.start, span.end))).toEqual(['{--three--}'])
   })
 
   it('CJK content keeps correct offsets', () => {
@@ -142,10 +151,11 @@ describe('grouping', () => {
     expect(items.map((i) => i.type)).toEqual(['highlight', 'thread'])
   })
 
-  it('counts: anchored highlights are not standalone', () => {
+  it('anchored highlights are not standalone', () => {
     const text = '{++a++} {--b--} {~~c~>d~~} {==anchored==}{>>one<<}{>>two<<} {==alone==}'
     const items = group(scan(text), text)
-    expect(reviewCounts(items)).toEqual({ comments: 2, edits: 3, highlights: 1 })
+    expect(items.map((item) => item.type)).toEqual(['suggestion', 'suggestion', 'suggestion', 'thread', 'highlight'])
+    expect(items[3]).toMatchObject({ comments: [{ body: 'one' }, { body: 'two' }] })
   })
 })
 
