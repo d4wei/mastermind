@@ -24,11 +24,11 @@ it.each([
   const from = source.indexOf(paragraph)
   expect(mapped).toEqual({ ranges: [{ from, to: from + paragraph.length, text: paragraph }] })
   if (!('ranges' in mapped)) throw new Error(mapped.error)
-  const commented = applyTextEdits(source, commentEdits(mapped.ranges, 'Alex', 'Review this.')!)
+  const commented = applyTextEdits(source, commentEdits(source, mapped.ranges, 'Alex', 'Review this.')!)
   const next = renderMarkdown(commented)
   expect(next.items).toMatchObject([{ type: 'thread', comments: [{ author: 'Alex', body: 'Review this.' }] }])
   expect(next.host.querySelector('p')!.textContent).toBe(host.querySelector('p')!.textContent)
-  const deletion = applyTextEdits(source, changeEdits(mapped.ranges, mapped.ranges.map(() => ''))!)
+  const deletion = applyTextEdits(source, changeEdits(source, mapped.ranges, mapped.ranges.map(() => ''))!)
   const deletionSpans = analyzeMarkdown(deletion).spans
   expect(deletionSpans).toHaveLength(1)
   expect(resolveAll(deletion, deletionSpans, 'reject')).toBe(source)

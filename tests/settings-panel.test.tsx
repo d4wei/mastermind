@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, useState } from 'react'
 import type { Root } from 'react-dom/client'
 import { createReactHost, removeReactHost } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -126,3 +126,22 @@ it.each(['Alex: Admin', 'Alex{Chen', 'Alex@Chen', 'a'.repeat(65)])(
     expect(input.getAttribute('aria-invalid')).toBe('false')
   },
 )
+
+it.each(['Escape', 'an outside click'])('keeps a typed comment Name when %s closes the panel', (how) => {
+  function Panel() {
+    const [open, setOpen] = useState(true)
+    return open ? <SettingsPanel onClose={() => setOpen(false)} /> : null
+  }
+  act(() => root.render(<Panel />))
+  const input = host.querySelector<HTMLInputElement>('input.settings-input')!
+  input.focus()
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+  act(() => { setValue.call(input, 'Bea'); input.dispatchEvent(new Event('input', { bubbles: true })) })
+  act(() => {
+    if (how === 'Escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    else document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  })
+  expect(host.querySelector('input')).toBeNull()
+  expect(update).toHaveBeenCalledOnce()
+  expect(update).toHaveBeenCalledWith({ authorTag: 'Bea' })
+})

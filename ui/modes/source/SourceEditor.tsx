@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { useDoc } from '../../documents/store'
 import { attachSourceSearch, sourceSearchExtension } from '../../find/source'
-import { useNav } from '../../app/navStore'
+import { useNav, type SourceOutline } from '../../app/navStore'
 
 const CRITIC_CLASS: Record<string, string> = {
   ins: 'cm-critic cm-critic-ins',
@@ -122,23 +122,22 @@ export function SourceEditor() {
     })
 
     const editorPosition = (offset: number): number => Math.min(Math.max(offset, 0), view.state.doc.length)
-    const sourceHeadingTop = (offset: number): number =>
-      view.documentTop + view.lineBlockAt(editorPosition(offset)).top
-    useNav.setState({ sourceHeadingTop })
-    useDoc.getState().registerScroller((offset) => {
-      const pos = editorPosition(offset)
-      // CodeMirror remeasures virtualized lines before scrolling its ancestor viewport.
-      view.dispatch({ selection: { anchor: pos },
-        effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 24 }) })
-    })
+    const sourceOutline: SourceOutline = {
+      headingTop: (offset) => view.documentTop + view.lineBlockAt(editorPosition(offset)).top,
+      scrollTo(offset) {
+        const pos = editorPosition(offset)
+        // CodeMirror remeasures virtualized lines before scrolling its ancestor viewport.
+        view.dispatch({ selection: { anchor: pos },
+          effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 24 }) })
+      },
+    }
+    useNav.setState({ source: sourceOutline })
 
-    const registeredScroller = useDoc.getState().scroller
     return () => {
       searchBinding?.dispose()
       // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
       if (useDoc.getState().hasDocument(sessionId)) retainedStates.set(sessionId, { state: view.state, revision })
-      if (useDoc.getState().scroller === registeredScroller) useDoc.getState().registerScroller(null)
-      if (useNav.getState().sourceHeadingTop === sourceHeadingTop) useNav.setState({ sourceHeadingTop: null })
+      if (useNav.getState().source === sourceOutline) useNav.setState({ source: null })
       stop()
       view.destroy()
     }

@@ -20,23 +20,25 @@ restore the original line endings.
 read and write failures from a verified external change; `diskChange.deleted` requires evidence
 that the path is missing: a deletion event or a host `missing` read result. Other read failures
 cannot distinguish a missing path from an unreadable one. A failed copy has its own `copyError` and
-does not change that diagnosis. Leaving a conflict clears its dismissal and copy failure.
+does not change that diagnosis. Leaving a conflict clears its dismissal and copy failure; a
+successful write also clears copy failure.
 Reading, copying, navigation, other documents, and closing remain available.
 
 `ConflictPanel` provides two direct choices. A conflicting version offers Save As and Use incoming;
 a failed read/write or missing file offers Retry and Save As. Use incoming replaces the notice with
 confirmation before reading again and adopting the current disk version. No second box opens.
 A newer invalidation rejects adoption; its read then presents the newer version for the same choice.
-Review undo retains the prior local buffer for this session.
+Review undo can recover the discarded local buffer until the next external change replaces the
+buffer.
 There is no merge operation or comparison editor.
 
 Retry reads before attempting a write. Reading the acknowledged version clears a read failure and
 allows pending edits to save. Changed disk contents with local edits remain blocked. A fresh read
 matching the current buffer reconciles the file as saved. A fresh read matching the exact disk text
 last read or written, including mixed line endings, refreshes the version token and resumes saving
-pending edits without changing local text or undo history. Every write still checks that fresh token, so intervening disk
-changes reject the save. A failed write may have partially changed the file, so it queues verification
-and retains the buffer rather than claiming rollback.
+pending edits without changing local text or undo history. Every write still checks that fresh
+token, so intervening disk changes reject the save. A failed write may have partially changed the
+file, so it queues verification and retains the buffer rather than claiming rollback.
 
 Save As obtains its destination from the native host. Cancellation and failure keep the original
 buffer. Success admits the new file and releases the original record, selecting the copy only if
@@ -71,7 +73,7 @@ A failed removal retains the record. Pending loads/reads cannot resurrect a clos
 Save As during closing writes a new file without admitting it or replacing the original tab.
 The adapter locks editing and pauses admission activation during close decisions.
 
-`documentLifecycle.ts` runs `prepareToClose` on browser blur and visibility changes. Browser unload cannot
-await writes and asks before leaving pending work. Process termination and crashes can lose
-in-memory work. Composer lifetime is documented in [drafts](../review/drafts.md); persisted buffers
-remain deferred in DIRECTION.md.
+`documentLifecycle.ts` runs `prepareToClose` on browser blur and visibility changes. Browser
+unload cannot await writes and asks before leaving pending work. Process termination and crashes
+can lose in-memory work. Composer lifetime is documented in [drafts](../review/drafts.md);
+persisted buffers remain deferred in DIRECTION.md.

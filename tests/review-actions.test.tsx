@@ -9,6 +9,7 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { parseResolvedThreads } from '../document/review-archive'
 import * as reviewScroll from '../ui/util/scroll'
 import { CommentRail } from '../ui/review/CommentRail'
+import { DraftScope, pendingDrafts, releaseDrafts } from '../ui/review/drafts'
 
 let host: HTMLDivElement
 let root: Root
@@ -145,6 +146,27 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   })))
   expect(store.getState().source).toBe(source + '{>>@reviewer: Answer 中文<<}')
   expect(edit).toHaveBeenCalledTimes(1)
+})
+
+it('disables a reply whose backtick would pair with code after the thread', () => {
+  const source = '{==context==}{>>@Da Wei: question<<} then `code` here.'
+  render(source)
+  click('Reply')
+  const textarea = host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!
+  const type = (text: string) => act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, text)
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const submit = () => Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-reply button'))
+    .find((button) => button.textContent === 'Reply')!
+  type('use `x')
+  expect(submit().disabled).toBe(true)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
+  type('use `x`')
+  expect(submit().disabled).toBe(false)
+  act(() => submit().click())
+  expect(store.getState().source).toBe('{==context==}{>>@Da Wei: question<<}{>>@reviewer: use `x`<<} then `code` here.')
 })
 
 it('keeps the reply draft and ignores submit while the IME handles keys', () => {
@@ -300,4 +322,51 @@ it('keeps paused discussions readable without opening a new reply input', () => 
   act(() => host.querySelector<HTMLElement>('.rail-body')!.click())
   expect(host.querySelector('textarea')).toBeNull()
   expect(host.querySelector('.rail-card-anchor')!.textContent).toBe('context')
+})
+
+function typeReply(value: string) {
+  act(() => {
+    const input = host.querySelector('textarea')!
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+}
+
+it('drops the reply draft of a resolved discussion instead of moving it to an identical one', () => {
+  render('{==a==}{>>@bo: same<<} x {==a==}{>>@bo: same<<}')
+  click('Reply', 0)
+  typeReply('meant for the first')
+  click('Resolve', 0)
+  expect(analyzeMarkdown(store.getState().source).items.filter((item) => item.type === 'thread')).toHaveLength(1)
+  click('Reply', 0)
+  expect(host.querySelector('textarea')!.value).toBe('')
+  expect(host.querySelector('.rail-orphan')).toBeNull()
+})
+
+it('keeps a reply draft on its discussion when an identical earlier one is resolved', () => {
+  render('{==a==}{>>@bo: same<<} x {==a==}{>>@bo: same<<} y {==a==}{>>@bo: same<<}')
+  click('Reply', 2)
+  typeReply('meant for the third')
+  click('Collapse discussion')
+  click('Resolve', 0)
+  expect(host.querySelector('.rail-orphan')).toBeNull()
+  click('Reply', 0)
+  expect(host.querySelector('textarea')!.value).toBe('')
+  click('Reply', 1)
+  expect(host.querySelector('textarea')!.value).toBe('meant for the third')
+})
+
+it('discards an orphaned reply draft on request', () => {
+  store.setState({ source: '{==a==}{>>@bo: one<<}', savedSource: '{==a==}{>>@bo: one<<}', status: 'ready' })
+  act(() => root.render(<DraftScope id="orphan"><Harness /></DraftScope>))
+  try {
+    click('Reply')
+    typeReply('unsent')
+    act(() => store.setState({ source: 'a {==b==}{>>@bo: two<<}' }))
+    expect(host.querySelector<HTMLTextAreaElement>('.rail-orphan textarea')!.value).toBe('unsent')
+    expect(pendingDrafts(['orphan'])).toHaveLength(1)
+    click('Discard draft')
+    expect(host.querySelector('.rail-orphan')).toBeNull()
+    expect(pendingDrafts(['orphan'])).toHaveLength(0)
+  } finally { releaseDrafts('orphan') }
 })

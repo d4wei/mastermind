@@ -14,7 +14,6 @@ export interface MastermindConfig {
   /** id of the chosen code-color scheme; `none` = uncolored (see ui/theme/codeThemes.ts) */
   codeTheme: string
   uiLang: 'en' | 'zh-CN'
-  /** Optional personal language code for prepared reading translations. */
 }
 
 export type ClientConfig = MastermindConfig

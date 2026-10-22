@@ -154,6 +154,21 @@ describe('substring fallback for leaves whose rendered length differs from sourc
     expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, selected.length), source, [])).toEqual({ error: 'unmapped' })
   })
 
+  it.each([
+    ['\\*x\\*{>>c<<} and *x*', '*x*'],
+    ['Tom &amp; Jerry{>>c<<} and [l](u "Tom & Jerry")', 'Tom & Jerry'],
+  ])('bounds an unpositioned piece beside a mark to its own source: %s', (source, piece) => {
+    const { host, spans } = renderMarkdown(source)
+    const whole = document.createRange()
+    whole.selectNodeContents(host.querySelector('p')!)
+    const result = rangeToSourceRanges(whole, source, spans)
+    const ranges = 'ranges' in result ? result.ranges : []
+    expect(ranges.every((range) => range.text !== piece || range.to <= spans[0]!.start)).toBe(true)
+    const leaf = textOf(host, 'p > span')
+    expect(leaf.data).toBe(piece)
+    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, piece.length), source, spans)).toEqual({ error: 'unmapped' })
+  })
+
   it('maps text that occurs once in both the rendered leaf and its source', () => {
     const source = 'AT&amp;T rocks'
     const { host } = renderMarkdown(source)
@@ -171,7 +186,7 @@ describe('comment round trip', () => {
     const mapped = rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, spans)
     if (!('ranges' in mapped)) throw new Error(mapped.error)
     expect(mapped.ranges).toEqual([{ from: 5, to: 10, text: 'a ==}' }])
-    expect(commentEdits(mapped.ranges, 'me', 'hi')).toBeNull()
+    expect(commentEdits(source, mapped.ranges, 'me', 'hi')).toBeNull()
   })
 
   it('anchors a comment on ordinary selected text', () => {
@@ -180,7 +195,7 @@ describe('comment round trip', () => {
     const leaf = textOf(host, 'p > span')
     const mapped = rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 4), source, spans)
     if (!('ranges' in mapped)) throw new Error(mapped.error)
-    const updated = applyTextEdits(source, commentEdits(mapped.ranges, 'me', 'hi')!)
+    const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'me', 'hi')!)
     expect(updated).toBe('{==Type==}{>>@me: hi<<} a ==} here.')
     expect(analyzeMarkdown(updated).items).toMatchObject([
       { type: 'thread', anchor: { start: 0, end: 10 }, comments: [{ author: 'me', body: 'hi' }] },

@@ -22,6 +22,8 @@ A failed background discovery on Original does not warn or block reading.
 
 `TranslatedView.tsx` renders the shared projection, preserves literal blocks, and has no mutation
 handler. Existing comments remain in their authored language. Find searches the displayed version.
+Heading blocks carry their source offsets, so the outline navigates the translated view; offsets
+inside a block refer to its displayed text and are not rendered.
 
 `TranslatedSelection.tsx` captures one block's exact passage, language, and artifact. Submission
 rereads the artifact and revalidates the current source, selected language, and captured passage

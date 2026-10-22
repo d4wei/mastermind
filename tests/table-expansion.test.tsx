@@ -86,6 +86,12 @@ it('restores horizontal position and only fades edges with hidden content', asyn
   toggle(); await finish(); expect(scroll.scrollLeft).toBe(0)
   toggle(); await finish(); expect(scroll.scrollLeft).toBe(400)
 })
+it('labels the expansion control with a themed tooltip arrow', async () => {
+  act(() => root.render(<Harness />))
+  act(() => host.querySelector<HTMLButtonElement>('.md-table-toggle')!.focus())
+  await finish()
+  expect(document.querySelector('.tooltip .tooltip-arrow')).not.toBeNull()
+})
 it('does not offer expansion for small tables', () => {
   naturalWidth = 300
   act(() => root.render(<Harness />))
@@ -134,4 +140,16 @@ it('settles an interrupted expansion at the resized viewport bounds', async () =
   await finish()
   expect(host.querySelector<HTMLElement>('.md-table-viewport')!.style.width).toBe('868px')
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
+})
+it('leaves Escape to an open settings panel', async () => {
+  act(() => root.render(<Harness />)); toggle(); await finish()
+  const panel = document.createElement('div')
+  panel.className = 'slide-over'; panel.setAttribute('role', 'dialog')
+  document.body.append(panel)
+  try {
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+    expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
+  } finally { panel.remove() }
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+  expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
 })

@@ -2,7 +2,6 @@ export interface SessionMeta {
   sessionId: string
   path: string
   displayName: string
-  mtimeMs: number
 }
 
 export interface FileResponse {

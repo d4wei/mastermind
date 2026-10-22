@@ -27,10 +27,14 @@ discussion, More, and Reply remain separate keyboard controls. More uses the sha
 behavior. Delete comment belongs to one message; Resolve archives the complete discussion through
 the existing source-splice helpers.
 
-Escape and clicks elsewhere in the article collapse selection. Reply drafts remain local to their
-discussions while the rail is mounted, including when switching or collapsing cards. Appending a
-reply retains the selected card. Source changes that replace the opening message or anchor create
-a different card identity. Identical discussions are distinguished in source order.
+Escape and clicks elsewhere in the article collapse selection; Escape that closes a panel does
+not. Reply drafts stay with their discussions, including when switching or collapsing cards.
+`thread-identity.ts` identifies a discussion by its anchor text and opening message plus its start
+offset, which edits elsewhere shift; identical discussions are told apart by that offset, not by
+their order. Appending a reply retains the selected card. Source changes that replace the opening
+message or anchor create a different card identity and clear a selection or hover on the old one.
+Resolve and deleting the opening message discard that discussion's draft; posting the reply
+clears it.
 
 The reply textarea retains normal text-input semantics and its submission shortcut. Composition
 keys remain with the IME. Conflict state prevents submission, deletion, and resolution while

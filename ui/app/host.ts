@@ -3,7 +3,7 @@ import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
 
 export type HostFailure = 'conflict' | 'missing' | 'failure'
-type HostInvalidation = 'changed' | 'deleted' | 'config' | 'translations'
+type HostInvalidation = 'changed' | 'deleted' | 'translations'
 
 export class HostError extends Error {
   constructor(public kind: HostFailure, message: string, public data?: unknown) {
@@ -14,7 +14,7 @@ export class HostError extends Error {
 export interface ReviewerHost {
   getSession(id: string): Promise<SessionMeta>
   getFile(id: string): Promise<FileResponse>
-  putFile(id: string, content: string, baseVersion: string): Promise<{ mtimeMs: number; version: string }>
+  putFile(id: string, content: string, baseVersion: string): Promise<{ version: string }>
   saveCopy?(id: string, content: string, forClose?: boolean): Promise<{ meta: SessionMeta; file: FileResponse } | null>
   subscribe(id: string, listener: (event: HostInvalidation) => void): () => void
   translations(id: string): Promise<unknown[]>

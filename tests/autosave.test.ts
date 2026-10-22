@@ -17,9 +17,9 @@ describe('autosave', () => {
   beforeEach(async () => {
     vi.useFakeTimers()
     getFile.mockReset()
-    putFile.mockReset().mockResolvedValue({ mtimeMs: 200, version: 'saved' })
+    putFile.mockReset().mockResolvedValue({ version: 'saved' })
     installHost(fakeHost({ getFile, putFile,
-      getSession: async (sessionId) => ({ sessionId, displayName: 'f.md', path: '/f.md', mtimeMs: 100 }),
+      getSession: async (sessionId) => ({ sessionId, displayName: 'f.md', path: '/f.md' }),
     }))
     store = createDocStore()
     await load()
@@ -96,7 +96,7 @@ describe('autosave', () => {
   })
 
   it('retains the exact accepted buffer after saving', async () => {
-    putFile.mockResolvedValue({ mtimeMs: 250, version: 'saved', content: 'REWRITTEN\n' })
+    putFile.mockResolvedValue({ version: 'saved', content: 'REWRITTEN\n' })
     store.getState().setSource('hello world')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
     expect(store.getState().source).toBe('hello world')

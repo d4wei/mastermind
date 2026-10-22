@@ -36,7 +36,6 @@ export interface DocStore {
   saving: boolean
   /** External buffer changes invalidate editor instances; editor input retains their history. */
   externalVersion: number
-  scroller: ((offset: number, index: number) => void) | null
   /** Undo for review operations applied outside the editor. */
   history: string[]
   /** `deleted` is set only on evidence that the path is missing. */
@@ -58,7 +57,6 @@ export interface DocStore {
   setSource(source: string): void
   /** Editor transaction path — updates the buffer without remounting the editor. */
   setSourceFromEditor(source: string): void
-  registerScroller(fn: DocStore['scroller']): void
   applyEdits(edits: TextEdit[]): void
   setMode(mode: ViewMode): void
   queueAutosave(): void
@@ -144,7 +142,8 @@ export function createDocStore() {
     try {
       const res = await requireReviewerHost().putFile(id, content, version)
       doc.diskSource = content
-      updateDocument(id, { savedSource: source, version: res.version, conflict: false, recoveryError: null, diskChange: null })
+      updateDocument(id, { savedSource: source, version: res.version, conflict: false, recoveryError: null,
+        copyError: false, diskChange: null })
       succeeded = true
       return true
     } catch (err) {
@@ -268,7 +267,6 @@ export function createDocStore() {
       status: 'loading',
       error: null,
       externalVersion: 0,
-      scroller: null,
 
       async prepareToClose(ids) {
         const scope = ids ?? [...documents.keys()]
@@ -304,7 +302,7 @@ export function createDocStore() {
         if (loadingId === id) { loadRequest++; loadingId = null }
         if (activeId === id) {
           setTabTitle('')
-          set({ ...releasedDocument, sessionId: null, scroller: null, status: 'loading' })
+          set({ ...releasedDocument, sessionId: null, status: 'loading' })
         } else publish({})
         return true
       },
@@ -315,13 +313,13 @@ export function createDocStore() {
         const retained = documents.get(sessionId)
         if (retained) {
           set((s) => ({ ...documentState(retained), sessionId, status: 'ready', error: null,
-            scroller: null, externalVersion: s.externalVersion + 1 }))
+            externalVersion: s.externalVersion + 1 }))
           setTabTitle(retained.meta!.displayName)
           await readDiskChange(sessionId, false)
           return
         }
         // Release the departing record so commands cannot reach it while this load runs or after it fails.
-        set({ ...releasedDocument, sessionId: null, status: 'loading', error: null, scroller: null })
+        set({ ...releasedDocument, sessionId: null, status: 'loading', error: null })
         try {
           const [meta, file] = await Promise.all([requireReviewerHost().getSession(sessionId), requireReviewerHost().getFile(sessionId)])
           if (request !== loadRequest) return
@@ -333,7 +331,7 @@ export function createDocStore() {
           documents.set(sessionId, record)
           set((s) => ({
             ...documentState(record), sessionId, status: 'ready', error: null,
-            scroller: null, externalVersion: s.externalVersion + 1,
+            externalVersion: s.externalVersion + 1,
           }))
           setTabTitle(meta.displayName)
         } catch (err) {
@@ -366,10 +364,6 @@ export function createDocStore() {
         if (get().conflict || source === get().source) return
         set({ source })
         get().queueAutosave()
-      },
-
-      registerScroller(fn) {
-        set({ scroller: fn })
       },
 
       applyEdits(edits) {

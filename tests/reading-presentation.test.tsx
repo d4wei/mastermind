@@ -22,10 +22,8 @@ it('uses one target per discussion and keeps code examples out of marker indexin
   expect(host.textContent).toContain('Standalone')
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
-  for (const reference of host.querySelectorAll<HTMLElement>('.critic-comment-reference')) {
-    const target = scrollToSpan({ current: host }, Number(reference.dataset.spanIndex))
-    expect(target?.matches('.critic-anchor, .critic-comment-marker')).toBe(true)
-    expect(target?.getAttribute('data-span-index')).toBe(reference.dataset.commentTarget)
+  for (const thread of host.querySelectorAll<HTMLElement>('.critic-anchor, .critic-comment-marker')) {
+    expect(scrollToSpan({ current: host }, Number(thread.dataset.spanIndex))).toBe(thread)
   }
   scroll.mockRestore()
 })

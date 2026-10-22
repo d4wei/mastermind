@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useState, type Ref } from 'react'
+import type { Node } from 'unist'
 import { prepareTranslation, type TranslationBlock, type PreparedTranslation } from '../../document/translation'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { useT } from '../i18n'
@@ -44,14 +45,25 @@ interface Props {
   sessionId: string
   source: string
   artifact: PreparedTranslation
-  containerRef: RefObject<HTMLElement | null>
+  containerRef: Ref<HTMLElement>
+}
+
+/** Offsets inside a block index its displayed text; removing them keeps them from posing as document offsets. */
+function withoutPositions(node: Node): void {
+  delete node.position
+  if ('children' in node && Array.isArray(node.children)) node.children.forEach(withoutPositions)
 }
 
 function TransBlock({ block, translated }: { block: TranslationBlock; translated?: string }) {
   const highlightCode = (useConfig((state) => state.config?.codeTheme) ?? 'none') !== 'none'
   const shown = translated ?? block.text
-  const analysis = useMemo(() => analyzeMarkdown(shown), [shown])
-  return <div className="trans-block">
+  const analysis = useMemo(() => {
+    const result = analyzeMarkdown(shown)
+    withoutPositions(result.tree)
+    return result
+  }, [shown])
+  // A heading block carries its source offset so outline navigation finds it as in the original.
+  return <div className="trans-block" data-ps={block.kind === 'heading' ? block.start : undefined}>
     <div className="trans-block-body md-root" data-trans-block-id={block.translatable ? block.id : undefined}>
       <MarkdownView tree={analysis.tree} ctx={{ source: shown, reviewSpans: analysis.spans, highlightCode }} />
     </div>

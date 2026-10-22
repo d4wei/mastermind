@@ -3,15 +3,17 @@
 `selection.ts` maps the rendered document's DOM ranges to exact source slices. It uses the
 renderer's `data-ps`/`data-pe` offsets when text matches. When escapes or entities make a leaf's
 rendered length differ from its source, the selected text maps only if it occurs exactly once in
-both the rendered and the source text of the narrowest positioned element holding the selection
-(the text leaf, or the block when the selection spans leaves); otherwise it is refused rather than
-guessed. Comments anchor to the first mapped range.
+both the rendered and the source text of its window: the narrowest positioned element holding the
+selection, bounded by the nearest positioned element or rendered review mark on each side. Text
+that is not unique within that window is refused, even when it is unique elsewhere in the block.
+Comments anchor to the first mapped range.
 
 A selection splits first at block boundaries, then within each block at rendered review marks
 (`.critic[data-span-index]`). The pieces outside the marks map independently; whitespace-only and
 unmappable pieces are skipped while the rest stay markable, and a selection wholly inside a mark
 yields nothing. A mapped range that still overlaps a review span, such as a mark that rendered
-literally, is dropped. A container block such as a list item with a nested list contributes only
+literally, is dropped. Unanchored highlights render as plain text without a
+`.critic[data-span-index]` element, so a piece across one overlaps its span and maps nothing. A container block such as a list item with a nested list contributes only
 its own text before the first nested block; the nested blocks map as blocks of their own, including
 when the selection's common ancestor is the container itself.
 
@@ -29,7 +31,7 @@ parses the source once for opaque ranges and lazily indexes that same tree for f
 the index is discarded after the operation.
 
 A selection confined to one text leaf within formatting keeps its exact text range, including the
-unique-substring fallback when rendered entities change that leaf's length.
+windowed unique-substring fallback when rendered entities change that leaf's length.
 A selection that crosses only part of a formatting wrapper is refused, so a mark cannot strand an
 opening or closing delimiter. Splitting those partial selections into several ranges is deferred.
 Text the renderer splits around a review mark keeps exact offsets when its parsed text node's value
@@ -62,4 +64,5 @@ the latest passage. A toolbar retained only for its exit animation cannot start 
 Escape dismisses pending work as well as the visible controls. A shown toolbar re-reads its surviving
 selection when the source changes, since no selection event follows. Draft text remains intact across
 focus changes, scrolling, and source updates; submission still requires the captured source. A
-comment or change whose insert would not reparse as exactly the intended mark cannot be submitted.
+comment, change, or reply cannot be submitted unless the whole edited source reparses with exactly
+the intended marks at the insert and no other mark gained or lost.

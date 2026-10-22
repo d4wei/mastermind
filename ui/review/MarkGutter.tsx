@@ -14,8 +14,6 @@ interface PlacedTick extends MarkTick {
 interface Props {
   docRef: RefObject<HTMLElement | null>
   marks: MarkTick[]
-  /** bumped when the buffer changes from outside the renderer — re-measure */
-  version: number
 }
 
 const KIND_CLASS: Record<MarkTick['kind'], string> = {
@@ -25,7 +23,7 @@ const KIND_CLASS: Record<MarkTick['kind'], string> = {
   comment: 'tick-comment',
 }
 
-export function MarkGutter({ docRef, marks, version }: Props) {
+export function MarkGutter({ docRef, marks }: Props) {
   const { hidden: tableExpanded } = useTableExpansion()
   const [ticks, setTicks] = useState<PlacedTick[]>([])
   const thumbRef = useRef<HTMLDivElement>(null)
@@ -70,7 +68,7 @@ export function MarkGutter({ docRef, marks, version }: Props) {
       ro.disconnect()
       window.removeEventListener('resize', schedule)
     }
-  }, [measure, version])
+  }, [measure])
 
   useEffect(() => {
     const onScroll = (): void => {

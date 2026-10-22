@@ -183,28 +183,46 @@ function mapFormattedSelection(
 /**
  * Escapes and entities change a leaf's rendered length, so its offsets cannot be read directly.
  * The selected text then maps only when it occurs exactly once in both the rendered and the source
- * text of the narrowest positioned element holding the selection: a unique source match alone may
- * be a different occurrence than the one the reader selected.
+ * text of its window: the narrowest positioned element holding the selection, narrowed to the extent
+ * between the nearest positioned elements or review marks on either side. A unique match outside
+ * that window may be a different occurrence than the one the reader selected.
  */
-function uniqueOccurrence(range: Range, block: HTMLElement, source: string, text: string): number | null {
-  const leaf = (node: Node, offset: number): HTMLElement | null | undefined =>
-    normalizePoint(node, offset).node.parentElement?.closest<HTMLElement>('[data-ps]')
-  const startLeaf = leaf(range.startContainer, range.startOffset)
-  const scope = startLeaf && startLeaf === leaf(range.endContainer, range.endOffset) &&
-    block.contains(startLeaf) ? startLeaf : block
-  const from = Number(scope.dataset.ps)
-  const to = Number(scope.dataset.pe)
+function uniqueOccurrence(
+  range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], text: string,
+): number | null {
+  const common = range.commonAncestorContainer
+  const holder = (common.nodeType === Node.ELEMENT_NODE ? common as Element : common.parentElement)
+    ?.closest<HTMLElement>('[data-ps]')
+  const scope = holder && block.contains(holder) ? holder : block
+  let from = Number(scope.dataset.ps)
+  let to = Number(scope.dataset.pe)
   if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  const rendered = scope.ownerDocument.createRange()
+  rendered.selectNodeContents(scope)
+  for (const neighbor of scope.querySelectorAll<HTMLElement>(`[data-ps], ${MARK_SELECTOR}`)) {
+    const span = neighbor.matches(MARK_SELECTOR) ? spans[Number(neighbor.dataset.spanIndex)] : undefined
+    const start = span ? span.start : Number(neighbor.dataset.ps)
+    const end = span ? span.end : Number(neighbor.dataset.pe)
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+    const extent = scope.ownerDocument.createRange()
+    extent.selectNode(neighbor)
+    // Elements holding or crossing the selection bound nothing; nested neighbors never widen a bound.
+    if (comparePoints(extent, true, range, false) <= 0) {
+      if (end > from) { from = end; rendered.setStartAfter(neighbor) }
+    } else if (comparePoints(extent, false, range, true) >= 0) {
+      if (start < to) { to = start; rendered.setEndBefore(neighbor) }
+    }
+  }
   const occursOnce = (haystack: string): number | null => {
     const first = haystack.indexOf(text)
     return first === -1 || haystack.indexOf(text, first + 1) !== -1 ? null : first
   }
-  const offset = occursOnce(source.slice(from, to))
-  return offset === null || occursOnce(scope.textContent ?? '') === null ? null : from + offset
+  const offset = from <= to ? occursOnce(source.slice(from, to)) : null
+  return offset === null || occursOnce(rendered.toString()) === null ? null : from + offset
 }
 
 function mapWithinBlock(
-  range: Range, block: HTMLElement, source: string, opaque: readonly SourceRange[],
+  range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], opaque: readonly SourceRange[],
   positionedNodes: () => Map<string, MarkdownNode>,
 ): SelResult {
   const selectedText = range.toString()
@@ -229,7 +247,7 @@ function mapWithinBlock(
       // A single text leaf can use the existing substring fallback without bridging hidden syntax.
       if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return formatted
     }
-    const fallback = uniqueOccurrence(range, block, source, selectedText)
+    const fallback = uniqueOccurrence(range, block, source, spans, selectedText)
     if (fallback === null) return { error: 'unmapped' }
     from = fallback
     to = from + selectedText.length
@@ -315,8 +333,9 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
     if (nested && sub.intersectsNode(nested)) endBefore(sub, block, nested)
     for (const piece of outsideMarks(sub, block)) {
       if (piece.collapsed || piece.toString().trim().length === 0) continue
-      const r = mapWithinBlock(piece, block, source, opaque, positionedNodes)
-      // A mark that rendered literally has no element to split at; never nest inside or across it.
+      const r = mapWithinBlock(piece, block, source, spans, opaque, positionedNodes)
+      // Marks without a rendered element to split at, such as literal marks and unanchored
+      // highlights, must not be nested inside or crossed.
       if ('error' in r || overlapsMark(r, spans)) continue
       ranges.push(r)
     }

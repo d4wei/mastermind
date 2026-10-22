@@ -47,7 +47,7 @@ beforeEach(async () => {
   vi.mocked(getFile).mockReset().mockImplementation(async (id) => ({
     content: disk.get(id)!, version: `${id}:${disk.get(id)}`, mtimeMs: 1,
   }))
-  vi.mocked(putFile).mockReset().mockResolvedValue({ version: 'saved', mtimeMs: 2 })
+  vi.mocked(putFile).mockReset().mockResolvedValue({ version: 'saved' })
   await useDoc.getState().load(a)
   useDoc.getState().setMode('source')
   host = document.createElement('div')
@@ -144,15 +144,14 @@ it('navigates through editor geometry without requiring an off-screen line in th
   vi.spyOn(view, 'documentTop', 'get').mockReturnValue(100)
   const lineBlockAt = vi.spyOn(view, 'lineBlockAt').mockReturnValue({ top: 900 } as ReturnType<EditorView['lineBlockAt']>)
   const domAtPos = vi.spyOn(view, 'domAtPos').mockImplementation(() => { throw new Error('Line is not rendered') })
-  expect(useNav.getState().sourceHeadingTop?.(offset)).toBe(1000)
-  act(() => useDoc.getState().scroller!(offset, 1))
+  expect(useNav.getState().source?.headingTop(offset)).toBe(1000)
+  act(() => useNav.getState().source!.scrollTo(offset))
   expect(lineBlockAt).toHaveBeenCalledWith(offset)
   expect(view.state.selection.main.anchor).toBe(offset)
   expect(domAtPos).not.toHaveBeenCalled()
   expect(scrollIntoView).toHaveBeenCalledWith(offset, { y: 'start', yMargin: 24 })
   act(() => useDoc.getState().setMode('reading'))
-  expect(useNav.getState().sourceHeadingTop).toBeNull()
-  expect(useDoc.getState().scroller).toBeNull()
+  expect(useNav.getState().source).toBeNull()
 })
 
 it('discards editor undo when its document closes', async () => {

@@ -7,21 +7,21 @@ interface Props {
   onClose: () => void
   /** Outside controls, such as the invoking button, that must not dismiss this panel. */
   ignoreSelector?: string
-  returnFocusSelector?: string
+  /** Receives focus on close when the element focused before opening is unavailable. */
+  returnFocus: string
   focusOnOpen?: boolean
   children: ReactNode
 }
 
-export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector, focusOnOpen = true, children }: Props) {
+export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOnOpen = true, children }: Props) {
   const t = useT()
   const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const panel = panelRef.current
     const previous = document.activeElement as HTMLElement | null
-    const returnFocus = previous && previous !== document.body && !panel?.contains(previous) &&
-      !previous.closest('[role="menu"]') ? previous :
-      document.querySelector<HTMLElement>(returnFocusSelector ?? ignoreSelector ?? '.topbar-overflow')
+    const restoreTarget = previous && previous !== document.body && !panel?.contains(previous) &&
+      !previous.closest('[role="menu"]') ? previous : document.querySelector<HTMLElement>(returnFocus)
     // Let child composers take focus before choosing the panel’s first control.
     const frame = requestAnimationFrame(() => {
       if (focusOnOpen && !panel?.contains(document.activeElement)) {
@@ -30,6 +30,8 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector,
     })
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
+        // Sibling window listeners still run; defaultPrevented tells them this Escape is consumed.
+        e.preventDefault()
         e.stopPropagation()
         onClose()
       }
@@ -51,10 +53,10 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocusSelector,
       document.removeEventListener('mousedown', onPointerDown)
       cancelAnimationFrame(frame)
       if (panel?.contains(document.activeElement) || document.activeElement === document.body) {
-        returnFocus?.focus({ preventScroll: true })
+        restoreTarget?.focus({ preventScroll: true })
       }
     }
-  }, [onClose, ignoreSelector, returnFocusSelector, focusOnOpen])
+  }, [onClose, ignoreSelector, returnFocus, focusOnOpen])
 
   return (
     <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}>

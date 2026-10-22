@@ -24,7 +24,7 @@ describe('reviewing inline code', () => {
       const mapped = rangeToSourceRanges(range, source, spans)
       if (!('ranges' in mapped)) throw new Error(mapped.error)
       expect(mapped.ranges).toEqual([{ from: 4, to: 4 + code.length, text: code }])
-      const updated = applyTextEdits(source, commentEdits(mapped.ranges, 'Alex', 'Keep `open` focused.')!)
+      const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'Alex', 'Keep `open` focused.')!)
       expect(updated).toBe(`Try {==${code}==}{>>@Alex: Keep \`open\` focused.<<} now.`)
       const next = renderMarkdown(updated)
       expect(next.items).toHaveLength(1)
@@ -32,7 +32,7 @@ describe('reviewing inline code', () => {
       expect(next.host.textContent).not.toContain('{==')
       expect(next.host.textContent).not.toContain('Keep `open` focused.')
       expect(next.host.querySelector('code')!.textContent).toBe(host.querySelector('code')!.textContent)
-      const deletion = applyTextEdits(source, changeEdits(mapped.ranges, mapped.ranges.map(() => ''))!)
+      const deletion = applyTextEdits(source, changeEdits(source, mapped.ranges, mapped.ranges.map(() => ''))!)
       const deletionSpans = analyzeMarkdown(deletion).spans
       expect(deletionSpans).toHaveLength(1)
       expect(resolveAll(deletion, deletionSpans, 'reject')).toBe(source)
@@ -69,7 +69,7 @@ describe('reviewing inline code', () => {
     const mapped = rangeToSourceRanges(select(host.querySelector('code')!.firstChild!), source, [])
     if (!('ranges' in mapped)) throw new Error(mapped.error)
     const ranges = mapped.ranges
-    const updated = applyTextEdits(source, commentEdits(ranges, 'Alex', 'Review this.')!)
+    const updated = applyTextEdits(source, commentEdits(source, ranges, 'Alex', 'Review this.')!)
     const next = renderMarkdown(updated)
     expect(next.spans).toHaveLength(2)
     const selection = select(next.host.querySelector('code')!.firstChild!)

@@ -25,7 +25,7 @@ afterEach(() => {
   host.remove(); trigger.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); close.mockClear()
 })
 function render(composer = false) {
-  act(() => root.render(<SlideOver title="Comments" onClose={close} returnFocusSelector=".test-trigger">
+  act(() => root.render(<SlideOver title="Comments" onClose={close} returnFocus=".test-trigger">
     {composer ? <textarea autoFocus /> : <p>Discussion</p>}
   </SlideOver>))
   act(() => vi.advanceTimersByTime(30))
@@ -64,8 +64,9 @@ it('hands focus from the overflow menu into its panel without restoring the trig
   function Harness() {
     const [open, setOpen] = useState(false)
     const onClose = useCallback(() => setOpen(false), [])
-    return <><TopBar settings={{ open, onToggle: () => setOpen(!open) }} />
-      {open && <SlideOver title="Settings" onClose={onClose} returnFocusSelector=".topbar-overflow">
+    return <><TopBar settings={{ open, onToggle: () => setOpen(!open) }} resolved={{ count: 0, open: false, onToggle: () => {} }}
+      railOpen={false} onToggleRail={() => {}} commentsAvailable={false} />
+      {open && <SlideOver title="Settings" onClose={onClose} returnFocus=".topbar-overflow">
         <input aria-label="Your name" />
       </SlideOver>}</>
   }

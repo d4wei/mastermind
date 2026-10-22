@@ -42,8 +42,8 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
   const returnFocus = useRef<HTMLElement | null>(null)
   const setInput = useCallback((element: HTMLInputElement | null) => {
     input.current = element
-    ime.inputRef(element)
-  }, [ime.inputRef])
+    ime.ref(element)
+  }, [ime.ref])
   const pendingReveal = useRef(false)
   const chooseFromPosition = useRef(false)
   const adapter = useSourceSearch((s) => s.adapter?.sessionId === sessionId ? s.adapter : null)

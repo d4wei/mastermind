@@ -9,12 +9,11 @@ import { requestFind } from '../find/events'
 import { useDoc } from '../documents/store'
 
 interface TopBarProps {
-  settings?: { open: boolean; onToggle: () => void }
-  resolved?: { count: number; open: boolean; onToggle: () => void }
-  railOpen?: boolean
-  onToggleRail?: () => void
-  commentsAvailable?: boolean
-
+  settings: { open: boolean; onToggle: () => void }
+  resolved: { count: number; open: boolean; onToggle: () => void }
+  railOpen: boolean
+  onToggleRail: () => void
+  commentsAvailable: boolean
 }
 
 export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, settings }: TopBarProps) {
@@ -47,14 +46,14 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
       <button type="button" className="btn-ghost btn-icon topbar-icon-btn" onClick={() => setMode(destination)}
         aria-label={t(destination)} title={t(destination)}><ModeIcon /></button>
       {mode === 'reading' && <LanguageMenu />}
-      {onToggleRail && mode === 'reading' && commentsAvailable && (
+      {mode === 'reading' && commentsAvailable && (
         <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-comments${railOpen ? ' active' : ''}`}
           onClick={onToggleRail} aria-label={railOpen ? t('hideComments') : t('showComments')}
           aria-pressed={railOpen} title={t('toggleRail')}><ChatIcon /></button>
       )}
-      {(settings || resolved) && <DropdownMenu.Root modal={false}>
+      <DropdownMenu.Root modal={false}>
         <DropdownMenu.Trigger asChild>
-          <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-overflow${settings?.open || resolved?.open ? ' active' : ''}`}
+          <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-overflow${settings.open || resolved.open ? ' active' : ''}`}
             aria-label={t('moreActions')}
             title={t('moreActions')}><MoreIcon /></button>
         </DropdownMenu.Trigger>
@@ -64,15 +63,15 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
               if (openingPanel.current) event.preventDefault()
               openingPanel.current = false
             }}>
-            {resolved && <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; resolved.onToggle() }}>
+            <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; resolved.onToggle() }}>
               <HistoryIcon />{t('resolved')} ({resolved.count})
-            </DropdownMenu.Item>}
-            {settings && <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; settings.onToggle() }}>
+            </DropdownMenu.Item>
+            <DropdownMenu.Item className="reader-menu-item" onSelect={() => { openingPanel.current = true; settings.onToggle() }}>
               <GearIcon />{t('settings')}
-            </DropdownMenu.Item>}
+            </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
-      </DropdownMenu.Root>}
+      </DropdownMenu.Root>
     </header>
   )
   return target ? createPortal(controls, target) : controls

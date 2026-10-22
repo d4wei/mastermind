@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
 import { documentViewport, readingLine, scrollToOffset } from '../util/scroll'
 import { useNav } from './navStore'
-import { useDoc } from '../documents/store'
 
 /** Shared breakpoint for document panels. */
 export function useIsNarrow(): boolean {
@@ -26,7 +25,7 @@ export function Navigator() {
   const t = useT()
   const items = useNav((s) => s.outline)
   const docEl = useNav((s) => s.docEl)
-  const sourceHeadingTop = useNav((s) => s.sourceHeadingTop)
+  const sourceOutline = useNav((s) => s.source)
   const [open, setOpen] = useState(false)
   const [activeOffset, setActiveOffset] = useState<number | null>(null)
   const container = useRef<HTMLElement>(null)
@@ -35,7 +34,7 @@ export function Navigator() {
   useEffect(() => { setActiveOffset(items[0]?.offset ?? null) }, [items])
   useEffect(() => {
     const heads = items.flatMap((item) => {
-      if (!docEl) return sourceHeadingTop ? [{ offset: item.offset, top: () => sourceHeadingTop(item.offset) }] : []
+      if (!docEl) return sourceOutline ? [{ offset: item.offset, top: () => sourceOutline.headingTop(item.offset) }] : []
       const element = docEl.querySelector<HTMLElement>(`[data-ps="${item.offset}"]`)
       return element ? [{ offset: item.offset, top: () => element.getBoundingClientRect().top }] : []
     })
@@ -76,7 +75,7 @@ export function Navigator() {
       window.removeEventListener('resize', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [items, docEl, sourceHeadingTop])
+  }, [items, docEl, sourceOutline])
 
   useEffect(() => {
     if (!open) return
@@ -102,10 +101,10 @@ export function Navigator() {
     '--heading-depth': item.depth - minDepth,
   } as CSSProperties)
   const active = items.find((item) => item.offset === activeOffset) ?? items[0]!
-  const go = (offset: number, index: number): void => {
+  const go = (offset: number): void => {
     if (docEl) scrollToOffset({ current: docEl }, offset)
     else {
-      useDoc.getState().scroller?.(offset, index)
+      sourceOutline?.scrollTo(offset)
       setActiveOffset(offset)
     }
     trigger.current?.focus()
@@ -125,8 +124,8 @@ export function Navigator() {
     </button>
     {open && <div className="outline-popover" id="heading-list">
       <ul className="nav-outline">
-        {items.map((item, index) => <li key={item.offset}>
-          <button type="button" onClick={() => go(item.offset, index)} title={item.text}
+        {items.map((item) => <li key={item.offset}>
+          <button type="button" onClick={() => go(item.offset)} title={item.text}
             onMouseDown={(event) => {
               // Keep WebKit's button blur from dismissing the popup before its click runs.
               if (event.button === 0) event.preventDefault()

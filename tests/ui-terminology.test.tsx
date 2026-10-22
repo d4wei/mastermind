@@ -14,6 +14,7 @@ import { Navigator } from '../ui/app/Navigator'
 import { useNav } from '../ui/app/navStore'
 import { TopBar } from '../ui/app/TopBar'
 import { ToolbarTarget } from '../ui/app/ToolbarTarget'
+import { useT } from '../ui/i18n'
 
 const initialConfig = useConfig.getState()
 const initialDoc = useDoc.getState()
@@ -22,6 +23,8 @@ const config: ClientConfig = {
   authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
   uiLang: 'en',
 }
+const bar = { settings: { open: false, onToggle: () => {} }, resolved: { count: 0, open: false, onToggle: () => {} },
+  railOpen: false, onToggleRail: () => {}, commentsAvailable: false }
 let host: HTMLDivElement
 let root: Root
 
@@ -55,11 +58,24 @@ it.each([
   installHost(null)
 })
 
+it.each(['en', 'zh-CN'] as const)('names Save As and keeps Resolve for discussions in %s recovery copy', (uiLang) => {
+  useConfig.setState({ config: { ...config, uiLang } })
+  const keys = ['closeSaveBody', 'conflictCopyFailed', 'conflictReadFailed', 'conflictSaveFailed', 'conflictNotice'] as const
+  function Copy() {
+    const t = useT()
+    return <>{keys.map((key) => <p key={key}>{t(key)}</p>)}</>
+  }
+  act(() => root.render(<Copy />))
+  const lines = Array.from(host.querySelectorAll('p'), (line) => line.textContent!)
+  expect(lines.slice(0, 4).every((line) => line.includes(uiLang === 'en' ? 'Save As…' : '另存为…'))).toBe(true)
+  expect(host.textContent).not.toMatch(/save a copy|另存副本|保存副本|resolve|解决/i)
+})
+
 it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const setMode = vi.fn()
   useDoc.setState({ mode: 'reading', setMode })
-  act(() => root.render(<TopBar />))
+  act(() => root.render(<TopBar {...bar} />))
   const button = host.querySelector<HTMLButtonElement>('[aria-label="Markdown"]')!
   expect(button.title).toBe('Markdown')
   act(() => button.click())
@@ -69,7 +85,7 @@ it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLan
 it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const onToggle = vi.fn()
-  act(() => root.render(<TopBar settings={{ open: true, onToggle }} />))
+  act(() => root.render(<TopBar {...bar} settings={{ open: true, onToggle }} />))
   const label = uiLang === 'en' ? 'Settings' : '设置'
   openReaderMenu(host)
   const button = readerMenuItem(label)
@@ -78,17 +94,16 @@ it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (
 })
 
 it('retains outline navigation to existing-file source offsets', () => {
-  const scroller = vi.fn()
-  useDoc.setState({ scroller })
+  const scrollTo = vi.fn()
   useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }],
-    docEl: null })
+    docEl: null, source: { headingTop: () => 0, scrollTo } })
   act(() => root.render(<Tooltip.Provider><Navigator /></Tooltip.Provider>))
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
   const second = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Second')!
   act(() => second.click())
-  expect(scroller).toHaveBeenCalledWith(12, 1)
+  expect(scrollTo).toHaveBeenCalledWith(12)
   expect(host.querySelector('.nav-seg')).toBeNull()
-  useNav.setState({ outline: [], docEl: null })
+  useNav.setState({ outline: [], docEl: null, source: null })
 })
 
 it('places native document controls in the file row while retaining their actions', () => {
@@ -98,7 +113,7 @@ it('places native document controls in the file row while retaining their action
   const setMode = vi.fn()
   useDoc.setState({ mode: 'reading', setMode })
   try {
-    act(() => root.render(<ToolbarTarget.Provider value={target}><TopBar /></ToolbarTarget.Provider>))
+    act(() => root.render(<ToolbarTarget.Provider value={target}><TopBar {...bar} /></ToolbarTarget.Provider>))
     expect(host.querySelector('.topbar')).toBeNull()
     expect(target.querySelector('.topbar')).not.toBeNull()
     act(() => target.querySelector<HTMLButtonElement>('[aria-label="Markdown"]')!.click())

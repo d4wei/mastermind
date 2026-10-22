@@ -21,7 +21,7 @@ beforeEach(() => {
   putFile.mockReset().mockRejectedValue(new HostError('failure', 'readonly'))
   saveCopy.mockReset().mockResolvedValue(null)
   installHost(fakeHost({ getFile, putFile, saveCopy,
-    getSession: async (id) => ({ sessionId: id, path: id + '.md', displayName: id + '.md', mtimeMs: 1 }) }))
+    getSession: async (id) => ({ sessionId: id, path: id + '.md', displayName: id + '.md' }) }))
   view = createReactHost()
   act(() => view.root.render(<CloseDialog />))
 })
@@ -42,7 +42,7 @@ async function dirty(ids = ['A']) {
 
 it('flushes ordinary autosave and closes without a prompt', async () => {
   const store = await dirty()
-  putFile.mockResolvedValue({ version: 'saved', mtimeMs: 2 })
+  putFile.mockResolvedValue({ version: 'saved' })
   let result: Map<string, number> | null = null
   await act(async () => { result = await confirmClose(store.getState(), ['A'], vi.fn()) })
   expect(result).toEqual(new Map())
@@ -52,7 +52,7 @@ it('flushes ordinary autosave and closes without a prompt', async () => {
 
 it('lets a slow close be cancelled without claiming to cancel the dispatched write', async () => {
   const store = await dirty()
-  let finish!: (value: { version: string; mtimeMs: number }) => void
+  let finish!: (value: { version: string }) => void
   putFile.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
   let closing!: ReturnType<typeof confirmClose>
   await act(async () => { closing = confirmClose(store.getState(), ['A'], vi.fn()) })
@@ -61,7 +61,7 @@ it('lets a slow close be cancelled without claiming to cancel the dispatched wri
   expect(document.querySelectorAll('dialog[open] button')).toHaveLength(1)
   await choose('cancel'); expect(await closing).toBeNull()
   expect(store.getState().saving).toBe(true)
-  await act(async () => finish({ version: 'saved', mtimeMs: 2 }))
+  await act(async () => finish({ version: 'saved' }))
   expect(store.getState().savedSource).toBe('A edited')
 })
 

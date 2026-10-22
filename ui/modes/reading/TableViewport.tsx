@@ -3,6 +3,7 @@ import { Tooltip } from 'radix-ui'
 import { useT } from '../../i18n'
 import { ExpandIcon, CollapseIcon } from '../../icons'
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
+import { ESCAPE_OWNER_SELECTOR } from '../../app/constants'
 import { useTableExpansion } from './TableExpansion'
 import { prefersReducedMotion } from '../../util/presence'
 
@@ -111,7 +112,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !isExpanded.current || event.defaultPrevented || event.isComposing) return
-      if (document.querySelector('.sel-toolbar, .settings-panel, .close-dialog[open]')) return
+      if (document.querySelector(`.sel-toolbar, ${ESCAPE_OWNER_SELECTOR}`)) return
       if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable=true], [role=dialog]')) return
       event.preventDefault()
       change.current(false, false, true)
@@ -150,7 +151,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
           {expanded ? <CollapseIcon /> : <ExpandIcon />}
         </button>
       </Tooltip.Trigger><Tooltip.Portal><Tooltip.Content className="tooltip" side="top" sideOffset={4}>
-        {label}<Tooltip.Arrow />
+        {label}<Tooltip.Arrow className="tooltip-arrow" />
       </Tooltip.Content></Tooltip.Portal></Tooltip.Root>}
       <div className="md-table-scroll" ref={scroller} role="region" aria-label={t('table')} tabIndex={0}>
         {children}

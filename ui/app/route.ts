@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
-import { parseRoute, type Route } from './route-parse'
 
-// Hand-rolled routing (no router dep). The pure pathname→Route parsing lives in
-// `route-parse.ts` (DOM-free); this module adds the browser-bound navigation.
+// Hand-rolled routing (no router dep). Parsing stays DOM-free; navigation and the hook touch
+// `window` only when called.
+
+export type Route = { kind: 'home' } | { kind: 'doc'; sessionId: string }
+
+const DOC_RE = /^\/d\/(preview|[0-9a-f-]+)\/?$/i
+
+export function parseRoute(pathname: string): Route {
+  const doc = DOC_RE.exec(pathname)
+  return doc ? { kind: 'doc', sessionId: doc[1]! } : { kind: 'home' }
+}
 
 /** SPA navigation: push a path and notify listeners (popstate covers back/forward). */
 export function navigate(to: string): void {

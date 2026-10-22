@@ -61,12 +61,7 @@ function scrollElementToTop(el: Element | null, offsetTop = 24): Element | null 
 }
 
 export function scrollToSpan(doc: RefObject<HTMLElement | null>, spanIndex: number): Element | null {
-  let target = doc.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null
-  const commentTarget = target?.getAttribute('data-comment-target')
-  if (commentTarget != null) {
-    target = doc.current?.querySelector(`[data-span-index="${commentTarget}"]`) ?? target
-  }
-  return scrollToElement(target)
+  return scrollToElement(doc.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null)
 }
 
 export function scrollToOffset(doc: RefObject<HTMLElement | null>, offset: number): Element | null {

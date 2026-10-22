@@ -41,3 +41,20 @@ it('applies only the newest update response', async () => {
   await first
   expect(useConfig.getState().config).toMatchObject({ fontSize: 19 })
 })
+
+it('reports a failed update even after a later update succeeded', async () => {
+  const responses: Array<{ resolve(config: typeof DEFAULT_CONFIG): void; reject(error: Error): void }> = []
+  const updateConfig = vi.fn(() => new Promise<typeof DEFAULT_CONFIG>((resolve, reject) => {
+    responses.push({ resolve, reject })
+  }))
+  installHost(fakeHost({ config: async () => ({ ...DEFAULT_CONFIG, fontSize: 19 }), themes: async () => [], updateConfig }))
+  await useConfig.getState().load()
+  const first = useConfig.getState().update({ authorTag: 'ed' })
+  const second = useConfig.getState().update({ fontSize: 19 })
+  responses[1]!.resolve({ ...DEFAULT_CONFIG, fontSize: 19 })
+  await second
+  responses[0]!.reject(new Error('unavailable'))
+  await first
+  expect(useConfig.getState()).toMatchObject({ config: { fontSize: 19 }, saveFailed: true })
+  expect(useConfig.getState().config?.authorTag).toBe(DEFAULT_CONFIG.authorTag)
+})

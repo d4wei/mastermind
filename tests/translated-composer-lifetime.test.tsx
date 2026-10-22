@@ -71,3 +71,19 @@ it.each(['same source', 'new source'])('retains the captured passage and draft w
   expect(useDoc.getState().source).toBe(source)
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
 })
+
+it('places a remounted composer beside its block rather than at the captured viewport position', () => {
+  const composer = () => host.querySelector<HTMLElement>('.sel-toolbar')!
+  expect([composer().style.top, composer().style.left]).toEqual(['8px', '100px'])
+  act(() => useDoc.getState().setMode('source'))
+  expect(host.querySelector('.sel-toolbar')).toBeNull()
+  const rect = HTMLElement.prototype.getBoundingClientRect
+  HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+    return this.dataset.transBlockId ? { top: 400, left: 40 } as DOMRect : rect.call(this)
+  }
+  try {
+    act(() => useDoc.getState().setMode('reading'))
+    expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
+    expect([composer().style.top, composer().style.left]).toEqual(['250px', '40px'])
+  } finally { HTMLElement.prototype.getBoundingClientRect = rect }
+})

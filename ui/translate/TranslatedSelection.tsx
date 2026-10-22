@@ -1,11 +1,11 @@
 import { requireReviewerHost } from '../app/host'
 import { useDraftGuard, useDraftState } from '../review/drafts'
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
 import { useDoc } from '../documents/store'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
-import { documentViewport } from '../util/scroll'
+import { documentViewport, readingLine } from '../util/scroll'
 import { useTranslation } from './translationStore'
 
 interface Props {
@@ -16,13 +16,16 @@ interface Props {
   stale?: boolean
   readOnly?: boolean
 }
-interface Selection { artifact: PreparedTranslation; blockId: string; quote: string; top: number; left: number }
+/** The retained draft holds no viewport coordinates; they go stale once the view scrolls or remounts. */
+interface Selection { artifact: PreparedTranslation; blockId: string; quote: string }
+interface Placement { top: number; left: number }
 export function TranslatedSelection({ containerRef, sessionId, artifact, authorTag, stale, readOnly = false }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const [selection, setSelection] = useDraftState<Selection | null>('translated:selection', null)
   const [composing, setComposing] = useDraftState('translated:composing', false)
   const [body, setBody] = useDraftState('translated:body', '')
+  const [placement, setPlacement] = useState<Placement | null>(null)
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const busy = useRef(false)
@@ -42,7 +45,8 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const quote = selected.toString()
       if (!quote.trim()) { setSelection(null); return }
       const rect = range.getBoundingClientRect()
-      setSelection({ artifact, blockId: first.dataset.transBlockId!, quote, top: rect.top, left: rect.left })
+      setSelection({ artifact, blockId: first.dataset.transBlockId!, quote })
+      setPlacement({ top: rect.top, left: rect.left })
       setError(false)
     }
     const scrollTarget = documentViewport().target
@@ -53,6 +57,14 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       scrollTarget.removeEventListener('scroll', change)
     }
   }, [containerRef, artifact])
+  // A retained draft reappears beside its block, or below the reading line when the block is absent.
+  useLayoutEffect(() => {
+    if (!selection || placement) return
+    const block = Array.from(containerRef.current?.querySelectorAll<HTMLElement>('[data-trans-block-id]') ?? [])
+      .find((element) => element.dataset.transBlockId === selection.blockId)
+    const rect = block?.getBoundingClientRect()
+    setPlacement(rect ? { top: rect.top, left: rect.left } : { top: readingLine() + 150, left: 8 })
+  }, [selection, placement, containerRef])
   const close = () => { setSelection(null); setComposing(false); setBody(''); setError(false) }
   const submit = async () => {
     if (readOnly || !selection || !body.trim() || busy.current) return
@@ -86,14 +98,14 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const composer = useRef<HTMLDivElement>(null)
   useDraftGuard('translated', t('comment'), composing && !!body.trim(),
     () => { requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus()) }, close)
-  if (!selection) return null
-  return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, selection.top - (composing ? 150 : 44)),
-    left: Math.max(8, Math.min(selection.left, window.innerWidth - 280)) }}
+  if (!selection || !placement) return null
+  return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, placement.top - (composing ? 150 : 44)),
+    left: Math.max(8, Math.min(placement.left, window.innerWidth - 280)) }}
     onMouseDown={(event) => { if ((event.target as HTMLElement).tagName !== 'TEXTAREA') event.preventDefault() }}>
     {!composing ? <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>{t('comment')}</button> :
       <div className="sel-composer">
         {readOnly && <p role="status">{t('editingPaused')}</p>}
-        <textarea readOnly={readOnly} ref={ime.textareaRef} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
+        <textarea readOnly={readOnly} ref={ime.ref} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
           onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur} value={body} placeholder={t('commentPlaceholder')}
           onChange={(event) => setBody(event.target.value)} onKeyDown={(event) => {
             if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }

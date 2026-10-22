@@ -1,5 +1,5 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
-import { commentMark } from '../modes/reading/marks'
+import { replyEdits } from '../modes/reading/marks'
 import { useDraftGuard, useDraftState } from './drafts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DropdownMenu } from 'radix-ui'
@@ -11,10 +11,9 @@ import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
 import { placeCommentCards } from './rail-layout'
+import { locateThread, rebaseThread, threadCards, threadRef, type ThreadCard, type ThreadRef } from './thread-identity'
 import type { CriticSpan, ReviewItem } from '../../document/critic/types'
 import type { TextEdit } from '../../document/types'
-
-type ThreadItem = Extract<ReviewItem, { type: 'thread' }>
 
 interface Props {
   readOnly?: boolean
@@ -34,11 +33,8 @@ interface Props {
 
 const CARD_GAP = 8
 
-/** Appending replies must not discard a draft or remount the discussion. */
-function threadKey(thread: ThreadItem, anchorText: string): string {
-  const first = thread.comments[0]
-  return JSON.stringify([anchorText, first?.author ?? '', first?.body])
-}
+/** An unsent reply; `thread` becomes null once its discussion no longer exists. */
+interface ReplyDraft { id: number; thread: ThreadRef | null; text: string }
 
 export function CommentRail({ items, spans, source, docRef, authorTag, activeSpan, hoveredSpan,
   onHover, onActivate, onEdit, replyRequest, onReplyHandled, readOnly = false }: Props) {
@@ -50,21 +46,44 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
   const [positions, setPositions] = useState<number[]>([])
   const [railHeight, setRailHeight] = useState(0)
   const [replyFor, setReplyFor] = useState<string | null>(null)
-  const [drafts, setDrafts] = useDraftState<Record<string, string>>('replies', {})
+  const [drafts, setDrafts] = useDraftState<ReplyDraft[]>('replies', [])
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   const selectedKey = useRef<string | null>(null)
-  const cards = useMemo(() => {
-    const seen = new Map<string, number>()
-    return items.filter((item): item is ThreadItem => item.type === 'thread').map((thread) => {
-      const anchorSpan = thread.anchor ?? thread.comments[0]!.span
-      const anchorText = thread.anchor ? source.slice(thread.anchor.innerStart, thread.anchor.innerEnd) : ''
-      const key = threadKey(thread, anchorText)
-      const duplicate = seen.get(key) ?? 0
-      seen.set(key, duplicate + 1)
-      return { key: `${key}#${duplicate}`, spanIndex: spans.indexOf(anchorSpan), anchorText, thread }
-    })
-  }, [items, spans, source])
+  const cards = useMemo(() => threadCards(items, spans, source), [items, spans, source])
+  // Each draft follows its discussion's identity and position, never its ordinal among duplicates.
+  const placedDrafts = useMemo(() => {
+    const byCard = new Map<string, ReplyDraft>()
+    const cardOf = new Map<number, ThreadCard>()
+    for (const draft of drafts) {
+      const card = draft.thread && locateThread(draft.thread, source, cards)
+      if (card && !byCard.has(card.key)) { byCard.set(card.key, draft); cardOf.set(draft.id, card) }
+    }
+    return { byCard, cardOf }
+  }, [drafts, cards, source])
+  useEffect(() => {
+    if (!drafts.some((draft) => draft.thread && draft.thread.source !== source)) return
+    setDrafts((current) => current.flatMap((draft) => {
+      if (!draft.thread || draft.thread.source === source) return [draft]
+      const card = placedDrafts.cardOf.get(draft.id)
+      return card || draft.text.trim() ? [{ ...draft, thread: card ? threadRef(card, source) : null }] : []
+    }))
+  }, [drafts, source, placedDrafts, setDrafts])
+  const draftText = (card: ThreadCard) => placedDrafts.byCard.get(card.key)?.text ?? ''
+  const setDraftText = (card: ThreadCard, text: string) => {
+    const existing = placedDrafts.byCard.get(card.key)
+    setDrafts((current) => existing
+      ? current.map((draft) => draft.id === existing.id ? { ...draft, text } : draft)
+      : [...current, { id: Math.max(0, ...current.map((draft) => draft.id)) + 1, thread: threadRef(card, source), text }])
+  }
+  const removeDraft = (id: number | undefined) => setDrafts((current) => current.filter((draft) => draft.id !== id))
+  /** Applies rail edits; drafts of other discussions follow them exactly, and `ended` loses its draft. */
+  const edit = (edits: TextEdit[], ended?: ThreadCard) => {
+    const removed = ended && placedDrafts.byCard.get(ended.key)?.id
+    onEdit(edits)
+    setDrafts((current) => current.filter((draft) => draft.id !== removed)
+      .map((draft) => draft.thread ? { ...draft, thread: rebaseThread(draft.thread, source, edits) } : draft))
+  }
 
   useLayoutEffect(() => {
     const rail = railRef.current
@@ -138,27 +157,32 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     setReplyFor(null)
     onActivate(null)
   }
-  const resolveThread = (thread: ThreadItem) => {
+  const resolveThread = (card: ThreadCard) => {
     if (readOnly) return
     let edits: TextEdit[]
-    try { edits = resolveThreadEdits(source, thread) }
+    try { edits = resolveThreadEdits(source, card.thread) }
     catch (error) { setResolveError(error instanceof Error ? error.message : String(error)); return }
     if (!edits.length) return
     onHover?.(null)
-    onEdit(edits)
+    edit(edits, card)
     setResolveError(null)
     collapse()
   }
-  const submitReply = (card: typeof cards[number]) => {
-    const text = drafts[card.key]
-    if (readOnly || !text?.trim()) return
-    onEdit([{ from: card.thread.end, to: card.thread.end, insert: commentMark(authorTag, text) }])
+  // Null marks a reply whose insert would not reparse as one comment in place; it stays editable
+  // but cannot submit.
+  const pendingReply = (card: ThreadCard): TextEdit[] | null => {
+    const text = draftText(card)
+    return readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text)
+  }
+  const submitReply = (card: ThreadCard) => {
+    const edits = pendingReply(card)
+    if (!edits) return
+    edit(edits, card)
     setReplyFor(null)
-    setDrafts((current) => { const next = { ...current }; delete next[card.key]; return next })
   }
 
-  useDraftGuard('replies', t('reply'), Object.values(drafts).some((text) => !!text.trim()), () => {
-    const card = cards.find((item) => drafts[item.key]?.trim())
+  useDraftGuard('replies', t('reply'), drafts.some((draft) => !!draft.text.trim()), () => {
+    const card = cards.find((item) => draftText(item).trim())
     if (!card) {
       requestAnimationFrame(() => {
         const input = railRef.current?.querySelector<HTMLTextAreaElement>('.rail-orphan textarea')
@@ -172,9 +196,9 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
       const input = cardRefs.current.get(card.key)?.querySelector('textarea')
       input?.focus(); input?.scrollIntoView({ block: 'nearest' })
     })
-  }, () => { setDrafts({}); setReplyFor(null) })
+  }, () => { setDrafts([]); setReplyFor(null) })
 
-  const orphaned = Object.entries(drafts).filter(([key, text]) => text.trim() && !cards.some((card) => card.key === key))
+  const orphaned = drafts.filter((draft) => draft.text.trim() && !placedDrafts.cardOf.has(draft.id))
   if (!cards.length && !orphaned.length) return null
   return <div ref={railRef} className="rail" inert={tableExpanded} aria-hidden={tableExpanded || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
@@ -209,7 +233,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
               </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
               {messageIndex === 0 && <>
                 <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')} title={t('resolve')}
-                  disabled={readOnly} onClick={() => resolveThread(card.thread)}><CheckIcon /></button>
+                  disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>
                 {selected && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('collapseDiscussion')}
                   title={t('collapseDiscussion')} onClick={collapse}><ChevronUpIcon /></button>}
               </>}
@@ -221,7 +245,8 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
                     <DropdownMenu.Item className="reader-menu-item" disabled={readOnly} onSelect={() => {
                       if (readOnly) return
                       onHover?.(null)
-                      onEdit(deleteCommentEdits(source, card.thread, messageIndex))
+                      // Deleting the opening message ends the discussion's identity.
+                      edit(deleteCommentEdits(source, card.thread, messageIndex), messageIndex === 0 ? card : undefined)
                       collapse()
                     }}>{t('deleteComment')}</DropdownMenu.Item>
                   </DropdownMenu.Content>
@@ -233,10 +258,10 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
           </div>)}
         {selected && replyFor === card.key ? <div className="rail-reply">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
-          <textarea autoFocus readOnly={readOnly} ref={ime.textareaRef} rows={2}
+          <textarea autoFocus readOnly={readOnly} ref={ime.ref} rows={2}
             onCompositionStart={ime.onCompositionStart} onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
-            value={drafts[card.key] ?? ''} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
-            onChange={(event) => setDrafts((current) => ({ ...current, [card.key]: event.target.value }))}
+            value={draftText(card)} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
+            onChange={(event) => setDraftText(card, event.target.value)}
             onKeyDown={(event) => {
               if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
               if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); submitReply(card) }
@@ -244,7 +269,7 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
             }} />
           <div className="rail-actions">
             <button type="button" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
-            <button type="button" className="btn-primary btn-compact" disabled={readOnly || !drafts[card.key]?.trim()}
+            <button type="button" className="btn-primary btn-compact" disabled={!pendingReply(card)}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
         </div> : <div className="rail-actions rail-footer">
@@ -258,9 +283,12 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     })}
     {orphaned.length > 0 && <div className="rail-orphan" style={{ paddingTop: cards.length ? railHeight : undefined }}>
       <p>{t('draftTargetChanged')}</p>
-      {orphaned.map(([key, text]) => <label key={key}>{t('reply')}
-        <textarea readOnly value={text} />
-      </label>)}
+      {orphaned.map((draft) => <div key={draft.id}>
+        <label>{t('reply')}<textarea readOnly value={draft.text} /></label>
+        <div className="rail-actions">
+          <button type="button" onClick={() => removeDraft(draft.id)}>{t('discardDraft')}</button>
+        </div>
+      </div>)}
     </div>}
   </div>
 }

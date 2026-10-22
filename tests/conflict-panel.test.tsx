@@ -20,11 +20,11 @@ function deferred<T>() {
 }
 beforeEach(() => {
   installHost(fakeHost({ getFile, putFile, saveCopy,
-    getSession: async (id) => ({ sessionId: id, displayName: id, path: id, mtimeMs: 1 }) }))
+    getSession: async (id) => ({ sessionId: id, displayName: id, path: id }) }))
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   getFile.mockReset().mockResolvedValue(file('one\nmiddle\nlast\n', 'v1'))
-  putFile.mockReset().mockResolvedValue({ mtimeMs: 2, version: 'v3' })
+  putFile.mockReset().mockResolvedValue({ version: 'v3' })
   saveCopy.mockReset().mockResolvedValue(null)
 })
 afterEach(() => { installHost(null); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
@@ -126,6 +126,19 @@ it('retains the whole local buffer on save-copy cancellation or failure', async 
   expect(putFile).not.toHaveBeenCalled()
 })
 
+it('clears a failed ordinary copy once a later write succeeds', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().setSource('edited\n')
+  saveCopy.mockRejectedValueOnce(new Error('existing destination'))
+  expect(await store.getState().saveCopy()).toBeNull()
+  expect(store.getState()).toMatchObject({ conflict: false, copyError: true })
+  store.getState().setSource('edited again\n')
+  await vi.advanceTimersByTimeAsync(600)
+  expect(putFile).toHaveBeenCalledOnce()
+  expect(store.getState()).toMatchObject({ savedSource: 'edited again\n', copyError: false })
+})
+
 it('switches to the admitted copy only after success, releasing the original buffer', async () => {
   const store = await conflict()
   const saving = deferred<unknown>()
@@ -134,7 +147,7 @@ it('switches to the admitted copy only after success, releasing the original buf
   const closing = store.getState().prepareToClose()
   expect(store.getState().hasDocument('A')).toBe(true)
   getFile.mockResolvedValue(file('ONE\nmiddle\nlast\n', 'copy-v1'))
-  saving.resolve({ meta: { sessionId: 'copy', path: 'copy.md', displayName: 'copy.md', mtimeMs: 1 },
+  saving.resolve({ meta: { sessionId: 'copy', path: 'copy.md', displayName: 'copy.md' },
     file: file('ONE\nmiddle\nlast\n', 'copy-v1') })
   expect(await operation).toBe('copy')
   expect(await closing).toBe(true)
@@ -175,7 +188,7 @@ it('does not cancel navigation already in flight when a saved copy completes', a
   const reading = deferred<ReturnType<typeof file>>()
   getFile.mockReturnValueOnce(reading.promise)
   const navigation = store.getState().load('B')
-  saving.resolve({ meta: { sessionId: 'copy', path: 'copy.md', displayName: 'copy.md', mtimeMs: 1 },
+  saving.resolve({ meta: { sessionId: 'copy', path: 'copy.md', displayName: 'copy.md' },
     file: file('ONE\nmiddle\nlast\n', 'copy-v1') })
   expect(await operation).toBe('copy')
   reading.resolve(file('B contents', 'B1'))

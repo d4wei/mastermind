@@ -32,7 +32,8 @@ export const useConfig = create<ConfigState>((set, get) => ({
 
   async update(patch) {
     const host = requireReviewerHost()
-    // Only the newest update applies its outcome, so an earlier response cannot revert a later patch.
+    // Only the newest update applies the config it gets back, so an earlier response cannot revert a
+    // later patch; every failure is still reported.
     const request = ++latestUpdate
     set({ saveFailed: false })
     const current = get().config
@@ -44,8 +45,7 @@ export const useConfig = create<ConfigState>((set, get) => ({
       if (request === latestUpdate) set({ config })
     } catch {
       const persisted = await host.config().catch(() => null)
-      if (request !== latestUpdate) return
-      if (persisted) set({ config: persisted })
+      if (persisted && request === latestUpdate) set({ config: persisted })
       set({ saveFailed: true })
     }
   },

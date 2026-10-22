@@ -1,13 +1,13 @@
 import { useConfig, type ConfigPatch } from '../app/configStore'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usableAuthorName } from '../../document/author'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
 import { useT, type MsgKey } from '../i18n'
 import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
-import { CODE_THEMES, type CodeTheme } from '../theme/codeThemes'
+import { CODE_THEMES, type CodeTheme, type CodeThemeId } from '../theme/codeThemes'
 
-const CODE_COLOR_LABEL: Record<string, MsgKey> = {
+const CODE_COLOR_LABEL: Record<CodeThemeId, MsgKey> = {
   none: 'codeColorNone', soft: 'codeColorSoft', vivid: 'codeColorVivid', warm: 'codeColorWarm',
 }
 
@@ -85,6 +85,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const themes = useConfig((s) => s.themes)
   const update = useConfig((s) => s.update)
   const [invalidName, setInvalidName] = useState(false)
+  // Escape and outside clicks unmount the panel without blurring the field, so commit on unmount too.
+  const pendingName = useRef<string | null>(null)
+  const commitName = useRef(() => {})
+  commitName.current = () => {
+    const name = pendingName.current === null ? null : usableAuthorName(pendingName.current)
+    pendingName.current = null
+    if (name && config && name !== config.authorTag) void update({ authorTag: name })
+  }
+  useEffect(() => () => commitName.current(), [])
 
   const t = useT()
 
@@ -94,7 +103,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const activeTheme = themes.find((th) => th.id === config.theme)
 
   return (
-    <SlideOver title={t('settings')} onClose={onClose} ignoreSelector=".reader-menu" returnFocusSelector=".topbar-overflow">
+    <SlideOver title={t('settings')} onClose={onClose} ignoreSelector=".reader-menu" returnFocus=".topbar-overflow">
       <div className="settings-body">
         <section>
           <h4>{t('generalSection')}</h4>
@@ -111,11 +120,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               aria-invalid={invalidName}
               title={t('authorTagHint')}
               onBlur={(e) => {
-                const v = usableAuthorName(e.target.value)
-                setInvalidName(v === null)
-                if (v && v !== config.authorTag) patch({ authorTag: v })
+                setInvalidName(usableAuthorName(e.target.value) === null)
+                pendingName.current = e.target.value
+                commitName.current()
               }}
-              onChange={(event) => setInvalidName(usableAuthorName(event.target.value) === null)}
+              onChange={(event) => {
+                pendingName.current = event.target.value
+                setInvalidName(usableAuthorName(event.target.value) === null)
+              }}
             />
             {invalidName && <small role="alert">{t('authorTagInvalid')}</small>}
           </label>
@@ -267,7 +279,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   onClick={() => patch({ codeTheme: c.id })}
                 >
                   <CodeSwatch theme={c} appearance={activeTheme?.appearance ?? 'light'} />
-                  {CODE_COLOR_LABEL[c.id] ? t(CODE_COLOR_LABEL[c.id]!) : c.name}
+                  {t(CODE_COLOR_LABEL[c.id])}
                 </button>
               ))}
             </div>

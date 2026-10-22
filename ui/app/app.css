@@ -990,15 +990,13 @@ mark.critic-hl.critic-anchor:hover,
   gap: calc(var(--space-unit) * 2);
 }
 
-/* shared tooltip (Radix) for icon-only controls */
+/* Radix tooltip for the table expansion control */
 .tooltip {
   z-index: var(--z-toast);
   max-width: 240px;
   background: var(--color-invert-bg);
   color: var(--color-invert-text);
   font-size: var(--font-size-micro);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);

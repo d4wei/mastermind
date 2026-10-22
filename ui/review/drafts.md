@@ -12,7 +12,7 @@ no draft is implicitly submitted or included in a saved Markdown copy.
 
 Selection drafts retain their source snapshot and cannot submit against changed source offsets.
 Replies retain their thread identity. If that thread disappears, their text remains copyable in the
-comments rail; it is not posted against a guessed target. Translated drafts retain their captured
+comments rail, with a Discard draft control; it is not posted against a guessed target. Translated drafts retain their captured
 artifact and use the translation checks before submission. Automatic target relocation is deferred.
 
 Save As transfers retained drafts to the admitted copy; closing releases the document's draft state.

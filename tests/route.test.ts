@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { parseRoute } from '../ui/app/route-parse'
+import { parseRoute } from '../ui/app/route'
 
 it('opens native documents and the development preview', () => {
   expect(parseRoute('/d/12')).toEqual({ kind: 'doc', sessionId: '12' })

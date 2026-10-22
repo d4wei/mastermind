@@ -237,3 +237,18 @@ it('blocks a comment whose selected text would not reparse as its anchor', async
   act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
   expect(edit).not.toHaveBeenCalled()
 })
+
+it('leaves Escape to an open settings panel', async () => {
+  await select()
+  const panel = document.createElement('div')
+  panel.className = 'slide-over'; panel.setAttribute('role', 'dialog')
+  document.body.append(panel)
+  try {
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    await act(async () => vi.advanceTimersByTimeAsync(300))
+    expect(host.querySelector('.sel-toolbar')).not.toBeNull()
+  } finally { panel.remove() }
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  await act(async () => vi.advanceTimersByTimeAsync(300))
+  expect(host.querySelector('.sel-toolbar')).toBeNull()
+})

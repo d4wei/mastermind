@@ -15,9 +15,10 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     catch (error) {
       if (error && typeof error === 'object' && 'status' in error && 'error' in error) {
         const message = 'message' in error ? error.message : error.error
-        const status = Number(error.status)
-        throw new HostError(status === 409 ? 'conflict' : status === 404 || status === 410 ? 'missing' : 'failure',
-          String(message), error)
+        // Only a missing file is deletion evidence; other 404s, such as a released session, are failures.
+        const kind = Number(error.status) === 409 ? 'conflict'
+          : error.error === 'file_not_found' ? 'missing' : 'failure'
+        throw new HostError(kind, String(message), error)
       }
       throw error
     }

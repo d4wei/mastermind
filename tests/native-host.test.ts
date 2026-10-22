@@ -39,6 +39,7 @@ describe('native reviewer boundary', () => {
 
   it.each([
     { status: 404, error: 'file_not_found', message: 'No such file or directory' },
+    { status: 404, error: 'document_not_open', message: 'The document is not open.' },
     { status: 403, error: 'permission_denied', message: 'Permission denied' },
     { status: 409, error: 'file_changed', message: 'The file changed. Compare before saving.' },
     { status: 500, error: 'file_io_error', message: 'The disk operation failed' },
@@ -47,7 +48,8 @@ describe('native reviewer boundary', () => {
       const invoke = vi.fn().mockRejectedValue(failure)
       const host = createNativeHost({ invoke, listen: vi.fn() }, [])
       await expect(host.getFile('0')).rejects.toMatchObject({
-        kind: failure.status === 409 ? 'conflict' : failure.status === 404 ? 'missing' : 'failure', message: failure.message, data: failure,
+        kind: failure.status === 409 ? 'conflict' : failure.error === 'file_not_found' ? 'missing' : 'failure',
+        message: failure.message, data: failure,
       })
       await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(HostError)
     })

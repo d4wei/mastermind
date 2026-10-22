@@ -2,15 +2,11 @@ import { useCallback, useRef } from 'react'
 
 export function useCompositionGuard() {
   const active = useRef(false)
-  const textareaRef = useCallback((element: HTMLTextAreaElement | null) => {
-    if (!element) active.current = false
-  }, [])
-  const inputRef = useCallback((element: HTMLInputElement | null) => {
+  const ref = useCallback((element: HTMLInputElement | HTMLTextAreaElement | null) => {
     if (!element) active.current = false
   }, [])
   return {
-    textareaRef,
-    inputRef,
+    ref,
     onCompositionStart: () => { active.current = true },
     onCompositionEnd: () => { active.current = false },
     onBlur: () => { active.current = false },

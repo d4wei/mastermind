@@ -10,6 +10,9 @@ import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
+import { useNav } from '../ui/app/navStore'
+import { useTranslation } from '../ui/translate/translationStore'
+import { prepareTranslation } from '../document/translation'
 
 const rail = vi.hoisted(() => ({ request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void) }))
 vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void }) => {
@@ -152,4 +155,58 @@ it('selects from the passage and clears selection on ordinary document clicks or
   expect(rail.active).toBe(0)
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   expect(rail.active).toBeNull()
+})
+
+it('keeps the selected discussion when an edit inserts an earlier one, and forgets it once resolved', () => {
+  render('a {==X==}{>>x<<} b {==Y==}{>>y<<}')
+  act(() => host.querySelector<HTMLElement>('.critic-anchor[data-span-index="2"]')!.click())
+  expect(rail.active).toBe(2)
+  act(() => useDoc.getState().applyEdits([{ from: 0, to: 0, insert: '{>>new<<} ' }]))
+  expect(host.querySelector('.critic-anchor.active')?.textContent).toBe('Y')
+  expect(rail.active).toBe(3)
+  const source = useDoc.getState().source
+  const y = analyzeMarkdown(source).items.filter((item) => item.type === 'thread')[2]!
+  if (y.type !== 'thread') throw new Error('Expected thread')
+  act(() => rail.onEdit!(resolveThreadEdits(source, y)))
+  expect(rail.active).toBeNull()
+  expect(host.querySelector('.critic-anchor.active')).toBeNull()
+})
+
+it('keeps the selected discussion when Escape closes a panel', () => {
+  render('a {==X==}{>>x<<}')
+  act(() => host.querySelector<HTMLElement>('.critic-anchor')!.click())
+  expect(rail.active).toBe(0)
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (0)').click())
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  expect(host.querySelector('[role="dialog"]')).toBeNull()
+  expect(rail.active).toBe(0)
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  expect(rail.active).toBeNull()
+})
+
+it('navigates the outline within the translated view', async () => {
+  vi.useRealTimers()
+  const { webcrypto } = await import('node:crypto')
+  vi.stubGlobal('crypto', webcrypto)
+  const source = '# One\n\ntext\n\n# Two\n\nmore'
+  const prepared = await prepareTranslation(source)
+  const artifact = { version: 1, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang: 'fr',
+    blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id,
+      // The first paragraph's emphasis starts at the second heading's source offset.
+      text: block.kind === 'heading' ? `${block.text} (fr)` : block.text === 'text' ? 'texte tradui *ici*' : block.text })) }
+  installHost(fakeHost({ translations: async () => [artifact] }))
+  render(source)
+  try {
+    await act(async () => { await useTranslation.getState().select('fr') })
+    await vi.waitFor(async () => {
+      await act(async () => {})
+      expect(host.querySelector('.trans-view [data-ps]')).not.toBeNull()
+    })
+    const { outline, docEl } = useNav.getState()
+    expect(docEl).toBe(host.querySelector('.trans-view'))
+    expect(outline.map((item) => docEl!.querySelector(`[data-ps="${item.offset}"]`)?.textContent))
+      .toEqual(['One (fr)', 'Two (fr)'])
+  } finally { useTranslation.getState().release('A') }
 })

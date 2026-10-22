@@ -1,4 +1,5 @@
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
+import { ESCAPE_OWNER_SELECTOR } from '../../app/constants'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { CriticSpan } from '../../../document/critic/types'
@@ -93,8 +94,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     const onKey = (e: KeyboardEvent): void => {
       if (ime.isComposing(e)) return
       if (e.key === 'Escape') {
-        // Leave Escape to active settings or dialog overlays.
-        if (document.querySelector('.settings-panel, .close-dialog[open]')) return
+        if (document.querySelector(ESCAPE_OWNER_SELECTOR)) return
         dismiss()
       }
     }
@@ -163,9 +163,10 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     window.getSelection()?.removeAllRanges()
     dismiss()
   }
-  // Null marks a draft the file cannot represent exactly; it stays editable but cannot submit.
-  const edits = composing === 'change' ? changeEdits(view.ranges, replacements)
-    : composing === 'comment' && comment.trim() ? commentEdits(view.ranges, authorTag, comment) : []
+  // Null marks a draft whose insert would not reparse as the intended mark in place; it stays
+  // editable but cannot submit.
+  const edits = composing === 'change' ? changeEdits(view.source, view.ranges, replacements)
+    : composing === 'comment' && comment.trim() ? commentEdits(view.source, view.ranges, authorTag, comment) : []
   const canSubmit = source === view.source && !readOnly && !!edits?.length
   const submit = (): void => {
     if (canSubmit) finish(edits!)
@@ -207,7 +208,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
           {(readOnly || source !== view.source) && <p role="status">{t(readOnly ? 'editingPaused' : 'draftSelectionChanged')}</p>}
           {composing === 'comment' ? <textarea readOnly={readOnly}
             autoFocus
-            ref={ime.textareaRef}
+            ref={ime.ref}
             onCompositionStart={ime.onCompositionStart}
             onCompositionEnd={ime.onCompositionEnd}
             onBlur={ime.onBlur}
@@ -222,7 +223,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
             {replacements.map((replacement, index) => <label key={index}>
               {t('replacement')}{replacements.length > 1 ? ` ${index + 1}` : ''}
               <textarea autoFocus={index === 0} readOnly={readOnly} rows={3}
-                ref={ime.textareaRef} onCompositionStart={ime.onCompositionStart}
+                ref={ime.ref} onCompositionStart={ime.onCompositionStart}
                 onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
                 value={replacement} onChange={(event) => setReplacements((current) =>
                   current.map((value, i) => i === index ? event.target.value : value))}

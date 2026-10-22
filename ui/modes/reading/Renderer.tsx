@@ -35,7 +35,6 @@ interface RenderCtx {
 interface PresentedCtx extends RenderCtx {
   anchoredHighlights?: ReadonlySet<number>
   commentMarkers?: ReadonlySet<number>
-  commentTargets?: ReadonlyMap<number, number>
 }
 
 function deletionProps(
@@ -118,7 +117,6 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
           key={key}
           className={`critic ${ctx.commentMarkers?.has(n.data.spanIndex) ? 'critic-comment-marker' : 'critic-comment-reference'}`}
           data-span-index={n.data.spanIndex}
-          data-comment-target={ctx.commentTargets?.get(n.data.spanIndex)}
           title={n.data.content}
           role="button"
           tabIndex={0}
@@ -362,7 +360,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
 
 export type CalloutKind = 'decisions' | 'questions' | 'todo' | 'risks'
 
-/** A heading with a callout kind opens a section that runs until the next heading of equal or higher rank. */
+/** Classifies a heading's text as a callout kind, or null for an ordinary heading. */
 export function calloutKind(text: string): CalloutKind | null {
   const s = text.trim().toLowerCase()
   if (/^decisions?\b/.test(s)) return 'decisions'
@@ -377,15 +375,12 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
     const spans = ctx.reviewSpans ?? scanMarkdown(ctx.source)
     const anchoredHighlights = new Set<number>()
     const commentMarkers = new Set<number>()
-    const commentTargets = new Map<number, number>()
     for (const item of group(spans, ctx.source)) {
       if (item.type !== 'thread') continue
       if (item.anchor) anchoredHighlights.add(spans.indexOf(item.anchor))
       else if (item.comments[0]) commentMarkers.add(spans.indexOf(item.comments[0].span))
-      const target = spans.indexOf((item.anchor ?? item.comments[0]!.span))
-      for (const comment of item.comments) commentTargets.set(spans.indexOf(comment.span), target)
     }
-    return { anchoredHighlights, commentMarkers, commentTargets }
+    return { anchoredHighlights, commentMarkers }
   }, [ctx.source, ctx.reviewSpans])
   const presented = { ...ctx, ...presentation }
   const children = tree.children
@@ -395,7 +390,8 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
     const node = children[i]!
     const kind = node.type === 'heading' ? calloutKind(plainText(node)) : null
     if (node.type === 'heading' && kind) {
-      // Leave the wrapper unpositioned so review selections anchor to its inner blocks.
+      // A callout section runs until the next heading of equal or higher rank. Leave the wrapper
+      // unpositioned so review selections anchor to its inner blocks.
       const depth = node.depth
       let j = i + 1
       while (j < children.length) {

@@ -3,13 +3,14 @@ import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { DraftScope, useDraftFocus, pendingDrafts, draftValue } from '../review/drafts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DocumentScroll } from './DocumentScroll'
-import { APP_NAME, DEFAULT_AUTHOR_TAG } from './constants'
+import { APP_NAME, DEFAULT_AUTHOR_TAG, ESCAPE_OWNER_SELECTOR } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
+import { locateThread, rebaseThread, threadCards, threadRef, type ThreadCard, type ThreadRef } from '../review/thread-identity'
 import { useNav } from './navStore'
 import { MarkGutter, type MarkTick } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
@@ -38,6 +39,34 @@ const TranslatedView = lazy(() => import('../translate/TranslatedView').then((m)
 
 const MODE_CYCLE: Record<ViewMode, ViewMode> = { reading: 'source', source: 'reading' }
 
+/**
+ * Holds a discussion choice by thread identity, so edits elsewhere cannot move it to another
+ * discussion. Returns the chosen card's span index in the current analysis, a chooser taking any
+ * member span index, and a rebase for edits about to be applied to the current source.
+ */
+function useThreadChoice(cards: ThreadCard[] | null, source: string) {
+  const [chosen, setChosen] = useState<ThreadRef | null>(null)
+  const current = useRef({ cards, source })
+  current.current = { cards, source }
+  const located = chosen && cards ? locateThread(chosen, source, cards) : null
+  // Re-anchor after a source change, or forget a discussion that no longer exists. Without an
+  // analysis (Markdown mode, translations) the choice waits for the next one.
+  useEffect(() => {
+    if (chosen && cards && chosen.source !== source) setChosen(located && threadRef(located, source))
+  }, [chosen, cards, source, located])
+  const choose = useCallback((spanIndex: number | null) => {
+    const { cards, source } = current.current
+    const card = spanIndex === null ? undefined : cards?.find((item) => item.members.includes(spanIndex))
+    setChosen((ref) => !card ? null : ref?.source === source && ref.start === card.start &&
+      ref.identity === card.identity ? ref : threadRef(card, source))
+  }, [])
+  const rebase = useCallback((edits: readonly TextEdit[]) => {
+    const { source } = current.current
+    setChosen((ref) => ref && rebaseThread(ref, source, edits))
+  }, [])
+  return [located?.spanIndex ?? null, choose, rebase] as const
+}
+
 function isTypingTarget(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null
   if (!el) return false
@@ -60,18 +89,18 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const load = useDoc((s) => s.load)
   const applyDocEdits = useDoc((s) => s.applyEdits)
   const { collapse: collapseTable, hidden: tableExpanded } = useTableExpansion()
-  const applyEdits = useCallback((edits: TextEdit[]) => {
-    collapseTable()
-    applyDocEdits(edits)
-  }, [collapseTable, applyDocEdits])
 
   const t = useT()
   const articleRef = useRef<HTMLElement | null>(null)
   const translatedRef = useRef<HTMLElement | null>(null)
+  // The translated article mounts after asynchronous preparation, so the outline needs to observe it.
+  const [translatedElement, setTranslatedElement] = useState<HTMLElement | null>(null)
+  const translatedContainer = useCallback((element: HTMLElement | null) => {
+    translatedRef.current = element
+    setTranslatedElement(element)
+  }, [])
   const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
   const replyHandled = useCallback(() => setReplyRequest(null), [])
-  const [activeSpan, setActiveSpan] = useState<number | null>(null)
-  const [hoveredSpan, setHoveredSpan] = useState<number | null>(null)
   const smallWindow = useIsNarrow()
   const reading = useReadingSpace()
   const narrow = smallWindow || reading.panel
@@ -79,12 +108,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
   const findOpenedRail = useRef(false)
   const closeRail = useCallback(() => { findOpenedRail.current = false; setRailOpen(false) }, [])
-  const revealFindComment = useCallback((spanIndex: number) => {
-    collapseTable()
-    if (!railOpen) findOpenedRail.current = true
-    setRailOpen(true)
-    setActiveSpan(spanIndex)
-  }, [railOpen, collapseTable])
   const restoreFindRail = useCallback(() => {
     if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
   }, [])
@@ -127,11 +150,31 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     if (loadedSessionId === sessionId && status === 'ready') void useTranslation.getState().synchronize()
   }, [sessionId, source, status, loadedSessionId])
 
+  const showTranslated = mode === 'reading' && transActive
+  const analysis = useMemo(
+    () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
+    [status, source, mode, showTranslated],
+  )
+  const cards = useMemo(() => analysis && threadCards(analysis.items, analysis.spans, source), [analysis, source])
+  const [activeSpan, chooseActive, rebaseActive] = useThreadChoice(cards, source)
+  const [hoveredSpan, chooseHovered] = useThreadChoice(cards, source)
+  const applyEdits = useCallback((edits: TextEdit[]) => {
+    collapseTable()
+    rebaseActive(edits)
+    applyDocEdits(edits)
+  }, [collapseTable, rebaseActive, applyDocEdits])
+  const revealFindComment = useCallback((spanIndex: number) => {
+    collapseTable()
+    if (!railOpen) findOpenedRail.current = true
+    setRailOpen(true)
+    chooseActive(spanIndex)
+  }, [railOpen, collapseTable, chooseActive])
+
   useEffect(() => {
     void load(sessionId)
-    setActiveSpan(null)
-    setHoveredSpan(null)
-  }, [sessionId, load])
+    chooseActive(null)
+    chooseHovered(null)
+  }, [sessionId, load, chooseActive, chooseHovered])
 
   useEffect(() => {
     if (status !== 'ready') return
@@ -142,7 +185,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     }
     const unsubscribe = requireReviewerHost().subscribe(sessionId, (event) => {
       if (event === 'translations') { refreshTranslations(); return }
-      if (event === 'config') { void useConfig.getState().load(); return }
       if (useDoc.getState().sessionId === sessionId) {
         refreshTranslations()
         useDoc.getState().notifyDiskChange(event === 'deleted')
@@ -151,21 +193,14 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     return () => { unsubscribe(); clearTimeout(translationRefresh) }
   }, [sessionId, status])
 
-  const showTranslated = mode === 'reading' && transActive
-  const analysis = useMemo(
-    () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
-    [status, source, mode, showTranslated],
-  )
-
-
   // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
     [analysis, status, source],
   )
   useEffect(() => {
-    useNav.getState().publish(outline, mode === 'reading' ? articleRef.current : null)
-  }, [outline, mode, externalVersion])
+    useNav.getState().publish(outline, mode !== 'reading' ? null : showTranslated ? translatedElement : articleRef.current)
+  }, [outline, mode, showTranslated, translatedElement, externalVersion])
   // Clear only on real unmount, so switching modes never blanks the outline
   // (which would briefly unmount the navigator and reset its transient state).
   useEffect(() => () => useNav.getState().publish([], null), [])
@@ -196,7 +231,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e)) setActiveSpan(null)
+      // An open panel consumes Escape; its listener may run after this one, so check the DOM too.
+      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e) &&
+        !e.defaultPrevented && !document.querySelector(ESCAPE_OWNER_SELECTOR)) chooseActive(null)
       // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -219,7 +256,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [chooseActive])
 
   const undoDeletion = useCallback(
     (el: HTMLElement): boolean => {
@@ -238,13 +275,13 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (!thread) return false
       const idx = Number(thread.dataset.spanIndex)
       if (Number.isFinite(idx)) {
-        setActiveSpan(idx)
+        chooseActive(idx)
         setReplyRequest({ spanIndex: idx })
         openRail()
       }
       return true
     },
-    [openRail],
+    [openRail, chooseActive],
   )
   const onArticleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -252,9 +289,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (window.getSelection()?.isCollapsed === false) return
       const del = (e.target as HTMLElement).closest('.critic-del') as HTMLElement | null
       if (del && undoDeletion(del)) return
-      if (!activateThread(e.target)) setActiveSpan(null)
+      if (!activateThread(e.target)) chooseActive(null)
     },
-    [undoDeletion, activateThread],
+    [undoDeletion, activateThread, chooseActive],
   )
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -270,29 +307,14 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     [undoDeletion, activateThread],
   )
 
-  const activeCardSpan = useMemo(() => {
-    if (activeSpan === null || !analysis) return null
-    for (const item of analysis.items) {
-      if (item.type !== 'thread') continue
-      const memberIdxs = [
-        ...(item.anchor ? [analysis.spans.indexOf(item.anchor)] : []),
-        ...item.comments.map((c) => analysis.spans.indexOf(c.span)),
-      ]
-      if (memberIdxs.includes(activeSpan)) {
-        return item.anchor ? analysis.spans.indexOf(item.anchor) : analysis.spans.indexOf(item.comments[0]!.span)
-      }
-    }
-    return null
-  }, [activeSpan, analysis])
-
   useEffect(() => {
     const doc = articleRef.current
     if (!doc) return
     doc.querySelectorAll('.critic-anchor.active, .critic-comment-marker.active').forEach((el) => el.classList.remove('active'))
-    if (activeCardSpan !== null) {
-      doc.querySelector(`.critic[data-span-index="${activeCardSpan}"]`)?.classList.add('active')
+    if (activeSpan !== null) {
+      doc.querySelector(`.critic[data-span-index="${activeSpan}"]`)?.classList.add('active')
     }
-  }, [activeCardSpan, analysis])
+  }, [activeSpan, analysis])
 
   useEffect(() => {
     const doc = articleRef.current
@@ -329,15 +351,17 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       source={source}
       docRef={articleRef}
       authorTag={authorTag}
-      activeSpan={activeCardSpan}
+      activeSpan={activeSpan}
       replyRequest={replyRequest}
       onReplyHandled={replyHandled}
       hoveredSpan={hoveredSpan}
-      onHover={setHoveredSpan}
-      onActivate={setActiveSpan}
+      onHover={chooseHovered}
+      onActivate={chooseActive}
       onEdit={(edits) => {
         const current = useDoc.getState()
-        if (current.sessionId === sessionId && current.source === source) current.applyEdits(edits)
+        if (current.sessionId !== sessionId || current.source !== source) return
+        rebaseActive(edits)
+        current.applyEdits(edits)
       }}
     />
   )
@@ -380,16 +404,16 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           <div className="doc-column">
             {showTranslated && (
               <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-                {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedRef} />}
+                {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
               </Suspense>
             )}
             {mode === 'reading' && !showTranslated && analysis && (
               <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
                 onPointerOver={(event) => {
                   const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
-                  setHoveredSpan(target ? Number(target.dataset.spanIndex) : null)
+                  chooseHovered(target ? Number(target.dataset.spanIndex) : null)
                 }}
-                onPointerLeave={() => setHoveredSpan(null)}>
+                onPointerLeave={() => chooseHovered(null)}>
                 <MarkdownView
                   tree={analysis.tree}
                   ctx={{
@@ -430,7 +454,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       {showRail && analysis && !showTranslated && narrow && (
         <div className="comments-panel" inert={tableExpanded} aria-hidden={tableExpanded}
           data-table-hidden={tableExpanded}>
-          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar" focusOnOpen={!findOpenedRail.current}>
+          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar"
+            returnFocus=".topbar-comments" focusOnOpen={!findOpenedRail.current}>
             {commentRail}
           </SlideOver>
         </div>
@@ -452,7 +477,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
             onEdit={applyEdits}
           />
           {markTicks.length > 0 && !showRail && (
-            <MarkGutter docRef={articleRef} marks={markTicks} version={externalVersion} />
+            <MarkGutter docRef={articleRef} marks={markTicks} />
           )}
         </>
       )}
