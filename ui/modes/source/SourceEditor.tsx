@@ -2,11 +2,11 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { editingLocked, useDoc } from '../../documents/store'
 import { attachSourceSearch, sourceSearchExtension } from '../../find/source'
-import { useNav, type SourceOutline } from '../../app/navStore'
+import type { SourceOutline } from '../../app/Navigator'
 import { documentMap } from '../../util/document-map'
 
 const CRITIC_CLASS: Record<string, string> = {
@@ -65,8 +65,11 @@ const editingState = (paused: boolean) => [EditorState.readOnly.of(paused), Edit
 
 const retainedStates = documentMap<{ state: EditorState; revision: number }>()
 
-export function SourceEditor() {
+/** `onOutline` receives the mounted view's heading geometry and navigation, and null on unmount. */
+export function SourceEditor({ onOutline }: { onOutline: Dispatch<SetStateAction<SourceOutline | null>> }) {
   const hostRef = useRef<HTMLDivElement>(null)
+  const reportOutline = useRef(onOutline)
+  reportOutline.current = onOutline
   const sessionId = useDoc((s) => s.sessionId)
   const externalVersion = useDoc((s) => s.externalVersion)
 
@@ -128,13 +131,13 @@ export function SourceEditor() {
           effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: 24 }) })
       },
     }
-    useNav.setState({ source: sourceOutline })
+    reportOutline.current(sourceOutline)
 
     return () => {
       searchBinding?.dispose()
       // Retain immutable state only. Cleanup must not flush an externally replaced buffer.
       if (useDoc.getState().hasDocument(sessionId)) retainedStates.set(sessionId, { state: view.state, revision })
-      if (useNav.getState().source === sourceOutline) useNav.setState({ source: null })
+      reportOutline.current((current) => current === sourceOutline ? null : current)
       stop()
       view.destroy()
     }

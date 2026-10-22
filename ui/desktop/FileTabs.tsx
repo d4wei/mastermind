@@ -4,6 +4,7 @@ import { AlertIcon, ChevronDownIcon, CrossIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { fileWindow } from './file-window'
 import { useClosePrompt } from './CloseDialog'
+import { closeOverlay, openOverlay, useOverlay, useOverlayOpen } from '../app/overlayStore'
 import { useT } from '../i18n'
 
 export interface OpenDocument { language?: string; id: string; path: string }
@@ -24,7 +25,8 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
   const list = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [geometry, setGeometry] = useState({ width: Infinity, widths: [] as number[], overflowWidths: [] as number[], gap: 0 })
-  const [open, setOpen] = useState(false)
+  const open = useOverlayOpen('files')
+  const setOpen = (next: boolean) => { if (next) openOverlay('files'); else closeOverlay('files') }
   const pendingFocus = useRef<{ id: string; index: number; menu: boolean } | null>(null)
   const closing = useRef(false)
   const selecting = useRef(false)
@@ -61,15 +63,8 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
     return () => observer.disconnect()
   }, [measurementKey])
 
-  useEffect(() => {
-    const dismiss = () => { selecting.current = true; setOpen(false) }
-    window.addEventListener('mastermind-find', dismiss)
-    window.addEventListener('mastermind-language-open', dismiss)
-    return () => {
-      window.removeEventListener('mastermind-find', dismiss)
-      window.removeEventListener('mastermind-language-open', dismiss)
-    }
-  }, [])
+  // The list closes with the file row, so a remounted row never reopens it.
+  useEffect(() => () => closeOverlay('files'), [])
   useLayoutEffect(() => {
     if (closePrompt) { selecting.current = true; setOpen(false) }
   }, [closePrompt])
@@ -146,7 +141,7 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
         +{'9'.repeat(index + 1)}<ChevronDownIcon /></span>)}
     </div>
     {files.slice(start, end).map((file, index) => row(file, start + index, false))}
-    <Popover.Root open={open && files.length > 0} onOpenChange={(next) => { setOpen(next); if (next) window.dispatchEvent(new Event('mastermind-files-open')) }} modal={false}>
+    <Popover.Root open={open && files.length > 0} onOpenChange={setOpen} modal={false}>
       {(hidden > 0 || open) && <Popover.Trigger asChild>
         <button ref={trigger} type="button" className="native-file-overflow btn-ghost" aria-label={label}
           title={t('openFiles')}>+{hidden}<ChevronDownIcon /></button>
@@ -159,10 +154,10 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
             const button = list.current?.querySelector<HTMLButtonElement>('[aria-current="page"]')
               ?? list.current?.querySelector<HTMLButtonElement>('.native-file-select')
             button?.focus(); button?.scrollIntoView?.({ block: 'nearest' })
-            window.dispatchEvent(new Event('mastermind-find-close'))
           }}
           onCloseAutoFocus={(event) => {
-            if (selecting.current || !trigger.current) event.preventDefault()
+            // Another overlay that replaced the list keeps focus for itself.
+            if (selecting.current || useOverlay.getState().open !== null || !trigger.current) event.preventDefault()
             selecting.current = false
           }}>
           <div className="native-file-list-title">{t('openFiles')}</div>

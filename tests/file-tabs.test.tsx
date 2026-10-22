@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { FileTabs, type OpenDocument } from '../ui/desktop/FileTabs'
 import { useClosePrompt } from '../ui/desktop/CloseDialog'
+import { openOverlay, requestFind, useOverlay } from '../ui/app/overlayStore'
 
 let host: HTMLDivElement
 let root: Root
@@ -93,13 +94,11 @@ it('navigates the whole list by keyboard and returns focus on Escape', async () 
   expect(menu()).toBeNull()
   await vi.waitFor(() => expect(document.activeElement).toBe(host.querySelector('button.native-file-overflow')))
 })
-it('closes Find on opening the list and closes the list on a Find request', async () => {
-  const listener = vi.fn(); window.addEventListener('mastermind-find-close', listener)
-  try {
-    await mount(); await open(); expect(listener).toHaveBeenCalledTimes(1)
-    await act(async () => window.dispatchEvent(new Event('mastermind-find')))
-    expect(menu()).toBeNull()
-  } finally { window.removeEventListener('mastermind-find-close', listener) }
+it('replaces Find on opening the list and closes the list on a Find request', async () => {
+  await act(async () => requestFind())
+  await mount(); await open(); expect(useOverlay.getState().open).toBe('files')
+  await act(async () => requestFind())
+  expect(menu()).toBeNull()
 })
 it('labels the list and close controls in Chinese', async () => {
   chinese = true
@@ -123,7 +122,7 @@ it('fits short labels by their measured widths and recomputes when they grow', a
 
 it('dismisses the file list when the language menu opens', async () => {
   await mount(); await open()
-  await act(async () => window.dispatchEvent(new Event('mastermind-language-open')))
+  await act(async () => openOverlay('language', 'doc'))
   expect(menu()).toBeNull()
 })
 

@@ -8,8 +8,9 @@ import { useTranslation } from '../ui/translate/translationStore'
 import { useDoc } from '../ui/documents/store'
 import { useConfig } from '../ui/app/configStore'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
-import { DraftScope, useDraftGuard, releaseDrafts, useDraftFocus } from '../ui/review/drafts'
+import { DraftScope, useDraftGuard, releaseDrafts, focusDraft } from '../ui/review/drafts'
 import { useClosePrompt } from '../ui/desktop/CloseDialog'
+import { openOverlay, requestFind } from '../ui/app/overlayStore'
 let root: Root
 let host: HTMLDivElement
 const initial = useTranslation.getState()
@@ -31,7 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount()); host.remove(); releaseDrafts('A')
   useTranslation.setState(initial); useDoc.setState(doc); useConfig.setState(config)
-  useClosePrompt.setState({ prompt: null }); useDraftFocus.setState({ target: null }); vi.unstubAllGlobals()
+  useClosePrompt.setState({ prompt: null }); focusDraft(null); vi.unstubAllGlobals()
 })
 async function mount(draft = false) { await act(async () => root.render(<DraftScope id="A"><LanguageMenu />{draft && <Draft />}</DraftScope>)) }
 async function open() { await act(async () => host.querySelector('button')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))) }
@@ -45,9 +46,9 @@ it('shows original and native language names with one selection indicator', asyn
   expect(select).toHaveBeenCalledWith('fr')
   expect(items()).toEqual([])
 })
-it.each(['mastermind-find', 'mastermind-files-open'])('dismisses when %s opens', async (event) => {
+it.each(['find', 'files'] as const)('dismisses when %s opens', async (overlay) => {
   await mount(); await open()
-  await act(async () => window.dispatchEvent(new Event(event)))
+  await act(async () => overlay === 'find' ? requestFind() : openOverlay(overlay))
   expect(items()).toEqual([])
 })
 it('omits the picker without valid translations and localizes surrounding labels', async () => {

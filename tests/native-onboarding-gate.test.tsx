@@ -8,9 +8,6 @@ const mocks = vi.hoisted(() => ({ load: vi.fn().mockResolvedValue(undefined), ho
 vi.mock('../ui/app/configStore', () => ({ useConfig: (selector: (state: unknown) => unknown) =>
   selector({ load: mocks.load }) }))
 vi.mock('../ui/app/route', () => ({ useRoute: () => mocks.home ? { kind: 'home' } : { kind: 'doc', sessionId: '4' } }))
-vi.mock('../ui/app/navStore', () => ({ useNav: (selector: (state: unknown) => unknown) =>
-  selector({ outline: [], collapsed: false }) }))
-vi.mock('../ui/app/Navigator', () => ({ Navigator: () => null, useIsNarrow: () => false }))
 vi.mock('../ui/app/SessionView', () => ({ SessionView: () => <article>Retained document</article> }))
 vi.mock('../ui/documents/documentLifecycle', () => ({ registerDocumentLifecycle: () => () => {} }))
 vi.mock('../ui/desktop/CloseDialog', () => ({ CloseDialog: () => null }))

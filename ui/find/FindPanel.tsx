@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import type { Analysis } from '../../document/markdown/analyze'
 import { useT } from '../i18n'
 import { ChevronDownIcon, ChevronUpIcon, CrossIcon, SearchIcon } from '../icons'
 import { commentSearchText } from '../review/CommentBody'
+import { closeOverlay, openOverlay, useOverlay } from '../app/overlayStore'
 import { useCompositionGuard } from '../util/composition'
 import { documentMap } from '../util/document-map'
 import { textMatches, type Match } from './matches'
@@ -20,12 +22,11 @@ interface Props {
   mode: 'reading' | 'translated' | 'source'
   docRef: RefObject<HTMLElement | null>
   analysis: Analysis | null
-  onOpen: () => void
   onRevealComment: (spanIndex: number) => void
   onClose: () => void
 }
 
-export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, onRevealComment, onClose }: Props) {
+export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealComment, onClose }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
   const [state, setState] = useState<FindState>(() => retained.get(sessionId) ?? { open: false, query: '', caseSensitive: false })
@@ -63,13 +64,14 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
     const seed = selected && !/[\r\n]/.test(selected) ? selected : undefined
     setState((current) => ({ ...current, open: true, query: seed ?? current.query }))
     if (!open || seed !== undefined) { pendingReveal.current = true; chooseFromPosition.current = true }
-    onOpen()
+    openOverlay('find')
     setFocusRequest((value) => value + 1)
-  }, [adapter, mode, docRef, open, onOpen])
+  }, [adapter, mode, docRef, open])
 
   const close = useCallback(() => {
     if (!open) return
     setState((current) => ({ ...current, open: false }))
+    closeOverlay('find')
     pendingReveal.current = false
     clearMatches()
     adapter?.close()
@@ -100,7 +102,8 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
   useEffect(() => {
     if (!open || mode === 'source') return
     const observer = new MutationObserver((records) => {
-      if (records.some((record) => !(record.target instanceof Element ? record.target : record.target.parentElement)?.closest('.find-bar'))) {
+      // Find's own controls and the outline strip change without changing searchable content.
+      if (records.some((record) => !(record.target instanceof Element ? record.target : record.target.parentElement)?.closest('.find-bar, .compact-outline'))) {
         setRevision((value) => value + 1)
       }
     })
@@ -167,10 +170,21 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onOpen, o
       }
     }
     window.addEventListener('keydown', key, true)
-    window.addEventListener('mastermind-find', openFind)
-    window.addEventListener('mastermind-find-close', close)
-    return () => { window.removeEventListener('keydown', key, true); window.removeEventListener('mastermind-find', openFind); window.removeEventListener('mastermind-find-close', close) }
+    return () => window.removeEventListener('keydown', key, true)
   }, [open, openFind, close, step, ime])
+
+  // Respond to overlay changes made after this panel mounted: a Find request opens or refocuses it,
+  // and opening any other overlay closes it. Find's open state is retained per document, so the
+  // store value seen at mount may belong to another document and is not acted on.
+  const overlay = useOverlay(useShallow((s) => [s.open, s.owner, s.findRequest] as const))
+  const seenOverlay = useRef(overlay)
+  useEffect(() => {
+    const [kind, owner, request] = overlay
+    const [seenKind, seenOwner, seenRequest] = seenOverlay.current
+    seenOverlay.current = overlay
+    if (request !== seenRequest) openFind()
+    else if ((kind !== seenKind || owner !== seenOwner) && kind !== null && kind !== 'find') close()
+  }, [overlay, openFind, close])
 
   useLayoutEffect(() => {
     if (!open) { clearMatches(); return }

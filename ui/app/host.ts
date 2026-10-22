@@ -39,7 +39,6 @@ export interface ReviewerHost {
   saveCopy?(id: string, content: string, forClose?: boolean): Promise<{ meta: SessionMeta; file: FileResponse } | null>
   subscribe(id: string, listener: (event: HostInvalidation) => void): () => void
   translations(id: string): Promise<unknown[]>
-  translation(id: string, targetLang: string): Promise<unknown>
   config(): Promise<ClientConfig>
   updateConfig(patch: Partial<Omit<ClientConfig, 'version'>>): Promise<ClientConfig>
   themes(): Promise<ThemeInfo[]>

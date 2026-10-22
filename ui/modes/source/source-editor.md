@@ -9,7 +9,7 @@ reverted to identical text, invalidates old editor history through the document 
 Each mount creates a fresh `EditorView` and transaction adapter. The adapter updates the view and
 pushes document changes into the store only while the captured document and external version are
 current. No callback tied to an old mount lives in the retained state. Cleanup retains state,
-unregisters only its own flusher and outline entry, and destroys the view; it never flushes stale content
+unregisters only its own flusher and outline callbacks, and destroys the view; it never flushes stale content
 over an adopted buffer. Views and DOM nodes are not cached.
 
 CodeMirror history remains separate from the store's undo stack for review operations performed
@@ -17,8 +17,8 @@ outside Markdown mode. Retention uses the existing CodeMirror history extension 
 source-editor undo stack. The cache has the same app lifetime as retained document buffers.
 
 Outline navigation uses CodeMirror's line-block geometry rather than requiring a rendered DOM line.
-The mounted view publishes heading-position and scroll callbacks as one navigation-store entry and
-clears its own entry on unmount.
+The mounted view reports heading-position and scroll callbacks to the document view through
+`onOutline` and clears its own report on unmount.
 Source offsets already use the document store's LF-normalized buffer. Navigation dispatches
 CodeMirror's scroll effect so it can remeasure virtualized lines before aligning the target in
 the document scroller, below the fixed controls.

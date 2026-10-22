@@ -1,5 +1,5 @@
 import type { DocStore } from '../documents/store'
-import { discardDrafts, pendingDrafts, useDraftFocus } from '../review/drafts'
+import { discardDrafts, focusDraft, pendingDrafts } from '../review/drafts'
 import { askToClose, useClosePrompt } from './CloseDialog'
 
 const CLOSE_PROGRESS_DELAY_MS = 400
@@ -28,7 +28,7 @@ export async function confirmClose(documents: DocStore, ids: string[] | undefine
     const choice = await askToClose({ kind: 'draft', names: drafts.map((draft) => draft.label) })
     if (choice === 'cancel') {
       const draft = drafts[0]!
-      useDraftFocus.setState({ target: draft })
+      focusDraft(draft)
       resume(draft.id)
       return null
     }

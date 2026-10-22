@@ -6,8 +6,6 @@ import { Tooltip } from 'radix-ui'
 import { useT } from '../i18n'
 import { ThemeEffects } from '../theme/ThemeProvider'
 import { useConfig } from './configStore'
-import { Navigator } from './Navigator'
-import { useNav } from './navStore'
 import { useRoute } from './route'
 import { registerDocumentLifecycle } from '../documents/documentLifecycle'
 import { TableExpansionProvider } from '../modes/reading/TableExpansion'
@@ -54,11 +52,8 @@ function AppFrame({
 }: {
   children: ReactNode
 }) {
-  const outlineCount = useNav((s) => s.outline.length)
-  const navPresent = outlineCount >= 2
   return (
     <TableExpansionProvider>
-      {navPresent && <Navigator />}
       <div className="app-content">{children}</div>
     </TableExpansionProvider>
   )

@@ -150,21 +150,20 @@ async function saveTranslation() {
   return artifact
 }
 
-it('serves a complete current prepared translation and reports a missing artifact', async () => {
-  expect((await request('/api/sessions/preview/translation?targetLang=zh-CN')).status).toBe(404)
+const translations = async () => (await request('/api/sessions/preview/translations')).json()
+
+it('serves a complete current prepared translation and omits a missing artifact', async () => {
+  expect(await translations()).toEqual([])
   const artifact = await saveTranslation()
-  const response = await request('/api/sessions/preview/translation?targetLang=zh-CN')
-  expect(response.status).toBe(200)
-  expect(await response.json()).toEqual(artifact)
+  expect(await translations()).toEqual([artifact])
 })
 
-it('rejects invalid translation paths and detects changed or deleted source files', async () => {
+it('omits translations of changed or deleted source files', async () => {
   await saveTranslation()
-  expect((await request('/api/sessions/preview/translation?targetLang=../outside')).status).toBe(400)
   await fs.writeFile(file, 'Changed narrative')
-  expect((await request('/api/sessions/preview/translation?targetLang=zh-CN')).status).toBe(409)
+  expect(await translations()).toEqual([])
   await fs.unlink(file)
-  expect((await request('/api/sessions/preview/translation?targetLang=zh-CN')).status).toBe(410)
+  expect(await translations()).toEqual([])
 })
 
 it.each([

@@ -1,6 +1,6 @@
 import type { TextEdit } from '../../document/types'
 import { useTableExpansion } from '../modes/reading/TableExpansion'
-import { DraftScope, useDraftFocus, useDraftState, pendingDrafts, draftValue } from '../review/drafts'
+import { DraftScope, useDraftPending, useDraftState, useDraftValue, useDrafts } from '../review/drafts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DocumentScroll } from './DocumentScroll'
 import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
@@ -13,12 +13,13 @@ import { CommentRail } from '../review/CommentRail'
 import { locateThread, rebaseReplies, rebaseThread, refreshThread, threadRef, type ReplyDraft,
   type ThreadRef } from '../review/thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
-import { useNav } from './navStore'
+import type { PreparedTranslation } from '../../document/translation'
+import { closeOverlay, openOverlay, useOverlay } from './overlayStore'
 import { MarkGutter } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../document/critic/scanner'
 import { useT } from '../i18n'
-import { useTranslation } from '../translate/translationStore'
+import { translationActive, useTranslation } from '../translate/translationStore'
 import { TranslatedSelection } from '../translate/TranslatedSelection'
 import { requireReviewerHost } from './host'
 import { useConfig } from './configStore'
@@ -29,7 +30,7 @@ import { Notice } from './Notifications'
 import { ConflictPanel } from './ConflictPanel'
 import { TopBar } from './TopBar'
 import { SlideOver } from './SlideOver'
-import { useIsNarrow } from './Navigator'
+import { Navigator, useIsNarrow, type SourceOutline } from './Navigator'
 import { readingSpace } from './reading-space'
 import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 
@@ -94,8 +95,13 @@ function DocumentView({ sessionId }: { sessionId: string }) {
 
   const t = useT()
   const articleRef = useRef<HTMLElement | null>(null)
+  // The outline locates headings in whichever article is mounted, so it observes both as state.
+  const [articleElement, setArticleElement] = useState<HTMLElement | null>(null)
+  const articleContainer = useCallback((element: HTMLElement | null) => {
+    articleRef.current = element
+    setArticleElement(element)
+  }, [])
   const translatedRef = useRef<HTMLElement | null>(null)
-  // The translated article mounts after asynchronous preparation, so the outline needs to observe it.
   const [translatedElement, setTranslatedElement] = useState<HTMLElement | null>(null)
   const translatedContainer = useCallback((element: HTMLElement | null) => {
     translatedRef.current = element
@@ -103,51 +109,12 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [])
   const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
   const replyHandled = useCallback(() => setReplyRequest(null), [])
-  const smallWindow = useIsNarrow()
-  const reading = useReadingSpace()
-  const narrow = smallWindow || reading.panel
-  const [railOpen, setRailOpen] = useState(!narrow)
-  useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
-  const findOpenedRail = useRef(false)
-  const closeRail = useCallback(() => { findOpenedRail.current = false; setRailOpen(false) }, [])
-  const restoreFindRail = useCallback(() => {
-    if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
-  }, [])
-  const [panel, setPanel] = useState<'settings' | 'resolved' | null>(null)
-  useEffect(() => { if (panel) window.dispatchEvent(new Event('mastermind-find-close')) }, [panel])
-  const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
-  const togglePanel = useCallback((next: 'settings' | 'resolved') => {
-    if (narrow) setRailOpen(false)
-    setPanel((current) => current === next ? null : next)
-  }, [narrow])
-  const draftFocus = useDraftFocus((s) => s.target)
-  useEffect(() => {
-    if (draftFocus?.id !== sessionId) return
-    useDoc.getState().setMode('reading')
-    setRailOpen(true)
-    setPanel(null)
-  }, [draftFocus, sessionId])
-  const closePanel = useCallback(() => setPanel(null), [])
-  const openRail = useCallback(() => {
-    collapseTable()
-    if (narrow) setPanel(null)
-    setRailOpen(true)
-  }, [narrow, collapseTable])
-  const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
-  const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const translation = useTranslation()
-  const translationLanguage = translation.targetLang
-  const retainedTranslation = useRef<{ sessionId: string; targetLang: string; artifact: NonNullable<typeof translation.artifact> } | null>(null)
-  if (translation.artifact && translation.sessionId === sessionId && translation.targetLang === translationLanguage) {
-    retainedTranslation.current = { sessionId, targetLang: translation.artifact.targetLang, artifact: translation.artifact }
-  }
-  const captured = retainedTranslation.current
-  const translatedDraft = pendingDrafts([sessionId]).some((draft) => draft.key === 'translated')
-    ? draftValue<{ artifact: NonNullable<typeof translation.artifact> }>(sessionId, 'translated:selection') : undefined
-  const composerArtifact = translation.artifact ?? (translation.error === 'stale' &&
-    captured?.sessionId === sessionId && captured.targetLang === translationLanguage ? captured.artifact : null) ?? translatedDraft?.artifact
-  const transActive = translation.active && translation.sessionId === sessionId &&
-    translation.source === source && translation.targetLang === translationLanguage
+  // An unfinished translated comment keeps the artifact it captured after its translation goes stale.
+  const translatedSelection = useDraftValue<{ artifact: PreparedTranslation } | null>(sessionId, 'translated:selection')
+  const translatedDraft = useDraftPending(sessionId, 'translated') ? translatedSelection : undefined
+  const composerArtifact = translation.artifact ?? translatedDraft?.artifact
+  const transActive = translationActive(translation, { sessionId, source })
   useEffect(() => {
     if (loadedSessionId === sessionId && status === 'ready') void useTranslation.getState().synchronize()
   }, [sessionId, source, status, loadedSessionId])
@@ -157,6 +124,49 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
     [status, source, mode, showTranslated],
   )
+  // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
+  const outline = useMemo(
+    () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
+    [analysis, status, source],
+  )
+  const [sourceOutline, setSourceOutline] = useState<SourceOutline | null>(null)
+  const smallWindow = useIsNarrow()
+  const reading = useReadingSpace(outline.length >= 2)
+  const narrow = smallWindow || reading.panel
+  const [railOpen, setRailOpen] = useState(!narrow)
+  useEffect(() => { if (narrow) setRailOpen(false) }, [narrow])
+  const findOpenedRail = useRef(false)
+  const closeRail = useCallback(() => { findOpenedRail.current = false; setRailOpen(false) }, [])
+  const restoreFindRail = useCallback(() => {
+    if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
+  }, [])
+  const panel = useOverlay((s) => s.owner === sessionId && (s.open === 'settings' || s.open === 'resolved') ? s.open : null)
+  const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
+  const togglePanel = useCallback((next: 'settings' | 'resolved') => {
+    if (narrow) setRailOpen(false)
+    const { open, owner } = useOverlay.getState()
+    if (open === next && owner === sessionId) closeOverlay(next)
+    else openOverlay(next, sessionId)
+  }, [narrow, sessionId])
+  const closePanel = useCallback(() => {
+    if (useOverlay.getState().owner === sessionId) closeOverlay('settings', 'resolved')
+  }, [sessionId])
+  // A panel lives no longer than its view: reopening the document starts with none.
+  useEffect(() => closePanel, [closePanel])
+  const draftFocus = useDrafts((s) => s.focus)
+  useEffect(() => {
+    if (draftFocus?.id !== sessionId) return
+    useDoc.getState().setMode('reading')
+    setRailOpen(true)
+    closePanel()
+  }, [draftFocus, sessionId, closePanel])
+  const openRail = useCallback(() => {
+    collapseTable()
+    if (narrow) closePanel()
+    setRailOpen(true)
+  }, [narrow, collapseTable, closePanel])
+  const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
+  const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const cards = analysis?.threads ?? null
   const [activeSpan, chooseActive, rebaseActive] = useThreadChoice(cards, source)
   const [hoveredSpan, chooseHovered, rebaseHovered] = useThreadChoice(cards, source)
@@ -207,17 +217,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     return () => { unsubscribe(); clearTimeout(translationRefresh) }
   }, [sessionId, status])
 
-  // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
-  const outline = useMemo(
-    () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
-    [analysis, status, source],
-  )
-  useEffect(() => {
-    useNav.getState().publish(outline, mode !== 'reading' ? null : showTranslated ? translatedElement : articleRef.current)
-  }, [outline, mode, showTranslated, translatedElement, externalVersion])
-  // Clear only on real unmount, so switching modes never blanks the outline
-  // (which would briefly unmount the navigator and reset its transient state).
-  useEffect(() => () => useNav.getState().publish([], null), [])
   const commentFootnotes = useMemo(() => {
     if (!analysis) return []
     return analysis.spans
@@ -360,6 +359,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
 
   return (
     <>
+      <Navigator outline={outline} docEl={mode !== 'reading' ? null : showTranslated ? translatedElement : articleElement}
+        source={sourceOutline} />
       <TopBar
         settings={{ open: panel === 'settings', onToggle: () => togglePanel('settings') }}
         resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
@@ -368,9 +369,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           collapseTable()
           findOpenedRail.current = false
           setRailOpen((v) => !v)
-          if (narrow) {
-            setPanel(null)
-          }
+          if (narrow) closePanel()
         }}
         commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
       />
@@ -382,7 +381,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       <Suspense fallback={null}>
         <FindPanel sessionId={sessionId} source={source} mode={showTranslated ? 'translated' : mode}
           docRef={showTranslated ? translatedRef : articleRef} analysis={analysis}
-          onOpen={closePanel} onRevealComment={revealFindComment} onClose={restoreFindRail} />
+          onRevealComment={revealFindComment} onClose={restoreFindRail} />
       </Suspense>
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
       <ConflictPanel />
@@ -400,7 +399,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
               </Suspense>
             )}
             {mode === 'reading' && !showTranslated && analysis && (
-              <article className="md-root" ref={articleRef} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
+              <article className="md-root" ref={articleContainer} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
                 onPointerOver={(event) => {
                   const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
                   chooseHovered(target ? Number(target.dataset.spanIndex) : null)
@@ -435,7 +434,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
             )}
             {mode === 'source' && (
               <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-                <SourceEditor key={`s${externalVersion}`} />
+                <SourceEditor key={`s${externalVersion}`} onOutline={setSourceOutline} />
               </Suspense>
             )}
           </div>
@@ -451,11 +450,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           </SlideOver>
         </div>
       )}
-      {mode === 'reading' && composerArtifact && ((translation.sessionId === sessionId &&
-        translation.targetLang === translationLanguage) || translatedDraft) && (
-        <TranslatedSelection key={`${sessionId}:${translationLanguage}`}
+      {mode === 'reading' && composerArtifact && (translation.sessionId === sessionId || translatedDraft) && (
+        <TranslatedSelection key={`${sessionId}:${translation.targetLang}`}
           containerRef={translatedRef} sessionId={sessionId} artifact={composerArtifact} authorTag={authorTag}
-          readOnly={readOnly} stale={translation.error === 'stale' || !!translatedDraft && !translation.active} />
+          readOnly={readOnly} stale={translation.error === 'stale' || !!translatedDraft && !transActive} />
       )}
       {mode === 'reading' && !showTranslated && analysis && (
         <>

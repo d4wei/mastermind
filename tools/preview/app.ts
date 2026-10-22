@@ -5,7 +5,7 @@ import path from 'node:path'
 import { DEFAULT_CONFIG } from '../../ui/settings/defaults'
 import { configPatch } from '../../ui/settings/config-values'
 import { readSessionFile, writeSessionFile } from './files'
-import { readPreparedTranslation, listPreparedTranslations, validLanguageCode } from '../translation/prepared-translations'
+import { listPreparedTranslations } from '../translation/prepared-translations'
 import { serveFile } from './static'
 import { scanThemes } from '../../themes/discovery'
 
@@ -64,16 +64,6 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
   app.get('/api/sessions/preview/translations', async (c) => {
     try { return c.json(await listPreparedTranslations(real, (await readSessionFile(real)).content)) }
     catch { return c.json([]) }
-  })
-  app.get('/api/sessions/preview/translation', async (c) => {
-    const lang = c.req.query('targetLang') ?? ''
-    if (!validLanguageCode(lang)) return c.json({ error: 'invalid targetLang' }, 400)
-    try {
-      const source = await readSessionFile(real)
-      const result = await readPreparedTranslation(real, source.content, lang)
-      if (result.status === 'ready') return c.json(result.artifact)
-      return result.status === 'missing' ? c.json({ error: result.status, kind: 'missing' }, 404) : c.json({ error: result.status }, 409)
-    } catch { return c.json({ error: 'file unreadable', kind: 'missing' }, 410) }
   })
   app.get('/api/sessions/preview/events', (c) => streamSSE(c, async (stream) => {
     let running = true

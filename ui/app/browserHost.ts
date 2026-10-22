@@ -30,7 +30,6 @@ export function createBrowserHost(): ReviewerHost {
       return () => events.close()
     },
     translations: (id) => request(`${session(id)}/translations`),
-    translation: (id, lang) => request(`${session(id)}/translation?targetLang=${encodeURIComponent(lang)}`),
     config: () => request('/api/config'),
     updateConfig: (patch) => request('/api/config', 'PUT', patch),
     themes: () => request('/api/themes'),

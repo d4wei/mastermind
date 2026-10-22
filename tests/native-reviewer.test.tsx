@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { NativeReviewer } from '../ui/desktop/NativeReviewer'
+import { useOverlay } from '../ui/app/overlayStore'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
@@ -515,11 +516,8 @@ it('disables native Find at home and forwards its menu event when a document is 
   mocks.id = '0'
   await mount()
   expect(mocks.invoke).toHaveBeenCalledWith('set_find_enabled', { enabled: true })
-  const requested = vi.fn()
-  window.addEventListener('mastermind-find', requested)
-  try {
-    const listener = mocks.listen.mock.calls.find(([event]) => event === 'find-requested')![1]
-    act(() => listener())
-    expect(requested).toHaveBeenCalledTimes(1)
-  } finally { window.removeEventListener('mastermind-find', requested) }
+  const requests = useOverlay.getState().findRequest
+  const listener = mocks.listen.mock.calls.find(([event]) => event === 'find-requested')![1]
+  act(() => listener())
+  expect(useOverlay.getState().findRequest).toBe(requests + 1)
 })

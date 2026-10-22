@@ -33,9 +33,9 @@ beforeEach(async () => {
   artifact = { version: 1, sourceHash: projection.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: projection.blocks.filter((block) => block.translatable).map((block, index) => ({ id: block.id, text: index ? 'Second translation' : quote })) }
   useConfig.setState({ config: { ...initialConfig.config! } })
-  installHost(fakeHost({ translation: async () => artifact }))
+  installHost(fakeHost({ translations: async () => [artifact] }))
   useDoc.setState({ ...initial, sessionId: 'A', source, savedSource: source, queueAutosave: vi.fn() })
-  useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', active: true, artifact, error: null })
+  useTranslation.setState({ sessionId: 'A', source, targetLang: 'zh-CN', artifact, error: null })
   ;({ host, root } = createReactHost())
   act(() => root.render(<Harness />))
 })
@@ -137,8 +137,8 @@ it('preserves the translated-comment draft across IME cancellation without submi
 
 it('rejects a replaced on-disk artifact even before its change event arrives', async () => {
   const submit = compose()
-  installHost(fakeHost({ translation: async () => ({ ...artifact,
-    blocks: artifact.blocks.map((block) => ({ ...block, text: 'Replacement text' })) }) }))
+  installHost(fakeHost({ translations: async () => [{ ...artifact,
+    blocks: artifact.blocks.map((block) => ({ ...block, text: 'Replacement text' })) }] }))
   act(() => submit.click())
   await vi.waitFor(() => expect(host.querySelector('[role="alert"]')).not.toBeNull())
   expect(useDoc.getState().source).toBe(source)

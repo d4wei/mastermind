@@ -34,8 +34,10 @@ and leaving the unfocused control dismiss the list. Selecting a heading scrolls 
 position and closes the list. Both modes follow document scroll position.
 Reading mode measures rendered headings; Markdown mode uses CodeMirror line geometry, including
 off-screen headings. Its scroll effect remeasures virtualized lines before positioning the target.
-`navStore` shares headings, the reading article, and the mounted editor's measurement callback;
-expansion is transient component state.
+The document view derives the headings and renders `Navigator` with them, the mounted reading
+article, and the mounted editor's measurement callbacks; expansion is transient component state.
+`Navigator` renders inside `.app-content`, before the controls; its fixed position keeps it out of the
+document flow, and Find ignores its updates when watching for content changes.
 
 `reading-space.ts` sizes the reading group from the available scroller width, preferred text width,
 font size, outline strip, fixed card width, and gap. The outline reserves space only while visible;
@@ -58,8 +60,11 @@ reduced motion changes position immediately. The animation uses the shared durat
 The Web Animations duration converts CSS seconds or milliseconds explicitly; production CSS may
 shorten the token to seconds.
 
-`SessionView` owns settings, find, and resolved history as one transient panel choice. On narrow
-layouts, opening another panel closes comments. Settings-save feedback belongs to application
+Find, the file list, the language menu, settings, and resolved history exclude one another through
+the one open value in `overlayStore.ts`; opening any closes the others. Settings, resolved history,
+and the language menu belong to the document view that opened them and close with it; Find keeps
+its per-document open state. On narrow layouts, opening settings or resolved history closes
+comments. Settings-save feedback belongs to application
 preferences and can appear without an active document.
 
 Settings and history panels fit within the viewport width and scroll their bodies when needed.

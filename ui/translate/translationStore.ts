@@ -5,10 +5,12 @@ import { useDoc } from '../documents/store'
 
 export interface TranslationSnapshot { sessionId: string | null; source: string }
 interface Choice { language: string | null; chosen: boolean; hinted: boolean }
-interface TransState extends TranslationSnapshot {
+interface TransState {
+  /** The document whose artifacts these are. */
+  sessionId: string | null
+  /** The source the artifacts were validated against; null while a changed source revalidates. */
+  source: string | null
   targetLang: string | null
-  active: boolean
-  loading: boolean
   artifact: PreparedTranslation | null
   available: PreparedTranslation[]
   error: 'stale' | 'unavailable' | null
@@ -28,8 +30,7 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
     return choices.get(id)!
   }
   const store = create<TransState>((set, get) => ({
-    sessionId: null, source: '', targetLang: null, active: false, loading: false,
-    artifact: null, available: [], error: null,
+    sessionId: null, source: null, targetLang: null, artifact: null, available: [], error: null,
     async synchronize() {
       const snapshot = current()
       if (!snapshot.sessionId) return
@@ -37,9 +38,9 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
       const token = ++generation
       const previous = get()
       if (previous.sessionId !== id) {
-        set({ ...snapshot, targetLang: null, active: false, artifact: null, available: [], error: null, loading: true })
+        set({ ...snapshot, targetLang: null, artifact: null, available: [], error: null })
       }
-      if (previous.sessionId === id && previous.source !== snapshot.source) set({ active: false })
+      if (previous.sessionId === id && previous.source !== snapshot.source) set({ source: null })
       try {
         const raw = await requireReviewerHost().translations(id)
         while (token === generation && current().sessionId === id) {
@@ -59,7 +60,7 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
           const artifact = available.find((item) => item.targetLang === selected.language) ?? null
           const invalidated = selected.language !== null && !artifact
           if (invalidated) selected.language = null
-          set({ ...now, targetLang: selected.language, active: !!artifact, artifact, available, loading: false,
+          set({ ...now, targetLang: selected.language, artifact, available,
             error: invalidated ? 'stale' : previous.sessionId === id ? previous.error : null })
           return
         }
@@ -68,7 +69,7 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
         const selected = choice(id)
         const hadTranslation = selected.language !== null
         selected.language = null
-        set({ ...current(), targetLang: null, active: false, artifact: null, available: [], loading: false,
+        set({ ...current(), targetLang: null, artifact: null, available: [],
           error: hadTranslation ? 'unavailable' : null })
       }
     },
@@ -78,7 +79,7 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
       const selected = choice(sessionId)
       selected.language = language
       selected.chosen = true
-      set({ active: false, artifact: null, targetLang: language, error: null })
+      set({ artifact: null, targetLang: language, error: null })
       await get().synchronize()
     },
     hint(id, language) {
@@ -89,11 +90,16 @@ export function createTranslationStore(current: () => TranslationSnapshot) {
     release(id) { choices.delete(id); hints.delete(id); if (get().sessionId === id) get().reset() },
     reset() {
       generation++
-      set({ sessionId: null, source: '', targetLang: null, active: false, loading: false,
-        artifact: null, available: [], error: null })
+      set({ sessionId: null, source: null, targetLang: null, artifact: null, available: [], error: null })
     },
   }))
   return store
+}
+
+/** Whether the selected artifact was validated against `current`, the document as it is now. */
+export function translationActive(state: Pick<TransState, 'sessionId' | 'source' | 'artifact'>,
+  current: TranslationSnapshot): boolean {
+  return !!state.artifact && state.sessionId === current.sessionId && state.source === current.source
 }
 
 export const useTranslation = createTranslationStore(() => ({

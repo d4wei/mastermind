@@ -6,7 +6,7 @@ import { editingLocked, useDoc } from '../documents/store'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { documentViewport, readingLine } from '../util/scroll'
-import { useTranslation } from './translationStore'
+import { translationActive, useTranslation } from './translationStore'
 
 interface Props {
   containerRef: RefObject<HTMLElement | null>
@@ -74,13 +74,14 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
     try {
       const current = useDoc.getState()
       const translated = useTranslation.getState()
-      if (current.sessionId !== sessionId || !translated.active || translated.artifact !== capturedArtifact ||
+      if (current.sessionId !== sessionId || !translationActive(translated, current) || translated.artifact !== capturedArtifact ||
         translated.targetLang !== capturedArtifact.targetLang ||
         !(await matchPreparedTranslation(current.source, capturedArtifact))) {
         setError(true); return
       }
+      const rereads = await requireReviewerHost().translations(sessionId)
       const latestArtifact = await matchPreparedTranslation(current.source,
-        await requireReviewerHost().translation(sessionId, capturedArtifact.targetLang))
+        rereads.find((item) => (item as { targetLang?: unknown } | null)?.targetLang === capturedArtifact.targetLang))
       if (!latestArtifact || JSON.stringify(latestArtifact) !== JSON.stringify(capturedArtifact)) {
         setError(true); return
       }
@@ -88,7 +89,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
         sourceHash: capturedArtifact.sourceHash, quote: selection.quote, language: capturedArtifact.targetLang, author: authorTag, body })
       const latest = useDoc.getState()
       if (editingLocked(latest) || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
-        useTranslation.getState().artifact !== capturedArtifact || !useTranslation.getState().active ||
+        useTranslation.getState().artifact !== capturedArtifact || !translationActive(useTranslation.getState(), latest) ||
         useTranslation.getState().targetLang !== capturedArtifact.targetLang) { setError(true); return }
       latest.applyEdits([edit])
       window.getSelection()?.removeAllRanges()

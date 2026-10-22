@@ -2,7 +2,9 @@
 
 `DraftScope` gives composers a document identity. `useDraftState` retains their input and captured
 selection in memory across file, panel, and mode changes. `useDraftGuard` identifies meaningful
-unfinished work and supplies the original composer's focus and discard actions. Empty composers do
+unfinished work and supplies the original composer's focus and discard actions. One store keyed by
+document id holds each document's retained values and meaningful drafts, together with the draft
+awaiting focus; document views read it reactively. Empty composers do
 not block close; a changed suggested replacement is meaningful even when it is empty (deletion).
 
 Closing offers Discard Drafts or Cancel before dealing with accepted document edits. Cancel selects
@@ -21,5 +23,6 @@ is not posted against a guessed target. Translated drafts retain their captured 
 the translation checks before submission.
 
 Save As transfers retained drafts to the admitted copy; closing releases the document's draft state.
-This registry is temporary app memory. It does not implement restart recovery or change the
+Prompts list drafts in the order they became meaningful, across documents.
+This store is temporary app memory. It does not implement restart recovery or change the
 Markdown file's authority for accepted review feedback.

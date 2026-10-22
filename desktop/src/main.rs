@@ -76,7 +76,6 @@ fn main() {
             document_io::write_document,
             document_io::save_document_copy,
             document_io::watch_document,
-            document_io::read_translation,
             document_io::list_translations,
             setup::setup_snapshot,
             setup::protect_setup_fields,

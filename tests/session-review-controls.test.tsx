@@ -10,8 +10,6 @@ import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
-import { useNav } from '../ui/app/navStore'
-import { Navigator } from '../ui/app/Navigator'
 import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
@@ -29,6 +27,14 @@ vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest
   return <div data-testid="rail" />
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
+const nav = vi.hoisted(() => ({ props: null as null | import('../ui/app/Navigator').NavigatorProps }))
+vi.mock('../ui/app/Navigator', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ui/app/Navigator')>()
+  return { ...actual, Navigator: (props: import('../ui/app/Navigator').NavigatorProps) => {
+    nav.props = props
+    return <actual.Navigator {...props} />
+  } }
+})
 let host: HTMLDivElement
 let root: Root
 const initial = useDoc.getState()
@@ -210,7 +216,7 @@ it('rebases the selection and reply drafts exactly through edits made in the doc
 
 it('keeps the selected discussion when Escape closes the outline popover', () => {
   useDoc.setState({ source: '# One\n\nBefore {==passage==}{>>@Alex: note<<}\n\n# Two\n' })
-  act(() => root.render(<><Navigator /><SessionView sessionId="A" /></>))
+  act(() => root.render(<SessionView sessionId="A" />))
   act(() => host.querySelector<HTMLElement>('.critic-anchor')!.click())
   expect(rail.active).toBe(0)
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.focus())
@@ -242,7 +248,7 @@ it('navigates the outline within the translated view', async () => {
       await act(async () => {})
       expect(host.querySelector('.trans-view [data-ps]')).not.toBeNull()
     })
-    const { outline, docEl } = useNav.getState()
+    const { outline, docEl } = nav.props!
     expect(docEl).toBe(host.querySelector('.trans-view'))
     expect(outline.map((item) => docEl!.querySelector(`[data-ps="${item.offset}"]`)?.textContent))
       .toEqual(['One (fr)', 'Two (fr)'])

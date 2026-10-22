@@ -7,7 +7,8 @@ import { installHost, HostError } from '../ui/app/host'
 import { createDocStore } from '../ui/documents/store'
 import { confirmClose } from '../ui/desktop/confirm-close'
 import { CloseDialog, askToClose, useClosePrompt } from '../ui/desktop/CloseDialog'
-import { DraftScope, pendingDrafts, releaseDrafts, useDraftFocus, useDraftGuard, useDraftState } from '../ui/review/drafts'
+import { DraftScope, pendingDrafts, releaseDrafts, focusDraft, transferDrafts, useDraftGuard, useDraftPending, useDraftState,
+  useDraftValue } from '../ui/review/drafts'
 
 const getFile = vi.fn(), putFile = vi.fn(), saveCopy = vi.fn()
 const file = (content: string, version = content) => ({ content, version, mtimeMs: 1 })
@@ -32,7 +33,7 @@ beforeEach(() => {
 afterEach(() => {
   removeReactHost(view.root, view.host)
   releaseDrafts('A'); releaseDrafts('B')
-  useClosePrompt.setState({ prompt: null }); useDraftFocus.setState({ target: null })
+  useClosePrompt.setState({ prompt: null }); focusDraft(null)
   installHost(null); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals()
 })
 const choose = async (choice: 'save' | 'discard' | 'cancel') => {
@@ -208,4 +209,30 @@ it('retains drafts across unmounts and discards only the named file’s drafts',
   await act(async () => { closing = confirmClose(store.getState(), ['A'], vi.fn()) })
   await choose('discard'); await closing
   expect(pendingDrafts().map((draft) => draft.id)).toEqual(['B'])
+})
+
+it('transfers a document’s drafts in their original order and exposes them reactively', async () => {
+  function Pending({ id }: { id: string }) {
+    const pending = useDraftPending(id, 'comment')
+    const value = useDraftValue<string>(id, 'comment')
+    return <output data-id={id}>{pending ? value : 'none'}</output>
+  }
+  act(() => view.root.render(<>
+    <DraftScope id="A"><Draft id="A" /></DraftScope><DraftScope id="B"><Draft id="B" /></DraftScope>
+    <Pending id="A" /><Pending id="C" />
+  </>))
+  const shown = (id: string) => view.host.querySelector(`output[data-id="${id}"]`)!.textContent
+  const textarea = view.host.querySelector('textarea')!
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'mine')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(shown('A')).toBe('mine')
+  expect(shown('C')).toBe('none')
+  act(() => view.root.render(<><DraftScope id="B"><Draft id="B" /></DraftScope><Pending id="A" /><Pending id="C" /></>))
+  act(() => transferDrafts('A', 'C'))
+  expect(shown('A')).toBe('none')
+  expect(shown('C')).toBe('mine')
+  expect(pendingDrafts().map((draft) => draft.id)).toEqual(['B', 'C'])
+  releaseDrafts('C')
 })

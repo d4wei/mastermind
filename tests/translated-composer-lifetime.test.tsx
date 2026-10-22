@@ -9,7 +9,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { SessionView } from '../ui/app/SessionView'
 import { useDoc } from '../ui/documents/store'
 import { useConfig } from '../ui/app/configStore'
-import { useTranslation } from '../ui/translate/translationStore'
+import { translationActive, useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
 vi.mock('../ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
@@ -56,7 +56,7 @@ it.each(['comment', 'narrative'])('retains the composer draft through a %s updat
   await act(async () => {
     await vi.waitFor(() => expect(useTranslation.getState().source).toBe(changed))
   })
-  expect(useTranslation.getState().active).toBe(kind === 'comment')
+  expect(translationActive(useTranslation.getState(), useDoc.getState())).toBe(kind === 'comment')
   if (kind === 'narrative') expect(host.querySelector('.sel-composer [role="alert"]')).not.toBeNull()
 })
 

@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
-import { useNav } from '../ui/app/navStore'
+import type { SourceOutline } from '../ui/app/Navigator'
 import { useDoc } from '../ui/documents/store'
 import { SourceEditor } from '../ui/modes/source/SourceEditor'
 
@@ -24,8 +24,11 @@ const disk = new Map<string, string>()
 function EditorMode() {
   const mode = useDoc((state) => state.mode)
   const status = useDoc((state) => state.status)
-  return mode === 'source' && status === 'ready' ? <SourceEditor /> : null
+  return mode === 'source' && status === 'ready' ? <SourceEditor onOutline={(update) => {
+    nav.source = typeof update === 'function' ? update(nav.source) : update
+  }} /> : null
 }
+const nav = { source: null as SourceOutline | null }
 
 function editor(): EditorView {
   const node = host.querySelector<HTMLElement>('.cm-editor')!
@@ -144,14 +147,14 @@ it('navigates through editor geometry without requiring an off-screen line in th
   vi.spyOn(view, 'documentTop', 'get').mockReturnValue(100)
   const lineBlockAt = vi.spyOn(view, 'lineBlockAt').mockReturnValue({ top: 900 } as ReturnType<EditorView['lineBlockAt']>)
   const domAtPos = vi.spyOn(view, 'domAtPos').mockImplementation(() => { throw new Error('Line is not rendered') })
-  expect(useNav.getState().source?.headingTop(offset)).toBe(1000)
-  act(() => useNav.getState().source!.scrollTo(offset))
+  expect(nav.source?.headingTop(offset)).toBe(1000)
+  act(() => nav.source!.scrollTo(offset))
   expect(lineBlockAt).toHaveBeenCalledWith(offset)
   expect(view.state.selection.main.anchor).toBe(offset)
   expect(domAtPos).not.toHaveBeenCalled()
   expect(scrollIntoView).toHaveBeenCalledWith(offset, { y: 'start', yMargin: 24 })
   act(() => useDoc.getState().setMode('reading'))
-  expect(useNav.getState().source).toBeNull()
+  expect(nav.source).toBeNull()
 })
 
 it('discards editor undo when its document closes', async () => {

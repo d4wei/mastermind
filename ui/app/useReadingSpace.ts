@@ -1,14 +1,13 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useConfig } from './configStore'
 import { DEFAULT_CONFIG } from '../settings/defaults'
-import { useNav } from './navStore'
 import { READING_LAYOUT_EVENT, readingSpace, type ReadingSpace } from './reading-space'
 import { prefersReducedMotion } from '../util/presence'
 
-export function useReadingSpace() {
+/** `outline` says whether the outline strip is shown and reserves its width. */
+export function useReadingSpace(outline: boolean) {
   const [element, ref] = useState<HTMLDivElement | null>(null)
   const config = useConfig((s) => s.config)
-  const outline = useNav((s) => s.outline.length >= 2)
   const [space, setSpace] = useState<ReadingSpace | null>(null)
   useLayoutEffect(() => {
     if (!element) return

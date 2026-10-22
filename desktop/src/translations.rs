@@ -26,7 +26,7 @@ fn directory(source: &Path) -> Result<PathBuf, FileError> {
     Ok(path)
 }
 
-pub fn read(source: &Path, language: &str) -> Result<Value, FileError> {
+fn read(source: &Path, language: &str) -> Result<Value, FileError> {
     if !language_code(language) {
         return Err(FileError::new(400, "invalid_language", "The translation language is invalid."));
     }

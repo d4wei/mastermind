@@ -31,7 +31,7 @@ it('reads the failure kind from the error body rather than the HTTP status', asy
     json: async () => ({ error: 'file unreadable', kind: 'missing' }) }))
   await expect(createBrowserHost().getFile('preview')).rejects.toMatchObject({ kind: 'missing' })
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: 'invalid' }) }))
-  await expect(createBrowserHost().translation('preview', 'fr')).rejects.toMatchObject({ kind: 'failure' })
+  await expect(createBrowserHost().translations('preview')).rejects.toMatchObject({ kind: 'failure' })
 })
 it('reports non-JSON host failures as structured host failures', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, statusText: 'Unavailable',

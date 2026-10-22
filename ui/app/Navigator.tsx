@@ -2,7 +2,7 @@ import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
 import { documentViewport, readingLine, scrollToOffset } from '../util/scroll'
-import { useNav } from './navStore'
+import type { OutlineItem } from '../modes/reading/outline'
 
 /** Shared breakpoint for document panels. */
 export function useIsNarrow(): boolean {
@@ -20,12 +20,22 @@ export function useIsNarrow(): boolean {
   return narrow
 }
 
-export function Navigator() {
+/** Outline geometry and navigation for Markdown mode, which has no rendered heading elements. */
+export interface SourceOutline {
+  headingTop(offset: number): number
+  scrollTo(offset: number): void
+}
+
+export interface NavigatorProps {
+  outline: OutlineItem[]
+  /** The rendered reading article; null in Markdown mode, which navigates through `source`. */
+  docEl: HTMLElement | null
+  source: SourceOutline | null
+}
+
+export function Navigator({ outline: items, docEl, source: sourceOutline }: NavigatorProps) {
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
-  const items = useNav((s) => s.outline)
-  const docEl = useNav((s) => s.docEl)
-  const sourceOutline = useNav((s) => s.source)
   const [open, setOpen] = useState(false)
   const [activeOffset, setActiveOffset] = useState<number | null>(null)
   const container = useRef<HTMLElement>(null)

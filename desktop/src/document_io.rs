@@ -326,21 +326,6 @@ pub async fn watch_document(
 }
 
 #[tauri::command]
-pub async fn read_translation(
-    id: String,
-    target_lang: String,
-    docs: State<'_>,
-) -> Result<Value, FileError> {
-    let docs = docs.inner().clone();
-    crate::worker::blocking_work()
-        .run(move || {
-            let path = admitted(&docs.lock().unwrap(), &id)?;
-            crate::translations::read(&path, &target_lang)
-        })
-        .await?
-}
-
-#[tauri::command]
 pub async fn list_translations(id: String, docs: State<'_>) -> Result<Vec<Value>, FileError> {
     let docs = docs.inner().clone();
     crate::worker::blocking_work().run(move || {

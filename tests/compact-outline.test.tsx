@@ -2,18 +2,18 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { Navigator } from '../ui/app/Navigator'
-import { useNav } from '../ui/app/navStore'
+import { Navigator, type NavigatorProps } from '../ui/app/Navigator'
 import { extractOutline } from '../ui/modes/reading/outline'
 import { parseMarkdown } from '../document/markdown/processor'
 
 let host: HTMLDivElement
 let root: Root
+let props: NavigatorProps
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { callback(0); return 1 })
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
-  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }], docEl: null, source: null })
+  props = { outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }], docEl: null, source: null }
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -21,12 +21,11 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
-  useNav.setState({ outline: [], docEl: null, source: null })
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 it('opens on keyboard focus and dismisses with Escape without reopening', () => {
-  act(() => root.render(<Navigator />))
+  act(() => root.render(<Navigator {...props} />))
   const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
   expect(host.querySelector('.nav-outline')).toBeNull()
   act(() => trigger.focus())
@@ -38,8 +37,8 @@ it('opens on keyboard focus and dismisses with Escape without reopening', () => 
 })
 it('navigates on every mouse selection when the trigger retains focus between openings', () => {
   const navigate = vi.fn()
-  useNav.setState({ source: { headingTop: () => 0, scrollTo: navigate } })
-  act(() => root.render(<Navigator />))
+  props.source = { headingTop: () => 0, scrollTo: navigate }
+  act(() => root.render(<Navigator {...props} />))
   const nav = host.querySelector('nav')!
   const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
   for (let index = 0; index < 4; index++) {
@@ -59,8 +58,8 @@ it('navigates on every mouse selection when the trigger retains focus between op
 })
 it('keeps keyboard heading activation and dismissal on focus leaving the outline', () => {
   const navigate = vi.fn()
-  useNav.setState({ source: { headingTop: () => 0, scrollTo: navigate } })
-  act(() => root.render(<Navigator />))
+  props.source = { headingTop: () => 0, scrollTo: navigate }
+  act(() => root.render(<Navigator {...props} />))
   const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
   act(() => trigger.focus())
   const heading = host.querySelectorAll<HTMLButtonElement>('.nav-outline button')[1]!
@@ -83,8 +82,8 @@ it('tracks the active heading as the document scrolls', () => {
   article.querySelectorAll('h1,h2').forEach((element, index) => {
     element.getBoundingClientRect = () => ({ top: index * 500 - scroll }) as DOMRect
   })
-  useNav.setState({ docEl: article })
-  act(() => root.render(<Navigator />))
+  props.docEl = article
+  act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   scroll = 600
   act(() => window.dispatchEvent(new Event('scroll')))
@@ -95,8 +94,8 @@ it('tracks the active heading as the document scrolls', () => {
 it('keeps all heading depths and moves the active indicator in both outlines', () => {
   const source = Array.from({ length: 6 }, (_, index) =>
     `${'#'.repeat(index + 1)} Level ${index + 1}\n\nSection text.\n\n`).join('')
-  useNav.setState({ outline: extractOutline(parseMarkdown(source)), docEl: null, source: null })
-  act(() => root.render(<Navigator />))
+  props = { outline: extractOutline(parseMarkdown(source)), docEl: null, source: null }
+  act(() => root.render(<Navigator {...props} />))
   const ticks = Array.from(host.querySelectorAll<HTMLElement>('.outline-tick'))
   expect(ticks.map((tick) => tick.style.getPropertyValue('--heading-depth'))).toEqual(['0', '1', '2', '3', '4', '5'])
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
@@ -116,14 +115,14 @@ it('tracks Markdown headings from editor geometry without rendered heading eleme
   let scroll = 0
   vi.spyOn(window, 'scrollY', 'get').mockImplementation(() => scroll)
   vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(2000)
-  useNav.setState({ source: { headingTop: (offset) => (offset === 0 ? 100 : 600) - scroll, scrollTo: () => {} } })
-  act(() => root.render(<Navigator />))
+  props.source = { headingTop: (offset) => (offset === 0 ? 100 : 600) - scroll, scrollTo: () => {} }
+  act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   scroll = 700
   act(() => window.dispatchEvent(new Event('scroll')))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(host.querySelectorAll('.outline-tick.active')).toHaveLength(1)
-  act(() => useNav.setState({ source: null }))
+  act(() => root.render(<Navigator {...props} source={null} />))
   act(() => window.dispatchEvent(new Event('scroll')))
 })
 
@@ -139,8 +138,8 @@ it('tracks element scrolling while the window stays stationary', () => {
   article.querySelectorAll('h1,h2').forEach((element, index) => {
     element.getBoundingClientRect = () => ({ top: 46 + index * 500 - viewport.scrollTop }) as DOMRect
   })
-  useNav.setState({ docEl: article })
-  act(() => root.render(<Navigator />))
+  props.docEl = article
+  act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   viewport.scrollTop = 600
   act(() => viewport.dispatchEvent(new Event('scroll')))

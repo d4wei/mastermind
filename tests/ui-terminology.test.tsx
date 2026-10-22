@@ -11,7 +11,6 @@ import { fakeHost } from './helpers/host'
 import { ConflictPanel } from '../ui/app/ConflictPanel'
 import { createDocStore, useDoc } from '../ui/documents/store'
 import { Navigator } from '../ui/app/Navigator'
-import { useNav } from '../ui/app/navStore'
 import { TopBar } from '../ui/app/TopBar'
 import { ToolbarTarget } from '../ui/app/ToolbarTarget'
 import { useT } from '../ui/i18n'
@@ -95,15 +94,13 @@ it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (
 
 it('retains outline navigation to existing-file source offsets', () => {
   const scrollTo = vi.fn()
-  useNav.setState({ outline: [{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }],
-    docEl: null, source: { headingTop: () => 0, scrollTo } })
-  act(() => root.render(<Tooltip.Provider><Navigator /></Tooltip.Provider>))
+  act(() => root.render(<Tooltip.Provider><Navigator outline={[{ depth: 1, text: 'First', offset: 0 }, { depth: 2, text: 'Second', offset: 12 }]}
+    docEl={null} source={{ headingTop: () => 0, scrollTo }} /></Tooltip.Provider>))
   act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
   const second = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Second')!
   act(() => second.click())
   expect(scrollTo).toHaveBeenCalledWith(12)
   expect(host.querySelector('.nav-seg')).toBeNull()
-  useNav.setState({ outline: [], docEl: null, source: null })
 })
 
 it('places native document controls in the file row while retaining their actions', () => {

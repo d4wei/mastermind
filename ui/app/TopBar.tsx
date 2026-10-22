@@ -5,7 +5,7 @@ import { ToolbarTarget } from './ToolbarTarget'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { ChatIcon, SearchIcon, CodeIcon, EyeIcon, GearIcon, HistoryIcon, MoreIcon } from '../icons'
-import { requestFind } from '../find/events'
+import { requestFind } from './overlayStore'
 import { useDoc } from '../documents/store'
 
 interface TopBarProps {

@@ -9,7 +9,6 @@ export function fakeHost(overrides: Partial<ReviewerHost> = {}): ReviewerHost {
     putFile: unconfigured,
     subscribe: () => () => {},
     translations: async () => [],
-    translation: unconfigured,
     config: unconfigured,
     updateConfig: unconfigured,
     themes: unconfigured,

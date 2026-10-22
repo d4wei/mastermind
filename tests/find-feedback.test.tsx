@@ -3,7 +3,7 @@ import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { FindPanel } from '../ui/find/FindPanel'
-import { requestFind } from '../ui/find/events'
+import { openOverlay, requestFind, useOverlay } from '../ui/app/overlayStore'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { useConfig } from '../ui/app/configStore'
 
@@ -18,7 +18,7 @@ function Harness({ text = 'Review the proposal. Review it again.', source = '', 
   return <div className="app-content"><button onClick={requestFind}>Find</button>
     <div className="document-scroll"><article ref={docRef}><h1>A proposal</h1><p>{text}</p></article></div>
     <FindPanel sessionId={id} source={source} mode="reading" docRef={docRef}
-      analysis={source ? analyzeMarkdown(source) : null} onOpen={open} onClose={close} onRevealComment={reveal} />
+      analysis={source ? analyzeMarkdown(source) : null} onClose={close} onRevealComment={reveal} />
   </div>
 }
 const input = () => host.querySelector<HTMLInputElement>('input')!
@@ -79,6 +79,18 @@ it('counts individual body occurrences, wraps, toggles case, and clears highligh
   fill(''); expect(highlights.get('find-current')?.size).toBe(0)
   key('Escape'); expect(host.querySelector('[role="search"]')).toBeNull()
   expect(highlights.size).toBe(0)
+})
+
+it('closes when another overlay opens, but not for one already open when it mounts', () => {
+  act(() => openOverlay('settings', 'doc'))
+  act(() => root.render(<Harness key="retained" />))
+  key('f', { metaKey: true }); expect(useOverlay.getState().open).toBe('find')
+  act(() => root.render(<Harness key="other" id={`other-${serial}`} />))
+  act(() => openOverlay('language', 'doc'))
+  act(() => root.render(<Harness key="retained" />))
+  expect(host.querySelector('[role="search"]')).not.toBeNull()
+  act(() => openOverlay('files'))
+  expect(host.querySelector('[role="search"]')).toBeNull()
 })
 
 it('does not navigate or close while confirming IME composition', () => {
@@ -163,7 +175,7 @@ it('searches the asynchronously rendered translation and visible discussions, ex
     return <div className="app-content"><div className="document-scroll">
       <TranslatedView sessionId={`translated-${serial}`} source={original} artifact={artifact} containerRef={docRef} />
       </div><FindPanel sessionId={`translated-${serial}`} source={original} mode="translated" docRef={docRef}
-        analysis={analyzeMarkdown(original)} onOpen={open} onClose={close} onRevealComment={reveal} /></div>
+        analysis={analyzeMarkdown(original)} onClose={close} onRevealComment={reveal} /></div>
   }
   await act(async () => root.render(<TranslatedHarness />))
   await vi.waitFor(async () => {
