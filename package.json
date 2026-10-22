@@ -33,9 +33,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', {recursive:true, force:true})\" && vite build && tsup",
+    "build": "tsup",
     "dev": "tsx tools/preview/index.ts",
-    "preview": "tsx tools/preview/index.ts",
     "desktop:assets": "node --import tsx tools/desktop/build-reviewer.mts",
     "desktop:build": "npm run desktop:assets && node tools/desktop/tauri.mjs build --bundles app -- --locked",
     "test": "vitest run",
@@ -43,23 +42,19 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
   },
   "dependencies": {
+    "@codemirror/commands": "6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",
-    "@codemirror/language": "^6.12.3",
     "@codemirror/search": "6.7.0",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.43.1",
-    "@lezer/highlight": "^1.2.3",
     "@radix-ui/react-icons": "^1.3.2",
-    "codemirror": "^6.0.2",
     "commander": "^15.0.0",
-    "diff": "^9.0.0",
     "radix-ui": "^1.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "remark-frontmatter": "5.0.0",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
-    "slot-text": "^0.3.1",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0",
     "yaml": "2.9.1",
@@ -83,6 +78,5 @@
     "vite": "^8.0.16",
     "vitest": "^4.1.8"
   },
-  "packageManager": "pnpm@10.6.2+sha512.47870716bea1572b53df34ad8647b42962bc790ce2bf4562ba0f643237d7302a3d6a8ecef9e4bdfc01d23af1969aa90485d4cebb0b9638fa5ef1daef656f6c1b",
   "private": true
 }

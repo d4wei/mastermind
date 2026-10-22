@@ -33,16 +33,20 @@ it('propagates malformed successful responses', async () => {
 it('adapts SSE names to invalidations and closes the connection', () => {
   const listeners = new Map<string, () => void>()
   const close = vi.fn()
+  const urls: string[] = []
   vi.stubGlobal('EventSource', class {
+    constructor(url: string) { urls.push(url) }
     addEventListener(name: string, listener: () => void) { listeners.set(name, listener) }
     close = close
   })
   const listener = vi.fn()
   const unsubscribe = createBrowserHost().subscribe('preview', listener)
+  expect(urls).toEqual(['/api/sessions/preview/events'])
+  expect([...listeners.keys()].sort()).toEqual(['file-changed', 'file-deleted', 'translations-changed'])
   listeners.get('file-changed')!()
   listeners.get('file-deleted')!()
-  listeners.get('config-changed')!()
-  expect(listener.mock.calls).toEqual([['changed'], ['deleted'], ['config']])
+  listeners.get('translations-changed')!()
+  expect(listener.mock.calls).toEqual([['changed'], ['deleted'], ['translations']])
   unsubscribe()
   expect(close).toHaveBeenCalledOnce()
 })

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -112,4 +113,26 @@ it('discovers targets independently and ignores foreign, malformed and redirecte
   expect(await listPreparedTranslations(file, 'Changed source')).toEqual([])
   await fs.unlink(translationFile(file, 'fr'))
   expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
+})
+
+it.runIf(process.platform !== 'win32')('reads a FIFO or a link to a device as stale without blocking or reading it', async () => {
+  const artifact = await artifactFor()
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
+  execFileSync('mkfifo', [translationFile(file, 'de')])
+  await fs.symlink('/dev/zero', translationFile(file, 'fr'))
+  await fs.symlink(translationFile(file, 'zh-CN'), translationFile(file, 'ja'))
+  for (const lang of ['de', 'fr', 'ja']) expect(await readPreparedTranslation(file, source, lang)).toEqual({ status: 'stale' })
+  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
+})
+
+it.runIf(process.platform !== 'win32')('refuses to read or save through a redirected translations directory', async () => {
+  const elsewhere = path.join(dir, 'elsewhere')
+  await fs.mkdir(path.join(dir, '.mastermind'))
+  await fs.mkdir(elsewhere)
+  await fs.symlink(elsewhere, path.dirname(translationFile(file, 'zh-CN')))
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow('symbolic link')
+  expect(await fs.readdir(elsewhere)).toEqual([])
+  await fs.writeFile(path.join(elsewhere, path.basename(translationFile(file, 'zh-CN'))), JSON.stringify(await artifactFor()))
+  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'stale' })
+  expect(await listPreparedTranslations(file, source)).toEqual([])
 })

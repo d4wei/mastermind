@@ -7,6 +7,24 @@ function die(code: number, message: string): never {
   process.stderr.write(`mastermind: ${message}\n`)
   process.exit(code)
 }
+const MARKDOWN = /\.(md|markdown)$/i
+/** Admits a Markdown file the way the preview does: both the given path and its target carry the extension. */
+function readMarkdown(file: string): { realPath: string; source: string } {
+  const requested = path.resolve(file)
+  let realPath: string
+  try {
+    realPath = fs.realpathSync(requested)
+    if (fs.statSync(realPath).isDirectory()) die(2, `not a file: ${requested} is a directory`)
+  } catch (error) {
+    die(2, (error as NodeJS.ErrnoException).code === 'ENOENT' ? `file not found: ${requested}` : `cannot read ${requested}`)
+  }
+  if (![requested, realPath].every((name) => MARKDOWN.test(name))) die(2, `Choose a Markdown file (.md or .markdown): ${requested}`)
+  try {
+    return { realPath, source: fs.readFileSync(realPath, 'utf8') }
+  } catch {
+    die(2, `cannot read ${requested}`)
+  }
+}
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = []
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer)
@@ -20,14 +38,7 @@ program
   .option('--save', 'read a complete prepared translation artifact as JSON from stdin')
   .description('emit every current block for a fresh translation pass, or save a complete result')
   .action(async (file: string, opts: { save?: boolean; sourceLang: string; targetLang: string }) => {
-    let realPath: string
-    let source: string
-    try {
-      realPath = fs.realpathSync(path.resolve(file))
-      source = fs.readFileSync(realPath, 'utf8')
-    } catch {
-      die(2, `file not found: ${path.resolve(file)}`)
-    }
+    const { realPath, source } = readMarkdown(file)
     try {
       if (opts.save) {
         const artifact: unknown = JSON.parse(await readStdin())

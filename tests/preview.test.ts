@@ -46,6 +46,28 @@ it('rejects hostile hosts and cross-origin saves without changing the selected f
   expect(await fs.readFile(file, 'utf8')).toBe('original\r\n')
 })
 
+it('admits only the origin of the address the request was sent to', async () => {
+  const own = { host: 'localhost:5173' }
+  const foreign = { ...own, origin: 'http://localhost:3000' }
+  expect((await request('/api/sessions/preview/file', 'GET', undefined, foreign)).status).toBe(403)
+  expect((await request('/api/sessions/preview/file', 'OPTIONS', undefined, {
+    ...foreign, 'access-control-request-method': 'PUT' })).status).toBe(403)
+  expect((await request('/api/sessions/preview/file', 'GET', undefined, { ...own, origin: 'http://127.0.0.1:5173' })).status).toBe(403)
+  expect((await request('/api/sessions/preview/file', 'GET', undefined, { ...own, origin: 'http://localhost:5173' })).status).toBe(200)
+  expect((await request('/api/sessions/preview/file', 'GET', undefined, own)).status).toBe(200)
+})
+
+it('stores only own configuration keys whose values match the default types', async () => {
+  const before = await (await request('/api/config')).json()
+  for (const patch of [{ theme: 12345 }, { fontSize: '16' }, { uiLang: 'fr' }, { uiLang: 7 }]) {
+    expect((await request('/api/config', 'PUT', patch)).status).toBe(400)
+  }
+  expect((await request('/api/config', 'PUT', { toString: 'x', constructor: 1, unknown: true })).status).toBe(200)
+  expect(await (await request('/api/config')).json()).toEqual(before)
+  const saved = await request('/api/config', 'PUT', { theme: 'nacht', fontSize: 18, uiLang: 'zh-CN' })
+  expect(await saved.json()).toEqual({ ...before, theme: 'nacht', fontSize: 18, uiLang: 'zh-CN' })
+})
+
 it('does not admit another document or expose administrative shutdown', async () => {
   expect((await request('/api/sessions', 'POST', { path: path.join(dir, 'another.md') })).status).toBe(404)
   expect((await request('/api/admin/shutdown', 'POST')).status).toBe(404)
@@ -62,20 +84,30 @@ it('requires a base version and rejects stale saves after a successful save', as
 })
 
 it('serves a contained symlink with exact content', async () => {
-  await fs.symlink(file, path.join(dir, 'inside.md'))
-  const response = await serveFile(dir, 'inside.md')
+  await fs.writeFile(path.join(dir, 'tokens.css'), ':root {}\r\n')
+  await fs.symlink(path.join(dir, 'tokens.css'), path.join(dir, 'inside.css'))
+  const response = await serveFile(dir, 'inside.css')
   expect(response?.status).toBe(200)
-  expect(await response?.text()).toBe('original\r\n')
+  expect(response?.headers.get('content-type')).toBe('text/css; charset=utf-8')
+  expect(await response?.text()).toBe(':root {}\r\n')
 })
 
 it('refuses static traversal and symlinks outside the serving root', async () => {
   const root = path.join(dir, 'static')
   await fs.mkdir(root)
-  await fs.symlink(file, path.join(root, 'escape.md'))
-  expect(await serveFile(root, 'escape.md')).toBeNull()
-  expect(await serveFile(root, '../doc.md')).toBeNull()
+  await fs.writeFile(path.join(dir, 'outside.css'), ':root {}')
+  await fs.symlink(path.join(dir, 'outside.css'), path.join(root, 'escape.css'))
+  expect(await serveFile(root, 'escape.css')).toBeNull()
+  expect(await serveFile(root, '../outside.css')).toBeNull()
 })
 
+it('serves the theme set the desktop build ships, without sources or docs', async () => {
+  const themes = path.resolve('themes')
+  expect((await serveFile(themes, 'grid/tokens.css'))?.status).toBe(200)
+  expect((await serveFile(themes, 'grid/theme.json'))?.status).toBe(200)
+  for (const name of ['README.md', 'discovery.ts', 'types.ts']) expect(await serveFile(themes, name)).toBeNull()
+  expect((await request('/themes/README.md')).status).toBe(404)
+})
 
 async function saveTranslation() {
   const source = await fs.readFile(file, 'utf8')

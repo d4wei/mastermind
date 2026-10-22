@@ -81,3 +81,35 @@ it('rejects an incomplete saved artifact without changing the previous artifact'
   expect(rejected.stderr).toContain('complete block structure')
   expect(await fs.readFile(plan.artifactPath)).toEqual(previous)
 }, 15_000)
+
+it('reports a directory argument as a directory rather than a missing file', async () => {
+  const folder = path.join(dir, 'chapter.md')
+  await fs.mkdir(folder)
+  const result = await run([folder, '--source-lang', 'en', '--target-lang', 'zh-CN'])
+  expect(result.code).toBe(2)
+  expect(result.stdout).toBe('')
+  expect(result.stderr).toContain(`not a file: ${folder} is a directory`)
+})
+
+it('rejects a path that is not Markdown, including a Markdown-named link to one', async () => {
+  const text = path.join(dir, 'notes.txt')
+  await fs.writeFile(text, '# Title\n')
+  const targets = [text]
+  if (process.platform !== 'win32') {
+    targets.push(path.join(dir, 'alias.md'))
+    await fs.symlink(text, targets[1]!)
+  }
+  for (const target of targets) {
+    const result = await run([target, '--source-lang', 'en', '--target-lang', 'zh-CN'])
+    expect(result.code).toBe(2)
+    expect(result.stdout).toBe('')
+    expect(result.stderr).toContain('Choose a Markdown file (.md or .markdown)')
+  }
+})
+
+it('reports a missing file as not found', async () => {
+  const missing = path.join(dir, 'missing.md')
+  const result = await run([missing, '--source-lang', 'en', '--target-lang', 'zh-CN'])
+  expect(result.code).toBe(2)
+  expect(result.stderr).toContain(`file not found: ${missing}`)
+})

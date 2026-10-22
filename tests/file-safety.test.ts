@@ -3,16 +3,15 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readSessionFile, writeSessionFile } from '../tools/preview/files'
-import type { FileTarget } from '../tools/preview/files'
 
 let dir: string
 let file: string
-let session: FileTarget
+let session: { path: string }
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mastermind-save-'))
   file = path.join(dir, 'document.md')
   await fs.writeFile(file, 'original\r\n')
-  session = { path: file } as FileTarget
+  session = { path: file }
 })
 afterEach(async () => {
   vi.restoreAllMocks()

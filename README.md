@@ -89,7 +89,7 @@ replaces a complete artifact. People do not need to operate these commands thems
 npm run dev -- /absolute/path/document.md  # foreground browser preview with Vite
 npm test                                 # application and tooling tests
 npm run typecheck                        # browser and Node configurations
-npm run build                            # browser assets and translation utility
+npm run build                            # translation utility
 npm run desktop:build                    # native macOS app
 ```
 

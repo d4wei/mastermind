@@ -28,11 +28,10 @@ export function createBrowserHost(): ReviewerHost {
     getFile: (id) => request(`${session(id)}/file`),
     putFile: (id, content, baseVersion) => request(`${session(id)}/file`, 'PUT', { content, baseVersion }),
     subscribe(id, listener) {
-      const events = new EventSource(`${session(id)}/events?role=ui`)
+      const events = new EventSource(`${session(id)}/events`)
       events.addEventListener('file-changed', () => listener('changed'))
       events.addEventListener('file-deleted', () => listener('deleted'))
       events.addEventListener('translations-changed', () => listener('translations'))
-      events.addEventListener('config-changed', () => listener('config'))
       return () => events.close()
     },
     translations: (id) => request(`${session(id)}/translations`),

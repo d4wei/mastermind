@@ -3,8 +3,6 @@ import path from 'node:path'
 import postcss from 'postcss'
 import type { ThemeInfo } from './types'
 
-interface ThemeJson { name?: string }
-
 function paletteMetadata(css: string): Pick<ThemeInfo, 'appearance' | 'swatch'> {
   const colors = new Map<string, string>()
   postcss.parse(css).walkDecls((decl) => { colors.set(decl.prop, decl.value) })
@@ -40,10 +38,11 @@ export async function scanThemes(themesDir: string): Promise<ThemeInfo[]> {
         fs.readFile(path.join(dir, 'theme.json'), 'utf8'),
         fs.readFile(path.join(dir, 'tokens.css'), 'utf8'),
       ])
-      const parsed = JSON.parse(jsonRaw) as ThemeJson
+      const parsed: unknown = JSON.parse(jsonRaw)
+      const name = parsed && typeof parsed === 'object' && 'name' in parsed ? parsed.name : undefined
       out.push({
         id,
-        name: parsed.name ?? id,
+        name: typeof name === 'string' && name !== '' ? name : id,
         ...paletteMetadata(css),
       })
     } catch (err) {

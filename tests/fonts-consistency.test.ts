@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   FONT_FACES,
@@ -7,9 +7,8 @@ import {
   MONO_FONTS,
   fontPresetById,
   monoById,
-  DEFAULT_FONT_PRESET,
-  DEFAULT_MONO,
 } from '../ui/theme/fonts'
+import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 
 describe('font registry', () => {
   const families = new Set(FONT_FACES.map((f) => f.family))
@@ -33,9 +32,18 @@ describe('font registry', () => {
     }
   })
 
+  it('every vendored woff2 on disk is a declared face', () => {
+    const themes = fileURLToPath(new URL('../themes/', import.meta.url))
+    const declared = new Set(FONT_FACES.map((f) => f.url.replace(/^\/themes\//, '')))
+    const vendored = readdirSync(themes, { recursive: true, encoding: 'utf8' })
+      .filter((rel) => rel.endsWith('.woff2'))
+      .map((rel) => rel.split('\\').join('/'))
+    expect(vendored.filter((rel) => !declared.has(rel))).toEqual([])
+  })
+
   it('defaults resolve, and unknown ids fall back to the first option', () => {
-    expect(fontPresetById(DEFAULT_FONT_PRESET).id).toBe(DEFAULT_FONT_PRESET)
-    expect(monoById(DEFAULT_MONO).id).toBe(DEFAULT_MONO)
+    expect(fontPresetById(DEFAULT_CONFIG.fontPreset).id).toBe(DEFAULT_CONFIG.fontPreset)
+    expect(monoById(DEFAULT_CONFIG.monoFont).id).toBe(DEFAULT_CONFIG.monoFont)
     expect(fontPresetById('nope').id).toBe(FONT_PRESETS[0]!.id)
     expect(monoById('nope').id).toBe(MONO_FONTS[0]!.id)
   })

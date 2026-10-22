@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import type { BigIntStats } from 'node:fs'
 import type { FileHandle } from 'node:fs/promises'
 import type { FileResponse } from '../../ui/app/hostTypes'
-export interface FileTarget { path: string }
+interface FileTarget { path: string }
 
 function identity(st: BigIntStats): string {
   return [st.dev, st.ino, st.size, st.mtimeNs, st.ctimeNs].join(':')
@@ -32,7 +32,7 @@ export async function readSessionFile(filePath: string): Promise<FileResponse> {
   }
 }
 
-export type WriteResult =
+type WriteResult =
   | { ok: true; mtimeMs: number; version: string }
   | { ok: false; currentMtimeMs: number | null }
 
