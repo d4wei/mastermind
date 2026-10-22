@@ -9,21 +9,30 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { parseResolvedThreads } from '../document/review-archive'
 import * as reviewScroll from '../ui/util/scroll'
 import { CommentRail } from '../ui/review/CommentRail'
-import { DraftScope, pendingDrafts, releaseDrafts } from '../ui/review/drafts'
+import { DraftScope, pendingDrafts, releaseDrafts, useDraftState } from '../ui/review/drafts'
+import { rebaseReplies, type ReplyDraft } from '../ui/review/thread-identity'
 
 let host: HTMLDivElement
 let root: Root
 let store: ReturnType<typeof createDocStore>
 let activate: ReturnType<typeof vi.fn<(spanIndex: number | null) => void>>
-let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => void>>
+let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => boolean>>
 
 function Harness({ request }: { request?: { spanIndex: number } }) {
   const [active, setActive] = useState<number | null>(null)
+  const [drafts, setDrafts] = useDraftState<ReplyDraft[]>('replies', [])
   const source = store((state) => state.source)
   const analysis = analyzeMarkdown(source)
   const docRef = useRef<HTMLElement>(null)
+  const onEdit = (edits: TextEdit[]) => {
+    if (!edit(edits)) return false
+    setDrafts((current) => rebaseReplies(current, source, edits))
+    store.getState().applyEdits(edits)
+    return true
+  }
   return <><article ref={docRef} /><CommentRail source={source} items={analysis.items} spans={analysis.spans}
-    replyRequest={request} readOnly={store((state) => state.conflict)} docRef={docRef} authorTag="reviewer" activeSpan={active} onActivate={(index) => { activate(index); setActive(index) }} onEdit={edit} /></>
+    replyRequest={request} readOnly={store((state) => !!state.recovery)} docRef={docRef} authorTag="reviewer" activeSpan={active}
+    onActivate={(index) => { activate(index); setActive(index) }} onEdit={onEdit} drafts={drafts} onDraftsChange={setDrafts} /></>
 }
 
 beforeEach(() => {
@@ -36,7 +45,7 @@ beforeEach(() => {
   root = createRoot(host)
   store = createDocStore()
   activate = vi.fn()
-  edit = vi.fn((edits) => store.getState().applyEdits(edits))
+  edit = vi.fn(() => !store.getState().recovery)
 })
 afterEach(() => {
   act(() => root.unmount())
@@ -250,7 +259,7 @@ it('retains the draft but disables mutation if a conflict arrives while replying
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Keep this draft')
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
   })
-  act(() => store.setState({ conflict: true }))
+  act(() => store.setState({ recovery: 'changed' }))
   expect(textarea.readOnly).toBe(true)
   expect(textarea.value).toBe('Keep this draft')
   click('Reply')
@@ -318,7 +327,7 @@ it('returns keyboard focus to the card when Escape closes the composer', () => {
 
 it('keeps paused discussions readable without opening a new reply input', () => {
   render('{==context==}{>>@Alex: question<<}')
-  act(() => store.setState({ conflict: true }))
+  act(() => store.setState({ recovery: 'changed' }))
   act(() => host.querySelector<HTMLElement>('.rail-body')!.click())
   expect(host.querySelector('textarea')).toBeNull()
   expect(host.querySelector('.rail-card-anchor')!.textContent).toBe('context')
@@ -369,4 +378,45 @@ it('discards an orphaned reply draft on request', () => {
     expect(host.querySelector('.rail-orphan')).toBeNull()
     expect(pendingDrafts(['orphan'])).toHaveLength(0)
   } finally { releaseDrafts('orphan') }
+})
+
+const draftsHolding = (text: string) => Array.from(host.querySelectorAll('textarea')).filter((input) => input.value === text)
+
+it('orphans a reply draft whose discussion vanished beside an identical one', () => {
+  render('{>>@bo: +1<<} x {>>@bo: +1<<}')
+  click('Reply', 0)
+  typeReply('meant for the first')
+  act(() => store.setState({ source: 'x {>>@bo: +1<<}' }))
+  expect(draftsHolding('meant for the first').map((input) => !!input.closest('.rail-orphan'))).toEqual([true])
+  expect(host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!.value).toBe('')
+})
+
+it('follows a unique discussion through an external change that rewrites around it', () => {
+  render('p {==a==}{>>@bo: one<<}')
+  click('Reply')
+  typeReply('kept')
+  act(() => store.setState({ source: '{==a==}{>>@bo: one<<} q' }))
+  expect(host.querySelector('.rail-orphan')).toBeNull()
+  expect(host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!.value).toBe('kept')
+})
+
+it('orphans a reply draft when an external change could have inserted a lookalike on either side', () => {
+  const discussion = '{==x==}{>>@a: ok<<}'
+  render(`${discussion}\n\nrest`)
+  click('Reply')
+  typeReply('meant for the original')
+  act(() => store.setState({ source: `${discussion}{>>@b: r<<}\n\n${discussion}\n\nrest` }))
+  expect(draftsHolding('meant for the original').map((input) => !!input.closest('.rail-orphan'))).toEqual([true])
+})
+
+it('keeps a sent reply draft when its edit does not apply', () => {
+  const source = '{==a==}{>>@bo: question<<}'
+  render(source)
+  click('Reply')
+  typeReply('not lost')
+  edit.mockImplementationOnce(() => false)
+  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).toHaveBeenCalledTimes(1)
+  expect(store.getState().source).toBe(source)
+  expect(host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!.value).toBe('not lost')
 })

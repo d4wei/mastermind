@@ -11,12 +11,17 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
 import { SessionView } from '../ui/app/SessionView'
 import { useNav } from '../ui/app/navStore'
+import { Navigator } from '../ui/app/Navigator'
+import { threadCards, threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
 
-const rail = vi.hoisted(() => ({ request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void) }))
-vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void }) => {
+const rail = vi.hoisted(() => ({ request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void),
+  drafts: [] as readonly ReplyDraft[], onDraftsChange: null as null | ((drafts: ReplyDraft[]) => void) }))
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void; drafts: readonly ReplyDraft[]; onDraftsChange: (drafts: ReplyDraft[]) => void }) => {
   rail.onEdit = props.onEdit
+  rail.drafts = props.drafts
+  rail.onDraftsChange = props.onDraftsChange
   rail.active = props.activeSpan
   rail.request = props.replyRequest ?? null
   rail.hovered = props.hoveredSpan
@@ -79,7 +84,7 @@ it('keeps resolved discussions available while a conflict pauses edits', () => {
   render('body')
   openReaderMenu(host)
   act(() => readerMenuItem('Resolved (0)').click())
-  act(() => useDoc.setState({ conflict: true }))
+  act(() => useDoc.setState({ recovery: 'changed' }))
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 })
 
@@ -181,6 +186,40 @@ it('keeps the selected discussion when Escape closes a panel', () => {
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   expect(host.querySelector('[role="dialog"]')).toBeNull()
+  expect(rail.active).toBe(0)
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  expect(rail.active).toBeNull()
+})
+
+it('rebases the selection and reply drafts exactly through edits made in the document', () => {
+  const discussion = '{==t==}{>>@bo: same<<}'
+  const source = `{--a--} ${discussion} {--b--} ${discussion}`
+  render(source)
+  act(() => host.querySelector<HTMLElement>('.critic-anchor[data-span-index="1"]')!.click())
+  expect(rail.active).toBe(1)
+  const { items, spans } = analyzeMarkdown(source)
+  const cards = threadCards(items, spans, source)
+  act(() => rail.onDraftsChange!([{ id: 1, thread: threadRef(cards[0]!, source, cards), text: 'mine' }]))
+  // Each deletion rejected from the article; together they span the first discussion.
+  act(() => host.querySelector<HTMLElement>('.critic-del')!.click())
+  act(() => host.querySelector<HTMLElement>('.critic-del')!.click())
+  const edited = useDoc.getState().source
+  expect(edited).toBe(`a ${discussion} b ${discussion}`)
+  expect(rail.active).toBe(0)
+  expect(rail.drafts.map((draft) => draft.thread && [draft.thread.source, draft.thread.start])).toEqual([[edited, 2]])
+})
+
+it('keeps the selected discussion when Escape closes the outline popover', () => {
+  useDoc.setState({ source: '# One\n\nBefore {==passage==}{>>@Alex: note<<}\n\n# Two\n' })
+  act(() => root.render(<><Navigator /><SessionView sessionId="A" /></>))
+  act(() => host.querySelector<HTMLElement>('.critic-anchor')!.click())
+  expect(rail.active).toBe(0)
+  act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.focus())
+  expect(host.querySelector('.outline-popover')).not.toBeNull()
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+  act(() => window.dispatchEvent(escape))
+  expect(escape.defaultPrevented).toBe(true)
+  expect(host.querySelector('.outline-popover')).toBeNull()
   expect(rail.active).toBe(0)
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   expect(rail.active).toBeNull()

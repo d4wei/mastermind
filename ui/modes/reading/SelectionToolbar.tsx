@@ -1,7 +1,7 @@
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
-import { ESCAPE_OWNER_SELECTOR } from '../../app/constants'
+import { escapeOwner } from '../../app/constants'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { CriticSpan } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
 import { useT } from '../../i18n'
@@ -92,9 +92,9 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (ime.isComposing(e)) return
+      if (ime.isComposing(e) || e.defaultPrevented) return
       if (e.key === 'Escape') {
-        if (document.querySelector(ESCAPE_OWNER_SELECTOR)) return
+        if (escapeOwner()) return
         dismiss()
       }
     }
@@ -146,6 +146,20 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   }, [present.mounted, composing])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
+  const verify = (text: string, changes: readonly string[]): TextEdit[] | null => {
+    if (!view) return []
+    // The analysis spans describe only the current source; a stale view rescans its own.
+    const known = source === view.source ? spans : undefined
+    return composing === 'change' ? changeEdits(view.source, view.ranges, changes, known)
+      : composing === 'comment' && text.trim() ? commentEdits(view.source, view.ranges, authorTag, text, known) : []
+  }
+  // Verifying reparses the document, so the composer's verdict follows its deferred text and is
+  // kept across renders, such as scroll frames, that change none of its inputs; submission verifies
+  // the final text.
+  const deferredComment = useDeferredValue(comment)
+  const deferredReplacements = useDeferredValue(replacements)
+  const edits = useMemo(() => verify(deferredComment, deferredReplacements),
+    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, source, spans, authorTag])
   if (!present.mounted || !view) return null
 
   const begin = (kind: 'comment' | 'change'): void => {
@@ -165,14 +179,14 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   }
   // Null marks a draft whose insert would not reparse as the intended mark in place; it stays
   // editable but cannot submit.
-  const edits = composing === 'change' ? changeEdits(view.source, view.ranges, replacements)
-    : composing === 'comment' && comment.trim() ? commentEdits(view.source, view.ranges, authorTag, comment) : []
-  const canSubmit = source === view.source && !readOnly && !!edits?.length
+  const current = source === view.source && !readOnly
+  const canSubmit = current && !!edits?.length
   const submit = (): void => {
-    if (canSubmit) finish(edits!)
+    const final = current ? verify(comment, replacements) : null
+    if (final?.length) finish(final)
   }
   const composerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
+    if (ime.isComposing(e.nativeEvent) || e.defaultPrevented) { e.stopPropagation(); return }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit()
     else if (e.key === 'Escape') {
       dismiss()

@@ -24,7 +24,12 @@ export interface ThreadRef {
   identity: string
   start: number
   source: string
+  /** No other discussion in `source` shares the identity. */
+  unique: boolean
 }
+
+/** An unsent reply; `thread` becomes null once its discussion no longer exists. */
+export interface ReplyDraft { id: number; thread: ThreadRef | null; text: string }
 
 export function threadCards(items: readonly ReviewItem[], spans: readonly CriticSpan[], source: string): ThreadCard[] {
   const seen = new Map<string, number>()
@@ -40,8 +45,20 @@ export function threadCards(items: readonly ReviewItem[], spans: readonly Critic
   })
 }
 
-export function threadRef(card: ThreadCard, source: string): ThreadRef {
-  return { identity: card.identity, start: card.start, source }
+type Located = Pick<ThreadCard, 'identity' | 'start'>
+
+/** `cards` are every discussion in `source`. */
+export function threadRef(card: Located, source: string, cards: readonly Located[]): ThreadRef {
+  const unique = cards.filter((other) => other.identity === card.identity).length === 1
+  return { identity: card.identity, start: card.start, source, unique }
+}
+
+/** The reference re-anchored to `source`: the same object when unchanged, null once its discussion is gone. */
+export function refreshThread(ref: ThreadRef, source: string, cards: readonly Located[]): ThreadRef | null {
+  const card = locateThread(ref, source, cards)
+  if (!card) return null
+  const next = threadRef(card, source, cards)
+  return ref.source === source && ref.start === next.start && ref.unique === next.unique ? ref : next
 }
 
 /** The offset after `edits`, or null when an edit replaces the character at `offset`. */
@@ -54,14 +71,34 @@ function mapOffset(offset: number, edits: readonly TextEdit[]): number | null {
   return offset + shift
 }
 
-/** The single replacement spanning everything that differs between two texts. */
-function changedRegion(before: string, after: string): TextEdit {
+/**
+ * The single replacement spanning everything that differs between two texts. Repeated text at
+ * the boundary admits several such regions; `prefixFirst` picks the one extending the common
+ * prefix, otherwise the common suffix.
+ */
+function changedRegion(before: string, after: string, prefixFirst: boolean): TextEdit {
   const limit = Math.min(before.length, after.length)
-  let prefix = 0
-  while (prefix < limit && before[prefix] === after[prefix]) prefix++
-  let suffix = 0
-  while (suffix < limit - prefix && before[before.length - 1 - suffix] === after[after.length - 1 - suffix]) suffix++
+  const common = (bound: number, at: (n: number) => boolean) => {
+    let n = 0
+    while (n < bound && at(n)) n++
+    return n
+  }
+  const fromStart = (bound: number) => common(bound, (n) => before[n] === after[n])
+  const fromEnd = (bound: number) => common(bound, (n) => before[before.length - 1 - n] === after[after.length - 1 - n])
+  const prefix = prefixFirst ? fromStart(limit) : fromStart(limit - fromEnd(limit))
+  const suffix = fromEnd(limit - prefix)
   return { from: prefix, to: before.length - suffix, insert: after.slice(prefix, after.length - suffix) }
+}
+
+/** Where `offset` lands after an unknown change; null when it was replaced or the alignments disagree. */
+function alignedOffset(offset: number, before: string, after: string): number | null {
+  const early = mapOffset(offset, [changedRegion(before, after, true)])
+  return early === mapOffset(offset, [changedRegion(before, after, false)]) ? early : null
+}
+
+/** Carries each draft's reference through edits applied to `source`. */
+export function rebaseReplies(drafts: readonly ReplyDraft[], source: string, edits: readonly TextEdit[]): ReplyDraft[] {
+  return drafts.map((draft) => draft.thread ? { ...draft, thread: rebaseThread(draft.thread, source, edits) } : draft)
 }
 
 /** Carries a reference through edits applied to its own source; null when they remove its start. */
@@ -73,16 +110,15 @@ export function rebaseThread(ref: ThreadRef, source: string, edits: readonly Tex
 
 /**
  * Finds the card a reference names in the current source, or null when it no longer exists. A
- * change of unknown shape is reduced to one changed region. A card starting at the mapped offset
- * settles the match; otherwise only a card whose identity no other card shares is accepted.
+ * change of unknown shape is reduced to one changed region, aligned from both ends. A card
+ * starting at the agreed offset settles the match. Otherwise only an identity that was unique
+ * before the change and still is can name a card, since duplicates are told apart only by offset.
  */
-export function locateThread<T extends Pick<ThreadCard, 'identity' | 'start'>>(
-  ref: ThreadRef, source: string, cards: readonly T[],
-): T | null {
+export function locateThread<T extends Located>(ref: ThreadRef, source: string, cards: readonly T[]): T | null {
   const current = ref.source === source
-  const start = current ? ref.start : mapOffset(ref.start, [changedRegion(ref.source, source)])
+  const start = current ? ref.start : alignedOffset(ref.start, ref.source, source)
   const at = start === null ? undefined : cards.find((card) => card.start === start)
   if (at || current) return at?.identity === ref.identity ? at : null
   const same = cards.filter((card) => card.identity === ref.identity)
-  return same.length === 1 ? same[0]! : null
+  return ref.unique && same.length === 1 ? same[0]! : null
 }

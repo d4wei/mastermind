@@ -3,7 +3,7 @@ import { Tooltip } from 'radix-ui'
 import { useT } from '../../i18n'
 import { ExpandIcon, CollapseIcon } from '../../icons'
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
-import { ESCAPE_OWNER_SELECTOR } from '../../app/constants'
+import { ESCAPE_OWNER_SELECTOR, escapeOwner } from '../../app/constants'
 import { useTableExpansion } from './TableExpansion'
 import { prefersReducedMotion } from '../../util/presence'
 
@@ -112,7 +112,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
     }
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || !isExpanded.current || event.defaultPrevented || event.isComposing) return
-      if (document.querySelector(`.sel-toolbar, ${ESCAPE_OWNER_SELECTOR}`)) return
+      if (escapeOwner(`.sel-toolbar, ${ESCAPE_OWNER_SELECTOR}`)) return
       if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable=true], [role=dialog]')) return
       event.preventDefault()
       change.current(false, false, true)

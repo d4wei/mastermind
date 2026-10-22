@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type SetStateAction } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type SetStateAction } from 'react'
 import { create } from 'zustand'
 
 const DocumentId = createContext({ id: '', name: '' })
@@ -18,12 +18,12 @@ export function useDraftState<T>(key: string, initial: T): [T, (next: SetStateAc
   const storageKey = keyFor(id, key)
   const [value, setValue] = useState<T>(() => id && values.has(storageKey) ? values.get(storageKey) as T : initial)
   const current = useRef(value)
-  const update = (next: SetStateAction<T>) => {
+  const update = useCallback((next: SetStateAction<T>) => {
     const result = typeof next === 'function' ? (next as (v: T) => T)(current.current) : next
     current.current = result
     if (id) values.set(storageKey, result)
     setValue(result)
-  }
+  }, [id, storageKey])
   return [value, update]
 }
 

@@ -13,9 +13,10 @@ A selection splits first at block boundaries, then within each block at rendered
 unmappable pieces are skipped while the rest stay markable, and a selection wholly inside a mark
 yields nothing. A mapped range that still overlaps a review span, such as a mark that rendered
 literally, is dropped. Unanchored highlights render as plain text without a
-`.critic[data-span-index]` element, so a piece across one overlaps its span and maps nothing. A container block such as a list item with a nested list contributes only
-its own text before the first nested block; the nested blocks map as blocks of their own, including
-when the selection's common ancestor is the container itself.
+`.critic[data-span-index]` element, so a piece across one overlaps its span and maps nothing. A
+container block such as a list item with a nested list contributes only its own text before the
+first nested block; the nested blocks map as blocks of their own, including when the selection's
+common ancestor is the container itself.
 
 Frontmatter properties or their literal fallback form one opaque block. Selections beginning
 there can continue into body text, but only the body portion receives review ranges. Nested raw
@@ -65,4 +66,6 @@ Escape dismisses pending work as well as the visible controls. A shown toolbar r
 selection when the source changes, since no selection event follows. Draft text remains intact across
 focus changes, scrolling, and source updates; submission still requires the captured source. A
 comment, change, or reply cannot be submitted unless the whole edited source reparses with exactly
-the intended marks at the insert and no other mark gained or lost.
+the intended marks starting inside each insert, every existing mark at its shifted offsets with
+unchanged extents, and no other mark. Composers show the verdict for their deferred text, reusing
+it until the source, selection, or text changes; submission verifies the final text.

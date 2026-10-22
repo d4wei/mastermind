@@ -5,16 +5,20 @@ import { createReactHost, removeReactHost, inputValue } from './helpers/dom'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { READING_LAYOUT_EVENT } from '../ui/app/reading-space'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { DropdownMenu } from 'radix-ui'
 
 let host: HTMLDivElement
 let root: Root
 const edit = vi.fn()
 let selectionRect: DOMRect
 const rangeBounds = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
-function Harness({ readOnly = false, text = 'Passage', source = text }: { readOnly?: boolean; text?: string; source?: string }) {
+function Harness({ readOnly = false, text = 'Passage', source = text, menu = false }: { readOnly?: boolean; text?: string; source?: string; menu?: boolean }) {
   const containerRef = useRef<HTMLElement>(null)
   return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe={text.length}>{text}</span></p></article></div>
-    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source={source} spans={[]} authorTag="reviewer" onEdit={edit} /></>
+    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source={source} spans={[]} authorTag="reviewer" onEdit={edit} />
+    {menu && <DropdownMenu.Root defaultOpen modal={false}><DropdownMenu.Trigger>More</DropdownMenu.Trigger>
+      <DropdownMenu.Portal><DropdownMenu.Content><DropdownMenu.Item>Delete comment</DropdownMenu.Item></DropdownMenu.Content></DropdownMenu.Portal>
+    </DropdownMenu.Root>}</>
 }
 beforeEach(() => {
   vi.useFakeTimers()
@@ -251,4 +255,14 @@ it('leaves Escape to an open settings panel', async () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
   await act(async () => vi.advanceTimersByTimeAsync(300))
   expect(host.querySelector('.sel-toolbar')).toBeNull()
+})
+
+it('keeps a composed comment when Escape closes an open menu', async () => {
+  const textarea = await compose()
+  act(() => root.render(<Harness menu />))
+  const item = document.querySelector<HTMLElement>('[role="menuitem"]')!
+  act(() => item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
+  expect(document.querySelector('[role="menuitem"]')).toBeNull()
+  expect(host.querySelector('textarea')).toBe(textarea)
+  expect(textarea.value).toBe('Existing draft')
 })

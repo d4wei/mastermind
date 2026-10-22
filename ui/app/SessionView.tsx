@@ -1,16 +1,17 @@
 import type { TextEdit } from '../../document/types'
 import { useTableExpansion } from '../modes/reading/TableExpansion'
-import { DraftScope, useDraftFocus, pendingDrafts, draftValue } from '../review/drafts'
+import { DraftScope, useDraftFocus, useDraftState, pendingDrafts, draftValue } from '../review/drafts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DocumentScroll } from './DocumentScroll'
-import { APP_NAME, DEFAULT_AUTHOR_TAG, ESCAPE_OWNER_SELECTOR } from './constants'
+import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
-import { locateThread, rebaseThread, threadCards, threadRef, type ThreadCard, type ThreadRef } from '../review/thread-identity'
+import { locateThread, rebaseReplies, rebaseThread, refreshThread, threadCards, threadRef, type ReplyDraft, type ThreadCard,
+  type ThreadRef } from '../review/thread-identity'
 import { useNav } from './navStore'
 import { MarkGutter, type MarkTick } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
@@ -42,7 +43,7 @@ const MODE_CYCLE: Record<ViewMode, ViewMode> = { reading: 'source', source: 'rea
 /**
  * Holds a discussion choice by thread identity, so edits elsewhere cannot move it to another
  * discussion. Returns the chosen card's span index in the current analysis, a chooser taking any
- * member span index, and a rebase for edits about to be applied to the current source.
+ * member span index, and a rebase for edits about to be applied to `base`.
  */
 function useThreadChoice(cards: ThreadCard[] | null, source: string) {
   const [chosen, setChosen] = useState<ThreadRef | null>(null)
@@ -52,17 +53,18 @@ function useThreadChoice(cards: ThreadCard[] | null, source: string) {
   // Re-anchor after a source change, or forget a discussion that no longer exists. Without an
   // analysis (Markdown mode, translations) the choice waits for the next one.
   useEffect(() => {
-    if (chosen && cards && chosen.source !== source) setChosen(located && threadRef(located, source))
-  }, [chosen, cards, source, located])
+    if (!chosen || !cards) return
+    const next = refreshThread(chosen, source, cards)
+    if (next !== chosen) setChosen(next)
+  }, [chosen, cards, source])
   const choose = useCallback((spanIndex: number | null) => {
     const { cards, source } = current.current
     const card = spanIndex === null ? undefined : cards?.find((item) => item.members.includes(spanIndex))
-    setChosen((ref) => !card ? null : ref?.source === source && ref.start === card.start &&
-      ref.identity === card.identity ? ref : threadRef(card, source))
+    setChosen((ref) => !card || !cards ? null : ref?.source === source && ref.start === card.start &&
+      ref.identity === card.identity ? ref : threadRef(card, source, cards))
   }, [])
-  const rebase = useCallback((edits: readonly TextEdit[]) => {
-    const { source } = current.current
-    setChosen((ref) => ref && rebaseThread(ref, source, edits))
+  const rebase = useCallback((edits: readonly TextEdit[], base: string) => {
+    setChosen((ref) => ref && rebaseThread(ref, base, edits))
   }, [])
   return [located?.spanIndex ?? null, choose, rebase] as const
 }
@@ -87,7 +89,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const externalVersion = useDoc((s) => s.externalVersion)
   const readOnly = useDoc(editingLocked)
   const load = useDoc((s) => s.load)
-  const applyDocEdits = useDoc((s) => s.applyEdits)
   const { collapse: collapseTable, hidden: tableExpanded } = useTableExpansion()
 
   const t = useT()
@@ -157,12 +158,24 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   )
   const cards = useMemo(() => analysis && threadCards(analysis.items, analysis.spans, source), [analysis, source])
   const [activeSpan, chooseActive, rebaseActive] = useThreadChoice(cards, source)
-  const [hoveredSpan, chooseHovered] = useThreadChoice(cards, source)
-  const applyEdits = useCallback((edits: TextEdit[]) => {
+  const [hoveredSpan, chooseHovered, rebaseHovered] = useThreadChoice(cards, source)
+  // Owned here rather than by the rail, which is unmounted while the narrow comments panel is closed.
+  const [replyDrafts, setReplyDrafts] = useDraftState<ReplyDraft[]>('replies', [])
+  /**
+   * The one path for review edits: they apply only to the source they were computed from, and the
+   * selected and hovered discussions and reply drafts follow them exactly. Returns whether they applied.
+   */
+  const applyReviewEdits = useCallback((edits: TextEdit[], base: string): boolean => {
+    const doc = useDoc.getState()
+    if (doc.sessionId !== sessionId || doc.source !== base || editingLocked(doc)) return false
     collapseTable()
-    rebaseActive(edits)
-    applyDocEdits(edits)
-  }, [collapseTable, rebaseActive, applyDocEdits])
+    rebaseActive(edits, base)
+    rebaseHovered(edits, base)
+    setReplyDrafts((drafts) => rebaseReplies(drafts, base, edits))
+    doc.applyEdits(edits)
+    return true
+  }, [sessionId, collapseTable, rebaseActive, rebaseHovered, setReplyDrafts])
+  const applyEdits = useCallback((edits: TextEdit[]) => { applyReviewEdits(edits, source) }, [applyReviewEdits, source])
   const revealFindComment = useCallback((spanIndex: number) => {
     collapseTable()
     if (!railOpen) findOpenedRail.current = true
@@ -233,7 +246,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
       // An open panel consumes Escape; its listener may run after this one, so check the DOM too.
       if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e) &&
-        !e.defaultPrevented && !document.querySelector(ESCAPE_OWNER_SELECTOR)) chooseActive(null)
+        !e.defaultPrevented && !escapeOwner()) chooseActive(null)
       // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
@@ -324,7 +337,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [hoveredSpan, analysis])
 
   const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
-    pendingDrafts([sessionId]).some((draft) => draft.key === 'replies')
+    replyDrafts.some((draft) => !!draft.text.trim())
   const showRail = mode === 'reading' && railOpen && hasThreads
   const inlineRail = showRail && !narrow && !showTranslated
   const geometry = reading.space ? readingSpace(reading.space, inlineRail) : null
@@ -357,12 +370,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       hoveredSpan={hoveredSpan}
       onHover={chooseHovered}
       onActivate={chooseActive}
-      onEdit={(edits) => {
-        const current = useDoc.getState()
-        if (current.sessionId !== sessionId || current.source !== source) return
-        rebaseActive(edits)
-        current.applyEdits(edits)
-      }}
+      drafts={replyDrafts}
+      onDraftsChange={setReplyDrafts}
+      onEdit={(edits) => applyReviewEdits(edits, source)}
     />
   )
 

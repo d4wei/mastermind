@@ -17,22 +17,49 @@ function commentMark(authorTag: string, body: string): string {
 type IntendedSpan = Partial<CriticSpan> & Pick<CriticSpan, 'kind' | 'start' | 'end'>
 interface MarkEdit { edit: TextEdit; spans: IntendedSpan[] }
 
+const OFFSETS = ['start', 'end', 'innerStart', 'innerEnd', 'oldStart', 'oldEnd', 'newStart', 'newEnd'] as const
+
+/** `span` moved by edits that end at or before its start; null when an edit reaches inside it. */
+function mappedSpan(span: CriticSpan, edits: readonly TextEdit[]): CriticSpan | null {
+  let shift = 0
+  for (const edit of edits) {
+    if (edit.to <= span.start) shift += edit.insert.length - (edit.to - edit.from)
+    else if (edit.from < span.end) return null
+  }
+  const moved = { ...span }
+  for (const key of OFFSETS) if (moved[key] !== undefined) moved[key] = moved[key] + shift
+  return moved
+}
+
+function sameSpan(a: CriticSpan | undefined, b: CriticSpan): boolean {
+  return !!a && a.kind === b.kind && OFFSETS.every((key) => a[key] === b[key])
+}
+
 /**
  * Surrounding Markdown can reinterpret delimiters once spliced (an unpaired backtick in the selection
- * can pair with a later one), so each edit is checked in the full edited source: the spans starting
- * inside its insert must be exactly the intended marks, and no other span may appear or disappear.
+ * can pair with a later one), so each edit is checked in the full edited source: every span of
+ * `source` (`spans`, scanned when omitted) must reappear at its shifted offsets with the same
+ * extents, and the spans starting inside each insert must be exactly its intended marks, so no
+ * other span appears or disappears.
  */
-function verifiedInPlace(source: string, marks: readonly MarkEdit[]): TextEdit[] | null {
+function verifiedInPlace(
+  source: string, spans: readonly CriticSpan[] | undefined, marks: readonly MarkEdit[],
+): TextEdit[] | null {
   if (!marks.length) return []
   const edits = marks.map(({ edit }) => edit)
-  const result = applyTextEdits(source, edits)
-  const spans = scanMarkdown(result)
+  const before = spans ?? scanMarkdown(source)
+  const after = scanMarkdown(applyTextEdits(source, edits))
   const intended = marks.reduce((count, mark) => count + mark.spans.length, 0)
-  if (spans.length !== scanMarkdown(source).length + intended) return null
+  if (after.length !== before.length + intended) return null
+  const byStart = new Map(after.map((span) => [span.start, span]))
+  for (const span of before) {
+    const moved = mappedSpan(span, edits)
+    if (!moved || !sameSpan(byStart.get(moved.start), moved)) return null
+  }
   let shift = 0
   for (const { edit, spans: expected } of [...marks].sort((a, b) => a.edit.from - b.edit.from)) {
     const at = edit.from + shift
-    const found = spans.filter((span) => span.start >= at && span.start < at + edit.insert.length)
+    const found = after.filter((span) => span.start >= at && span.start < at + edit.insert.length)
     if (found.length !== expected.length) return null
     for (const [index, want] of expected.entries()) {
       const got = found[index]!
@@ -50,13 +77,13 @@ function verifiedInPlace(source: string, marks: readonly MarkEdit[]): TextEdit[]
  * Returns null when the edited source would not parse as that highlight followed by its comment.
  */
 export function commentEdits(
-  source: string, ranges: readonly SelRange[], authorTag: string, body: string,
+  source: string, ranges: readonly SelRange[], authorTag: string, body: string, spans?: readonly CriticSpan[],
 ): TextEdit[] | null {
   const anchor = ranges[0]
   if (!anchor) return []
   const highlight = `{==${anchor.text}==}`
   const insert = highlight + commentMark(authorTag, body)
-  return verifiedInPlace(source, [{
+  return verifiedInPlace(source, spans, [{
     edit: { from: anchor.from, to: anchor.to, insert },
     spans: [
       { kind: 'highlight', start: 0, end: highlight.length, innerStart: 3, innerEnd: 3 + anchor.text.length },
@@ -66,16 +93,18 @@ export function commentEdits(
 }
 
 /** Returns null when the edited source would not parse as exactly that reply comment. */
-export function replyEdits(source: string, at: number, authorTag: string, body: string): TextEdit[] | null {
+export function replyEdits(
+  source: string, at: number, authorTag: string, body: string, spans?: readonly CriticSpan[],
+): TextEdit[] | null {
   const insert = commentMark(authorTag, body)
-  return verifiedInPlace(source, [{
+  return verifiedInPlace(source, spans, [{
     edit: { from: at, to: at, insert }, spans: [{ kind: 'comment', start: 0, end: insert.length }],
   }])
 }
 
 /** Returns null when any edited fragment would not parse as exactly its deletion or substitution. */
 export function changeEdits(
-  source: string, ranges: readonly SelRange[], replacements: readonly string[],
+  source: string, ranges: readonly SelRange[], replacements: readonly string[], spans?: readonly CriticSpan[],
 ): TextEdit[] | null {
   if (ranges.length !== replacements.length) return null
   const marks: MarkEdit[] = []
@@ -97,5 +126,5 @@ export function changeEdits(
       }] })
     }
   }
-  return verifiedInPlace(source, marks)
+  return verifiedInPlace(source, spans, marks)
 }

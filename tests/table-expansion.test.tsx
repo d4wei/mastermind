@@ -4,6 +4,7 @@ import { Tooltip } from 'radix-ui'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createReactHost, removeReactHost } from './helpers/dom'
 import { TableViewport } from '../ui/modes/reading/TableViewport'
+import { SlideOver } from '../ui/app/SlideOver'
 import { TableExpansionProvider, useTableExpansion } from '../ui/modes/reading/TableExpansion'
 
 let host: HTMLDivElement
@@ -13,12 +14,15 @@ let windowWidth: number
 const originalWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
 const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
 const originalOffset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
-function Surroundings() {
+const closePanel = vi.fn()
+function Surroundings({ panel }: { panel: boolean }) {
   const { hidden, collapse } = useTableExpansion()
-  return <><aside inert={hidden} data-hidden={hidden}>Comments</aside><button onClick={collapse}>Open discussion</button></>
+  return <><aside inert={hidden} data-hidden={hidden}>{panel
+    ? <SlideOver title="Comments" onClose={closePanel} returnFocus=".md-table-toggle">Comments</SlideOver> : 'Comments'}</aside>
+    <button onClick={collapse}>Open discussion</button></>
 }
-function Harness({ version = 'same', second = false, show = true }) {
-  return <Tooltip.Provider><TableExpansionProvider><Surroundings /><div className="document-scroll">
+function Harness({ version = 'same', second = false, show = true, panel = false }) {
+  return <Tooltip.Provider><TableExpansionProvider><Surroundings panel={panel} /><div className="document-scroll">
     {show && <TableViewport contentKey={version}><table data-ps="20"><tbody><tr><td data-ps="30">Passage</td></tr></tbody></table></TableViewport>}
     {second && <TableViewport contentKey="second"><table><tbody><tr><td>Another table</td></tr></tbody></table></TableViewport>}
   </div></TableExpansionProvider></Tooltip.Provider>
@@ -152,4 +156,12 @@ it('leaves Escape to an open settings panel', async () => {
   } finally { panel.remove() }
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
+})
+it('collapses on Escape while the panel it hid stays open', async () => {
+  closePanel.mockClear()
+  act(() => root.render(<Harness panel />)); toggle(); await finish()
+  expect(host.querySelector('aside')!.hasAttribute('inert')).toBe(true)
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))); await finish()
+  expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
+  expect(closePanel).not.toHaveBeenCalled()
 })

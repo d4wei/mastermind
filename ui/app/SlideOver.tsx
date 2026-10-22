@@ -29,7 +29,8 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOn
       }
     })
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229) {
+      // A panel hidden under an inert ancestor leaves Escape to whatever hid it.
+      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !panelRef.current?.closest('[inert]')) {
         // Sibling window listeners still run; defaultPrevented tells them this Escape is consumed.
         e.preventDefault()
         e.stopPropagation()

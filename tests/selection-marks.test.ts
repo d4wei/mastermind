@@ -105,4 +105,14 @@ describe('marks verified in the edited source', () => {
     expect(out).toBe('Keep {++this++} and {~~that~>those~~}.')
     expect(scan(out).map((span) => span.kind)).toEqual(['ins', 'sub'])
   })
+
+  it('refuses an edit that trades one existing mark for another while the count holds', () => {
+    // Unfencing the first line releases the fenced mark and lets the last fence swallow the next one.
+    const source = '```\n{++a++}\n```\n{++b++}\n'
+    const fence: SelRange[] = [{ from: 0, to: 3, text: '```' }]
+    const spans = scanMarkdown(source)
+    expect(scanMarkdown(applyTextEdits(source, [{ from: 0, to: 3, insert: '{--```--}' }]))).toHaveLength(spans.length + 1)
+    expect(changeEdits(source, fence, [''], spans)).toBeNull()
+    expect(changeEdits(source, fence, [''])).toBeNull()
+  })
 })

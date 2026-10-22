@@ -83,7 +83,9 @@ export function Navigator() {
       if (!container.current?.contains(event.target as Node)) setOpen(false)
     }
     const escape = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || event.defaultPrevented || container.current?.closest('[inert]')) return
+      // Document-level Escape handlers skip a prevented Escape.
+      event.preventDefault()
       if (container.current?.contains(document.activeElement)) trigger.current?.focus()
       setOpen(false)
     }
