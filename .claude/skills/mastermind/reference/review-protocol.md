@@ -25,9 +25,11 @@ Use a {==short timeout==}{>>@alice: What happens on a slow connection?<<}{>>@cod
 can be retried; the following paragraph specifies the limit.<<} for the initial attempt.
 ```
 
-Keep a mark inside one Markdown block, with no blank lines or nested marks. Delimiters inside code
-or frontmatter are literal text. When writing a new comment, rephrase delimiter-like syntax that
-would break its boundaries; do not assume backslash escaping makes nested CriticMarkup safe.
+Keep a mark inside one Markdown block, with no blank lines or nested marks. Delimiters inside code,
+frontmatter, raw HTML, images and their alt text, and link destinations are literal text; marks
+there are inert, so keep them in link text or prose. When writing a new comment, rephrase
+delimiter-like syntax that would break its boundaries; do not assume backslash escaping makes nested
+CriticMarkup safe.
 
 ## Address feedback in place
 

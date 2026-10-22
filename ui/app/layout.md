@@ -64,11 +64,11 @@ preferences and can appear without an active document.
 
 Settings and history panels fit within the viewport width and scroll their bodies when needed.
 `Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling.
-Conflict recovery, save failures, and translation feedback share it; Find retains the top-center
-slot. Dismissed failures remain reachable from a compact control. Conflict state also appears on
-file tabs. Informational notices dismiss completely. Error notices retain an icon-only warning
-control that reopens their content. Successful transient messages expire; unresolved failures do
-not disappear on a timer.
+Conflict recovery, save failures, and translation feedback share it; Find floats below the top-right
+document controls. Dismissed failures remain reachable from a compact control. Conflict state also
+appears on file tabs. Informational notices dismiss completely. Error notices retain an icon-only
+warning control that reopens their content. Successful transient messages expire; unresolved
+failures do not disappear on a timer.
 Find controls wrap to fit narrow widths. Long source/code lines can still scroll within their own
 content areas.
 
@@ -106,5 +106,5 @@ not add a ring to buttons. Text fields strengthen their existing boundary while 
 editor uses its caret rather than a page-sized outline. Inverted composers use a local light ring.
 Panels move keyboard focus inside on open and return it to the invoking control on dismissal;
 clicking elsewhere keeps focus at the clicked destination. Radix menu items use the highlighted row
-surface. Search matches use an inline wash and underline, independent of focus, and clear when no
-match remains or Find closes.
+surface. Search matches use a neutral fill, darker on the current match, independent of focus, and
+clear when no match remains or Find closes.

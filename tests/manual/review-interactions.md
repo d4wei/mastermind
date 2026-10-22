@@ -12,7 +12,7 @@ reading view for the selection checks.
    not its depth; the trailing Notes heading should remain ordinary.
 2. **Cross-block comments:** select from the first selection paragraph into the second. Choose
    Comment and submit a short message. Only the first markable source range becomes a highlighted
-   comment anchor; the remaining selected ranges stay unchanged. Inspect Source to check the
+   comment anchor; the remaining selected ranges stay unchanged. Inspect Markdown to check the
    `{==…==}{>>…<<}` pair, then undo to restore the copy.
 3. **Cross-block changes:** repeat that selection and choose Suggest change. Each editable fragment
    gets a replacement field. Edit one field and clear another to suggest replacement and deletion,
@@ -20,7 +20,7 @@ reading view for the selection checks.
    paragraph into a list and from a list into the table as well. Existing marks and text that cannot
    be mapped safely to source may split or limit the ranges. An entirely unmarkable selection should
    not offer an actionable toolbar. Undo should restore the whole operation at once.
-4. **Review actions:** accept or reject the deletion suggestion below and inspect Source for the
+4. **Review actions:** accept or reject the deletion suggestion below and inspect Markdown for the
    corresponding text splice. Add a reply to the existing comment; feedback remains in the file
    with its author. Ordinary successful edits and review actions do not require a success toast.
 5. **Save error notification:** use a disposable copy. In the localhost browser preview, block its
@@ -98,11 +98,12 @@ example for selection checks that include the end of a literal block.
 ## Responsive controls
 
 Use a disposable copy with a long filename. Check widths of 320, 768, and 1440 pixels with English
-and Chinese interface labels, a translation language configured, and light and dark themes.
+and Chinese interface labels, a prepared translation, and light and dark themes.
 
-- Document controls remain at the bottom left, with Settings and Resolved in the overflow menu. In
+- Document controls remain at the top right, with Settings and Resolved in the overflow menu. In
   the native app, the square Open button and file pills stay at the top left. Long filenames clip,
-  pills scroll horizontally, and the active file's full path appears in the native window title.
+  pills that do not fit move into a counted overflow list that keeps the active file visible, and
+  the active file's full path appears in the native window title.
   Hover an inactive file pill: its background and text respond while the active pill stays distinct.
 - The compact outline shows heading ticks and the current section. Hover, click, or focus opens the
   heading list; Escape closes it and returns keyboard focus to the trigger. Scroll the document and
@@ -183,7 +184,7 @@ Toggle comments repeatedly and resize during movement. Horizontal movement must 
 text width must not animate, and reduced motion must switch directly. Check the active passage,
 selection, and open composer during these changes.
 
-Compare Open, Source, Comments, and More: matching button surfaces and icon weight, including the
+Compare Open, Markdown, Comments, and More: matching button surfaces and icon weight, including the
 selected Comments state. Across all themes, compare ordinary, hovered, pressed, selected, disabled,
 and keyboard-focused controls on both the page and raised surfaces. Sepia comments use brown and
 Rose comments plum; insertion and deletion keep their separate meanings.

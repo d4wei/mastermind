@@ -62,12 +62,14 @@ recovery across external file changes and app restarts, or explicitly drop the p
 supersedes the general session-restoration deferral without adopting a storage mechanism.
 
 
-## 2026-10-17 — Intermittent comment-triggered conflict
+## 2026-10-17 — Intermittent comment-triggered conflict (updated 2026-10-22)
 
-**Gap.** The reported comment-triggered warning has not been reproduced. A separate transient-read
-recovery defect was fixed, but does not establish its cause. Recovery and exit now follow the
-[document contract](ui/documents/store.md). Capture the source revision, pending write, watcher
-event, and native error classification if the warning recurs.
+**Gap.** The reported comment-triggered warning has not been reproduced. A transient-read recovery
+defect and three plausible triggers were fixed: a metadata-only change to a mixed line-ending file
+and a native missing-file read misread as a failure (`6b5cdde`), and a preview save racing the
+event poll reported as deletion (`27ac137`). None is confirmed as the cause. Recovery and exit
+follow the [document contract](ui/documents/store.md). Capture the source revision, pending write,
+watcher event, and native error classification if the warning recurs.
 
 **Exit:** capture and fix the trigger, or explicitly defer it with diagnostic requirements recorded.
 

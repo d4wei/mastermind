@@ -43,12 +43,12 @@ The magnifying-glass button or `Cmd+F` / `Ctrl+F` opens Find. Search the display
 comments in Read, the displayed translation in translated reading, or the full source in Markdown.
 Enter and Shift-Enter move between occurrences; Escape closes the floating panel.
 
-Select original text to comment, highlight it, or suggest deletion. Agents may append a signed
-reply to a discussion. Delete removes one comment; Resolve archives the discussion at the file
-tail, visible through Resolved. `Cmd+Z` undoes review actions.
+Select original text to comment or suggest a change; clearing the replacement suggests deletion.
+Agents may append a signed reply to a discussion. Delete removes one comment; Resolve archives the
+discussion at the file tail, visible through Resolved. `Cmd+Z` undoes review actions.
 
-A clean buffer reloads external changes automatically. A dirty buffer keeps local edits and the
-disk version, pauses editing, and offers incoming adoption, three-way merging, or saving a new copy.
+A clean buffer reloads external changes automatically. A dirty buffer keeps local edits, pauses
+editing, and offers Use incoming, which discards them, or Save As, which writes them to a new file.
 The [native file contract](desktop/src/files.md) describes concurrency and filesystem limits.
 Closing the app waits for saves; failures retain recoverable text and block the close.
 
@@ -81,16 +81,19 @@ node bin/mastermind.js translate-blocks plan.md \
 Opening reports each file's admission result and returns without waiting for review completion.
 Setup suggestions are transient; people confirm them graphically. Translation preparation is a
 standalone Node utility and never starts the app or a server. Its save operation validates and
-replaces a complete artifact. People do not need to operate these commands themselves.
+replaces a complete artifact under `.mastermind/translations/` beside the document; keep that
+directory out of version control. The [bundled skill](.claude/skills/mastermind/SKILL.md) lists path
+limits, exit statuses, and the opening-hint order. People do not need to operate these commands
+themselves.
 
 ## Develop
 
 ```sh
-npm run dev -- /absolute/path/document.md  # foreground browser preview with Vite
-npm test                                 # application and tooling tests
-npm run typecheck                        # browser and Node configurations
-npm run build                            # translation utility
-npm run desktop:build                    # native macOS app
+npm run dev -- path/to/document.md  # foreground browser preview with Vite
+npm test                           # application and tooling tests
+npm run typecheck                  # browser and Node configurations
+npm run build                      # translation utility
+npm run desktop:build              # native macOS app
 ```
 
 The [browser preview](tools/preview/README.md) is explicit development tooling. It opens only the

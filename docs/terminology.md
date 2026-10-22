@@ -243,9 +243,10 @@ public explanations; clean/dirty buffer remains useful technical terminology.
 
 Evidence: [document sessions][sessions], [state ownership][store], and [lifetime ruling][decisions].
 
-Use **open document / 已打开的文档** when lifecycle matters, otherwise document. A current
-server session is a per-file registry object; the intended app session is the app's whole lifetime.
-Use **document session** only for that existing server object and **app session** for app lifetime.
+Use **open document / 已打开的文档** when lifecycle matters, otherwise document. The native host's
+`Documents` registry holds one admitted document per file until it closes; the app session is the
+app's whole lifetime. Use **admitted document** for that registry entry, **document session** for
+its lifetime, and **app session** for app lifetime.
 Use **document buffer** for unsaved in-memory text, and **review state** for the broader state.
 
 Example: “This document is no longer open. Open the file again.”

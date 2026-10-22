@@ -1,6 +1,6 @@
 ---
 status: historical
-updated: 2026-10-13
+updated: 2026-10-22
 ---
 # Project origins
 
@@ -55,7 +55,8 @@ The original [behaviors plan][upstream-behaviors] adds integration rationale wor
   snapshots instead of cached-block reuse and opens files independently of translation.
 - **One preferred/secondary language pair.** Setup and the reading toggle share `langPair`, avoiding
   competing preferences. Retain consistent language configuration and optional translated reading;
-  `DECISIONS.md` defines repository and optional translation languages in place of a symmetric pair.
+  in place of a symmetric pair, `DECISIONS.md` has the preparing agent choose translation languages
+  and readers choose among prepared versions.
 - **Portable, reversible provisioning.** Upstream's shared installer and marked global blocks make
   installation reversible across harnesses. Retain portability and clear removal guidance; the
   harness installation ruling in `DECISIONS.md` assigns installation to the invoking harness.

@@ -30,9 +30,9 @@ The public [review skill](../.claude/skills/mastermind/SKILL.md) describes prepa
 participation.
 
 Tauri owns native file access and application lifetime while React renders the review interface.
-Graphical onboarding confirms Name and language choices; native file opening retains documents
-admitted during setup. The foreground browser preview is development tooling. Signing and public
-distribution identity remain separate from adopting the native application.
+Graphical onboarding confirms Your name and Interface language; native file opening retains
+documents admitted during setup. The foreground browser preview is development tooling. Signing and
+public distribution identity remain separate from adopting the native application.
 
 ## Authoritative references
 
@@ -41,5 +41,5 @@ distribution identity remain separate from adopting the native application.
 - [Implementation map](source-map.md): source modules and their contracts.
 - [Decisions](../DECISIONS.md): settled constraints.
 - [Native validation](../tools/desktop/results.md) and [direction](../DIRECTION.md): release gaps
-  and
-  unresolved choices.
+  and unresolved choices.
+- [Project origins](fork-rationale.md): design rationale inherited from upstream Mastermind.

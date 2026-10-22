@@ -24,6 +24,12 @@ Installed command identity is not yet configured; do not assume a global `master
 belongs to this application. Translation never prevents opening the original. When the person
 returns with feedback, reread the files; do not infer approval from admission.
 
+One `open` accepts at most 64 paths. Each given path and, for a symlink, its target must end in
+`.md` or `.markdown`. Exit status is 0 on full success, 1 when any file failed (see its result), 2
+for invalid invocation, and 3 (`outcome_unknown`) when the reply was lost; admission is idempotent,
+so retrying after 3 is safe. A file that is not valid UTF-8 opens with replacement characters, but
+saving any edit to it is refused (`not_utf8`); Save As writes a UTF-8 copy.
+
 ## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.
@@ -69,8 +75,12 @@ node /path/to/mastermind/bin/mastermind.js open --language zh-CN -- plan.md
 ```
 
 Repeat preparation and saving for each requested target language. Artifacts coexist per target.
+`--save` writes `.mastermind/translations/<basename>.<lang>.json` beside the resolved document and
+refuses when that directory resolves outside the document's folder; keep `.mastermind/` gitignored.
 The optional `--language` opening hint selects a valid prepared version once; it never changes saved
-settings or overrides a reader's existing choice. The menu also lets readers choose Original.
+settings or overrides a reader's existing choice. The app keeps only the first hint per open
+document and spends it at that document's next translation discovery, so `--save` before
+`open --language`. The menu also lets readers choose Original.
 
 A changed source or invalid/incomplete artifact is rejected as a whole. Reread the current document
 and prepare again; do not patch identifiers until stale output passes. Translation failures leave
@@ -87,7 +97,7 @@ node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader
 
 Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions are transient and
 cannot overwrite saved or actively edited choices. Do not force a questionnaire before opening.
-People confirm their Name and Interface language graphically and change them later in Settings.
+People confirm Your name and Interface language graphically and change them later in Settings.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; optional translation follows the same preparation

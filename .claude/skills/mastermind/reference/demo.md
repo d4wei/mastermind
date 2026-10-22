@@ -1,7 +1,7 @@
 # Welcome to mastermind
 
 This is a demo document. mastermind renders Markdown **and** your review marks,
-and can show a prepared translation in your optional translation language.
+and can show any prepared translation you choose from the Reading language menu.
 
 ## What you're looking at
 
@@ -13,12 +13,11 @@ writes a plan here; you mark it up; it reads the same file back.
 
 ## How to review
 
-- **Comment on a passage** — select some text (or hover a paragraph and use the
-  button on its right) and choose *Comment*. The passage is highlighted and your
-  note rides along. {==This sentence carries a comment.==}{>>@alice: Is this example clear?<<}
+- **Comment on a passage** — select some text and choose *Comment*. The passage
+  is highlighted and your note rides along. {==This sentence carries a comment.==}{>>@alice: Is this example clear?<<}
   {>>@codex: Yes; this reply stays beside the question.<<}
-- **Suggest a deletion** — select text or a whole block and choose *Suggest
-  deletion*. It stays visible but {--struck through--}, so you can see what's queued
+- **Suggest a deletion** — select text, choose *Suggest change*, and clear the
+  replacement. It stays visible but {--struck through--}, so you can see what's queued
   for the agent. Changed your mind? Click the struck-through text to undo it.
 
 Use **Resolve** when a discussion is finished: it moves into the file's hidden archive and remains
@@ -38,5 +37,5 @@ function greet(name: string): string {
 }
 ```
 
-If a translation has been prepared, toggle to your translation language. Select a translated passage
-to comment on its original block; the comment keeps the selected translation as context.
+If a translation has been prepared, choose it from the Reading language menu. Select a translated
+passage to comment on its original block; the comment keeps the selected translation as context.

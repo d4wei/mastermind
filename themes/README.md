@@ -32,8 +32,8 @@ the same CSS variables as the theme defaults.
 - **Other review marks:** insertion green, deletion brick, and highlight gold retain independent
   semantic roles. Dotted underlines, strikethrough, labels, and card linkage distinguish meaning
   even when a theme accent resembles a review color.
-- **Navigation:** Open, Source, Comments, More, file tabs, and secondary actions use neutral ink and
-  surfaces. The current outline tick uses the text-safe accent. Find matches and its Match case
+- **Navigation:** Open, Markdown, Comments, More, file tabs, and secondary actions use neutral ink
+  and surfaces. The current outline tick uses the text-safe accent. Find matches and its Match case
   control use neutral emphasis, independent of review colors. The current match uses a darker fill
   without an additional underline or outline.
 - **Selection and focus:** neutral selection fill and a neutral keyboard focus ring remain separate

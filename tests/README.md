@@ -3,7 +3,7 @@
 The suite follows behavior across layers. Pure document tests check source offsets, exact splices,
 malformed markup, line endings, and translation validation. DOM tests check renderer selection,
 composition, review controls, and real CodeMirror history. Store tests exercise document-owned
-buffers, save and read races, retained comparisons, and shutdown using a fake host.
+buffers, save and read races, conflict recovery, and shutdown using a fake host.
 
 Host adapters own HTTP or native command adaptation. Node filesystem tests check the development
 preview implementation; Rust tests check the separate native implementation. Similar scenarios at
