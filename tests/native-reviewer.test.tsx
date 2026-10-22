@@ -7,7 +7,7 @@ import { NativeReviewer } from '../ui/desktop/NativeReviewer'
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
   listen: vi.fn(), closeDocument: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
-  status: 'ready' as 'loading' | 'ready' | 'error',
+  status: 'ready' as 'loading' | 'ready' | 'error', appRenders: 0,
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
@@ -19,10 +19,14 @@ vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ session
   getState: () => ({ notifyDiskChange: vi.fn(),
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [] }),
 }) }))
-vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign(() => mocks.chinese, {
+vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign((select: (state: unknown) => unknown) =>
+  select({ config: { uiLang: mocks.chinese ? 'zh-CN' : 'en' } }), {
   getState: () => ({ load: mocks.load }),
 }) }))
-vi.mock('../ui/app/App', () => ({ App: ({ home, onboarding }: { home: React.ReactNode; onboarding?: React.ReactNode }) => onboarding ?? home }))
+vi.mock('../ui/app/App', () => ({ App: ({ home, onboarding }: { home: React.ReactNode; onboarding?: React.ReactNode }) => {
+  mocks.appRenders++
+  return onboarding ?? home
+} }))
 
 let host: HTMLDivElement
 let root: Root
@@ -470,6 +474,40 @@ it.each([false, true])('fades the last file only if closing succeeds: %s', async
   } finally { HTMLElement.prototype.animate = original }
 })
 
+
+it('keeps the setup surface visible after closing the last file before setup completes', async () => {
+  const original = HTMLElement.prototype.animate
+  const faded: Element[] = []
+  HTMLElement.prototype.animate = function (frames: Keyframe[]) {
+    if (frames.at(-1)?.opacity === 0) faded.push(this)
+    return { finished: Promise.resolve(), cancel() {} } as unknown as Animation
+  }
+  mocks.id = '0'
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [snapshot().files[0]] }
+    : command === 'setup_snapshot' ? { ...setup(), completed: false }
+    : command === 'close_document' ? { ...snapshot(1), files: [] } : other(command))
+  try {
+    await mount()
+    await act(async () => button('Close first.md').click())
+    await poll()
+    expect(mocks.navigate).toHaveBeenLastCalledWith('/')
+    expect(host.querySelector('.native-setup')).not.toBeNull()
+    expect(faded).toEqual([])
+  } finally { HTMLElement.prototype.animate = original }
+})
+
+it('does not re-render the session tree when a poll returns an unchanged snapshot', async () => {
+  await mount()
+  const renders = mocks.appRenders
+  await poll()
+  await poll()
+  expect(mocks.appRenders).toBe(renders)
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? snapshot(0, null, ['Missing /lost.md']) : other(command))
+  await poll()
+  expect(mocks.appRenders).toBeGreaterThan(renders)
+})
 
 it('disables native Find at home and forwards its menu event when a document is active', async () => {
   await mount()

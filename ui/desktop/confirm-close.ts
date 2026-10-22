@@ -47,6 +47,8 @@ export async function confirmClose(documents: DocStore, ids: string[] | undefine
     } else {
       copyFailed = false
       for (const doc of pending) {
+        // A document saved or reverted while an earlier Save As dialog was open needs no copy.
+        if (!documents.pendingDocuments(ids).some((item) => item.id === doc.id)) continue
         if (!await documents.saveCopy(doc.id, true)) {
           copyFailed = !!documents.pendingDocuments(ids).find((item) => item.id === doc.id)?.copyFailed
           break

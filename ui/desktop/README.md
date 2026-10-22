@@ -69,7 +69,7 @@ release their document, composer, and editor state. The
 
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
 A newer activation revision selects the admitted file; repeated polls preserve manual selection.
-Polling never overlaps requests. Native opening, setup, and command errors share the application's
+Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native opening, setup, and command errors share the application's
 notification host. `close.ts` coalesces window close requests and awaits native termination
 cancellation before unlocking the editor. Failed setup confirmation keeps the window available.
 Native lifecycle details live beside the [termination adapter](../../desktop/src/termination.md).
@@ -87,7 +87,8 @@ configuration loading waits for that gate, avoiding an older load overwriting co
 File admission, opening controls, activation, and close handling continue during setup. Failed
 loading
 offers retry; a failed confirmation retains the form. Saved preferences keep computed defaults
-distinct from explicit saved choices.
+distinct from explicit saved choices. The renderer keeps each stored preference only when
+[`config-values.ts`](../settings/config-values.ts) accepts it; any other field uses its default.
 
 Candidate Enter keeps its IME default while suppressing implicit form submission through the next
 task. The [HTML implicit-submission algorithm][implicit-submit] activates the default submit button;
@@ -108,7 +109,7 @@ icon, label, and platform Open shortcut. The wordmark retains a horizontal slit 
 `home-motion.ts` drifts each complete row independently, sends the rows beyond opposite window
 edges when the first file is admitted, and fades the outgoing and incoming screens. Cancelling the
 picker or failing to open a file leaves home in place. The last document fades only after saving
-and native close succeed; ordinary document switching has no screen transition. The Open button
+and native close succeed, and only when home will replace it rather than setup; ordinary document switching has no screen transition. The Open button
 changes between home and toolbar placement without position animation. Reduced motion skips drift
 and screen transitions. Unmount cancels pending animations and animation frames. The native window
 drag area remains available in both states.

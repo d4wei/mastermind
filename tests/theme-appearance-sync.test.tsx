@@ -97,3 +97,18 @@ it('uses the loaded theme appearance for native controls when switching between 
   act(() => tokens().dispatchEvent(new Event('load')))
   expect(setAppearance).toHaveBeenLastCalledWith(channels, 'light')
 })
+
+it('applies the loaded theme over the startup default without a veil, then cross-fades later choices', () => {
+  const link = document.createElement('link')
+  link.id = 'theme-tokens'
+  link.href = '/themes/grid/tokens.css'
+  document.head.append(link)
+  document.documentElement.dataset.theme = 'grid'
+  useConfig.setState({ config: null })
+  act(() => root.render(<ThemeEffects />))
+  act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'carbon' } }))
+  expect(document.documentElement.dataset.theme).toBe('carbon')
+  expect(document.querySelector('.theme-veil')).toBeNull()
+  act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'grid' } }))
+  expect(document.querySelector('.theme-veil')).not.toBeNull()
+})

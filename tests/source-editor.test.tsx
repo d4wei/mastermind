@@ -177,6 +177,15 @@ it('freezes editor mutations and undo without losing selection or text on confli
   expect(view.state.selection.main.to).toBe(4)
 })
 
+it('applies a lock that began in reading mode to the retained editor state', () => {
+  act(() => editor().dispatch({ changes: { from: 5, insert: ' local' } }))
+  act(() => useDoc.getState().setMode('reading'))
+  act(() => useDoc.getState().notifyDiskChange(true))
+  act(() => useDoc.getState().setMode('source'))
+  expect(undoDepth(editor().state)).toBe(1)
+  expect(editor().contentDOM.getAttribute('contenteditable')).toBe('false')
+})
+
 it('freezes Markdown-mode typing when a read reports the file is not valid UTF-8', async () => {
   const view = editor()
   vi.mocked(getFile).mockResolvedValueOnce({ content: 'alpha', version: 'lossy', mtimeMs: 2, lossy: true })

@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG } from '../settings/defaults'
+import { storedConfig } from '../settings/config-values'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
 import { HostError } from '../app/host'
@@ -24,8 +24,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     }
   }
   const config = async (): Promise<ClientConfig> => {
-    const saved = await invoke<Partial<ClientConfig> | null>('read_preferences')
-    return { ...DEFAULT_CONFIG, ...saved, version: 1 }
+    return storedConfig(await invoke<unknown>('read_preferences'))
   }
   const pendingReads = new Map<string, number>()
   const getFile: ReviewerHost['getFile'] = async (id) => {

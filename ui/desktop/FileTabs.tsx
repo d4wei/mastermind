@@ -4,19 +4,21 @@ import { AlertIcon, ChevronDownIcon, CrossIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { fileWindow } from './file-window'
 import { useClosePrompt } from './CloseDialog'
+import { useT } from '../i18n'
 
 export interface OpenDocument { language?: string; id: string; path: string }
 interface FileTabsProps {
   files: OpenDocument[]
   activeId: string | null
-  chinese: boolean
+  /** Interface language before setup saves one; otherwise the configured language applies. */
+  language?: 'en' | 'zh-CN'
   needsAttention: (id: string) => boolean
   onSelect: (id: string) => void
   onAttention: (id: string) => void
   onClose: (file: OpenDocument) => Promise<boolean>
 }
 
-export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, onAttention, onClose }: FileTabsProps) {
+export function FileTabs({ files, activeId, language, needsAttention, onSelect, onAttention, onClose }: FileTabsProps) {
   const bar = useRef<HTMLElement>(null)
   const measure = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
@@ -28,6 +30,7 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
   const selecting = useRef(false)
   const selectedFocus = useRef<string | null>(null)
   const closePrompt = useClosePrompt((state) => state.prompt)
+  const t = useT(language)
   const labels = fileLabels(files.map((file) => file.path))
   const activeIndex = Math.max(0, files.findIndex((file) => file.id === activeId))
   const measurementKey = JSON.stringify(files.map((file, index) => [file.id, labels[index], needsAttention(file.id)]))
@@ -116,11 +119,11 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
     <Control type={measuring ? undefined : "button"} className="native-file-select" aria-current={!measuring && activeId === file.id ? 'page' : undefined}
       title={file.path} onClick={measuring ? undefined : () => select(file.id)}>{labels[index]}</Control>
     {needsAttention(file.id) && <Control type={measuring ? undefined : "button"} className="native-file-attention btn-ghost btn-icon"
-      aria-label={`${labels[index]} · ${chinese ? '需要处理' : 'Needs attention'}`}
+      aria-label={`${labels[index]} · ${t('needsAttention')}`}
       onClick={measuring ? undefined : () => { select(file.id); onAttention(file.id) }}><AlertIcon /></Control>}
     <Control type={measuring ? undefined : "button"} className="native-file-close btn-icon" onClick={measuring ? undefined : () => { void close(file, menu) }}
-      aria-label={`${chinese ? '关闭' : 'Close'} ${labels[index]}`}
-      title={`${chinese ? '关闭' : 'Close'} ${file.path}`}><CrossIcon /></Control>
+      aria-label={`${t('close')} ${labels[index]}`}
+      title={`${t('close')} ${file.path}`}><CrossIcon /></Control>
   </div>
   }
   const move = (event: KeyboardEvent) => {
@@ -135,8 +138,8 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
     const button = rows[next]?.querySelector<HTMLButtonElement>('.native-file-select')
     button?.focus(); button?.scrollIntoView?.({ block: 'nearest' })
   }
-  const label = chinese ? `全部 ${files.length} 个打开的文件` : `All ${files.length} open files`
-  return <nav ref={bar} data-tauri-drag-region className="native-file-pills" aria-label={chinese ? '打开的文件' : 'Open files'}>
+  const label = t('allOpenFiles').replace('{count}', String(files.length))
+  return <nav ref={bar} data-tauri-drag-region className="native-file-pills" aria-label={t('openFiles')}>
     <div ref={measure} className="native-file-measure" aria-hidden inert>
       {files.map((file, index) => row(file, index, false, true))}
       {Array.from({ length: overflowDigits }, (_, index) => <span key={index} className="native-file-overflow">
@@ -146,10 +149,10 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
     <Popover.Root open={open && files.length > 0} onOpenChange={(next) => { setOpen(next); if (next) window.dispatchEvent(new Event('mastermind-files-open')) }} modal={false}>
       {(hidden > 0 || open) && <Popover.Trigger asChild>
         <button ref={trigger} type="button" className="native-file-overflow btn-ghost" aria-label={label}
-          title={chinese ? '打开的文件' : 'Open files'}>+{hidden}<ChevronDownIcon /></button>
+          title={t('openFiles')}>+{hidden}<ChevronDownIcon /></button>
       </Popover.Trigger>}
       <Popover.Portal>
-        <Popover.Content ref={list} className="native-file-list" aria-label={chinese ? '打开的文件' : 'Open files'}
+        <Popover.Content ref={list} className="native-file-list" aria-label={t('openFiles')}
           align="end" sideOffset={8} collisionPadding={8} onKeyDown={move}
           onOpenAutoFocus={(event) => {
             event.preventDefault(); selecting.current = false
@@ -162,7 +165,7 @@ export function FileTabs({ files, activeId, chinese, needsAttention, onSelect, o
             if (selecting.current || !trigger.current) event.preventDefault()
             selecting.current = false
           }}>
-          <div className="native-file-list-title">{chinese ? '打开的文件' : 'Open files'}</div>
+          <div className="native-file-list-title">{t('openFiles')}</div>
           {files.map((file, index) => row(file, index, true))}
         </Popover.Content>
       </Popover.Portal>

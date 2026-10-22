@@ -41,7 +41,6 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
   const compositionSubmit = useRef(false)
   const compositionReset = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const confirming = useRef(false)
-  const chinese = values.uiLang === 'zh-CN'
   const name = usableAuthorName(values.authorTag)
   const t = useT(values.uiLang)
   useEffect(() => { onLanguagePreview?.(values.uiLang) }, [values.uiLang, onLanguagePreview])
@@ -68,7 +67,7 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
         const confirmed = await nativeBridge.invoke<SetupSnapshot>('confirm_setup', {
           values: { ...values, authorTag: name },
         })
-        if (!confirmed.completed) throw new Error(chinese ? '设置尚未保存。' : 'Setup was not saved.')
+        if (!confirmed.completed) throw new Error(t('setupNotSaved'))
         await useConfig.getState().load()
         onConfirmed(confirmed)
         return true
@@ -109,21 +108,20 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
     }}>
       <fieldset disabled={saving}>
         <label className="native-setup-field">
-          <span>{chinese ? '怎么称呼你？' : 'What should we call you?'}</span>
+          <span>{t('setupNamePrompt')}</span>
           <input className="settings-input native-setup-name" name="authorTag" value={values.authorTag} required autoComplete="nickname"
             aria-invalid={!name} aria-describedby={!name ? 'setup-name-error' : undefined}
             onChange={(event) => {
               protect('authorTag')
               setValues((current) => ({ ...current, authorTag: event.target.value }))
             }} />
-          <small>{chinese ? '这个名字会显示在你的评论旁。' : 'This name appears beside your comments.'}</small>
+          <small>{t('authorTagHint')}</small>
           {!name && <small id="setup-name-error" className="native-setup-name-error" role="alert">
             {t('authorTagInvalid')}
           </small>}
         </label>
-        <div className="native-setup-field" role="group"
-          aria-label={chinese ? '界面语言' : 'Interface language'}>
-          <span>{chinese ? '界面语言' : 'Interface language'}</span>
+        <div className="native-setup-field" role="group" aria-label={t('uiLanguage')}>
+          <span>{t('uiLanguage')}</span>
           <div className="native-setup-options">
             {(['en', 'zh-CN'] as const).map((uiLang) => <button key={uiLang} type="button"
               className="btn-ghost" name="uiLang" value={uiLang} aria-pressed={values.uiLang === uiLang}
@@ -134,10 +132,10 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
           </div>
         </div>
         <button className="btn-primary" type="submit" disabled={!name}>
-          {saving ? (chinese ? '正在保存…' : 'Saving…') : (chinese ? '开始审阅' : 'Start reviewing')}
+          {t(saving ? 'setupSaving' : 'startReviewing')}
         </button>
       </fieldset>
-      {error && <p role="alert">{chinese ? '无法完成设置。请重试。' : 'Could not complete setup. Try again.'} {error}</p>}
+      {error && <p role="alert">{t('setupFailed')} {error}</p>}
     </form>
   </main>
 }

@@ -1,20 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { Analysis } from '../../document/markdown/analyze'
-import { useDoc } from '../documents/store'
 import { useT } from '../i18n'
 import { ChevronDownIcon, ChevronUpIcon, CrossIcon, SearchIcon } from '../icons'
 import { commentSearchText } from '../review/CommentBody'
 import { useCompositionGuard } from '../util/composition'
+import { documentMap } from '../util/document-map'
 import { textMatches, type Match } from './matches'
 import { clearMatches, commentRange, paintMatches, readingMatches, revealMatch } from './reading'
 import { useSourceSearch } from './source'
 import './find.css'
 
 interface FindState { open: boolean; query: string; caseSensitive: boolean }
-const retained = new Map<string, FindState>()
-useDoc.subscribe((state) => {
-  for (const id of retained.keys()) if (!state.hasDocument(id)) retained.delete(id)
-})
+const retained = documentMap<FindState>()
 
 interface Result extends Match { range?: Range; comment?: number; anchor?: number }
 interface Props {

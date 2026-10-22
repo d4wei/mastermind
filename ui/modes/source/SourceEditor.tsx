@@ -7,6 +7,7 @@ import { scanMarkdown } from '../../../document/markdown/scan'
 import { editingLocked, useDoc } from '../../documents/store'
 import { attachSourceSearch, sourceSearchExtension } from '../../find/source'
 import { useNav, type SourceOutline } from '../../app/navStore'
+import { documentMap } from '../../util/document-map'
 
 const CRITIC_CLASS: Record<string, string> = {
   ins: 'cm-critic cm-critic-ins',
@@ -62,12 +63,7 @@ const sourceTheme = EditorView.theme({
 const editing = new Compartment()
 const editingState = (paused: boolean) => [EditorState.readOnly.of(paused), EditorView.editable.of(!paused)]
 
-const retainedStates = new Map<string, { state: EditorState; revision: number }>()
-useDoc.subscribe((state) => {
-  for (const id of retainedStates.keys()) {
-    if (!state.hasDocument(id)) retainedStates.delete(id)
-  }
-})
+const retainedStates = documentMap<{ state: EditorState; revision: number }>()
 
 export function SourceEditor() {
   const hostRef = useRef<HTMLDivElement>(null)
@@ -114,7 +110,8 @@ export function SourceEditor() {
     })
 
     searchBinding = attachSourceSearch(view, sessionId)
-    view.dispatch({ effects: editing.reconfigure(editingState(editingLocked(useDoc.getState()))) })
+    // A new state is built with the current lock; a retained one carries the lock from when it was left.
+    if (state === retained?.state) view.dispatch({ effects: editing.reconfigure(editingState(editingLocked(useDoc.getState()))) })
     const stop = useDoc.subscribe((state, previous) => {
       if (ownsBuffer() && editingLocked(state) !== editingLocked(previous)) {
         view.dispatch({ effects: editing.reconfigure(editingState(editingLocked(state))) })

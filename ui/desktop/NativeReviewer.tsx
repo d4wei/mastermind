@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate, useRoute } from '../app/route'
 import { useDoc } from '../documents/store'
-import { useConfig } from '../app/configStore'
+import { useT } from '../i18n'
 import { requestFind } from '../find/events'
 import { FileIcon } from '../icons'
 import { FileTabs, type OpenDocument } from './FileTabs'
@@ -24,9 +24,11 @@ interface OpeningSnapshot {
   opening_errors: string[]
 }
 
+// Each poll returns fresh arrays; keeping equal state unchanged spares the session tree a re-render.
+const unlessEqual = <T,>(next: T) => (current: T): T => JSON.stringify(current) === JSON.stringify(next) ? current : next
+
 export function NativeReviewer() {
   const [files, setFiles] = useState<OpenDocument[]>([])
-  const closingFile = useRef(false)
   const closingWindow = useRef(false)
   const fileCloseCompletion = useRef<Promise<void> | null>(null)
   const activationRevision = useRef(0)
@@ -46,6 +48,9 @@ export function NativeReviewer() {
   const homeMotion = useRef<ReturnType<typeof createHomeMotion> | null>(null)
   const atHome = files.length === 0 && setupRequired === false
   const homeReady = useRef(false)
+  // Home shows only once setup completes, and only showing home restores a faded surface.
+  const setupComplete = useRef(false)
+  useLayoutEffect(() => { setupComplete.current = setupRequired === false }, [setupRequired])
   useLayoutEffect(() => {
     const motion = createHomeMotion(document.getElementById('root')!)
     homeMotion.current = motion
@@ -74,14 +79,14 @@ export function NativeReviewer() {
     }).catch((error) => setError(String(error)))
     return () => { disposed = true; stop?.() }
   }, [])
-  const configuredChinese = useConfig((s) => s.config?.uiLang === 'zh-CN')
-  const chinese = setupRequired !== false && previewLanguage ? previewLanguage === 'zh-CN' : configuredChinese
+  const language = setupRequired !== false ? previewLanguage : undefined
+  const t = useT(language)
   useEffect(() => {
     let disposed = false
     let setupRevision = -1
     let refreshing = false
     const refresh = async (): Promise<void> => {
-      if (refreshing || closingFile.current || closingWindow.current) return
+      if (refreshing || fileCloseCompletion.current || closingWindow.current) return
       refreshing = true
       try {
         const [opening, onboarding] = await Promise.allSettled([
@@ -90,7 +95,7 @@ export function NativeReviewer() {
             uiLangDefault: systemInterfaceLanguage(navigator.languages),
           }),
         ])
-        if (disposed || closingFile.current || closingWindow.current) return
+        if (disposed || fileCloseCompletion.current || closingWindow.current) return
         if (opening.status === 'fulfilled' && opening.value.activation_revision >= activationRevision.current) {
           const snapshot = opening.value
           if (snapshot.files.length > 0 && homeReady.current) {
@@ -98,8 +103,8 @@ export function NativeReviewer() {
             if (disposed) return
           }
           for (const file of snapshot.files) if (file.language) useTranslation.getState().hint(file.id, file.language)
-          setFiles(snapshot.files)
-          setOpeningErrors(snapshot.opening_errors)
+          setFiles(unlessEqual(snapshot.files))
+          setOpeningErrors(unlessEqual(snapshot.opening_errors))
           if (snapshot.activation_revision > activationRevision.current) {
             activationRevision.current = snapshot.activation_revision
             if (snapshot.active_id !== null) navigate(`/d/${snapshot.active_id}`)
@@ -109,7 +114,7 @@ export function NativeReviewer() {
           setSetupError('')
           if (onboarding.value.revision >= setupRevision) {
             setupRevision = onboarding.value.revision
-            setSetup(onboarding.value)
+            setSetup(unlessEqual<SetupSnapshot | null>(onboarding.value))
             setSetupRequired((required) => required ?? !onboarding.value.completed)
           }
         } else {
@@ -132,7 +137,7 @@ export function NativeReviewer() {
       () => nativeBridge.invoke<void>('finish_close').catch((error) => { setError(String(error)); throw error }),
       (locked) => {
         closingWindow.current = locked
-        document.getElementById('root')!.inert = locked || closingFile.current
+        document.getElementById('root')!.inert = locked || fileCloseCompletion.current !== null
       },
       async () => {
         try { await nativeBridge.invoke('cancel_close') }
@@ -152,8 +157,7 @@ export function NativeReviewer() {
     void nativeBridge.invoke<void>('dismiss_opening_errors').catch((error) => setError(String(error)))
   }
   const closeFile = (file: OpenDocument): Promise<boolean> => {
-    if (closingFile.current) return Promise.resolve(false)
-    closingFile.current = true
+    if (fileCloseCompletion.current) return Promise.resolve(false)
     const root = document.getElementById('root')!
     root.inert = true
     const completion = (async () => {
@@ -166,10 +170,10 @@ export function NativeReviewer() {
             id: Number(file.id), activeId: id === null ? null : Number(id),
             activationRevision: activationRevision.current,
           })
-          if (snapshot.files.length === 0) await homeMotion.current?.leave(false)
+          if (snapshot.files.length === 0 && setupComplete.current) await homeMotion.current?.leave(false)
         }, allowed.get(file.id))
         if (!closed) {
-          setError(chinese ? '文件状态再次变化，请重试关闭。' : 'The file changed again. Please try closing it again.')
+          setError(t('closeChangedAgain'))
           navigate(`/d/${file.id}`)
           return false
         }
@@ -181,19 +185,19 @@ export function NativeReviewer() {
         navigate(snapshot!.active_id === null ? '/' : `/d/${snapshot!.active_id}`)
         return true
       } catch (error) { setError(String(error)); return false }
-      finally { closingFile.current = false; root.inert = closingWindow.current; fileCloseCompletion.current = null }
+      finally { fileCloseCompletion.current = null; root.inert = closingWindow.current }
     })()
     fileCloseCompletion.current = completion.then(() => {})
     return completion
   }
-  const openLabel = chinese ? '打开 Markdown 文件…' : 'Open Markdown files…'
+  const openLabel = t('openMarkdownFiles')
   return <Notifications>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
       <button type="button" className={`native-open${atHome ? ' native-open-home' : ' btn-icon'}`} onClick={chooseFiles}
         aria-label={openLabel} title={openLabel}><FileIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
-      <FileTabs files={files} activeId={id} chinese={chinese} needsAttention={documentState.needsAttention}
+      <FileTabs files={files} activeId={id} language={language} needsAttention={documentState.needsAttention}
         onSelect={(fileId) => navigate(`/d/${fileId}`)}
         onAttention={(fileId) => { if (id === fileId) void documentState.openConflict() }} onClose={closeFile} />
       <div className="native-document-controls" ref={setToolbarTarget} />
@@ -204,7 +208,7 @@ export function NativeReviewer() {
       {error && <Notice key={error} error>{error}</Notice>}
       {setupError && <Notice key={setupError} error>{setupError}
         <button type="button" onClick={() => { void refreshSetup.current() }}>
-          {chinese ? '重试加载设置' : 'Retry loading setup'}
+          {t('retryLoadingSetup')}
         </button>
       </Notice>}
     <CloseDialog />
@@ -219,7 +223,7 @@ export function NativeReviewer() {
         setSetup(confirmed)
         setSetupRequired(false)
       }} /> : <div className="center-note" role="status">
-        {chinese ? '正在加载设置…' : 'Loading setup…'}
+        {t('loadingSetup')}
       </div>} home={<div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
     </div>} /></ToolbarTarget.Provider>

@@ -32,7 +32,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); useClosePrompt.setSt
 function Harness() {
   const [list, setList] = useState(files)
   const [active, setActive] = useState('0')
-  return <FileTabs files={list} activeId={active} chinese={chinese} needsAttention={(id) => id === '4'}
+  return <FileTabs files={list} activeId={active} language={chinese ? 'zh-CN' : undefined} needsAttention={(id) => id === '4'}
     onAttention={() => {}} onSelect={(id) => { select(id); setActive(id) }} onClose={async (file) => {
       close(file.id)
       if (blocked) return false
@@ -132,7 +132,7 @@ it('accepts further closes when the next file never becomes active', async () =>
   function Unloaded() {
     const [list, setList] = useState(files.slice(0, 3))
     const [active, setActive] = useState<string | null>('0')
-    return <FileTabs files={list} activeId={active} chinese={false} needsAttention={() => false}
+    return <FileTabs files={list} activeId={active} needsAttention={() => false}
       onSelect={() => {}} onAttention={() => {}} onClose={async (file) => {
         closed.push(file.id)
         setList((old) => old.filter((item) => item.id !== file.id))

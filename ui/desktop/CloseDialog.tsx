@@ -21,9 +21,11 @@ export function CloseDialog() {
   const t = useT()
   const ime = useCompositionGuard()
   const dialog = useRef<HTMLDialogElement>(null)
+  // showModal focuses the dialog's first control, so the intended one is focused only once it is open.
   useLayoutEffect(() => {
-    if (prompt) dialog.current?.showModal()
-    else dialog.current?.close()
+    if (!prompt) { dialog.current?.close(); return }
+    dialog.current?.showModal()
+    dialog.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus()
   }, [prompt])
   return createPortal(<dialog ref={dialog} className="close-dialog" aria-labelledby="close-title"
     onCancel={(event) => { event.preventDefault(); choose('cancel') }}
@@ -37,8 +39,8 @@ export function CloseDialog() {
         {prompt.kind !== 'saving' && <button type="button" className="btn-ghost" onClick={() => choose('discard')}>
           {t(prompt.kind === 'draft' ? 'discardDrafts' : 'dontSave')}</button>}
         <button type="button" className={prompt.kind === 'draft' ? 'btn-primary' : 'btn-ghost'}
-          autoFocus={prompt.kind !== 'save'} onClick={() => choose('cancel')}>{t('cancel')}</button>
-        {prompt.kind === 'save' && <button type="button" className="btn-primary" autoFocus
+          data-initial-focus={prompt.kind !== 'save' || undefined} onClick={() => choose('cancel')}>{t('cancel')}</button>
+        {prompt.kind === 'save' && <button type="button" className="btn-primary" data-initial-focus
           onClick={() => choose('save')}>{t('conflictSaveCopy')}</button>}
       </div>
     </>}

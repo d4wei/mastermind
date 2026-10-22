@@ -3,7 +3,8 @@
 `ThemeEffects` synchronizes the native background and light/dark appearance when the theme
 stylesheet loads, including an already-loaded startup stylesheet. Its transition fallback only
 removes the veil; it does not send a color before the stylesheet is ready. CSS tokens remain the
-color authority.
+color authority. The first configured theme replaces the startup default without a veil; only later
+theme choices cross-fade.
 
 `appearance.ts` samples the root's computed background through an sRGB canvas. This uses the
 browser's color conversion for OKLCH and other CSS color forms rather than maintaining a second

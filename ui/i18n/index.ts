@@ -103,6 +103,17 @@ const en = {
   authorTagHint: 'This name appears beside your comments.',
   authorTagInvalid: 'Use up to 64 characters without :, @, {, }, <, >, =, | or line breaks.',
   uiLanguage: 'Interface language',
+  openMarkdownFiles: 'Open Markdown files…',
+  openFiles: 'Open files',
+  allOpenFiles: 'All {count} open files',
+  closeChangedAgain: 'The file changed again. Please try closing it again.',
+  loadingSetup: 'Loading setup…',
+  retryLoadingSetup: 'Retry loading setup',
+  setupNamePrompt: 'What should we call you?',
+  setupSaving: 'Saving…',
+  startReviewing: 'Start reviewing',
+  setupNotSaved: 'Setup was not saved.',
+  setupFailed: 'Could not complete setup. Try again.',
 } as const
 
 export type MsgKey = keyof typeof en
@@ -210,6 +221,17 @@ const zhCN: Record<MsgKey, string> = {
   authorTagHint: '这个名字会显示在你的评论旁。',
   authorTagInvalid: '请填写不超过 64 个字符的名字，不含 :、@、{、}、<、>、=、| 或换行。',
   uiLanguage: '界面语言',
+  openMarkdownFiles: '打开 Markdown 文件…',
+  openFiles: '打开的文件',
+  allOpenFiles: '全部 {count} 个打开的文件',
+  closeChangedAgain: '文件状态再次变化，请重试关闭。',
+  loadingSetup: '正在加载设置…',
+  retryLoadingSetup: '重试加载设置',
+  setupNamePrompt: '怎么称呼你？',
+  setupSaving: '正在保存…',
+  startReviewing: '开始审阅',
+  setupNotSaved: '设置尚未保存。',
+  setupFailed: '无法完成设置。请重试。',
 }
 
 const DICTIONARIES: Record<'en' | 'zh-CN', Record<MsgKey, string>> = { en, 'zh-CN': zhCN }

@@ -2,9 +2,8 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { usableAuthorName } from '../../document/author'
 import { DEFAULT_CONFIG } from '../../ui/settings/defaults'
-import type { MastermindConfig } from '../../ui/settings/types'
+import { configPatch } from '../../ui/settings/config-values'
 import { readSessionFile, writeSessionFile } from './files'
 import { readPreparedTranslation, listPreparedTranslations, validLanguageCode } from '../translation/prepared-translations'
 import { serveFile } from './static'
@@ -13,21 +12,6 @@ import { scanThemes } from '../../themes/discovery'
 // Status, code, and message match the native host's refusal of the same write.
 const NOT_UTF8_MESSAGE = 'The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.'
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
-// Keyed by the union so a new interface language fails to compile until it is admitted here.
-const UI_LANGUAGES: Record<MastermindConfig['uiLang'], true> = { en: true, 'zh-CN': true }
-
-/** Admits known keys whose values have the default's type and a usable author name; null rejects the whole patch. */
-function configPatch(patch: object): Partial<MastermindConfig> | null {
-  const accepted: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(patch)) {
-    if (!Object.hasOwn(DEFAULT_CONFIG, key)) continue
-    if (typeof value !== typeof DEFAULT_CONFIG[key as keyof MastermindConfig]) return null
-    if (key === 'uiLang' && !Object.hasOwn(UI_LANGUAGES, value as string)) return null
-    if (key === 'authorTag' && usableAuthorName(value as string) !== value) return null
-    accepted[key] = value
-  }
-  return accepted
-}
 
 export interface PreviewOptions {
   /** Interval between checks of the selected file and its prepared translations. */

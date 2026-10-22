@@ -114,6 +114,13 @@ describe('native reviewer boundary', () => {
     expect(listener).toHaveBeenCalledTimes(2)
   })
 
+  it('falls back per field when hand-edited preferences have unusable values', async () => {
+    const saved = { lineHeight: '1.6', fontSize: null, contentWidth: -1, uiLang: 'fr', authorTag: 'a:b',
+      theme: 'nacht', fontPreset: 7, version: 9, unknown: true }
+    const host = createNativeHost({ invoke: vi.fn().mockResolvedValue(saved), listen: vi.fn() }, [])
+    expect(await host.config()).toEqual({ ...DEFAULT_CONFIG, theme: 'nacht' })
+  })
+
   it('serializes preference patches so concurrent controls do not erase each other', async () => {
     let saved: Record<string, unknown> | null = null
     const bridge: NativeBridge = {

@@ -6,7 +6,7 @@ import { fakeHost } from './helpers/host'
 import { installHost, HostError } from '../ui/app/host'
 import { createDocStore } from '../ui/documents/store'
 import { confirmClose } from '../ui/desktop/confirm-close'
-import { CloseDialog, useClosePrompt } from '../ui/desktop/CloseDialog'
+import { CloseDialog, askToClose, useClosePrompt } from '../ui/desktop/CloseDialog'
 import { DraftScope, pendingDrafts, releaseDrafts, useDraftFocus, useDraftGuard, useDraftState } from '../ui/review/drafts'
 
 const getFile = vi.fn(), putFile = vi.fn(), saveCopy = vi.fn()
@@ -15,7 +15,11 @@ let view: ReturnType<typeof createReactHost>
 beforeEach(() => {
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', '') }
+  // Like the browser, opening focuses the first control unless one carries the autofocus attribute.
+  HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute('open', '')
+    ;(this.querySelector<HTMLElement>('[autofocus]') ?? this.querySelector('button'))?.focus()
+  }
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open') }
   getFile.mockReset().mockResolvedValue(file('base'))
   putFile.mockReset().mockRejectedValue(new HostError('failure', 'readonly'))
@@ -49,6 +53,13 @@ it('flushes ordinary autosave and closes without a prompt', async () => {
   expect(document.querySelector('dialog[open]')).toBeNull()
   expect(putFile).toHaveBeenCalledWith('A', 'A edited', 'base')
 })
+
+it.each([['draft', 'Cancel'], ['save', 'Save As…'], ['saving', 'Cancel']] as const)(
+  'focuses the safe action once the %s prompt is open', async (kind, label) => {
+    await act(async () => { void askToClose({ kind, names: ['A.md'] }) })
+    expect(document.activeElement?.textContent).toBe(label)
+    await choose('cancel')
+  })
 
 it('lets a slow close be cancelled without claiming to cancel the dispatched write', async () => {
   const store = await dirty()
@@ -145,6 +156,24 @@ it('removes only successfully copied files from a quit decision', async () => {
   expect(store.getState().hasDocument('copy-A')).toBe(false)
   await choose('discard')
   expect([...(await closing)!.keys()]).toEqual(['A', 'B'])
+})
+
+it('skips Save As for a document that became clean after the prompt listed it', async () => {
+  const store = await dirty(['A', 'B'])
+  let bClean = false
+  const state = store.getState()
+  const documents = { ...state, pendingDocuments: (ids?: string[]) =>
+    state.pendingDocuments(ids).filter((doc) => !(bClean && doc.id === 'B')) }
+  saveCopy.mockImplementationOnce(async () => {
+    bClean = true
+    return { meta: { sessionId: 'copy-A' }, file: file('A edited') }
+  })
+  let closing!: ReturnType<typeof confirmClose>
+  await act(async () => { closing = confirmClose(documents, undefined, vi.fn()) })
+  expect(document.querySelector('dialog')?.textContent).toContain('B.md')
+  await choose('save')
+  expect([...(await closing)!.keys()]).toEqual(['A'])
+  expect(saveCopy).toHaveBeenCalledOnce()
 })
 
 function Draft({ id }: { id: string }) {

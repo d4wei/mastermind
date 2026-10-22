@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
 import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
@@ -15,6 +15,8 @@ export function ThemeEffects() {
 
   const themeId = config?.theme ?? 'grid'
   const theme = themes.find((t) => t.id === themeId) ?? themes[0]
+  // The first configured theme replaces the startup default instantly; only later choices cross-fade.
+  const configuredThemeShown = useRef(false)
 
   // Keep the previous background visible while the replacement stylesheet loads.
   useEffect(() => {
@@ -24,7 +26,6 @@ export function ThemeEffects() {
     const synchronize = () => syncHostAppearance(theme?.appearance ?? 'light')
     const href = `/themes/${id}/tokens.css`
     let link = document.getElementById(TOKENS_LINK_ID) as HTMLLinkElement | null
-    const firstLoad = !link
     if (!link) {
       link = document.createElement('link')
       link.id = TOKENS_LINK_ID
@@ -39,7 +40,7 @@ export function ThemeEffects() {
 
     const reduce = prefersReducedMotion()
     let veil: HTMLDivElement | null = null
-    if (!firstLoad && prev && prev !== id && !reduce) {
+    if (configuredThemeShown.current && prev && prev !== id && !reduce) {
       veil = document.createElement('div')
       veil.className = 'theme-veil'
       veil.style.background = getComputedStyle(document.body).backgroundColor
@@ -71,6 +72,7 @@ export function ThemeEffects() {
       veil?.remove()
     }
   }, [theme?.id, theme?.appearance, themeId])
+  useEffect(() => { if (config) configuredThemeShown.current = true }, [config])
 
   // Declare local font faces independently of the selected theme.
   useEffect(() => {
