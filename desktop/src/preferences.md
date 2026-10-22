@@ -9,7 +9,9 @@ Preference reads use the same byte limit as preference writes, checking one addi
 JSON parsing. Oversized preferences are rejected without rewriting the file. Preference command
 failures keep their string response shape; document and admission errors use the structured shape.
 
-Writes replace the saved object through a temporary file in the same directory. The writer mutex
+Writes sync a temporary file in the same directory, then rename it over the preference path, so
+readers see either the previous or the new complete object. The rename itself is not synced, and it
+replaces a symlinked preference path with a regular file. The writer mutex
 protects that temporary path from competing writes within this host. This is separate from the
 setup mutex, which protects the complete read-modify-write operation.
 

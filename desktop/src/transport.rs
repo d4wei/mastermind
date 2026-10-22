@@ -1,5 +1,6 @@
 use crate::admission::{Documents, MAX_FRAME, Response};
-use interprocess::local_socket::tokio::{Listener, Stream, prelude::*};
+use mastermind_launch_check::protocol::MAX_REPLY_FRAME;
+use interprocess::local_socket::tokio::{Listener, prelude::*};
 use mastermind_launch_check::protocol::Operation;
 use std::{
     io,
@@ -9,16 +10,17 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 
 pub const DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
+const ACCEPT_RETRY: std::time::Duration = std::time::Duration::from_millis(100);
 
-async fn frame(stream: &Stream) -> io::Result<Vec<u8>> {
+async fn frame(stream: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    BufReader::new(stream.take((MAX_FRAME + 1) as u64))
+    BufReader::new(stream.take((limit + 1) as u64))
         .read_until(b'\n', &mut bytes)
         .await?;
-    if bytes.len() > MAX_FRAME || bytes.last() != Some(&b'\n') {
+    if bytes.len() > limit || bytes.last() != Some(&b'\n') {
         return Err(io::Error::other("invalid_frame"));
     }
     Ok(bytes)
@@ -32,7 +34,7 @@ pub async fn exchange(root: &Path, request: &Operation) -> io::Result<Response> 
         return Err(io::Error::other("request_too_large"));
     }
     (&stream).write_all(&bytes).await?;
-    let response: Response = serde_json::from_slice(&frame(&stream).await?)?;
+    let response: Response = serde_json::from_slice(&frame(&stream, MAX_REPLY_FRAME).await?)?;
     if response.version != crate::admission::VERSION {
         return Err(io::Error::other("incompatible_version"));
     }
@@ -44,8 +46,28 @@ fn dispatch(request: Operation, docs: &Mutex<Documents>, setup: &crate::setup::S
         Operation::Open(request) => docs.lock().unwrap().admit(request),
         Operation::Setup(request) => setup.suggest(request),
     };
-    response.onboarding_needed = setup.onboarding_needed().ok();
+    // A rejected request reports unknown setup state, like invocation failures.
+    if response.error.is_none() {
+        response.onboarding_needed = setup.onboarding_needed().ok();
+    }
     response
+}
+
+/// Waits for the next connection. Accept failures such as descriptor exhaustion or an aborted
+/// connection are transient, so the listener keeps serving after a short pause.
+async fn next_connection<T, F>(mut accept: impl FnMut() -> F) -> T
+where
+    F: std::future::Future<Output = io::Result<T>>,
+{
+    loop {
+        match accept().await {
+            Ok(connection) => return connection,
+            Err(error) => {
+                eprintln!("Launcher connection failed: {error}");
+                tokio::time::sleep(ACCEPT_RETRY).await;
+            }
+        }
+    }
 }
 
 pub async fn serve(
@@ -58,7 +80,8 @@ pub async fn serve(
         std::env::var_os("MM_LAUNCH_CHECK_DROP_REPLY").is_some(),
     ));
     let slots = Arc::new(tokio::sync::Semaphore::new(16));
-    while let Ok(stream) = listener.accept().await {
+    loop {
+        let stream = next_connection(|| listener.accept()).await;
         let Ok(permit) = slots.clone().try_acquire_owned() else {
             continue;
         };
@@ -69,7 +92,7 @@ pub async fn serve(
         tokio::spawn(async move {
             let _permit = permit;
             let work = async {
-                let response = match frame(&stream).await.and_then(|bytes| {
+                let response = match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
                     serde_json::from_slice::<Operation>(&bytes).map_err(io::Error::from)
                 }) {
                     Ok(request) => crate::worker::blocking_work()
@@ -101,6 +124,70 @@ pub async fn serve(
 mod tests {
     use super::*;
     use crate::admission::{Request, VERSION};
+
+    #[test]
+    fn replies_for_requests_within_the_frame_limit_are_accepted() {
+        let path = format!("/{}", "p".repeat(699));
+        let request = serde_json::to_vec(&Operation::Open(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![path.clone(); crate::admission::MAX_FILES],
+        }))
+        .unwrap();
+        assert!(request.len() < MAX_FRAME);
+        let mut reply = serde_json::to_vec(&Response {
+            results: (0..crate::admission::MAX_FILES)
+                .map(|_| mastermind_launch_check::protocol::FileResult {
+                    path: path.clone(),
+                    canonical: Some(path.clone()),
+                    status: "already_open".into(),
+                    error: None,
+                    message: None,
+                })
+                .collect(),
+            error: None,
+            ..Response::error("")
+        })
+        .unwrap();
+        reply.push(b'\n');
+        assert!(reply.len() > MAX_FRAME);
+        let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        assert_eq!(runtime.block_on(frame(&reply[..], MAX_REPLY_FRAME)).unwrap(), reply);
+        assert!(runtime.block_on(frame(&reply[..], MAX_FRAME)).is_err());
+    }
+
+    #[test]
+    fn accept_failures_do_not_stop_the_listener() {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build().unwrap();
+        let mut attempts = 0;
+        let connection = runtime.block_on(next_connection(|| {
+            attempts += 1;
+            let result = if attempts < 3 {
+                Err(io::Error::from(io::ErrorKind::ConnectionAborted))
+            } else {
+                Ok(attempts)
+            };
+            async move { result }
+        }));
+        assert_eq!(connection, 3);
+    }
+
+    #[test]
+    fn rejected_requests_report_unknown_setup_state() {
+        let path = std::env::temp_dir().join(format!(
+            "mastermind-transport-rejected-{}.json",
+            std::process::id()
+        ));
+        let setup = crate::setup::Setup::new(path);
+        let docs = Mutex::new(Documents::default());
+        let response = dispatch(
+            Operation::Open(Request { language: None, version: VERSION + 1, paths: vec![] }),
+            &docs,
+            &setup,
+        );
+        assert_eq!(response.error.as_deref(), Some("incompatible_version"));
+        assert_eq!(response.onboarding_needed, None);
+    }
 
     #[test]
     fn setup_operations_do_not_wait_for_the_document_registry() {

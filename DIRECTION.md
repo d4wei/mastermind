@@ -26,6 +26,17 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-22 — Launcher endpoint location
+
+**Gap.** The launcher endpoint directory derives from `TMPDIR` (`desktop/src/endpoint/unix.rs`).
+A launcher run from a shell whose `TMPDIR` differs from a Finder-launched app's starts a second
+host and window. On Linux the `/tmp` fallback name is predictable, so another user can pre-create
+it; startup then fails the privacy check rather than sharing it. Candidate roots are
+`confstr(_CS_DARWIN_USER_TEMP_DIR)` on macOS and `$XDG_RUNTIME_DIR` on Linux.
+
+**Exit:** choose per-platform endpoint roots that every launch path of one user resolves
+identically and no other user can create, then test discovery across differing `TMPDIR` values.
+
 ## 2026-10-18 — Agent-requested file closing
 
 **Bet.** Let the bundled skill close files as well as open them, so completed reviews need not

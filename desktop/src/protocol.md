@@ -6,8 +6,9 @@ invoking process's directory, starts or reuses one local host, and reports admis
 waiting for onboarding or review completion.
 The Windows console companion preserves command output without attaching a console to the GUI.
 
-`protocol.rs` owns the version, frame and request bounds, strict request envelopes, and reply
-fields. Open and setup are distinct operations; unknown or mixed fields reject the request. The
+`protocol.rs` owns the version, request and reply frame bounds, request bounds, strict request
+envelopes, and reply fields. Replies echo each path beside its canonical target and message, so
+the launcher reads them under a larger bound than requests. Open and setup are distinct operations; unknown or mixed fields reject the request. The
 transport checks versions before admission. `endpoint/` scopes local sockets or named pipes to the
 OS user; endpoint existence does not authorize reading arbitrary files.
 
@@ -25,7 +26,11 @@ Stdout contains one JSON reply; diagnostics go to stderr. Replies carry file adm
 not document contents or feedback. Exit status is zero for a fully successful operation, one for
 per-file failures, two for invalid invocation or request errors, and three for an unknown outcome.
 A lost acknowledgment or timeout may follow successful admission. Retrying is safe; the launcher
-never kills the app or rolls back files solely because its connection failed.
+never kills the app or rolls back files solely because its connection failed. On Unix the launcher
+starts the app in its own process group, so interrupting or signalling the launcher's group does
+not stop an app holding unsaved edits. If the app it started exits unsuccessfully before
+accepting a connection, the launcher reports an unknown outcome without waiting for the deadline.
+The app keeps accepting launcher connections after a transient accept failure.
 
 `onboarding_needed` reports the host's setup state, or null when that state cannot be established.
 A successful setup suggestion returns per-field `accepted` or `ignored`; it does not persist choices

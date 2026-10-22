@@ -1,13 +1,10 @@
 use crate::files::{self, FileError};
+use mastermind_launch_check::protocol::language_code;
 use serde_json::Value;
 use std::{fs, path::{Path, PathBuf}};
 
 const MAX_TRANSLATIONS: usize = 64;
 const MAX_TOTAL_BYTES: usize = 32 * 1024 * 1024;
-
-pub fn language_code(code: &str) -> bool {
-    mastermind_launch_check::protocol::language_code(code)
-}
 
 pub fn watch_paths(source: &Path) -> Vec<PathBuf> {
     let parent = source.parent().unwrap();

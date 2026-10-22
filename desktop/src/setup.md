@@ -17,8 +17,8 @@ ignore agent suggestions.
 Suggestions never write preferences and disappear when the host exits.
 
 Successful opening and setup replies report actual `onboarding_needed`. When preferences cannot
-be read or validated, admission still succeeds and the value is null. Invocation failures and
-unknown outcomes also report null rather than guessing completion. Per-file results retain their
+be read or validated, admission still succeeds and the value is null. Invocation failures,
+rejected requests, and unknown outcomes also report null rather than guessing completion. Per-file results retain their
 existing semantics. Setup acknowledgments do not mean a person has confirmed the suggestions.
 
 The GUI commands return `{ completed, revision, values, saved, protected }`. The latter three

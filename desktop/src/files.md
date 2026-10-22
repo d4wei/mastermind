@@ -3,7 +3,8 @@
 `files.rs` owns bounded, versioned reads and guarded writes. `document_io.rs` accepts document IDs
 from the admitted path registry; webview commands cannot name an arbitrary write destination.
 Admission accepts `.md` and `.markdown`, case-insensitively, on both the selected path and canonical
-target. Non-Markdown files return `not_markdown` without entering the registry. The picker filters
+target. The selected name is checked before any filesystem access, so a missing, oversized, or
+special non-Markdown path also returns `not_markdown` without entering the registry. The picker filters
 these extensions; CLI, document events, and drops use the same admission rule. Save As rejects an
 unsupported extension before creating a file. These checks identify document types by filename,
 not by guessing from content.
@@ -19,13 +20,17 @@ They compare descriptor metadata before and after reading, then compare a second
 the path. Versions include filesystem identity, metadata, and SHA-256 of the raw bytes. The
 Windows identity is the volume and file ID; Unix uses device and inode plus metadata timestamps.
 A changed or replaced path rejects the snapshot. Reads and changed writes share a size limit.
-Unsupported types are checked before opening and again through descriptor metadata.
+Unsupported types are checked before opening and again through descriptor metadata. Unix opens
+are nonblocking only until the descriptor is confirmed to be a regular file.
 
 A separate write mutex serializes this host's writes. The document registry is locked only to
 resolve the admitted path, so writes do not hold that registry during disk I/O.
 Each write rechecks its supplied base version through the opened descriptor. Missing paths are
-conflicts and are never recreated. An unchanged decoded string returns without writing, retaining
-original bytes even when they contain invalid UTF-8. Changed content is written and truncated
+conflicts and are never recreated. Documents reach the UI as lossily decoded text. An unchanged
+string returns without writing, retaining original bytes even when they contain invalid UTF-8.
+Changed content for a file that is not valid UTF-8 is refused with `not_utf8`, because writing it
+would replace invalid sequences outside the edit; Save As can write a UTF-8 copy instead. Changed
+content is written and truncated
 through the existing descriptor, preserving inode, permissions, and admitted symlink aliases.
 A second snapshot checks the resulting content and path identity before reporting success.
 
@@ -37,7 +42,8 @@ available for recovery and retry.
 Notify watches parent directories so replacing an individual file preserves the directory watch.
 Prepared artifact directories share this lifecycle; see [translation discovery](translations.md).
 Events invalidate the active document; a versioned read decides whether content changed. Read-only
-access events are ignored. Watch errors also invalidate. The UI revalidates on focus and at
+access events are ignored. Watch errors also invalidate. A removal event for a watched directory
+drops it from the watch set, so a recreated directory is registered on the next watch request. The UI revalidates on focus and at
 intervals even when watch registration succeeds; failed registration uses a faster interval.
 Inactive documents revalidate on return; their saves still check versions. Network filesystem
 notifications and parent-directory replacement remain platform validation work.
@@ -46,11 +52,14 @@ Native filesystem commands and admission share the blocking-work gate described 
 [`worker.md`](worker.md). Filesystem work runs outside the event loop; response deadlines do not
 cancel operations already running.
 
-Native file failures serialize `status`, stable `error` code, and readable `message`. Admission
+Native file and watch failures serialize `status`, stable `error` code, and readable `message`.
+The opening inventory commands (`snapshot`, `close_document`, `dismiss_opening_errors`) can fail
+only when their worker fails and report a plain string, like preference commands. Admission
 returns the same code and message per failed path; graphical opening and the host adapter display
 the message. Missing reads use `file_not_found`; denied access uses `permission_denied`; unsupported
 file types use `not_supported_file`; oversized content uses `file_too_large`. Other I/O errors use
-`file_io_error` with the OS diagnostic. Registry and translation validation retain their own codes.
+`file_io_error` with the OS diagnostic; watch registration failures use `watch_failed`. Registry
+and translation validation retain their own codes.
 
 Writes treat missing paths, paths replaced by unsupported types, and changed version/identity as
 `file_changed` conflicts. Other read, metadata, and write errors preserve their classification,
@@ -63,15 +72,19 @@ Initial setup and per-field saved choices are described in [`setup.md`](setup.md
 
 `save_document_copy` obtains its destination from the native save picker; the webview provides only
 an admitted document ID and retained content. It cannot supply an arbitrary write path. Cancellation
-returns without writing. `create_copy` uses exclusive creation, rejecting existing destinations,
+returns without writing. Before creating anything, Save As checks the destination's extension and
+requires a UTF-8 canonical path. `create_copy` uses exclusive creation, rejecting existing destinations,
 including symlink and hard-link aliases. It checks the size, writes and syncs the bytes, then reads
 back a versioned snapshot. Failure retains the renderer buffer; a partial new file may remain and
 is never silently removed or overwritten on retry.
 
-After successful creation and admission, the registry replaces the old document ID with a fresh ID.
-The original disk file is untouched. This does not advance activation: the renderer switches only
-if the person still has the originating document selected. Unused watches are released. A failed
-creation or admission does not release the original document.
+An ordinary Save As also refuses, before creation, a destination still registered to an admitted
+document, such as one whose file was deleted, with `already_open`; the copy never merges into that
+document. After creation, the new file is admitted under a fresh ID with the snapshot creation
+verified, and the original document's registry entry is removed. The original disk file is
+untouched. This does not advance activation: the renderer switches only if the person still has the
+originating document selected. Unused watches are released. A failed creation or admission does
+not release the original document.
 
 When `forClose` is true, creation and readback use the same exclusive-copy path, but the new file
 is not admitted and the original registry entry stays intact. The renderer can complete its close

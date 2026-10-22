@@ -332,7 +332,7 @@ impl Setup {
         Response {
             version: VERSION,
             pid: std::process::id(),
-            onboarding_needed: Some(!completed),
+            onboarding_needed: None,
             setup_results: Some(results),
             results: vec![],
             error: None,

@@ -29,6 +29,13 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-22 — Files that are not valid UTF-8 are read-only in place
+
+**Ruled.** The native host decodes such a file lossily for display and refuses an edited write to
+it, so bytes outside the person's edits can never be rewritten; Save As writes a UTF-8 copy.
+
+**Beat:** writing the replacement characters back, which silently changed every invalid byte.
+
 ## 2026-10-19 — Expand table viewports without reflowing cells
 
 **Ruled.** Wide tables scroll within the prose width and can explicitly expand to the window's

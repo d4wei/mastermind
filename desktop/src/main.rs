@@ -13,7 +13,7 @@ mod preferences;
 #[cfg(feature = "readiness-trace")]
 mod readiness;
 mod setup;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 mod host_process;
 mod termination;
 mod transport;
@@ -96,9 +96,10 @@ fn main() {
             app.manage(setup.clone());
             #[cfg(feature = "readiness-trace")]
             app.manage(Arc::new(readiness::Readiness::from_environment()?));
-            app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(
-                app.handle().clone(),
-            )?)));
+            let invalidations = app.handle().clone();
+            app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(move || {
+                let _ = invalidations.emit("document-invalidated", ());
+            })?)));
             termination::install(app.handle())?;
             app.set_menu(lifecycle::menu(app.handle())?)?;
             let runtime = tauri::async_runtime::handle();

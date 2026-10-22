@@ -81,8 +81,9 @@ async fn launch(root: PathBuf, request: Operation) -> io::Result<Response> {
                 ) => {}
             Err(error) => return Err(error),
         }
-        // Reap a losing startup process while another process finishes creating the endpoint.
-        let _ = child.try_wait()?;
+        if host_process::startup_failed(&mut child)? {
+            return Err(io::Error::other("host_startup_failed"));
+        }
         tokio::time::sleep(std::time::Duration::from_millis(30)).await;
     }
 }

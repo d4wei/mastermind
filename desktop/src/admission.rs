@@ -2,7 +2,11 @@ use crate::files::FileError;
 pub use mastermind_launch_check::protocol::{
     FileResult, MAX_FILES, MAX_FRAME, Request, Response, VERSION,
 };
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fs,
+    path::{Path, PathBuf},
+};
 
 pub const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown"];
 
@@ -17,18 +21,66 @@ pub fn require_markdown(path: &std::path::Path) -> Result<(), FileError> {
     ))
 }
 
+pub struct Document {
+    pub path: String,
+    /// The admission snapshot, released when the renderer first reads it.
+    pub snapshot: Option<crate::files::Snapshot>,
+    pub language: Option<String>,
+}
+
+pub enum Admission {
+    Opened(usize),
+    AlreadyOpen(usize),
+}
+
 #[derive(Default)]
 pub struct Documents {
-    pub files: BTreeMap<PathBuf, Option<crate::files::Snapshot>>,
-    pub order: BTreeMap<usize, String>,
-    pub languages: BTreeMap<usize, String>,
-    pub next_id: usize,
+    entries: BTreeMap<usize, Document>,
+    ids: HashMap<String, usize>,
+    next_id: usize,
     pub activation_revision: u64,
     pub active_id: Option<usize>,
     pub opening_errors: Vec<String>,
 }
 
+fn utf8_path(path: &Path) -> Result<String, FileError> {
+    path.to_str().map(str::to_owned).ok_or_else(|| {
+        FileError::new(400, "unsupported_path_encoding", "The file path is not valid UTF-8.")
+    })
+}
+
 impl Documents {
+    pub fn entries(&self) -> impl Iterator<Item = (usize, &Document)> {
+        self.entries.iter().map(|(id, document)| (*id, document))
+    }
+
+    pub fn get(&self, id: usize) -> Option<&Document> {
+        self.entries.get(&id)
+    }
+
+    pub fn get_mut(&mut self, id: usize) -> Option<&mut Document> {
+        self.entries.get_mut(&id)
+    }
+
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub(crate) fn insert(&mut self, path: String, snapshot: Option<crate::files::Snapshot>) -> usize {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.ids.insert(path.clone(), id);
+        self.entries.insert(id, Document { path, snapshot, language: None });
+        id
+    }
+
+    pub fn remove(&mut self, id: usize) -> Option<Document> {
+        let document = self.entries.remove(&id)?;
+        self.ids.remove(&document.path);
+        Some(document)
+    }
+
     pub fn admit(&mut self, request: Request) -> Response {
         if request.version != VERSION {
             return Response::error("incompatible_version");
@@ -45,17 +97,29 @@ impl Documents {
         {
             return Response::error("invalid_request");
         }
+        let mut first = None;
         let results: Vec<FileResult> = request
             .paths
             .into_iter()
             .map(|path| match self.open(&path) {
-                Ok((canonical, status)) => FileResult {
-                    path,
-                    canonical: Some(canonical),
-                    status: status.into(),
-                    error: None,
-                    message: None,
-                },
+                Ok(admission) => {
+                    let (id, status) = match admission {
+                        Admission::Opened(id) => (id, "opened"),
+                        Admission::AlreadyOpen(id) => (id, "already_open"),
+                    };
+                    first.get_or_insert(id);
+                    let document = self.entries.get_mut(&id).unwrap();
+                    if document.language.is_none() {
+                        document.language.clone_from(&request.language);
+                    }
+                    FileResult {
+                        path,
+                        canonical: Some(document.path.clone()),
+                        status: status.into(),
+                        error: None,
+                        message: None,
+                    }
+                }
                 Err(error) => FileResult {
                     path,
                     canonical: None,
@@ -65,20 +129,8 @@ impl Documents {
                 },
             })
             .collect();
-        if let Some(language) = request.language {
-            for result in &results {
-                if let Some(canonical) = &result.canonical {
-                    if let Some((&id, _)) = self.order.iter().find(|(_, path)| *path == canonical) {
-                        self.languages.entry(id).or_insert_with(|| language.clone());
-                    }
-                }
-            }
-        }
-        if let Some(canonical) = results.iter().find_map(|result| result.canonical.as_ref()) {
-            self.active_id = self
-                .order
-                .iter()
-                .find_map(|(id, path)| (path == canonical).then_some(*id));
+        if first.is_some() {
+            self.active_id = first;
             self.activation_revision += 1;
         }
         Response {
@@ -92,49 +144,71 @@ impl Documents {
     }
 
     pub fn close(&mut self, id: usize, active_id: Option<usize>, activation_revision: u64) {
-        let Some(path) = self.order.remove(&id) else {
+        if self.remove(id).is_none() {
             return;
-        };
-        self.files.remove(&PathBuf::from(path));
-        self.languages.remove(&id);
-        if activation_revision == self.activation_revision {
+        }
+        // A selection the renderer observed before a concurrent close may name a removed ID.
+        if activation_revision == self.activation_revision
+            && active_id.is_none_or(|active| self.entries.contains_key(&active) || active == id)
+        {
             self.active_id = active_id;
         }
         if self.active_id == Some(id) {
             self.active_id = self
-                .order
+                .entries
                 .range(id..)
                 .next()
-                .or_else(|| self.order.iter().next_back())
+                .or_else(|| self.entries.iter().next_back())
                 .map(|(id, _)| *id);
         }
         self.activation_revision += 1;
     }
 
-    pub(crate) fn open(&mut self, path: &str) -> Result<(String, &'static str), FileError> {
+    pub(crate) fn open(&mut self, path: &str) -> Result<Admission, FileError> {
+        // The selected name decides the document type before any filesystem access.
+        require_markdown(Path::new(path))?;
         let canonical = fs::canonicalize(path)?;
-        let display = canonical
-            .to_str()
-            .ok_or_else(|| {
-                FileError::new(
-                    400,
-                    "unsupported_path_encoding",
-                    "The file path is not valid UTF-8.",
-                )
-            })?
-            .to_owned();
-        if self.files.contains_key(&canonical) {
-            require_markdown(std::path::Path::new(path))?;
-            return Ok((display, "already_open"));
+        let display = utf8_path(&canonical)?;
+        if let Some(&id) = self.ids.get(&display) {
+            return Ok(Admission::AlreadyOpen(id));
         }
-        let snapshot = crate::files::read(&canonical)?;
-        require_markdown(std::path::Path::new(path))?;
         require_markdown(&canonical)?;
-        self.files.insert(canonical, Some(snapshot));
-        self.order.insert(self.next_id, display.clone());
-        self.next_id += 1;
-        Ok((display, "opened"))
+        let snapshot = crate::files::read(&canonical)?;
+        Ok(Admission::Opened(self.insert(display, Some(snapshot))))
     }
+
+    /// Admits a Save As destination that `create` must newly create. The canonical destination is
+    /// resolved and checked before creation; a path still registered to another document (such as
+    /// one whose file was deleted) is refused rather than merged into that document.
+    pub(crate) fn admit_new_copy(
+        &mut self,
+        path: &Path,
+        create: impl FnOnce() -> Result<crate::files::Snapshot, FileError>,
+    ) -> Result<(usize, crate::files::Snapshot), FileError> {
+        let canonical = copy_destination(path)?;
+        if self.ids.contains_key(&canonical) {
+            return Err(FileError::new(
+                409,
+                "already_open",
+                "Another open document uses this path. Choose a different name.",
+            ));
+        }
+        let snapshot = create()?;
+        let id = self.insert(canonical, Some(snapshot.clone()));
+        Ok((id, snapshot))
+    }
+}
+
+/// Validates a Save As destination before creation and returns its canonical path. Exclusive
+/// creation refuses a final symlink, so the created file's canonical path is its canonical parent
+/// joined with the selected name.
+pub(crate) fn copy_destination(path: &Path) -> Result<String, FileError> {
+    require_markdown(path)?;
+    let invalid = || FileError::new(400, "invalid_path", "Choose a file path for the copy.");
+    let name = path.file_name().ok_or_else(invalid)?;
+    let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty()).ok_or_else(invalid)?;
+    utf8_path(path)?;
+    utf8_path(&fs::canonicalize(parent)?.join(name))
 }
 
 #[cfg(test)]
@@ -155,15 +229,62 @@ mod tests {
         let result = docs.admit(fixture.request(&names));
         assert!(result.results[..4].iter().all(|result| result.status == "opened"));
         assert!(result.results[4..].iter().all(|result| result.error.as_deref() == Some("not_markdown")));
-        assert_eq!(docs.order.len(), 4);
+        assert_eq!(docs.len(), 4);
         #[cfg(unix)] {
             std::os::unix::fs::symlink(fixture.0.join("notebook.html"), fixture.0.join("alias.md")).unwrap();
             std::os::unix::fs::symlink(fixture.0.join("valid.md"), fixture.0.join("alias.html")).unwrap();
             let result = docs.admit(fixture.request(&["alias.md", "alias.html"]));
             assert!(result.results.iter().all(|result| result.error.as_deref() == Some("not_markdown")));
-            assert_eq!(docs.order.len(), 4);
+            assert_eq!(docs.len(), 4);
         }
     }
+    #[test]
+    fn non_markdown_names_are_rejected_before_filesystem_access() {
+        let fixture = Fixture::new();
+        let large = fs::File::create(fixture.0.join("large.txt")).unwrap();
+        large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
+        fs::create_dir(fixture.0.join("folder.txt")).unwrap();
+        let mut docs = Documents::default();
+        let result = docs.admit(fixture.request(&["missing.txt", "large.txt", "folder.txt"]));
+        assert!(result.results.iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+        assert_eq!(docs.len(), 0);
+    }
+
+    #[test]
+    fn closing_ignores_a_selection_that_is_no_longer_admitted() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md", "c.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a.md", "b.md", "c.md"]));
+        docs.close(1, Some(7), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(0));
+        docs.close(2, Some(1), docs.activation_revision);
+        assert_eq!(docs.active_id, Some(0));
+    }
+
+    #[test]
+    fn a_new_copy_is_never_merged_into_a_registered_document() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a.md"), "a").unwrap();
+        fs::write(fixture.0.join("stale.md"), "stale").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a.md", "stale.md"]));
+        fs::remove_file(fixture.0.join("stale.md")).unwrap();
+        let mut created = false;
+        let error = docs
+            .admit_new_copy(&fixture.0.join("stale.md"), || {
+                created = true;
+                Err(FileError::conflict())
+            })
+            .unwrap_err();
+        assert_eq!((error.status, error.error.as_str()), (409, "already_open"));
+        assert!(!created);
+        assert_eq!(docs.len(), 2);
+        assert!(docs.get(1).unwrap().snapshot.is_some());
+    }
+
     struct Fixture(PathBuf);
     impl Fixture {
         fn new() -> Self {
@@ -200,14 +321,14 @@ mod tests {
         let mut request = fixture.request(&["a.md", "missing.md"]);
         request.language = Some("fr".into());
         docs.admit(request);
-        assert_eq!(docs.languages.len(), 1);
-        assert_eq!(docs.languages[&0], "fr");
+        assert_eq!(docs.entries().filter(|(_, d)| d.language.is_some()).count(), 1);
+        assert_eq!(docs.get(0).unwrap().language.as_deref(), Some("fr"));
         let mut request = fixture.request(&["a.md"]);
         request.language = Some("zh-CN".into());
         docs.admit(request);
-        assert_eq!(docs.languages[&0], "fr");
+        assert_eq!(docs.get(0).unwrap().language.as_deref(), Some("fr"));
         docs.close(0, None, docs.activation_revision);
-        assert!(docs.languages.is_empty());
+        assert_eq!(docs.len(), 0);
     }
 
     #[test]
@@ -220,9 +341,9 @@ mod tests {
         docs.admit(fixture.request(&["a.md", "b.md", "c.md"]));
         docs.close(1, Some(1), docs.activation_revision);
         assert_eq!(docs.active_id, Some(2));
-        assert!(!docs.order.contains_key(&1));
+        assert!(docs.get(1).is_none());
         assert_eq!(
-            docs.order[&2],
+            docs.get(2).unwrap().path,
             fs::canonicalize(fixture.0.join("c.md"))
                 .unwrap()
                 .to_str()
@@ -231,15 +352,14 @@ mod tests {
         assert_eq!(fs::read_to_string(fixture.0.join("b.md")).unwrap(), "b.md");
         docs.admit(fixture.request(&["b.md"]));
         assert_eq!(docs.active_id, Some(3));
-        assert_eq!(docs.order.keys().copied().collect::<Vec<_>>(), [0, 2, 3]);
+        assert_eq!(docs.entries().map(|(id, _)| id).collect::<Vec<_>>(), [0, 2, 3]);
         docs.close(0, Some(2), docs.activation_revision);
         assert_eq!(docs.active_id, Some(2));
         docs.close(3, Some(3), docs.activation_revision);
         assert_eq!(docs.active_id, Some(2));
         docs.close(2, Some(2), docs.activation_revision);
         assert_eq!(docs.active_id, None);
-        assert!(docs.order.is_empty());
-        assert!(docs.files.is_empty());
+        assert_eq!(docs.len(), 0);
     }
 
     #[test]
@@ -291,7 +411,7 @@ mod tests {
             "already_open"
         );
         assert_eq!(
-            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             original
         );
         assert_eq!(docs.active_id, Some(0));
@@ -313,9 +433,9 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["opened", "error", "already_open", "opened"]
         );
-        assert_eq!(docs.order.len(), 2);
-        assert_eq!(PathBuf::from(&docs.order[&0]).file_name().unwrap(), "a.md");
-        assert_eq!(PathBuf::from(&docs.order[&1]).file_name().unwrap(), "b.md");
+        assert_eq!(docs.len(), 2);
+        assert_eq!(PathBuf::from(&docs.get(0).unwrap().path).file_name().unwrap(), "a.md");
+        assert_eq!(PathBuf::from(&docs.get(1).unwrap().path).file_name().unwrap(), "b.md");
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
     }
@@ -326,8 +446,9 @@ mod tests {
         fs::write(fixture.0.join("a.md"), b"original\r\n").unwrap();
         let large = fs::File::create(fixture.0.join("large.md")).unwrap();
         large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
+        fs::create_dir(fixture.0.join("folder.md")).unwrap();
         let mut docs = Documents::default();
-        let response = docs.admit(fixture.request(&["missing.md", "a.md", ".", "large.md"]));
+        let response = docs.admit(fixture.request(&["missing.md", "a.md", "folder.md", "large.md"]));
         let encoded = serde_json::to_value(response).unwrap();
         for (index, code) in [
             (0, "file_not_found"),
@@ -342,10 +463,10 @@ mod tests {
         }
         assert_eq!(encoded["results"][1]["status"], "opened");
         assert!(encoded["results"][1].get("message").is_none());
-        assert_eq!(docs.order.len(), 1);
+        assert_eq!(docs.len(), 1);
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(
-            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             b"original\r\n"
         );
     }
@@ -367,7 +488,7 @@ mod tests {
         assert_eq!(result.results[1].status, "opened");
         assert_eq!(docs.active_id, Some(3));
         assert_eq!(docs.activation_revision, 3);
-        assert_eq!(docs.order.len(), 4);
+        assert_eq!(docs.len(), 4);
     }
 
     #[test]
@@ -379,8 +500,7 @@ mod tests {
         docs.admit(fixture.request(&["a.md", "b.md"]));
         docs.opening_errors.push("graphical opening error".into());
         docs.admit(fixture.request(&["b.md"]));
-        let canonical = fs::canonicalize(fixture.0.join("b.md")).unwrap();
-        let snapshot = docs.files[&canonical].as_ref().unwrap().clone();
+        let snapshot = docs.get(1).unwrap().snapshot.as_ref().unwrap().clone();
         fs::remove_file(fixture.0.join("b.md")).unwrap();
 
         let result = docs.admit(fixture.request(&["b.md", "missing.md", "."]));
@@ -402,9 +522,9 @@ mod tests {
             assert!(docs.admit(request).error.is_some());
             assert_eq!(docs.active_id, Some(1));
             assert_eq!(docs.activation_revision, 2);
-            assert_eq!(docs.order.len(), 2);
+            assert_eq!(docs.len(), 2);
             assert_eq!(docs.opening_errors, ["graphical opening error"]);
-            let retained = docs.files[&canonical].as_ref().unwrap();
+            let retained = docs.get(1).unwrap().snapshot.as_ref().unwrap();
             assert_eq!(retained.bytes, snapshot.bytes);
             assert_eq!(retained.version, snapshot.version);
             assert_eq!(retained.mtime_ms, snapshot.mtime_ms);
@@ -431,7 +551,7 @@ mod tests {
             docs.admit(request).error.as_deref(),
             Some("invalid_request")
         );
-        assert!(docs.files.is_empty());
+        assert_eq!(docs.len(), 0);
         assert_eq!(docs.active_id, None);
         assert_eq!(docs.activation_revision, 0);
     }
@@ -443,7 +563,7 @@ mod tests {
         let result = docs.admit(fixture.request(&[".", "missing.md"]));
         assert!(result.results.iter().all(|r| r.status == "error"));
         assert!(!fixture.0.join("missing.md").exists());
-        assert!(docs.files.is_empty());
+        assert_eq!(docs.len(), 0);
         assert_eq!(docs.active_id, None);
         assert_eq!(docs.activation_revision, 0);
     }

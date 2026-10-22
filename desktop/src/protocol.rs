@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 pub const VERSION: u32 = 1;
 pub const MAX_FRAME: usize = 64 * 1024;
 pub const MAX_FILES: usize = 64;
+/// Replies echo each requested path beside its canonical target and message, so the launcher
+/// reads them under a larger bound than requests.
+pub const MAX_REPLY_FRAME: usize = MAX_FILES * MAX_FRAME;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

@@ -6,56 +6,80 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde_json::{Value, json};
 use std::{
     collections::HashSet,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 pub struct FileWatch {
     watcher: RecommendedWatcher,
-    parents: HashSet<PathBuf>,
+    /// Shared with the event callback, which forgets removed directories so a recreated directory
+    /// is registered again.
+    parents: Arc<Mutex<HashSet<PathBuf>>>,
+}
+
+fn forget_removed(parents: &Mutex<HashSet<PathBuf>>, event: &notify::Event) {
+    if matches!(event.kind, notify::EventKind::Remove(_)) {
+        let mut parents = parents.lock().unwrap();
+        for path in &event.paths {
+            parents.remove(path);
+        }
+    }
 }
 
 impl FileWatch {
     pub fn retain_documents(&mut self, docs: &Documents) {
-        self.parents.retain(|parent| {
+        let watcher = &mut self.watcher;
+        self.parents.lock().unwrap().retain(|parent| {
             if docs
-                .files
-                .keys()
-                .any(|path| crate::translations::watch_paths(path).contains(parent))
+                .entries()
+                .any(|(_, document)| crate::translations::watch_paths(Path::new(&document.path)).contains(parent))
             {
                 return true;
             }
             // Retain failed removals so a later close can retry releasing the watch.
-            self.watcher.unwatch(parent).is_err()
+            watcher.unwatch(parent).is_err()
         });
     }
 
-    pub fn new(app: tauri::AppHandle) -> notify::Result<Self> {
+    fn watch(&mut self, source: &Path) -> notify::Result<()> {
+        for parent in crate::translations::watch_paths(source) {
+            if !self.parents.lock().unwrap().contains(&parent) {
+                self.watcher.watch(&parent, RecursiveMode::NonRecursive)?;
+                self.parents.lock().unwrap().insert(parent);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn new(invalidate: impl Fn() + Send + 'static) -> notify::Result<Self> {
+        let parents = Arc::new(Mutex::new(HashSet::new()));
+        let removed = parents.clone();
         let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+            if let Ok(event) = &event {
+                forget_removed(&removed, event);
+            }
             // Events are invalidation hints, including overflow/errors; a fresh versioned read decides.
             if !matches!(&event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_))) {
-                let _ = app.emit("document-invalidated", ());
+                invalidate();
             }
         })?;
-        Ok(Self {
-            watcher,
-            parents: HashSet::new(),
-        })
+        Ok(Self { watcher, parents })
     }
 }
 
 type State<'a> = tauri::State<'a, Arc<Mutex<Documents>>>;
 
-fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
-    let index = id
-        .parse::<usize>()
+fn admitted_id(docs: &Documents, id: &str) -> Result<usize, FileError> {
+    id.parse::<usize>()
         .ok()
-        .and_then(|index| docs.order.get(&index));
-    index
-        .map(PathBuf::from)
+        .filter(|index| docs.get(*index).is_some())
         .ok_or_else(|| FileError::new(404, "document_not_open", "The document is not open."))
+}
+
+fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
+    Ok(PathBuf::from(&docs.get(admitted_id(docs, id)?).unwrap().path))
 }
 
 #[tauri::command]
@@ -72,18 +96,18 @@ pub async fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileErr
                 "mtimeMs": 0
             }))
         })
-        .await
-        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+        .await?
 }
 
 fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
     let path = {
         let mut docs = docs.lock().unwrap();
-        let path = admitted(&docs, id)?;
-        if let Some(snapshot) = docs.files.get_mut(&path).and_then(Option::take) {
+        let index = admitted_id(&docs, id)?;
+        let document = docs.get_mut(index).unwrap();
+        if let Some(snapshot) = document.snapshot.take() {
             return Ok(snapshot);
         }
-        path
+        PathBuf::from(&document.path)
     };
     files::read(&path)
 }
@@ -93,8 +117,7 @@ pub async fn read_document(id: String, docs: State<'_>) -> Result<Snapshot, File
     let docs = docs.inner().clone();
     crate::worker::blocking_work()
         .run(move || read_registered_document(&docs, &id))
-        .await
-        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+        .await?
 }
 
 static DOCUMENT_WRITES: Mutex<()> = Mutex::new(());
@@ -123,69 +146,38 @@ pub async fn write_document(
                 files::write(&path, &content, &base_version)
             })
         })
-        .await
-        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+        .await?
 }
 
-fn save_registered_copy(
+/// Creates a new copy of an admitted document. A close copy leaves the registry untouched;
+/// otherwise the copy replaces the original's registry entry.
+fn save_copy(
     docs: &Mutex<Documents>,
     id: &str,
-    path: PathBuf,
+    path: &Path,
     content: &str,
+    for_close: bool,
 ) -> Result<Value, FileError> {
-    let mut docs = docs.lock().unwrap();
-    let original = admitted(&docs, id)?;
-    crate::admission::require_markdown(&path)?;
-    files::create_copy(&path, content)?;
-    let (canonical, _) = docs.open(path.to_str().ok_or_else(|| {
-        FileError::new(
-            400,
-            "unsupported_path_encoding",
-            "The file path is not valid UTF-8.",
-        )
-    })?)?;
-    let copy_id = *docs
-        .order
-        .iter()
-        .find(|(_, value)| **value == canonical)
-        .unwrap()
-        .0;
-    let saved = files::read(std::path::Path::new(&canonical))?;
-    if saved.content() != content {
-        return Err(FileError::conflict());
-    }
-    // Preserve the activation revision: a save picker must not steal later navigation.
-    let old_id = id.parse::<usize>().unwrap();
-    docs.order.remove(&old_id);
-    docs.languages.remove(&old_id);
-    docs.files.remove(&original);
-    if docs.active_id == Some(old_id) {
-        docs.active_id = Some(copy_id);
-    }
+    let canonical = crate::admission::copy_destination(path)?;
+    let (session_id, saved) = if for_close {
+        serialized_write(docs, id, |_| files::create_copy(path, content))
+            .map(|saved| (id.to_owned(), saved))?
+    } else {
+        let mut docs = docs.lock().unwrap();
+        let old_id = admitted_id(&docs, id)?;
+        let (copy_id, saved) = docs.admit_new_copy(path, || files::create_copy(path, content))?;
+        // Preserve the activation revision: a save picker must not steal later navigation.
+        docs.remove(old_id);
+        if docs.active_id == Some(old_id) {
+            docs.active_id = Some(copy_id);
+        }
+        (copy_id.to_string(), saved)
+    };
     Ok(json!({
-        "meta": { "sessionId": copy_id.to_string(), "path": canonical,
+        "meta": { "sessionId": session_id, "path": canonical,
             "displayName": path.file_name().unwrap().to_string_lossy(), "mtimeMs": saved.mtime_ms },
         "file": saved
     }))
-}
-
-fn save_close_copy(
-    docs: &Mutex<Documents>,
-    id: &str,
-    path: PathBuf,
-    content: &str,
-) -> Result<Value, FileError> {
-    serialized_write(docs, id, |_| {
-        crate::admission::require_markdown(&path)?;
-        files::create_copy(&path, content)?;
-        let saved = files::read(&path)?;
-        if saved.content() != content {
-            return Err(FileError::conflict());
-        }
-        Ok(json!({ "meta": { "sessionId": id, "path": path,
-            "displayName": path.file_name().unwrap().to_string_lossy(),
-            "mtimeMs": saved.mtime_ms }, "file": saved }))
-    })
 }
 
 #[tauri::command]
@@ -223,18 +215,17 @@ pub async fn save_document_copy(
         .into_path()
         .map_err(|e| FileError::new(400, "invalid_path", e.to_string()))?;
     let watch = watch.inner().clone();
+    let for_close = for_close.unwrap_or(false);
     crate::worker::blocking_work()
         .run(move || {
-            if for_close.unwrap_or(false) {
-                return save_close_copy(&docs, &id, path, &content).map(Some);
+            let saved = save_copy(&docs, &id, &path, &content, for_close)?;
+            if !for_close {
+                let documents = docs.lock().unwrap();
+                watch.lock().unwrap().retain_documents(&documents);
             }
-            let saved = save_registered_copy(&docs, &id, path, &content)?;
-            let documents = docs.lock().unwrap();
-            watch.lock().unwrap().retain_documents(&documents);
             Ok(Some(saved))
         })
-        .await
-        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+        .await?
 }
 
 #[tauri::command]
@@ -242,25 +233,20 @@ pub async fn watch_document(
     id: String,
     docs: State<'_>,
     watch: tauri::State<'_, Arc<Mutex<FileWatch>>>,
-) -> Result<(), String> {
+) -> Result<(), FileError> {
     let docs = docs.inner().clone();
     let watch = watch.inner().clone();
     crate::worker::blocking_work()
         .run(move || {
             let docs = docs.lock().unwrap();
-            let path = admitted(&docs, &id).map_err(|e| e.error)?;
-            let mut watch = watch.lock().unwrap();
-            for parent in crate::translations::watch_paths(&path) {
-                if !watch.parents.contains(&parent) {
-                    watch.watcher.watch(&parent, RecursiveMode::NonRecursive)
-                        .map_err(|e| e.to_string())?;
-                    watch.parents.insert(parent);
-                }
-            }
-            Ok(())
+            let path = admitted(&docs, &id)?;
+            watch
+                .lock()
+                .unwrap()
+                .watch(&path)
+                .map_err(|e| FileError::new(500, "watch_failed", e.to_string()))
         })
-        .await
-        .map_err(|e| e.to_string())?
+        .await?
 }
 
 #[tauri::command]
@@ -271,18 +257,11 @@ pub async fn read_translation(
 ) -> Result<Value, FileError> {
     let docs = docs.inner().clone();
     crate::worker::blocking_work()
-        .run(move || read_registered_translation(&docs, &id, &target_lang))
-        .await
-        .map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
-}
-
-fn read_registered_translation(
-    docs: &Mutex<Documents>,
-    id: &str,
-    target_lang: &str,
-) -> Result<Value, FileError> {
-    let path = admitted(&docs.lock().unwrap(), id)?;
-    crate::translations::read(&path, target_lang)
+        .run(move || {
+            let path = admitted(&docs.lock().unwrap(), &id)?;
+            crate::translations::read(&path, &target_lang)
+        })
+        .await?
 }
 
 #[tauri::command]
@@ -291,7 +270,7 @@ pub async fn list_translations(id: String, docs: State<'_>) -> Result<Vec<Value>
     crate::worker::blocking_work().run(move || {
         let path = admitted(&docs.lock().unwrap(), &id)?;
         crate::translations::list(&path)
-    }).await.map_err(|e| FileError::new(500, "file_io_error", e.to_string()))?
+    }).await?
 }
 
 #[cfg(test)]
@@ -315,16 +294,20 @@ mod tests {
         });
         let revision = docs.activation_revision;
         let docs = Mutex::new(docs);
-        assert!(save_registered_copy(&docs, "0", original.clone(), "local").is_err());
+        assert!(save_copy(&docs, "0", &original, "local", false).is_err());
         let html = dir.join("copy.html");
-        assert_eq!(save_registered_copy(&docs, "0", html.clone(), "local").unwrap_err().error, "not_markdown");
+        assert_eq!(save_copy(&docs, "0", &html, "local", false).unwrap_err().error, "not_markdown");
         assert!(!html.exists());
-        assert_eq!(docs.lock().unwrap().order.len(), 1);
-        let result = save_registered_copy(&docs, "0", copy.clone(), "local").unwrap();
+        assert_eq!(docs.lock().unwrap().len(), 1);
+        let result = save_copy(&docs, "0", &copy, "local", false).unwrap();
         assert_eq!(result["meta"]["sessionId"], "1");
         assert_eq!(result["file"]["content"], "local");
         assert_eq!(docs.lock().unwrap().activation_revision, revision);
-        assert!(!docs.lock().unwrap().order.contains_key(&0));
+        assert!(docs.lock().unwrap().get(0).is_none());
+        assert_eq!(
+            docs.lock().unwrap().get(1).unwrap().snapshot.as_ref().unwrap().version,
+            result["file"]["version"].as_str().unwrap()
+        );
         assert_eq!(fs::read_to_string(original).unwrap(), "original");
         assert_eq!(fs::read_to_string(copy).unwrap(), "local");
         fs::remove_dir_all(dir).unwrap();
@@ -346,28 +329,72 @@ mod tests {
         });
         let revision = docs.activation_revision;
         let docs = Mutex::new(docs);
-        assert!(save_close_copy(&docs, "0", original.clone(), "local").is_err());
+        assert!(save_copy(&docs, "0", &original, "local", true).is_err());
         let html = dir.join("copy.html");
-        assert_eq!(save_close_copy(&docs, "0", html.clone(), "local").unwrap_err().error, "not_markdown");
+        assert_eq!(save_copy(&docs, "0", &html, "local", true).unwrap_err().error, "not_markdown");
         assert!(!html.exists());
-        let saved = save_close_copy(&docs, "0", copy.clone(), "local\r\n").unwrap();
+        let saved = save_copy(&docs, "0", &copy, "local\r\n", true).unwrap();
+        assert_eq!(saved["meta"]["sessionId"], "0");
         assert_eq!(saved["file"]["content"], "local\r\n");
         assert_eq!(fs::read_to_string(original).unwrap(), "original");
         assert_eq!(fs::read_to_string(copy).unwrap(), "local\r\n");
-        assert_eq!(docs.lock().unwrap().order.len(), 1);
-        assert!(docs.lock().unwrap().order.contains_key(&0));
+        assert_eq!(docs.lock().unwrap().len(), 1);
+        assert!(docs.lock().unwrap().get(0).is_some());
         assert_eq!(docs.lock().unwrap().activation_revision, revision);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn copy_destinations_are_validated_before_creation() {
+        let dir = std::env::temp_dir().join(format!("mastermind-copy-checks-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("original.md");
+        let stale = dir.join("stale.md");
+        fs::write(&original, "original").unwrap();
+        fs::write(&stale, "stale").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![original.to_str().unwrap().into(), stale.to_str().unwrap().into()],
+        });
+        fs::remove_file(&stale).unwrap();
+        let docs = Mutex::new(docs);
+        let error = save_copy(&docs, "0", &stale, "local", false).unwrap_err();
+        assert_eq!(error.error, "already_open");
+        assert!(!stale.exists());
+        assert_eq!(docs.lock().unwrap().len(), 2);
+        assert!(docs.lock().unwrap().get(0).is_some());
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let invalid = dir.join(std::ffi::OsStr::from_bytes(b"copy-\xff.md"));
+            for for_close in [false, true] {
+                let error = save_copy(&docs, "0", &invalid, "local", for_close).unwrap_err();
+                assert_eq!(error.error, "unsupported_path_encoding");
+                assert!(fs::symlink_metadata(&invalid).is_err());
+            }
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn removed_watch_directories_are_registered_again() {
+        let parents = Mutex::new(HashSet::from([PathBuf::from("/watched"), PathBuf::from("/kept")]));
+        let event = |kind| notify::Event::new(kind).add_path(PathBuf::from("/watched"));
+        forget_removed(&parents, &event(notify::EventKind::Modify(notify::event::ModifyKind::Any)));
+        assert_eq!(parents.lock().unwrap().len(), 2);
+        forget_removed(&parents, &event(notify::EventKind::Remove(notify::event::RemoveKind::Folder)));
+        assert_eq!(*parents.lock().unwrap(), HashSet::from([PathBuf::from("/kept")]));
     }
 
     #[test]
     fn writes_are_serialized_without_holding_the_document_registry() {
         use std::sync::mpsc;
         use std::time::Duration;
-        let docs = Arc::new(Mutex::new(Documents {
-            order: [(0, "/admitted/document.md".into())].into(),
-            ..Documents::default()
-        }));
+        let mut registry = Documents::default();
+        registry.insert("/admitted/document.md".into(), None);
+        let docs = Arc::new(Mutex::new(registry));
         let (first_started_tx, first_started_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let first_docs = docs.clone();
@@ -434,7 +461,7 @@ mod tests {
             404
         );
         assert!(!path.exists());
-        assert!(docs.lock().unwrap().files.values().all(Option::is_none));
+        assert!(docs.lock().unwrap().get(0).unwrap().snapshot.is_none());
     }
 
     #[test]

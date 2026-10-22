@@ -1,5 +1,10 @@
 use serde_json::Value;
-use std::{fs, io::Read, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    io::{Read, Write},
+    path::PathBuf,
+    sync::Mutex,
+};
 use tauri::Manager;
 
 pub(crate) fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -43,7 +48,11 @@ pub(crate) fn write_preferences_file(path: PathBuf, config: Value) -> Result<(),
     }
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
     let temp = path.with_extension("json.tmp");
-    fs::write(&temp, bytes).map_err(|e| e.to_string())?;
+    let mut file = fs::File::create(&temp).map_err(|e| e.to_string())?;
+    // Sync before renaming so the replaced path never names an unwritten file after a crash.
+    file.write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|e| e.to_string())?;
     fs::rename(&temp, path).map_err(|e| e.to_string())
 }
 

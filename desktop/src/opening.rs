@@ -27,12 +27,11 @@ impl Snapshot {
         Self {
             pid: std::process::id(),
             files: docs
-                .order
-                .iter()
-                .map(|(id, path)| OpenDocument {
+                .entries()
+                .map(|(id, document)| OpenDocument {
                     id: id.to_string(),
-                    path: path.clone(),
-                    language: docs.languages.get(id).cloned(),
+                    path: document.path.clone(),
+                    language: document.language.clone(),
                 })
                 .collect(),
             activation_revision: docs.activation_revision,
@@ -189,16 +188,16 @@ mod tests {
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
         assert_eq!(
-            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             b"original\r\n"
         );
         std::fs::write(&path, b"external change").unwrap();
         admit_graphical(&mut docs, vec![Ok(path.clone())]);
         assert!(docs.opening_errors.is_empty());
-        assert_eq!(docs.order.len(), 1);
+        assert_eq!(docs.len(), 1);
         assert_eq!(docs.activation_revision, 2);
         assert_eq!(
-            docs.files.values().next().unwrap().as_ref().unwrap().bytes,
+            docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             b"original\r\n"
         );
         std::fs::remove_file(&path).unwrap();
@@ -207,11 +206,11 @@ mod tests {
     #[test]
     fn graphical_failures_are_retained_without_discarding_other_documents() {
         let mut docs = Documents::default();
-        docs.order.insert(0, "retained".into());
+        docs.insert("retained".into(), None);
         docs.active_id = Some(0);
         admit_graphical(&mut docs, vec![Err("Not a local file.".into())]);
         assert_eq!(docs.opening_errors, ["Not a local file."]);
-        assert_eq!(docs.order.values().collect::<Vec<_>>(), ["retained"]);
+        assert_eq!(docs.entries().map(|(_, d)| d.path.as_str()).collect::<Vec<_>>(), ["retained"]);
         assert_eq!(docs.active_id, Some(0));
         admit_graphical(
             &mut docs,
@@ -221,6 +220,6 @@ mod tests {
         );
         assert_eq!(docs.opening_errors.len(), 1);
         assert!(docs.opening_errors[0].starts_with("Open at most"));
-        assert_eq!(docs.order.values().collect::<Vec<_>>(), ["retained"]);
+        assert_eq!(docs.entries().map(|(_, d)| d.path.as_str()).collect::<Vec<_>>(), ["retained"]);
     }
 }

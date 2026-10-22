@@ -80,6 +80,12 @@ impl From<io::Error> for FileError {
     }
 }
 
+impl From<tokio::task::JoinError> for FileError {
+    fn from(error: tokio::task::JoinError) -> Self {
+        Self::new(500, "file_io_error", error.to_string())
+    }
+}
+
 impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.message)
@@ -137,6 +143,18 @@ fn open(path: &Path, write: bool) -> Result<File, FileError> {
         FileError::from(error)
     })?;
     validate_metadata(&file.metadata()?)?;
+    // O_NONBLOCK only guards the open against FIFOs; some network and FUSE filesystems honor it
+    // for regular files and could fail a write midway with EAGAIN.
+    #[cfg(unix)]
+    {
+        use std::os::fd::AsRawFd;
+        let fd = file.as_raw_fd();
+        // The descriptor is owned by `file` for both calls; fcntl reads and sets only its flags.
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+        if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags & !libc::O_NONBLOCK) } < 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+    }
     Ok(file)
 }
 
@@ -237,9 +255,17 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
     if base.version != base_version {
         return Err(FileError::conflict());
     }
-    // Lossy decoding must not rewrite unedited bytes that are not valid UTF-8.
+    // The UI edits lossy-decoded text: an unchanged string retains the original bytes, and a
+    // changed one would replace every invalid sequence the person never touched.
     if content == base.content() {
         return Ok(base);
+    }
+    if std::str::from_utf8(&base.bytes).is_err() {
+        return Err(FileError::new(
+            422,
+            "not_utf8",
+            "The file is not valid UTF-8, so saving would change bytes outside your edits. Save a copy instead.",
+        ));
     }
     file.seek(SeekFrom::Start(0))?;
     file.write_all(content.as_bytes())?;
@@ -442,6 +468,31 @@ mod tests {
         let saved = write(&f.file(), &base.content(), &base.version).unwrap();
         assert_eq!(saved.version, base.version);
         assert_eq!(fs::read(f.file()).unwrap(), bytes);
+    }
+
+    #[test]
+    fn edits_to_a_file_that_is_not_utf8_are_refused_without_changing_it() {
+        let f = Fixture::new();
+        let latin1 = b"caf\xe9\r\n";
+        fs::write(f.file(), latin1).unwrap();
+        let base = read(&f.file()).unwrap();
+        assert_eq!(base.content(), "caf\u{fffd}\r\n");
+        let error = write(&f.file(), "caf\u{fffd}\r\nedit", &base.version).unwrap_err();
+        assert_eq!((error.status, error.error.as_str()), (422, "not_utf8"));
+        assert!(!error.message.is_empty());
+        assert_eq!(fs::read(f.file()).unwrap(), latin1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn opened_regular_files_are_blocking() {
+        use std::os::fd::AsRawFd;
+        let f = Fixture::new();
+        for write in [false, true] {
+            let file = open(&f.file(), write).unwrap();
+            let flags = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFL) };
+            assert_eq!(flags & libc::O_NONBLOCK, 0);
+        }
     }
 
     #[test]

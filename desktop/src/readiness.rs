@@ -75,8 +75,9 @@ impl Readiness {
         let path = session_id
             .parse::<usize>()
             .ok()
-            .and_then(|id| docs.order.get(&id));
-        if nonce != config.nonce || path.map(PathBuf::from).as_ref() != Some(&config.target) {
+            .and_then(|id| docs.get(id))
+            .map(|document| PathBuf::from(&document.path));
+        if nonce != config.nonce || path.as_ref() != Some(&config.target) {
             return Err("readiness_identity_mismatch".into());
         }
         if self
@@ -178,14 +179,14 @@ mod tests {
             signalled: AtomicBool::new(false),
         };
         let mut docs = Documents::default();
-        docs.order.insert(0, config.target.to_str().unwrap().into());
-        docs.order.insert(
-            1,
+        docs.insert(config.target.to_str().unwrap().into(), None);
+        docs.insert(
             std::env::temp_dir()
                 .join("other.md")
                 .to_str()
                 .unwrap()
                 .into(),
+            None,
         );
         for (nonce, id) in [
             ("wrong", "0"),
