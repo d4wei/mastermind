@@ -1,6 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { scrollElementToTop } from '../ui/util/scroll'
+import { scrollToOffset, scrollToSpan } from '../ui/util/scroll'
+
+// Both entry points resolve their target through the document, so tag the element and go through them.
+function scrollElementToTop(element: Element): void {
+  element.setAttribute('data-ps', '0')
+  scrollToOffset({ current: document.body }, 0)
+}
+function scrollToElement(element: Element): void {
+  element.setAttribute('data-span-index', '0')
+  scrollToSpan({ current: document.body }, 0)
+}
 
 afterEach(() => {
   document.body.replaceChildren()
@@ -25,8 +35,7 @@ it.each([0, 60, 120])('keeps outline targets below %ipx of document controls', (
   expect(scrollTo).toHaveBeenCalledWith(0, 600 - height - 24)
 })
 
-it('scrolls the bounded document viewport without moving the window', async () => {
-  const { scrollToElement } = await import('../ui/util/scroll')
+it('scrolls the bounded document viewport without moving the window', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
   const pageScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   const viewport = document.createElement('div')

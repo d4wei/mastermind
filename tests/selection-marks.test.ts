@@ -30,7 +30,7 @@ describe('markEdits — cross-block marks round-trip', () => {
   it('attaches a comment to the first block and leaves later source unchanged', () => {
     const out = applyTextEdits(
       SOURCE,
-      commentEdits(CROSS, 'Alex', 'needs detail'),
+      commentEdits(CROSS, 'Alex', 'needs detail')!,
     )
     const items = group(scan(out), out)
     const threads = items.filter((it) => it.type === 'thread')

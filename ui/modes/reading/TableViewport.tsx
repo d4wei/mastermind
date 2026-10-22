@@ -4,6 +4,7 @@ import { useT } from '../../i18n'
 import { ExpandIcon, CollapseIcon } from '../../icons'
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { useTableExpansion } from './TableExpansion'
+import { prefersReducedMotion } from '../../util/presence'
 
 interface Geometry { left: number; width: number }
 
@@ -60,8 +61,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
       const css = getComputedStyle(host)
       const duration = css.getPropertyValue('--dur-fade').trim()
       const ms = parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000)
-      const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
-      const time = immediate || reduced || !Number.isFinite(ms) ? 0 : ms
+      const time = immediate || prefersReducedMotion() || !Number.isFinite(ms) ? 0 : ms
       const start = performance.now()
       const step = (now: number) => {
         const progress = time ? Math.min(1, (now - start) / time) : 1

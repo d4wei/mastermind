@@ -41,6 +41,8 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
   const composingRef = useRef(false)
   composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
+  const activeRef = useRef(active)
+  activeRef.current = active
   const selectedRange = useRef<Range | null>(null)
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelSelectionCheck = (): void => {
@@ -79,6 +81,8 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       }, 120)
     }
     document.addEventListener('selectionchange', onSelectionChange)
+    // A shown toolbar's selection can survive a source change without a new event; re-read it.
+    if (activeRef.current) onSelectionChange()
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange)
       cancelSelectionCheck()
@@ -121,7 +125,7 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
       window.removeEventListener('mastermind-table-layout', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [active])
+  }, [!!active])
 
   const meaningful = composing === 'comment' ? !!comment.trim() : composing === 'change' &&
     !!active && replacements.some((text, index) => text !== active.ranges[index]?.text)
@@ -159,11 +163,12 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
     window.getSelection()?.removeAllRanges()
     dismiss()
   }
-  const changes = composing === 'change' ? changeEdits(view.ranges, replacements) : []
-  const canSubmit = source === view.source && !readOnly && (composing === 'comment' ? !!comment.trim() : !!changes?.length)
+  // Null marks a draft the file cannot represent exactly; it stays editable but cannot submit.
+  const edits = composing === 'change' ? changeEdits(view.ranges, replacements)
+    : composing === 'comment' && comment.trim() ? commentEdits(view.ranges, authorTag, comment) : []
+  const canSubmit = source === view.source && !readOnly && !!edits?.length
   const submit = (): void => {
-    if (!canSubmit) return
-    finish(composing === 'comment' ? commentEdits(view.ranges, authorTag, comment) : changes!)
+    if (canSubmit) finish(edits!)
   }
   const composerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (ime.isComposing(e.nativeEvent)) { e.stopPropagation(); return }
@@ -223,8 +228,8 @@ export function SelectionToolbar({ containerRef, source, spans, authorTag, onEdi
                   current.map((value, i) => i === index ? event.target.value : value))}
                 onKeyDown={composerKey} />
             </label>)}
-            {changes === null && <p role="alert">{t('changeInvalid')}</p>}
           </>}
+          {edits === null && <p role="alert">{t(composing === 'comment' ? 'commentInvalid' : 'changeInvalid')}</p>}
           <div className="sel-composer-actions">
             <button type="button" onClick={() => {
               cancelSelectionCheck()

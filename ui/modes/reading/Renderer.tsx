@@ -1,5 +1,4 @@
 import type {
-  AlignType,
   BlockContent,
   DefinitionContent,
   List,
@@ -19,8 +18,9 @@ import type { CriticSpan } from '../../../document/critic/types'
 import { DiamondIcon } from '../../icons'
 import { Frontmatter } from './Frontmatter'
 import { TableViewport } from './TableViewport'
+import { plainText } from './outline'
 
-export interface RenderCtx {
+interface RenderCtx {
   source: string
   reviewSpans?: CriticSpan[]
   /** Absent → interactive affordances (task checkboxes) are disabled. */
@@ -74,7 +74,7 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
           key={key}
           className="critic critic-del"
           data-span-index={n.data.spanIndex}
-          {...deletionProps(ctx, phrasingText(n.children))}
+          {...deletionProps(ctx, plainText(n))}
         >
           {renderInline(n.children, ctx)}
         </del>
@@ -270,12 +270,6 @@ function renderList(node: List, key: number, ctx: PresentedCtx): ReactNode {
   )
 }
 
-const ALIGN_STYLE: Record<NonNullable<AlignType>, 'left' | 'center' | 'right'> = {
-  left: 'left',
-  center: 'center',
-  right: 'right',
-}
-
 function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: number, ctx: PresentedCtx): ReactNode {
   switch (node.type) {
     case 'paragraph':
@@ -311,7 +305,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
       const align = node.align ?? []
       const cellStyle = (i: number) => {
         const a = align[i]
-        return a ? { textAlign: ALIGN_STYLE[a] } : undefined
+        return a ? { textAlign: a } : undefined
       }
       return (
         <TableViewport key={key} contentKey={ctx.source}><table {...posAttrs(node)}>
@@ -366,26 +360,16 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
   }
 }
 
-export const CALLOUT_HEADING = /^(decisions?|open\s+questions?|to-?dos?|todos?|risks?)\b/i
-
 export type CalloutKind = 'decisions' | 'questions' | 'todo' | 'risks'
 
+/** A heading with a callout kind opens a section that runs until the next heading of equal or higher rank. */
 export function calloutKind(text: string): CalloutKind | null {
   const s = text.trim().toLowerCase()
   if (/^decisions?\b/.test(s)) return 'decisions'
-  if (/^open\s+questions?\b|^questions?\b/.test(s)) return 'questions'
-  if (/^to-?dos?\b|^todos?\b/.test(s)) return 'todo'
+  if (/^open\s+questions?\b/.test(s)) return 'questions'
+  if (/^to-?dos?\b/.test(s)) return 'todo'
   if (/^risks?\b/.test(s)) return 'risks'
   return null
-}
-
-function phrasingText(nodes: readonly PhrasingContent[]): string {
-  let out = ''
-  for (const n of nodes) {
-    if ('value' in n && typeof n.value === 'string') out += n.value
-    else if ('children' in n && Array.isArray(n.children)) out += phrasingText(n.children as PhrasingContent[])
-  }
-  return out
 }
 
 export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
@@ -409,10 +393,10 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
   let i = 0
   while (i < children.length) {
     const node = children[i]!
-    if (node.type === 'heading' && CALLOUT_HEADING.test(phrasingText(node.children).trim())) {
+    const kind = node.type === 'heading' ? calloutKind(plainText(node)) : null
+    if (node.type === 'heading' && kind) {
       // Leave the wrapper unpositioned so review selections anchor to its inner blocks.
       const depth = node.depth
-      const kind = calloutKind(phrasingText(node.children))
       let j = i + 1
       while (j < children.length) {
         const next = children[j]!
@@ -420,7 +404,7 @@ export function MarkdownView({ tree, ctx }: { tree: Root; ctx: RenderCtx }) {
         j++
       }
       out.push(
-        <section key={i} className={kind ? `md-callout md-callout--${kind}` : 'md-callout'}>
+        <section key={i} className={`md-callout md-callout--${kind}`}>
           {children.slice(i, j).map((b, bi) => renderBlock(b, bi, presented))}
         </section>,
       )

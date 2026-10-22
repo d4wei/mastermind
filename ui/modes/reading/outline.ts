@@ -1,4 +1,4 @@
-import type { Heading, Root } from 'mdast'
+import type { Root } from 'mdast'
 import type { Node, Parent } from 'unist'
 
 export interface OutlineItem {
@@ -7,7 +7,8 @@ export interface OutlineItem {
   offset: number
 }
 
-function headingText(node: Heading): string {
+/** Concatenated literal values beneath a node, without Markdown syntax. */
+export function plainText(node: Node): string {
   let s = ''
   const walk = (n: Node): void => {
     const v = (n as { value?: string }).value
@@ -25,7 +26,7 @@ export function extractOutline(tree: Root): OutlineItem[] {
     if (node.type === 'heading') {
       const offset = node.position?.start?.offset
       if (offset === undefined) continue
-      out.push({ depth: node.depth, text: headingText(node), offset })
+      out.push({ depth: node.depth, text: plainText(node), offset })
     }
   }
   return out

@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { prefersReducedMotion } from './presence'
 
 export function documentViewport() {
   const element = document.querySelector<HTMLElement>('.document-scroll')
@@ -27,7 +28,7 @@ function smoothScrollTo(top: number): void {
     else window.scrollTo(0, y)
   }
   // Hidden pages cannot complete an animation while their frame callbacks are paused.
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden || Math.abs(dist) < 2) {
+  if (prefersReducedMotion() || document.hidden || Math.abs(dist) < 2) {
     move(dest)
     return
   }
@@ -44,7 +45,7 @@ function smoothScrollTo(top: number): void {
   scrollRaf = requestAnimationFrame(step)
 }
 
-export function scrollToElement(el: Element | null): Element | null {
+function scrollToElement(el: Element | null): Element | null {
   if (el) {
     const rect = el.getBoundingClientRect()
     const viewport = documentViewport()
@@ -53,13 +54,9 @@ export function scrollToElement(el: Element | null): Element | null {
   return el
 }
 
-/** Align viewport coordinates with the document's reading line. */
-export function scrollPositionToTop(top: number, offsetTop = 24): void {
-  smoothScrollTo(documentViewport().scrollTop + top - offsetTop - readingLine())
-}
-
-export function scrollElementToTop(el: Element | null, offsetTop = 24): Element | null {
-  if (el) scrollPositionToTop(el.getBoundingClientRect().top, offsetTop)
+function scrollElementToTop(el: Element | null, offsetTop = 24): Element | null {
+  // Align viewport coordinates with the document's reading line.
+  if (el) smoothScrollTo(documentViewport().scrollTop + el.getBoundingClientRect().top - offsetTop - readingLine())
   return el
 }
 
@@ -77,7 +74,7 @@ export function scrollToOffset(doc: RefObject<HTMLElement | null>, offset: numbe
 }
 
 /** Reveal only the missing edge; already-visible targets must not move the reading position. */
-export function revealRange(top: number, bottom: number): void {
+function revealRange(top: number, bottom: number): void {
   const viewport = documentViewport()
   const visibleTop = readingLine()
   const visibleBottom = viewport.top + viewport.height

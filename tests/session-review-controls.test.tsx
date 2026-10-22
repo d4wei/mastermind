@@ -21,7 +21,6 @@ vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest
   return <div data-testid="rail" />
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 let host: HTMLDivElement
 let root: Root
 const initial = useDoc.getState()

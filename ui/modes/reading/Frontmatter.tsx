@@ -4,7 +4,7 @@ import './frontmatter.css'
 
 const MAX_PROPERTY_SOURCE_LENGTH = 64 * 1024
 
-export interface MetadataProperty { name: string; value: string }
+interface MetadataProperty { name: string; value: string }
 
 export function metadataProperties(source: string): MetadataProperty[] | null {
   // Large metadata stays literal rather than adding YAML parsing to the rendering path.

@@ -4,7 +4,6 @@ import { installHost } from '../app/host'
 import { createNativeHost } from './host'
 import { nativeBridge } from './bridge'
 import { NativeReviewer } from './NativeReviewer'
-import 'slot-text/style.css'
 import '../app/app.css'
 import './native.css'
 

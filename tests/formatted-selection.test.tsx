@@ -5,8 +5,8 @@ import * as processor from '../document/markdown/processor'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { applyTextEdits } from '../document/edits'
 import { resolveAll } from '../document/critic/resolve'
-import { markEdits, rangeToSource, rangeToSourceRanges } from '../ui/modes/reading/selection'
-import { commentEdits, deletionWrap } from '../ui/modes/reading/marks'
+import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { changeEdits, commentEdits } from '../ui/modes/reading/marks'
 
 
 it.each([
@@ -24,12 +24,11 @@ it.each([
   const from = source.indexOf(paragraph)
   expect(mapped).toEqual({ ranges: [{ from, to: from + paragraph.length, text: paragraph }] })
   if (!('ranges' in mapped)) throw new Error(mapped.error)
-  expect(rangeToSource(range, source, spans)).toEqual(mapped.ranges[0])
-  const commented = applyTextEdits(source, commentEdits(mapped.ranges, 'Alex', 'Review this.'))
+  const commented = applyTextEdits(source, commentEdits(mapped.ranges, 'Alex', 'Review this.')!)
   const next = renderMarkdown(commented)
   expect(next.items).toMatchObject([{ type: 'thread', comments: [{ author: 'Alex', body: 'Review this.' }] }])
   expect(next.host.querySelector('p')!.textContent).toBe(host.querySelector('p')!.textContent)
-  const deletion = applyTextEdits(source, markEdits(mapped.ranges, deletionWrap))
+  const deletion = applyTextEdits(source, changeEdits(mapped.ranges, mapped.ranges.map(() => ''))!)
   const deletionSpans = analyzeMarkdown(deletion).spans
   expect(deletionSpans).toHaveLength(1)
   expect(resolveAll(deletion, deletionSpans, 'reject')).toBe(source)
@@ -57,7 +56,6 @@ it.each(['start', 'end'])('refuses a selection crossing a partial formatting wra
   range.setStart(edge === 'start' ? bold : first, edge === 'start' ? 2 : 0)
   range.setEnd(edge === 'end' ? bold : last, edge === 'end' ? 2 : last.textContent!.length)
   expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
-  expect(rangeToSource(range, source, [])).toEqual({ error: 'unmapped' })
 })
 
 it('keeps selections confined to formatted text and refuses partial inline code crossing', () => {
@@ -81,12 +79,13 @@ it('refuses hidden syntax gaps not accounted for by complete positioned wrappers
   expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
 })
 
-it('does not nest new marks into formatted selections containing an existing review mark', () => {
+it('maps only the exact pieces around an existing review mark in formatted text', () => {
   const source = 'Before **bold** {==already==}{>>note<<} after.'
   const { host, spans } = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('p')!)
-  expect(rangeToSourceRanges(range, source, spans)).toEqual({ error: 'unmapped' })
+  // The piece before the mark crosses formatting into text the renderer leaves unpositioned.
+  expect(rangeToSourceRanges(range, source, spans)).toEqual({ ranges: [{ from: 39, to: 46, text: ' after.' }] })
 })
 
 it('retains unique-substring mapping within one formatted text leaf containing an entity', () => {
@@ -97,7 +96,6 @@ it('retains unique-substring mapping within one formatted text leaf containing a
   range.setStart(leaf, 0)
   range.setEnd(leaf, 5)
   expect(rangeToSourceRanges(range, source, [])).toEqual({ ranges: [{ from: 2, to: 7, text: 'bravo' }] })
-  expect(rangeToSource(range, source, [])).toEqual({ from: 2, to: 7, text: 'bravo' })
 })
 
 it('does not use the substring fallback across a partial wrapper containing an entity', () => {
@@ -107,7 +105,6 @@ it('does not use the substring fallback across a partial wrapper containing an e
   range.setStart(host.querySelector('strong span')!.firstChild!, 1)
   range.setEnd(host.querySelector('p > span:last-child')!.firstChild!, 6)
   expect(rangeToSourceRanges(range, source, [])).toEqual({ error: 'unmapped' })
-  expect(rangeToSource(range, source, [])).toEqual({ error: 'unmapped' })
 })
 
 it('parses once per multi-block mapping operation and does not cache across operations', () => {

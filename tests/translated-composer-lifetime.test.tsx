@@ -12,7 +12,6 @@ import { useConfig } from '../ui/app/configStore'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
-vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 vi.mock('../ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
   containerRef: React.RefObject<HTMLElement | null>; artifact: PreparedTranslation
 }) => <article ref={containerRef}><div data-trans-block-id={artifact.blocks[0]!.id}>{artifact.blocks[0]!.text}</div></article> }))

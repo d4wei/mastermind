@@ -14,7 +14,6 @@ import { useNav } from './navStore'
 import { MarkGutter, type MarkTick } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../document/critic/scanner'
-import { SlotLabel } from '../util/SlotLabel'
 import { useT } from '../i18n'
 import { useTranslation } from '../translate/translationStore'
 import { TranslatedSelection } from '../translate/TranslatedSelection'
@@ -55,7 +54,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
-  const notice = useDoc((s) => s.notice)
   const mode = useDoc((s) => s.mode)
   const externalVersion = useDoc((s) => s.externalVersion)
   const readOnly = useDoc((s) => s.conflict)
@@ -136,12 +134,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [sessionId, load])
 
   useEffect(() => {
-    if (!notice || notice.kind === 'error') return
-    const timer = setTimeout(() => useDoc.getState().setNotice(null), 5000)
-    return () => clearTimeout(timer)
-  }, [notice])
-
-  useEffect(() => {
     if (status !== 'ready') return
     let translationRefresh: ReturnType<typeof setTimeout> | undefined
     const refreshTranslations = () => {
@@ -153,7 +145,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (event === 'config') { void useConfig.getState().load(); return }
       if (useDoc.getState().sessionId === sessionId) {
         refreshTranslations()
-        useDoc.getState().notifyDiskChange(0, event === 'deleted')
+        useDoc.getState().notifyDiskChange(event === 'deleted')
       }
     })
     return () => { unsubscribe(); clearTimeout(translationRefresh) }
@@ -227,7 +219,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePanel])
+  }, [])
 
   const undoDeletion = useCallback(
     (el: HTMLElement): boolean => {
@@ -239,23 +231,30 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     [analysis, source, applyEdits],
   )
 
+  /** Opens the discussion of a comment anchor or marker; returns false when `target` is neither. */
+  const activateThread = useCallback(
+    (target: EventTarget): boolean => {
+      const thread = (target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
+      if (!thread) return false
+      const idx = Number(thread.dataset.spanIndex)
+      if (Number.isFinite(idx)) {
+        setActiveSpan(idx)
+        setReplyRequest({ spanIndex: idx })
+        openRail()
+      }
+      return true
+    },
+    [openRail],
+  )
   const onArticleClick = useCallback(
     (e: React.MouseEvent) => {
       // a drag-to-select that ends inside a deletion shouldn't also undo it
       if (window.getSelection()?.isCollapsed === false) return
       const del = (e.target as HTMLElement).closest('.critic-del') as HTMLElement | null
       if (del && undoDeletion(del)) return
-      const target = (e.target as HTMLElement).closest('.critic-anchor, .critic-comment-marker')
-      if (target) {
-        const idx = Number((target as HTMLElement).dataset.spanIndex)
-        if (Number.isFinite(idx)) {
-          setActiveSpan(idx)
-          setReplyRequest({ spanIndex: idx })
-          openRail()
-        }
-      } else setActiveSpan(null)
+      if (!activateThread(e.target)) setActiveSpan(null)
     },
-    [undoDeletion, openRail],
+    [undoDeletion, activateThread],
   )
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -266,18 +265,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         undoDeletion(del)
         return
       }
-      const target = (e.target as HTMLElement).closest('.critic-anchor, .critic-comment-marker')
-      if (target) {
-        e.preventDefault()
-        const idx = Number((target as HTMLElement).dataset.spanIndex)
-        if (Number.isFinite(idx)) {
-          setActiveSpan(idx)
-          setReplyRequest({ spanIndex: idx })
-          openRail()
-        }
-      }
+      if (activateThread(e.target)) e.preventDefault()
     },
-    [undoDeletion, openRail],
+    [undoDeletion, activateThread],
   )
 
   const activeCardSpan = useMemo(() => {
@@ -434,7 +424,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
               </Suspense>
             )}
           </div>
-          {showRail && analysis && !showTranslated && !narrow && commentRail}
+          {inlineRail && commentRail}
         </div>
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (
@@ -465,18 +455,6 @@ function DocumentView({ sessionId }: { sessionId: string }) {
             <MarkGutter docRef={articleRef} marks={markTicks} version={externalVersion} />
           )}
         </>
-      )}
-      {notice && (
-        <Notice key={notice.msg} error={notice.kind === 'error'}>
-          <SlotLabel
-            revealOnMount
-            text={
-              notice.count !== undefined
-                ? `${notice.count} ${t(notice.msg as never)} · ${t('undoHint')}`
-                : t(notice.msg as never)
-            }
-          />
-        </Notice>
       )}
     </>
   )

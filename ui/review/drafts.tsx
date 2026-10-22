@@ -3,7 +3,7 @@ import { create } from 'zustand'
 
 const DocumentId = createContext({ id: '', name: '' })
 const values = new Map<string, unknown>()
-export interface ReviewDraft { id: string; key: string; label: string; discard: () => void }
+interface ReviewDraft { id: string; key: string; label: string; discard: () => void }
 const drafts = new Map<string, ReviewDraft>()
 const keyFor = (id: string, key: string) => JSON.stringify([id, key])
 export const useDraftFocus = create<{ target: ReviewDraft | null }>(() => ({ target: null }))

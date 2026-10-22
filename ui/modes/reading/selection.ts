@@ -1,4 +1,5 @@
 import type { Node as MarkdownNode, Parent } from 'unist'
+import { visit } from 'unist-util-visit'
 import { parseMarkdown } from '../../../document/markdown/processor'
 import type { CriticSpan, Range as SourceRange } from '../../../document/critic/types'
 import { excludedRanges } from '../../../document/markdown/exclusions'
@@ -10,11 +11,13 @@ export interface SelRange {
   text: string
 }
 
-export type SelError = 'empty' | 'cross-block' | 'unmapped' | 'overlaps-mark'
-export type SelResult = SelRange | { error: SelError }
-export type MultiSelResult = { ranges: SelRange[] } | { error: SelError }
+type SelError = 'empty' | 'unmapped'
+type SelResult = SelRange | { error: SelError }
+type MultiSelResult = { ranges: SelRange[] } | { error: SelError }
 
 const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote,pre,.md-frontmatter'
+/** Rendered review marks; their hidden delimiters make rendered and source text diverge. */
+const MARK_SELECTOR = '.critic[data-span-index]'
 
 function closestBlock(node: Node): HTMLElement | null {
   const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement
@@ -112,14 +115,11 @@ function lazyPositionedNodes(tree: MarkdownNode): () => Map<string, MarkdownNode
   return () => {
     if (positioned) return positioned
     const nodes = new Map<string, MarkdownNode>()
-    const visitMarkdown = (node: MarkdownNode): void => {
+    visit(tree, (node) => {
       const from = node.position?.start.offset
       const to = node.position?.end.offset
       if (from !== undefined && to !== undefined) nodes.set(`${node.type}:${from}:${to}`, node)
-      const children = (node as Parent).children
-      if (children) children.forEach(visitMarkdown)
-    }
-    visitMarkdown(tree)
+    })
     positioned = nodes
     return positioned
   }
@@ -180,6 +180,29 @@ function mapFormattedSelection(
   return { from, to, text: source.slice(from, to) }
 }
 
+/**
+ * Escapes and entities change a leaf's rendered length, so its offsets cannot be read directly.
+ * The selected text then maps only when it occurs exactly once in both the rendered and the source
+ * text of the narrowest positioned element holding the selection: a unique source match alone may
+ * be a different occurrence than the one the reader selected.
+ */
+function uniqueOccurrence(range: Range, block: HTMLElement, source: string, text: string): number | null {
+  const leaf = (node: Node, offset: number): HTMLElement | null | undefined =>
+    normalizePoint(node, offset).node.parentElement?.closest<HTMLElement>('[data-ps]')
+  const startLeaf = leaf(range.startContainer, range.startOffset)
+  const scope = startLeaf && startLeaf === leaf(range.endContainer, range.endOffset) &&
+    block.contains(startLeaf) ? startLeaf : block
+  const from = Number(scope.dataset.ps)
+  const to = Number(scope.dataset.pe)
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  const occursOnce = (haystack: string): number | null => {
+    const first = haystack.indexOf(text)
+    return first === -1 || haystack.indexOf(text, first + 1) !== -1 ? null : first
+  }
+  const offset = occursOnce(source.slice(from, to))
+  return offset === null || occursOnce(scope.textContent ?? '') === null ? null : from + offset
+}
+
 function mapWithinBlock(
   range: Range, block: HTMLElement, source: string, opaque: readonly SourceRange[],
   positionedNodes: () => Map<string, MarkdownNode>,
@@ -206,13 +229,9 @@ function mapWithinBlock(
       // A single text leaf can use the existing substring fallback without bridging hidden syntax.
       if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return formatted
     }
-    const bps = Number(block.dataset.ps)
-    const bpe = Number(block.dataset.pe)
-    if (!Number.isFinite(bps) || !Number.isFinite(bpe)) return { error: 'unmapped' }
-    const blockSource = source.slice(bps, bpe)
-    const first = blockSource.indexOf(selectedText)
-    if (first === -1 || blockSource.indexOf(selectedText, first + 1) !== -1) return { error: 'unmapped' }
-    from = bps + first
+    const fallback = uniqueOccurrence(range, block, source, selectedText)
+    if (fallback === null) return { error: 'unmapped' }
+    from = fallback
     to = from + selectedText.length
   }
 
@@ -224,65 +243,53 @@ function overlapsMark(r: SelRange, spans: readonly CriticSpan[]): boolean {
   return spans.some((s) => r.from < s.end && r.to > s.start)
 }
 
-export function rangeToSource(range: Range, source: string, spans: readonly CriticSpan[]): SelResult {
-  if (range.collapsed) return { error: 'empty' }
-  if (range.toString().length === 0) return { error: 'empty' }
-
-  const startBlock = closestBlock(range.startContainer)
-  const endBlock = closestBlock(range.endContainer)
-  if (!startBlock || startBlock !== endBlock) return { error: 'cross-block' }
-
-  const tree = parseMarkdown(source)
-  const r = mapWithinBlock(range, startBlock, source, excludedRanges(tree), lazyPositionedNodes(tree))
-  if ('error' in r) return r
-  if (overlapsMark(r, spans)) return { error: 'overlaps-mark' }
-  return r
-}
-
-/** Ancestor containers must not duplicate the selected ranges of their nested blocks. */
+/** Includes the common ancestor itself, which is the outer item when a selection enters a nested list. */
 function blocksBetween(range: Range, startBlock: HTMLElement, endBlock: HTMLElement): HTMLElement[] {
   const ca = range.commonAncestorContainer
   const root = (ca.nodeType === Node.ELEMENT_NODE ? ca : ca.parentElement) as HTMLElement | null
   if (!root) return []
-  const all = Array.from(root.querySelectorAll<HTMLElement>(BLOCK_SELECTOR))
-    .filter((block) => !block.parentElement?.closest('.md-frontmatter'))
+  const all = [
+    ...(root.matches(BLOCK_SELECTOR) ? [root] : []),
+    ...root.querySelectorAll<HTMLElement>(BLOCK_SELECTOR),
+  ].filter((block) => !block.parentElement?.closest('.md-frontmatter'))
   const si = all.indexOf(startBlock)
   const ei = all.indexOf(endBlock)
   if (si === -1 || ei === -1) return []
-  const slice = all.slice(Math.min(si, ei), Math.max(si, ei) + 1)
-  return slice.filter((b) => !slice.some((o) => o !== b && b.contains(o)))
+  return all.slice(Math.min(si, ei), Math.max(si, ei) + 1)
 }
 
 /**
- * Split a block's selected slice [from, to) into the runs that are free of any
- * existing mark — a new mark can't overlap one already there, so a slice that
- * straddles a highlight/comment becomes the gaps on either side. Whitespace-only
- * gaps are dropped so we never emit an empty `{== ==}`.
+ * Ends the range in the last text before `element`. A boundary placed between elements would
+ * otherwise normalize forward into `element`'s first text and map to an offset past hidden syntax.
  */
-function markFreeGaps(
-  from: number, to: number, source: string, spans: readonly CriticSpan[], opaque: readonly SourceRange[],
-): SelRange[] {
-  const blocking = spans
-    .filter((s) => s.start < to && s.end > from)
-    .sort((a, b) => a.start - b.start)
-  const out: SelRange[] = []
-  const push = (a: number, b: number): void => {
-    const text = source.slice(a, b)
-    if (b > a && text.trim().length > 0 && !splitsOpaqueSyntax(a, b, opaque)) {
-      out.push({ from: a, to: b, text })
-    }
-  }
-  let cursor = from
-  for (const m of blocking) {
-    if (m.start > cursor) push(cursor, Math.min(m.start, to))
-    cursor = Math.max(cursor, m.end)
-    if (cursor >= to) break
-  }
-  if (cursor < to) push(cursor, to)
-  return out
+function endBefore(range: Range, block: HTMLElement, element: Element): void {
+  const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+  let last: Text | null = null
+  for (let node = walker.nextNode(); node && element.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING;
+    node = walker.nextNode()) last = node as Text
+  if (last) range.setEnd(last, last.length)
+  else range.setEndBefore(element)
 }
 
-/** Unmappable blocks are skipped; markable blocks in the same selection remain available. */
+/** The parts of a block's selected range outside rendered review marks, in document order. */
+function outsideMarks(sub: Range, block: HTMLElement): Range[] {
+  const pieces: Range[] = []
+  const rest = sub.cloneRange()
+  for (const mark of block.querySelectorAll(MARK_SELECTOR)) {
+    if (!rest.intersectsNode(mark)) continue
+    const before = rest.cloneRange()
+    endBefore(before, block, mark)
+    pieces.push(before)
+    rest.setStartAfter(mark)
+  }
+  pieces.push(rest)
+  return pieces
+}
+
+/**
+ * A block's sub-range excludes rendered review marks and nested blocks; the pieces that remain map
+ * independently, and unmappable pieces are skipped while the others stay markable.
+ */
 export function rangeToSourceRanges(range: Range, source: string, spans: readonly CriticSpan[]): MultiSelResult {
   if (range.collapsed) return { error: 'empty' }
   if (range.toString().length === 0) return { error: 'empty' }
@@ -299,20 +306,20 @@ export function rangeToSourceRanges(range: Range, source: string, spans: readonl
   const opaque = excludedRanges(tree)
   const positionedNodes = lazyPositionedNodes(tree)
   for (const block of blocks) {
-    // The single-block case uses the selection as-is; spanning blocks each get a
-    // fresh range clamped to the selection where it enters/leaves, block edges
-    // otherwise.
-    let sub = range
-    if (blocks.length > 1) {
-      sub = (block.ownerDocument ?? document).createRange()
-      sub.selectNodeContents(block)
-      if (block === startBlock) sub.setStart(range.startContainer, range.startOffset)
-      if (block === endBlock) sub.setEnd(range.endContainer, range.endOffset)
+    const sub = block.ownerDocument.createRange()
+    sub.selectNodeContents(block)
+    if (block === startBlock) sub.setStart(range.startContainer, range.startOffset)
+    if (block === endBlock) sub.setEnd(range.endContainer, range.endOffset)
+    // A container block's own text precedes its nested blocks, which map as blocks themselves.
+    const nested = block.querySelector(BLOCK_SELECTOR)
+    if (nested && sub.intersectsNode(nested)) endBefore(sub, block, nested)
+    for (const piece of outsideMarks(sub, block)) {
+      if (piece.collapsed || piece.toString().trim().length === 0) continue
+      const r = mapWithinBlock(piece, block, source, opaque, positionedNodes)
+      // A mark that rendered literally has no element to split at; never nest inside or across it.
+      if ('error' in r || overlapsMark(r, spans)) continue
+      ranges.push(r)
     }
-    if (sub.collapsed || sub.toString().trim().length === 0) continue
-    const r = mapWithinBlock(sub, block, source, opaque, positionedNodes)
-    if ('error' in r) continue
-    ranges.push(...markFreeGaps(r.from, r.to, source, spans, opaque))
   }
 
   if (ranges.length === 0) return { error: 'unmapped' }

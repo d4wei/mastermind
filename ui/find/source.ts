@@ -15,7 +15,7 @@ export const sourceSearchExtension = search({
   },
 })
 
-export interface SourceSearch {
+interface SourceSearch {
   sessionId: string
   matches(query: string, caseSensitive: boolean): Match[]
   query(query: string, caseSensitive: boolean): void
@@ -27,7 +27,7 @@ export interface SourceSearch {
 }
 export const useSourceSearch = create<{ adapter: SourceSearch | null }>(() => ({ adapter: null }))
 
-export function sourceMatches(state: EditorState, query: string, caseSensitive: boolean): Match[] {
+function sourceMatches(state: EditorState, query: string, caseSensitive: boolean): Match[] {
   if (!query) return []
   const cursor = searchQuery(query, caseSensitive).getCursor(state)
   const matches: Match[] = []

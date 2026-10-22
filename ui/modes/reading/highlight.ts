@@ -1,6 +1,6 @@
 /** Code coloring is approximate; concatenating token values preserves the original code text. */
 
-export type TokenType =
+type TokenType =
   | 'text'
   | 'comment'
   | 'keyword'

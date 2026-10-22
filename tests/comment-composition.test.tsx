@@ -11,10 +11,10 @@ let root: Root
 const edit = vi.fn()
 let selectionRect: DOMRect
 const rangeBounds = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
-function Harness({ readOnly = false }: { readOnly?: boolean }) {
+function Harness({ readOnly = false, text = 'Passage', source = text }: { readOnly?: boolean; text?: string; source?: string }) {
   const containerRef = useRef<HTMLElement>(null)
-  return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe="7">Passage</span></p></article></div>
-    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source="Passage" spans={[]} authorTag="reviewer" onEdit={edit} /></>
+  return <><div className="document-scroll"><article ref={containerRef}><p><span data-ps="0" data-pe={text.length}>{text}</span></p></article></div>
+    <SelectionToolbar readOnly={readOnly} containerRef={containerRef} source={source} spans={[]} authorTag="reviewer" onEdit={edit} /></>
 }
 beforeEach(() => {
   vi.useFakeTimers()
@@ -34,14 +34,17 @@ afterEach(() => {
   if (rangeBounds) Object.defineProperty(Range.prototype, 'getBoundingClientRect', rangeBounds)
   else Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
 })
-async function compose(action = 'Comment') {
-  act(() => root.render(<Harness />))
+async function select(harness = <Harness />) {
+  act(() => root.render(harness))
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('span')!)
   window.getSelection()!.removeAllRanges()
   window.getSelection()!.addRange(range)
   act(() => document.dispatchEvent(new Event('selectionchange')))
   await act(async () => vi.advanceTimersByTimeAsync(120))
+}
+async function compose(action = 'Comment', harness = <Harness />) {
+  await select(harness)
   act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((b) => b.textContent === action)!.click())
   const textarea = host.querySelector('textarea')!
   act(() => {
@@ -213,4 +216,24 @@ it('Escape cancels a pending selection check without reviving the toolbar', asyn
   expect(host.querySelector('.sel-toolbar')).toBeNull()
   await compose()
   expect(host.querySelector('textarea')).not.toBeNull()
+})
+
+it('re-reads a surviving selection when the source changes under a shown toolbar', async () => {
+  await select()
+  act(() => root.render(<Harness source={'Passage\n'} />))
+  await act(async () => vi.advanceTimersByTimeAsync(120))
+  act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((b) => b.textContent === 'Comment')!.click())
+  const textarea = host.querySelector('textarea')!
+  act(() => inputValue(textarea, 'Note'))
+  expect(host.querySelector('[role="status"]')).toBeNull()
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).toHaveBeenCalledWith([{ from: 0, to: 7, insert: '{==Passage==}{>>@reviewer: Note<<}' }])
+})
+
+it('blocks a comment whose selected text would not reparse as its anchor', async () => {
+  const textarea = await compose('Comment', <Harness text="a ==}" />)
+  expect(host.querySelector('[role="alert"]')!.textContent).toBe('This passage cannot anchor a comment. Select text without review delimiters.')
+  expect(host.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
 })

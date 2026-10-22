@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { placeCommentCards, type RailMeasurement } from '../ui/review/rail-layout'
+import { placeCommentCards } from '../ui/review/rail-layout'
 
 it('gives a selected crowded discussion its anchor while retaining readable neighbors', () => {
   const cards = [300, 340, 380].map((anchorTop) => ({ anchorTop, height: 100 }))
@@ -18,7 +18,7 @@ it('keeps cards on the surface when there is insufficient room before the select
 it('never overlaps cards or changes source order across crowded and sparse layouts', () => {
   const heights = [40, 140, 800, 64, 220]
   for (const spacing of [0, 12, 80, 800]) {
-    const cards: RailMeasurement[] = heights.map((height, i) => ({ height, anchorTop: i * spacing }))
+    const cards = heights.map((height, i) => ({ height, anchorTop: i * spacing }))
     for (let selected = -1; selected < cards.length; selected++) {
       const tops = placeCommentCards(cards, selected, 8)
       expect(tops[0]).toBeGreaterThanOrEqual(0)

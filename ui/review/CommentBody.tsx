@@ -1,5 +1,5 @@
 import { parseTranslatedComment } from '../../document/translation'
-export function commentContent(body: string) {
+function commentContent(body: string) {
   const translated = parseTranslatedComment(body)
   const prose = (translated?.comment ?? body).replace(/\r\n?/g, '\n')
     .split(/\n[ \t]*\n+/)

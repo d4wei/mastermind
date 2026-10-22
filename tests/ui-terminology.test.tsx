@@ -15,7 +15,6 @@ import { useNav } from '../ui/app/navStore'
 import { TopBar } from '../ui/app/TopBar'
 import { ToolbarTarget } from '../ui/app/ToolbarTarget'
 
-vi.mock('../ui/util/SlotLabel', () => ({ SlotLabel: ({ text }: { text: string }) => <span>{text}</span> }))
 const initialConfig = useConfig.getState()
 const initialDoc = useDoc.getState()
 const config: ClientConfig = {

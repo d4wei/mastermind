@@ -1,14 +1,14 @@
 import { textMatches, type Match } from './matches'
 
 interface Point { node: Text; offset: number }
-export interface TextRun { text: string; starts: Point[]; ends: Point[] }
-export interface ReadingMatch extends Match { range: Range }
+interface TextRun { text: string; starts: Point[]; ends: Point[] }
+interface ReadingMatch extends Match { range: Range }
 
 const blocks = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'PRE', 'TD', 'TH', 'DT', 'DD', 'BLOCKQUOTE', 'DIV', 'SECTION', 'ARTICLE'])
 const excluded = 'button, input, textarea, select, script, style, [hidden], [aria-hidden="true"], .print-footnotes, .rail-card-anchor, .rail-author'
 
 /** Inline text shares a run; block boundaries and excluded chrome never join searchable phrases. */
-export function readingRuns(root: HTMLElement): TextRun[] {
+function readingRuns(root: HTMLElement): TextRun[] {
   const runs: TextRun[] = []
   let run: TextRun = { text: '', starts: [], ends: [] }
   const flush = () => {
@@ -43,7 +43,7 @@ export function readingRuns(root: HTMLElement): TextRun[] {
   return runs
 }
 
-export function runRange(run: TextRun, match: Match): Range {
+function runRange(run: TextRun, match: Match): Range {
   const start = run.starts[match.from]!
   const end = run.ends[match.to - 1]!
   const range = document.createRange()

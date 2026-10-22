@@ -199,7 +199,7 @@ it('keeps hover separate from selection and never changes card positions on hove
 })
 
 it('preserves the expanded thread and reading position after appending a reply', () => {
-  const reveal = vi.spyOn(reviewScroll, 'revealRange')
+  const reveal = vi.spyOn(reviewScroll, 'revealElement')
   render('{==context==}{>>@Alex: question<<}')
   click('Reply')
   const input = host.querySelector('textarea')!
@@ -208,6 +208,8 @@ it('preserves the expanded thread and reading position after appending a reply',
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   const card = host.querySelector('.rail-card')!
+  act(() => vi.advanceTimersByTime(40))
+  reveal.mockClear()
   click('Reply')
   expect(host.querySelector('.rail-card')).toBe(card)
   expect(host.querySelectorAll('.rail-body')).toHaveLength(2)

@@ -1,4 +1,5 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
+import { commentMark } from '../modes/reading/marks'
 import { useDraftGuard, useDraftState } from './drafts'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { DropdownMenu } from 'radix-ui'
@@ -149,10 +150,9 @@ export function CommentRail({ items, spans, source, docRef, authorTag, activeSpa
     collapse()
   }
   const submitReply = (card: typeof cards[number]) => {
-    const text = drafts[card.key]?.trim()
-    if (readOnly || !text) return
-    const body = text.replace(/\n[ \t]*\n+/g, '\n').replaceAll('<<}', '<< }')
-    onEdit([{ from: card.thread.end, to: card.thread.end, insert: `{>>@${authorTag}: ${body}<<}` }])
+    const text = drafts[card.key]
+    if (readOnly || !text?.trim()) return
+    onEdit([{ from: card.thread.end, to: card.thread.end, insert: commentMark(authorTag, text) }])
     setReplyFor(null)
     setDrafts((current) => { const next = { ...current }; delete next[card.key]; return next })
   }

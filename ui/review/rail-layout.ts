@@ -1,4 +1,4 @@
-export interface RailMeasurement {
+interface RailMeasurement {
   anchorTop: number
   height: number
 }
