@@ -15,7 +15,8 @@ Before window creation, selection remains in the registry for the first renderer
 failures remain in the inventory snapshot until dismissed or replaced by another graphical request.
 Cancellation of a native dialog does nothing. Launcher errors remain in its JSON response.
 File reads run outside the event loop. The registry mutex serializes admissions. Guarded saves
-serialize on a separate write mutex and hold the registry only to resolve the admitted path.
+serialize on a separate write mutex and hold the registry only to resolve the admitted path and,
+for Save As, to check and register the destination.
 
 The pinned [Tauri dialog plugin](https://v2.tauri.app/plugin/dialog/) supplies the native multi-file
 picker; Rust opens the selected files through the application's admission checks. The frontend has
@@ -28,12 +29,12 @@ remain unconfigured, while dialogs and window drops use native events on both pl
 `close_document` removes the admitted path and snapshot without touching disk contents. The renderer
 first saves and checks that document while editing is locked. The command accepts the renderer's
 current selection and observed activation revision; a selection that names a document no longer
-admitted is ignored. A concurrent opening request takes precedence;
-otherwise closing the active file selects its next neighbor, then its previous neighbor. Closing
-another file preserves selection, and closing the last file leaves no active document. A completed
-close advances the revision so older inventory responses cannot restore a removed pill.
-Directory watches are released when no admitted file uses the directory; failed removals remain
-eligible for retry on the next close. Watch registration and removal share the registry lock.
+admitted is ignored. A concurrent opening request takes precedence; otherwise closing the active
+file selects its next neighbor, then its previous neighbor. Closing another file preserves
+selection, and closing the last file leaves no active document. A completed close advances the
+revision so older inventory responses cannot restore a removed pill. Directory watches are released
+when no admitted file uses the directory; failed removals remain eligible for retry on the next
+close. Watch registration and removal share the registry lock.
 
 The host retains admitted documents without a total session limit. Inventory polling and raw OS
 error details remain bounded hardening work. See the [observations](../../tools/desktop/results.md)

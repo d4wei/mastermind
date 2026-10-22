@@ -4,16 +4,15 @@
 from the admitted path registry; webview commands cannot name an arbitrary write destination.
 Admission accepts `.md` and `.markdown`, case-insensitively, on both the selected path and canonical
 target. The selected name is checked before any filesystem access, so a missing, oversized, or
-special non-Markdown path also returns `not_markdown` without entering the registry. The picker filters
-these extensions; CLI, document events, and drops use the same admission rule. Save As rejects an
-unsupported extension before creating a file. These checks identify document types by filename,
-not by guessing from content.
+special non-Markdown path also returns `not_markdown` without entering the registry. The picker
+filters these extensions; CLI, document events, and drops use the same admission rule. Save As
+rejects an unsupported extension before creating a file. These checks identify document types by
+filename, not by guessing from content.
 
-Admission canonicalizes paths, so an opened Markdown symlink and its target share one document.
-The first webview read receives the admitted snapshot even if the path changed or disappeared after
-opening
-was acknowledged. Subscribing after the document loads triggers a fresh read, retaining that base
-and surfacing subsequent disk changes. Delivering the initial snapshot releases its host copy.
+Admission canonicalizes paths, so an opened Markdown symlink and its target share one document. The
+first webview read receives the admitted snapshot even if the path changed or disappeared after
+opening was acknowledged. Subscribing after the document loads triggers a fresh read, retaining that
+base and surfacing subsequent disk changes. Delivering the initial snapshot releases its host copy.
 
 Reads open an existing regular file without following a final symlink or Windows reparse point.
 They compare descriptor metadata before and after reading, then compare a second descriptor at
@@ -23,16 +22,19 @@ A changed or replaced path rejects the snapshot. Reads and changed writes share 
 Unsupported types are checked before opening and again through descriptor metadata. Unix opens
 are nonblocking only until the descriptor is confirmed to be a regular file.
 
-A separate write mutex serializes this host's writes. The document registry is locked only to
-resolve the admitted path, so writes do not hold that registry during disk I/O.
-Each write rechecks its supplied base version through the opened descriptor. Missing paths are
-conflicts and are never recreated. Documents reach the UI as lossily decoded text. An unchanged
-string returns without writing, retaining original bytes even when they contain invalid UTF-8.
-Changed content for a file that is not valid UTF-8 is refused with `not_utf8`, because writing it
-would replace invalid sequences outside the edit; Save As can write a UTF-8 copy instead. Changed
-content is written and truncated
-through the existing descriptor, preserving inode, permissions, and admitted symlink aliases.
-A second snapshot checks the resulting content and path identity before reporting success.
+A separate write mutex serializes this host's writes, including Save As. The document registry is
+locked only to resolve the admitted path and, for Save As, to check and register the destination,
+so writes do not hold that registry during disk I/O. Each write rechecks its supplied base version
+through the opened descriptor. Missing paths are conflicts and are never recreated.
+
+Snapshots reach the UI as `{ mtimeMs, version, content, lossy }`. `content` is lossily decoded
+text; `lossy` is true when the bytes are not valid UTF-8, so the UI can open such a file read-only.
+A UTF-8 byte order mark is valid UTF-8. An unchanged string returns without writing, retaining
+original bytes even when they contain invalid UTF-8. Changed content for a file that is not valid
+UTF-8 is refused with `not_utf8`, because writing it would replace invalid sequences outside the
+edit; Save As can write a UTF-8 copy instead. Changed content is written and truncated through the
+existing descriptor, preserving inode, permissions, and admitted symlink aliases. A second snapshot
+checks the resulting content and path identity before reporting success.
 
 This is not a filesystem transaction. Unrelated writers do not share the mutex and can intervene
 after validation. A partial write or process failure can leave partial content. No crash-durability
@@ -43,10 +45,13 @@ Notify watches parent directories so replacing an individual file preserves the 
 Prepared artifact directories share this lifecycle; see [translation discovery](translations.md).
 Events invalidate the active document; a versioned read decides whether content changed. Read-only
 access events are ignored. Watch errors also invalidate. A removal event for a watched directory
-drops it from the watch set, so a recreated directory is registered on the next watch request. The UI revalidates on focus and at
-intervals even when watch registration succeeds; failed registration uses a faster interval.
-Inactive documents revalidate on return; their saves still check versions. Network filesystem
-notifications and parent-directory replacement remain platform validation work.
+marks it removed; the next watch request or close releases its registration and a watch request
+registers it again, so a recreated directory is watched once. The event callback never waits on the
+watch set, and watch calls are never made while holding it, because they can join the thread that
+runs the callback. The UI revalidates on focus and at intervals even when watch registration
+succeeds; failed registration uses a faster interval. Inactive documents revalidate on return; their
+saves still check versions. Network filesystem notifications and parent-directory replacement remain
+platform validation work.
 
 Native filesystem commands and admission share the blocking-work gate described in
 [`worker.md`](worker.md). Filesystem work runs outside the event loop; response deadlines do not
@@ -73,15 +78,17 @@ Initial setup and per-field saved choices are described in [`setup.md`](setup.md
 `save_document_copy` obtains its destination from the native save picker; the webview provides only
 an admitted document ID and retained content. It cannot supply an arbitrary write path. Cancellation
 returns without writing. Before creating anything, Save As checks the destination's extension and
-requires a UTF-8 canonical path. `create_copy` uses exclusive creation, rejecting existing destinations,
-including symlink and hard-link aliases. It checks the size, writes and syncs the bytes, then reads
-back a versioned snapshot. Failure retains the renderer buffer; a partial new file may remain and
-is never silently removed or overwritten on retry.
+requires a UTF-8 canonical path. `create_copy` uses exclusive creation, rejecting existing
+destinations, including symlink and hard-link aliases. It checks the size, writes and syncs the
+bytes, then reads back a versioned snapshot. Failure retains the renderer buffer; a partial new file
+may remain and is never silently removed or overwritten on retry.
 
-An ordinary Save As also refuses, before creation, a destination still registered to an admitted
-document, such as one whose file was deleted, with `already_open`; the copy never merges into that
-document. After creation, the new file is admitted under a fresh ID with the snapshot creation
-verified, and the original document's registry entry is removed. The original disk file is
+An ordinary Save As also refuses, before creation, a destination still registered to another
+admitted document, such as one whose file was deleted, with `already_open`; the copy never merges
+into that document. The originating document's own deleted path is allowed, since the copy replaces
+its entry. On macOS and Windows the comparison ignores case, approximating their default volumes.
+After creation the check is repeated, the new file is admitted under a fresh ID with the snapshot
+creation verified, and the original document's registry entry is removed. The original disk file is
 untouched. This does not advance activation: the renderer switches only if the person still has the
 originating document selected. Unused watches are released. A failed creation or admission does
 not release the original document.

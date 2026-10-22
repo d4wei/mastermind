@@ -177,26 +177,51 @@ impl Documents {
         Ok(Admission::Opened(self.insert(display, Some(snapshot))))
     }
 
-    /// Admits a Save As destination that `create` must newly create. The canonical destination is
-    /// resolved and checked before creation; a path still registered to another document (such as
-    /// one whose file was deleted) is refused rather than merged into that document.
-    pub(crate) fn admit_new_copy(
-        &mut self,
-        path: &Path,
-        create: impl FnOnce() -> Result<crate::files::Snapshot, FileError>,
-    ) -> Result<(usize, crate::files::Snapshot), FileError> {
-        let canonical = copy_destination(path)?;
-        if self.ids.contains_key(&canonical) {
+    /// Refuses a Save As destination registered to an admitted document other than `origin`, such
+    /// as one whose file was deleted; a copy is never merged into another document. The origin's
+    /// own path is allowed because the copy replaces its entry.
+    pub(crate) fn check_copy_destination(
+        &self,
+        origin: usize,
+        canonical: &str,
+    ) -> Result<(), FileError> {
+        let destination = destination_key(canonical);
+        if self.ids.iter().any(|(path, id)| *id != origin && destination_key(path) == destination) {
             return Err(FileError::new(
                 409,
                 "already_open",
                 "Another open document uses this path. Choose a different name.",
             ));
         }
-        let snapshot = create()?;
-        let id = self.insert(canonical, Some(snapshot.clone()));
-        Ok((id, snapshot))
+        Ok(())
     }
+
+    /// Registers a created copy in place of `origin`. The destination is checked again because an
+    /// admission can register the created file before this call. The activation revision is kept:
+    /// a save picker must not steal later navigation.
+    pub(crate) fn replace_with_copy(
+        &mut self,
+        origin: usize,
+        canonical: String,
+        snapshot: crate::files::Snapshot,
+    ) -> Result<usize, FileError> {
+        self.check_copy_destination(origin, &canonical)?;
+        self.remove(origin);
+        let id = self.insert(canonical, Some(snapshot));
+        if self.active_id == Some(origin) {
+            self.active_id = Some(id);
+        }
+        Ok(id)
+    }
+}
+
+/// Compares Save As destinations case-insensitively on macOS and Windows, whose default volumes
+/// ignore case. Admitted paths carry their on-disk case from canonicalization, but a destination
+/// that does not exist yet keeps the case the person typed. Lowercasing approximates the volume's
+/// folding rules; on a case-sensitive volume it only refuses a name that differs from an open
+/// document's by case.
+fn destination_key(path: &str) -> String {
+    if cfg!(any(target_os = "macos", windows)) { path.to_lowercase() } else { path.to_owned() }
 }
 
 /// Validates a Save As destination before creation and returns its canonical path. Exclusive
@@ -272,17 +297,27 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(fixture.request(&["a.md", "stale.md"]));
         fs::remove_file(fixture.0.join("stale.md")).unwrap();
-        let mut created = false;
-        let error = docs
-            .admit_new_copy(&fixture.0.join("stale.md"), || {
-                created = true;
-                Err(FileError::conflict())
-            })
-            .unwrap_err();
+        let stale = copy_destination(&fixture.0.join("stale.md")).unwrap();
+        let error = docs.check_copy_destination(0, &stale).unwrap_err();
         assert_eq!((error.status, error.error.as_str()), (409, "already_open"));
-        assert!(!created);
+        assert!(docs.check_copy_destination(1, &stale).is_ok());
+        let snapshot = docs.get(0).unwrap().snapshot.clone().unwrap();
+        assert_eq!(docs.replace_with_copy(0, stale, snapshot).unwrap_err().error, "already_open");
         assert_eq!(docs.len(), 2);
-        assert!(docs.get(1).unwrap().snapshot.is_some());
+        assert!(docs.get(0).unwrap().snapshot.is_some());
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn copy_destinations_differing_only_by_case_are_refused() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a.md"), "a").unwrap();
+        fs::write(fixture.0.join("stale.md"), "stale").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a.md", "stale.md"]));
+        fs::remove_file(fixture.0.join("stale.md")).unwrap();
+        let alias = copy_destination(&fixture.0.join("STALE.md")).unwrap();
+        assert_eq!(docs.check_copy_destination(0, &alias).unwrap_err().error, "already_open");
     }
 
     struct Fixture(PathBuf);

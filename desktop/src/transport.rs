@@ -14,6 +14,12 @@ use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufRead
 
 pub const DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 const ACCEPT_RETRY: std::time::Duration = std::time::Duration::from_millis(100);
+const ACCEPT_RETRY_CAP: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Doubles the pause after each consecutive accept failure, up to the cap.
+fn accept_retry_delay(failures: u32) -> std::time::Duration {
+    ACCEPT_RETRY.saturating_mul(1 << failures.saturating_sub(1).min(16)).min(ACCEPT_RETRY_CAP)
+}
 
 async fn frame(stream: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
@@ -53,18 +59,21 @@ fn dispatch(request: Operation, docs: &Mutex<Documents>, setup: &crate::setup::S
     response
 }
 
-/// Waits for the next connection. Accept failures such as descriptor exhaustion or an aborted
-/// connection are transient, so the listener keeps serving after a short pause.
+/// Waits for the next connection. The listener treats every accept failure as transient, such as
+/// descriptor exhaustion or an aborted connection, and keeps serving; backoff keeps a failure that
+/// does not clear from spinning.
 async fn next_connection<T, F>(mut accept: impl FnMut() -> F) -> T
 where
     F: std::future::Future<Output = io::Result<T>>,
 {
+    let mut failures = 0u32;
     loop {
         match accept().await {
             Ok(connection) => return connection,
             Err(error) => {
+                failures = failures.saturating_add(1);
                 eprintln!("Launcher connection failed: {error}");
-                tokio::time::sleep(ACCEPT_RETRY).await;
+                tokio::time::sleep(accept_retry_delay(failures)).await;
             }
         }
     }
@@ -170,6 +179,13 @@ mod tests {
             async move { result }
         }));
         assert_eq!(connection, 3);
+    }
+
+    #[test]
+    fn repeated_accept_failures_back_off_to_a_cap() {
+        let delays: Vec<_> = [1, 2, 3, 6, 7, 40, u32::MAX].map(accept_retry_delay).into();
+        assert_eq!(delays[..4], [100, 200, 400, 3200].map(std::time::Duration::from_millis));
+        assert!(delays[4..].iter().all(|delay| *delay == ACCEPT_RETRY_CAP));
     }
 
     #[test]

@@ -7,65 +7,136 @@ use serde_json::{Value, json};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
 };
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
-pub struct FileWatch {
-    watcher: RecommendedWatcher,
-    /// Shared with the event callback, which forgets removed directories so a recreated directory
-    /// is registered again.
-    parents: Arc<Mutex<HashSet<PathBuf>>>,
+/// Directories registered with the watcher, shared with its event callback. The callback only
+/// moves a removed directory from `parents` to `removed`; `FileWatch` methods release the backend
+/// registration afterwards. Watcher calls can join the thread that runs the callback, so this lock
+/// is never held across a watcher call.
+#[derive(Default)]
+struct Directories {
+    parents: HashSet<PathBuf>,
+    removed: HashSet<PathBuf>,
 }
 
-fn forget_removed(parents: &Mutex<HashSet<PathBuf>>, event: &notify::Event) {
-    if matches!(event.kind, notify::EventKind::Remove(_)) {
-        let mut parents = parents.lock().unwrap();
-        for path in &event.paths {
-            parents.remove(path);
+impl Directories {
+    fn forget(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
+        for path in paths {
+            if self.parents.remove(&path) {
+                self.removed.insert(path);
+            }
+        }
+    }
+}
+
+pub struct FileWatch<W = RecommendedWatcher> {
+    watcher: W,
+    directories: Arc<Mutex<Directories>>,
+    /// Removal paths the callback could not record without waiting for `directories`.
+    deferred: mpsc::Receiver<PathBuf>,
+}
+
+/// Records a removed watched directory so the next watch request registers it again. The callback
+/// never waits on `directories`; a contended lock defers the paths to the next `FileWatch` call.
+fn forget_removed(
+    directories: &Mutex<Directories>,
+    deferred: &mpsc::Sender<PathBuf>,
+    event: &notify::Event,
+) {
+    if !event.kind.is_remove() {
+        return;
+    }
+    match directories.try_lock() {
+        Ok(mut directories) => directories.forget(event.paths.iter().cloned()),
+        Err(_) => {
+            for path in &event.paths {
+                let _ = deferred.send(path.clone());
+            }
         }
     }
 }
 
 impl FileWatch {
+    pub fn new(invalidate: impl Fn() + Send + 'static) -> notify::Result<Self> {
+        Self::with_watcher(invalidate)
+    }
+}
+
+impl<W: Watcher> FileWatch<W> {
+    fn with_watcher(invalidate: impl Fn() + Send + 'static) -> notify::Result<Self> {
+        let directories = Arc::new(Mutex::new(Directories::default()));
+        let shared = directories.clone();
+        let (defer, deferred) = mpsc::channel();
+        let watcher = W::new(
+            move |event: notify::Result<notify::Event>| {
+                if let Ok(event) = &event {
+                    forget_removed(&shared, &defer, event);
+                }
+                // Events are invalidation hints, including overflow/errors; a fresh versioned read
+                // decides.
+                if !matches!(&event, Ok(event) if event.kind.is_access()) {
+                    invalidate();
+                }
+            },
+            notify::Config::default(),
+        )?;
+        Ok(Self { watcher, directories, deferred })
+    }
+
+    fn directories(&self) -> std::sync::MutexGuard<'_, Directories> {
+        let mut directories = self.directories.lock().unwrap();
+        directories.forget(self.deferred.try_iter());
+        directories
+    }
+
+    /// Releases the backend registration of removed directories so re-registering one does not
+    /// duplicate it. Errors are ignored because a backend may already have dropped the directory.
+    fn release_removed(&mut self) {
+        let removed = std::mem::take(&mut self.directories().removed);
+        for path in removed {
+            let _ = self.watcher.unwatch(&path);
+        }
+    }
+
     pub fn retain_documents(&mut self, docs: &Documents) {
-        let watcher = &mut self.watcher;
-        self.parents.lock().unwrap().retain(|parent| {
-            if docs
-                .entries()
-                .any(|(_, document)| crate::translations::watch_paths(Path::new(&document.path)).contains(parent))
-            {
-                return true;
-            }
+        self.release_removed();
+        let used: HashSet<PathBuf> = docs
+            .entries()
+            .flat_map(|(_, document)| crate::translations::watch_paths(Path::new(&document.path)))
+            .collect();
+        let unused: Vec<PathBuf> = self
+            .directories()
+            .parents
+            .iter()
+            .filter(|parent| !used.contains(*parent))
+            .cloned()
+            .collect();
+        for parent in unused {
             // Retain failed removals so a later close can retry releasing the watch.
-            watcher.unwatch(parent).is_err()
-        });
+            if self.watcher.unwatch(&parent).is_ok() {
+                self.directories().parents.remove(&parent);
+            }
+        }
     }
 
     fn watch(&mut self, source: &Path) -> notify::Result<()> {
+        self.release_removed();
         for parent in crate::translations::watch_paths(source) {
-            if !self.parents.lock().unwrap().contains(&parent) {
-                self.watcher.watch(&parent, RecursiveMode::NonRecursive)?;
-                self.parents.lock().unwrap().insert(parent);
+            // Record the directory first so a removal reported during registration is not lost.
+            if !self.directories().parents.insert(parent.clone()) {
+                continue;
+            }
+            if let Err(error) = self.watcher.watch(&parent, RecursiveMode::NonRecursive) {
+                let mut directories = self.directories();
+                directories.parents.remove(&parent);
+                directories.removed.remove(&parent);
+                return Err(error);
             }
         }
         Ok(())
-    }
-
-    pub fn new(invalidate: impl Fn() + Send + 'static) -> notify::Result<Self> {
-        let parents = Arc::new(Mutex::new(HashSet::new()));
-        let removed = parents.clone();
-        let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            if let Ok(event) = &event {
-                forget_removed(&removed, event);
-            }
-            // Events are invalidation hints, including overflow/errors; a fresh versioned read decides.
-            if !matches!(&event, Ok(event) if matches!(event.kind, notify::EventKind::Access(_))) {
-                invalidate();
-            }
-        })?;
-        Ok(Self { watcher, parents })
     }
 }
 
@@ -150,7 +221,8 @@ pub async fn write_document(
 }
 
 /// Creates a new copy of an admitted document. A close copy leaves the registry untouched;
-/// otherwise the copy replaces the original's registry entry.
+/// otherwise the copy replaces the original's registry entry. Like other guarded saves, creation
+/// holds the write mutex and locks the registry only before and after disk I/O.
 fn save_copy(
     docs: &Mutex<Documents>,
     id: &str,
@@ -159,19 +231,22 @@ fn save_copy(
     for_close: bool,
 ) -> Result<Value, FileError> {
     let canonical = crate::admission::copy_destination(path)?;
-    let (session_id, saved) = if for_close {
-        serialized_write(docs, id, |_| files::create_copy(path, content))
-            .map(|saved| (id.to_owned(), saved))?
-    } else {
-        let mut docs = docs.lock().unwrap();
-        let old_id = admitted_id(&docs, id)?;
-        let (copy_id, saved) = docs.admit_new_copy(path, || files::create_copy(path, content))?;
-        // Preserve the activation revision: a save picker must not steal later navigation.
-        docs.remove(old_id);
-        if docs.active_id == Some(old_id) {
-            docs.active_id = Some(copy_id);
+    let _write = DOCUMENT_WRITES.lock().unwrap();
+    let origin = {
+        let docs = docs.lock().unwrap();
+        let origin = admitted_id(&docs, id)?;
+        if !for_close {
+            docs.check_copy_destination(origin, &canonical)?;
         }
-        (copy_id.to_string(), saved)
+        origin
+    };
+    let saved = files::create_copy(path, content)?;
+    let session_id = if for_close {
+        id.to_owned()
+    } else {
+        let copy_id =
+            docs.lock().unwrap().replace_with_copy(origin, canonical.clone(), saved.clone())?;
+        copy_id.to_string()
     };
     Ok(json!({
         "meta": { "sessionId": session_id, "path": canonical,
@@ -378,14 +453,135 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    /// Records backend calls and lets a test deliver events through the registered callback.
+    struct Recording {
+        handler: Box<dyn notify::EventHandler>,
+        calls: Vec<(&'static str, PathBuf)>,
+    }
+
+    impl Watcher for Recording {
+        fn new<F: notify::EventHandler>(handler: F, _: notify::Config) -> notify::Result<Self> {
+            Ok(Self { handler: Box::new(handler), calls: Vec::new() })
+        }
+        fn watch(&mut self, path: &Path, _: RecursiveMode) -> notify::Result<()> {
+            self.calls.push(("watch", path.to_owned()));
+            Ok(())
+        }
+        fn unwatch(&mut self, path: &Path) -> notify::Result<()> {
+            self.calls.push(("unwatch", path.to_owned()));
+            Ok(())
+        }
+        fn kind() -> notify::WatcherKind {
+            notify::WatcherKind::NullWatcher
+        }
+    }
+
+    impl FileWatch<Recording> {
+        fn remove(&mut self, path: &Path) {
+            let kind = notify::EventKind::Remove(notify::event::RemoveKind::Folder);
+            let event = notify::Event::new(kind).add_path(path.to_owned());
+            self.watcher.handler.handle_event(Ok(event));
+        }
+    }
+
     #[test]
-    fn removed_watch_directories_are_registered_again() {
-        let parents = Mutex::new(HashSet::from([PathBuf::from("/watched"), PathBuf::from("/kept")]));
-        let event = |kind| notify::Event::new(kind).add_path(PathBuf::from("/watched"));
-        forget_removed(&parents, &event(notify::EventKind::Modify(notify::event::ModifyKind::Any)));
-        assert_eq!(parents.lock().unwrap().len(), 2);
-        forget_removed(&parents, &event(notify::EventKind::Remove(notify::event::RemoveKind::Folder)));
-        assert_eq!(*parents.lock().unwrap(), HashSet::from([PathBuf::from("/kept")]));
+    fn removed_watch_directories_are_released_and_registered_again() {
+        let dir = PathBuf::from("/watched");
+        let mut watch = FileWatch::<Recording>::with_watcher(|| {}).unwrap();
+        watch.watch(&dir.join("doc.md")).unwrap();
+        watch.watch(&dir.join("doc.md")).unwrap();
+        let modify = notify::Event::new(notify::EventKind::Modify(notify::event::ModifyKind::Any));
+        watch.watcher.handler.handle_event(Ok(modify.add_path(dir.clone())));
+        watch.watch(&dir.join("doc.md")).unwrap();
+        assert_eq!(watch.watcher.calls, [("watch", dir.clone())]);
+        watch.remove(&dir);
+        watch.watch(&dir.join("doc.md")).unwrap();
+        assert_eq!(watch.watcher.calls[1..], [("unwatch", dir.clone()), ("watch", dir.clone())]);
+        // A removal reported while the directory set is locked is deferred, not waited on.
+        let held = watch.directories.clone();
+        let guard = held.lock().unwrap();
+        watch.remove(&dir);
+        drop(guard);
+        watch.retain_documents(&Documents::default());
+        assert_eq!(watch.watcher.calls[3..], [("unwatch", dir.clone())]);
+        assert!(watch.directories().parents.is_empty());
+    }
+
+    #[test]
+    fn releasing_watches_does_not_wait_on_the_event_callback() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::Duration;
+        let base = fs::canonicalize(std::env::temp_dir())
+            .unwrap()
+            .join(format!("mastermind-watch-churn-{}", std::process::id()));
+        let (kept, released) = (base.join("kept"), base.join("released"));
+        fs::create_dir_all(&kept).unwrap();
+        fs::create_dir_all(&released).unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let churn = {
+            let (stop, kept) = (stop.clone(), kept.clone());
+            std::thread::spawn(move || {
+                for index in 0.. {
+                    if stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    let file = kept.join(format!("churn-{}", index % 50));
+                    let _ = fs::write(&file, b"x");
+                    let _ = fs::remove_file(&file);
+                }
+            })
+        };
+        let (progress, rounds) = std::sync::mpsc::channel();
+        let (kept_doc, released_doc) = (kept.join("doc.md"), released.join("doc.md"));
+        // Detached so a deadlock fails the timeout below instead of blocking the test run.
+        std::thread::spawn(move || {
+            let mut watch = FileWatch::new(|| {}).unwrap();
+            let mut docs = Documents::default();
+            docs.insert(kept_doc.to_str().unwrap().into(), None);
+            watch.watch(&kept_doc).unwrap();
+            for round in 0..100 {
+                watch.watch(&released_doc).unwrap();
+                watch.retain_documents(&docs);
+                progress.send(round).unwrap();
+            }
+        });
+        let mut last = None;
+        while let Ok(round) = rounds.recv_timeout(Duration::from_secs(10)) {
+            last = Some(round);
+        }
+        stop.store(true, Ordering::Relaxed);
+        churn.join().unwrap();
+        let _ = fs::remove_dir_all(&base);
+        assert_eq!(last, Some(99), "releasing a watch stalled after round {last:?}");
+    }
+
+    #[test]
+    fn a_copy_can_replace_its_own_deleted_path() {
+        let dir = std::env::temp_dir().join(format!("mastermind-self-copy-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let original = dir.join("a.md");
+        fs::write(&original, "original").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![original.to_str().unwrap().into()],
+        });
+        fs::remove_file(&original).unwrap();
+        let docs = Mutex::new(docs);
+        let result = save_copy(&docs, "0", &original, "recovered", false).unwrap();
+        assert_eq!(result["meta"]["sessionId"], "1");
+        assert_eq!(fs::read_to_string(&original).unwrap(), "recovered");
+        let mut docs = docs.into_inner().unwrap();
+        assert_eq!((docs.len(), docs.active_id), (1, Some(1)));
+        let reopened = docs.admit(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![original.to_str().unwrap().into()],
+        });
+        assert_eq!(reopened.results[0].status, "already_open");
+        assert_eq!(docs.active_id, Some(1));
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

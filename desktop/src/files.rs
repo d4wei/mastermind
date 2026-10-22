@@ -16,6 +16,9 @@ pub struct Snapshot {
     pub version: String,
     #[serde(rename = "content", serialize_with = "serialize_content")]
     pub bytes: Vec<u8>,
+    /// The bytes are not valid UTF-8, so `content` replaced invalid sequences and edits cannot be
+    /// saved in place.
+    pub lossy: bool,
 }
 
 impl Snapshot {
@@ -210,6 +213,7 @@ fn finish_snapshot(
             .as_secs_f64()
             * 1000.0,
         version: format!("{token}:{:x}", Sha256::digest(&bytes)),
+        lossy: std::str::from_utf8(&bytes).is_err(),
         bytes,
     })
 }
@@ -260,11 +264,11 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
     if content == base.content() {
         return Ok(base);
     }
-    if std::str::from_utf8(&base.bytes).is_err() {
+    if base.lossy {
         return Err(FileError::new(
             422,
             "not_utf8",
-            "The file is not valid UTF-8, so saving would change bytes outside your edits. Save a copy instead.",
+            "The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.",
         ));
     }
     file.seek(SeekFrom::Start(0))?;
@@ -481,6 +485,15 @@ mod tests {
         assert_eq!((error.status, error.error.as_str()), (422, "not_utf8"));
         assert!(!error.message.is_empty());
         assert_eq!(fs::read(f.file()).unwrap(), latin1);
+    }
+
+    #[test]
+    fn snapshots_report_lossy_decoding_for_invalid_utf8_only() {
+        let f = Fixture::new();
+        fs::write(f.file(), b"caf\xe9\r\n").unwrap();
+        assert_eq!(serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"], true);
+        fs::write(f.file(), b"\xef\xbb\xbfcaf\xc3\xa9\r\n").unwrap();
+        assert_eq!(serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"], false);
     }
 
     #[cfg(unix)]
