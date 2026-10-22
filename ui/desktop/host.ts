@@ -1,8 +1,7 @@
 import { storedConfig } from '../settings/config-values'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
-import { HostError } from '../app/host'
-import type { ReviewerHost } from '../app/host'
+import { failureKind, HostError, type ReviewerHost } from '../app/host'
 
 export interface NativeBridge {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>
@@ -13,12 +12,10 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
   const invoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
     try { return await bridge.invoke<T>(command, args) }
     catch (error) {
-      if (error && typeof error === 'object' && 'status' in error && 'error' in error) {
+      // Structured file errors carry their failure kind; preference commands reject with plain strings.
+      if (error && typeof error === 'object' && 'error' in error) {
         const message = 'message' in error ? error.message : error.error
-        // Only a missing file is deletion evidence; other 404s, such as a released session, are failures.
-        const kind = Number(error.status) === 409 ? 'conflict'
-          : error.error === 'file_not_found' ? 'missing' : error.error === 'not_utf8' ? 'notUtf8' : 'failure'
-        throw new HostError(kind, String(message), error)
+        throw new HostError(failureKind(error), String(message), error)
       }
       throw error
     }

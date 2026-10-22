@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { HostError, installHost } from '../ui/app/host'
-import type { FileResponse } from '../ui/app/hostTypes'
+import type { FileResponse } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
 import { ConflictPanel } from '../ui/app/ConflictPanel'
 import { Notifications } from '../ui/app/Notifications'
@@ -50,7 +50,7 @@ function attempts(store: ReturnType<typeof createDocStore>) {
 it('opens a file that is not valid UTF-8 read-only and never schedules or lists a save', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  expect(store.getState()).toMatchObject({ lossy: true, conflict: false, source: lossyFile.content })
+  expect(store.getState()).toMatchObject({ lossy: true, recovery: null, source: lossyFile.content })
   attempts(store)
   await vi.advanceTimersByTimeAsync(1000)
   expect(store.getState()).toMatchObject({ source: lossyFile.content, revision: 0, history: [] })
@@ -78,7 +78,7 @@ it('marks a document lossy when the host refuses its write as not UTF-8, without
   await store.getState().load('A')
   store.getState().setSource('abc\n')
   await vi.advanceTimersByTimeAsync(1000)
-  expect(store.getState()).toMatchObject({ lossy: true, conflict: false, recoveryError: null, source: 'abc\n' })
+  expect(store.getState()).toMatchObject({ lossy: true, recovery: null, source: 'abc\n' })
   attempts(store)
   // A host that omits the field cannot clear lossiness it proved for the same version.
   store.getState().notifyDiskChange()

@@ -1,5 +1,5 @@
 import { fakeHost } from './helpers/host'
-import type { FileResponse } from '../ui/app/hostTypes'
+import type { FileResponse } from '../ui/app/host'
 import { HostError, installHost } from '../ui/app/host'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createDocStore } from '../ui/documents/store'
@@ -107,7 +107,7 @@ it('retains failed writes and failed navigation for recovery', async () => {
   await store.getState().load('A')
   expect(store.getState().source).toBe('local')
   expect(store.getState().savedSource).toBe('A')
-  expect(store.getState().conflict).toBe(true)
+  expect(store.getState().recovery).toBe('changed')
 })
 
 it.each(['loading', 'failed'] as const)('keeps commands away from the departing document while another is %s', async (phase) => {
@@ -147,7 +147,7 @@ it('reloads clean external changes and retains all versions when dirty', async (
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState().source).toBe('local')
   expect(store.getState().savedSource).toBe('external')
-  expect(store.getState().conflict).toBe(true)
+  expect(store.getState().recovery).toBe('changed')
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(0)
 })
@@ -160,7 +160,7 @@ it('does not let a delayed reload replace edits made while reading disk', async 
   store.getState().setSource('local')
   disk.resolve(response({ content: 'disk', mtimeMs: 2, version: 'A-2' }))
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ source: 'local', conflict: true })
+  expect(store.getState()).toMatchObject({ source: 'local', recovery: 'changed' })
 })
 
 it('clears review undo when a clean external change replaces the buffer', async () => {
@@ -192,7 +192,7 @@ it.each(['\n', '\r\n'])('refreshes an unchanged baseline version and saves a pen
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState()).toMatchObject({ source: local, savedSource: original.replaceAll('\r\n', '\n'),
-    version: 'A-metadata', conflict: false, diskChange: null, history, externalVersion, revision })
+    version: 'A-metadata', recovery: null, history, externalVersion, revision })
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(1)
   expect(writes[0]).toMatchObject({ baseVersion: 'A-metadata', content: local.replaceAll('\n', eol) })
@@ -209,7 +209,7 @@ it('refreshes an unchanged mixed line-ending baseline and saves pending edits', 
   disks.set('A', { content: 'a\r\nb\r\nc\n', mtimeMs: 2, version: 'A-touched' })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ conflict: false, version: 'A-touched' })
+  expect(store.getState()).toMatchObject({ recovery: null, version: 'A-touched' })
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(1)
   expect(writes[0]).toMatchObject({ baseVersion: 'A-touched', content: 'a\r\nb\r\nc\r\nd\r\n' })
@@ -219,7 +219,7 @@ it('refreshes an unchanged mixed line-ending baseline and saves pending edits', 
   store.getState().setSource('a\nb\nc\nd\ne\n')
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ conflict: false, version: 'A-touched-again' })
+  expect(store.getState()).toMatchObject({ recovery: null, version: 'A-touched-again' })
 })
 
 it('retries a rejected stale version only while disk still matches the saved baseline', async () => {
@@ -236,8 +236,7 @@ it('retries a rejected stale version only while disk still matches the saved bas
   writes[1]!.pending.resolve(response({}, 409))
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(2)
-  expect(store.getState()).toMatchObject({ conflict: true, source: 'local comment', savedSource: 'A',
-    recoveryError: null, diskChange: { deleted: false } })
+  expect(store.getState()).toMatchObject({ recovery: 'changed', source: 'local comment', savedSource: 'A' })
 })
 
 it('does not treat a line-ending change as unchanged disk content with a pending edit', async () => {
@@ -248,7 +247,7 @@ it('does not treat a line-ending change as unchanged disk content with a pending
   disks.set('A', { content: 'Body\n', mtimeMs: 2, version: 'A-2' })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(600)
-  expect(store.getState().conflict).toBe(true)
+  expect(store.getState().recovery).toBe('changed')
   expect(writes).toHaveLength(0)
 })
 
@@ -260,14 +259,14 @@ it.each(['changed', 'deleted', 'unreadable'] as const)(
     const save = store.getState().prepareToClose()
     writes[0]!.pending.resolve(response({ error: 'read only' }, 500))
     await save
-    expect(store.getState().recoveryError).toBe('save')
+    expect(store.getState().recovery).toBe('saveFailed')
     const disk = deferred<unknown>()
     reads.set('A', disk)
     store.getState().notifyDiskChange(event === 'deleted')
     disk.resolve(event === 'unreadable' ? response({ error: 'unavailable' }, 500)
       : response({ content: 'external', mtimeMs: 2, version: 'A-2' }))
     await vi.advanceTimersByTimeAsync(0)
-    expect(store.getState().conflict).toBe(true)
+    expect(store.getState().recovery).toBe(({ changed: 'changed', deleted: 'missing', unreadable: 'readFailed' } as const)[event])
     expect(store.getState().source).toBe('local')
     expect(store.getState().savedSource).toBe('A')
   },
@@ -286,7 +285,7 @@ it('revalidates retained documents and captures inactive external changes', asyn
   await store.getState().load('A')
   expect(store.getState().source).toBe('local A')
   expect(store.getState().savedSource).toBe('external A')
-  expect(store.getState().conflict).toBe(true)
+  expect(store.getState().recovery).toBe('changed')
 })
 
 it('ignores reversed disk reads and reconciles changes received during a save', async () => {
@@ -458,7 +457,7 @@ it('does not restore a closed buffer when an older disk read fails', async () =>
   pending.resolve(response({}, 404))
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState().sessionId).toBeNull()
-  expect(store.getState().conflict).toBe(false)
+  expect(store.getState().recovery).toBeNull()
 })
 
 it('allows another document load to finish while a background file closes', async () => {
@@ -481,16 +480,14 @@ it.each([false, true])('recovers an unchanged disk version after a temporary rea
   disks.set('A', new HostError('failure', 'Temporarily unreadable'))
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState().conflict).toBe(true)
-  expect(store.getState().recoveryError).toBe('read')
+  expect(store.getState().recovery).toBe('readFailed')
   store.getState().closeConflict()
 
   disks.set('A', { content: 'A', version: 'A-1', mtimeMs: 1 })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState().conflict).toBe(false)
+  expect(store.getState().recovery).toBeNull()
   expect(store.getState().conflictDismissed).toBe(false)
-  expect(store.getState().recoveryError).toBeNull()
   expect(store.getState().source).toBe(dirty ? 'local comment' : 'A')
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(dirty ? 1 : 0)
@@ -507,10 +504,8 @@ it('keeps a real external change conflicted after a temporary read failure', asy
   disks.set('A', { content: 'external edit', version: 'A-2', mtimeMs: 2 })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState().conflict).toBe(true)
+  expect(store.getState().recovery).toBe('changed')
   expect(store.getState().source).toBe('local comment')
-  expect(store.getState().diskChange).toEqual({ deleted: false })
-  expect(store.getState().recoveryError).toBeNull()
   await vi.advanceTimersByTimeAsync(600)
   expect(writes).toHaveLength(0)
 })
@@ -521,11 +516,28 @@ it('records a missing-file read as deletion evidence and recovers when the file 
   disks.set('A', response({}, 404))
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'read', diskChange: { deleted: true } })
+  expect(store.getState()).toMatchObject({ recovery: 'missing' })
   disks.set('A', { content: 'A', mtimeMs: 1, version: 'A-1' })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ conflict: false, recoveryError: null, diskChange: null })
+  expect(store.getState()).toMatchObject({ recovery: null })
+})
+
+it.each([false, true])('keeps a deletion event until the held version reads back, failed read between: %s', async (failedRead) => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  store.getState().notifyDiskChange(true)
+  expect(store.getState().recovery).toBe('missing')
+  if (failedRead) {
+    disks.set('A', response({}, 500))
+    store.getState().notifyDiskChange()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.getState().recovery).toBe('missing')
+  }
+  disks.set('A', { content: 'A', mtimeMs: 1, version: 'A-1' })
+  store.getState().notifyDiskChange()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(store.getState().recovery).toBeNull()
 })
 
 it('keeps a deletion received during a write that then fails', async () => {
@@ -537,5 +549,5 @@ it('keeps a deletion received during a write that then fails', async () => {
   disks.set('A', response({}, 500))
   writes[0]!.pending.resolve(response({}, 500))
   await vi.advanceTimersByTimeAsync(0)
-  expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save', diskChange: { deleted: true } })
+  expect(store.getState()).toMatchObject({ recovery: 'missing' })
 })

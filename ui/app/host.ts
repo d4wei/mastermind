@@ -1,15 +1,35 @@
-import type { FileResponse, SessionMeta } from './hostTypes'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
 
+export interface SessionMeta {
+  sessionId: string
+  path: string
+  displayName: string
+}
+
+export interface FileResponse {
+  content: string
+  mtimeMs: number
+  version: string
+  /** True when the bytes are not valid UTF-8 and `content` is their lossy decoding; absent reads as false. */
+  lossy?: boolean
+}
+
+const HOST_FAILURES = ['conflict', 'missing', 'notUtf8', 'failure'] as const
 /** `notUtf8` is a refused write to a file whose bytes are not valid UTF-8. */
-export type HostFailure = 'conflict' | 'missing' | 'notUtf8' | 'failure'
+export type HostFailure = typeof HOST_FAILURES[number]
 type HostInvalidation = 'changed' | 'deleted' | 'translations'
 
 export class HostError extends Error {
   constructor(public kind: HostFailure, message: string, public data?: unknown) {
     super(message)
   }
+}
+
+/** Both hosts serialize a failure's `kind`; an absent or unknown kind is a plain failure. */
+export function failureKind(error: unknown): HostFailure {
+  const kind = error && typeof error === 'object' && 'kind' in error ? error.kind : undefined
+  return HOST_FAILURES.find((known) => known === kind) ?? 'failure'
 }
 
 export interface ReviewerHost {

@@ -83,7 +83,7 @@ describe('autosave', () => {
     putFile.mockRejectedValue(new Error('disk unavailable'))
     store.getState().setSource('accepted edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save' })
+    expect(store.getState()).toMatchObject({ recovery: 'saveFailed' })
     expect(store.getState().savedSource).toBe('hello')
     expect(store.getState().source).toBe('accepted edit')
   })
@@ -92,7 +92,7 @@ describe('autosave', () => {
     putFile.mockRejectedValue(new HostError('conflict', 'file changed on disk'))
     store.getState().setSource('racing edit')
     await vi.advanceTimersByTimeAsync(AUTOSAVE_MS)
-    expect(store.getState().conflict).toBe(true)
+    expect(store.getState().recovery).toBe('changed')
   })
 
   it('retains the exact accepted buffer after saving', async () => {

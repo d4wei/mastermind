@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import type { BigIntStats } from 'node:fs'
 import type { FileHandle } from 'node:fs/promises'
-import type { FileResponse } from '../../ui/app/hostTypes'
+import type { FileResponse } from '../../ui/app/host'
 interface FileTarget { path: string }
 
 function identity(st: BigIntStats): string {

@@ -1,19 +1,23 @@
 import { useState } from 'react'
-import { useT } from '../i18n'
+import { useT, type MsgKey } from '../i18n'
 import { Notification } from './Notifications'
 import { AlertIcon } from '../icons'
-import { useDoc, type createDocStore } from '../documents/store'
+import { useDoc, type createDocStore, type Recovery } from '../documents/store'
 import { requireReviewerHost } from './host'
 import { navigate } from './route'
 import { transferDrafts } from '../review/drafts'
 
 interface Props { store?: ReturnType<typeof createDocStore> }
 
+const RECOVERY_MESSAGE = {
+  changed: 'conflictNotice', missing: 'conflictMissing', readFailed: 'conflictReadFailed', saveFailed: 'conflictSaveFailed',
+} as const satisfies Record<Recovery, MsgKey>
+
 export function ConflictPanel({ store = useDoc }: Props) {
   const state = store()
   const t = useT()
   const [confirmIncoming, setConfirmIncoming] = useState(false)
-  if (state.saving || !state.conflict && !state.lossy) return null
+  if (state.saving || !state.recovery && !state.lossy) return null
   const saveCopy = async () => {
     const copyId = await state.saveCopy()
     if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
@@ -22,7 +26,7 @@ export function ConflictPanel({ store = useDoc }: Props) {
   const saveCopyButton = requireReviewerHost().saveCopy && <button type="button" className="btn-primary"
     onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>
   // Lossiness persists until the file is read back as UTF-8, so its notice has no dismissal.
-  if (!state.conflict) return <Notification>
+  if (!state.recovery) return <Notification>
     <strong>{state.meta?.displayName}</strong>
     <p>{t('lossyNotice')}</p>
     {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
@@ -30,16 +34,15 @@ export function ConflictPanel({ store = useDoc }: Props) {
   </Notification>
   if (state.conflictDismissed) return <Notification compact>
     <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
-      title={t('needsAttention')} onClick={() => void state.openConflict()}>
+      title={t('needsAttention')} onClick={() => state.openConflict()}>
       <AlertIcon />
     </button>
   </Notification>
-  const ioFailure = !!state.diskChange?.deleted || state.recoveryError !== null
-  const message = state.diskChange?.deleted ? 'conflictMissing' : state.recoveryError === 'read'
-    ? 'conflictReadFailed' : state.recoveryError === 'save' ? 'conflictSaveFailed' : 'conflictNotice'
+  // Only an external change can be adopted; failures and a missing path offer Retry instead.
+  const ioFailure = state.recovery !== 'changed'
   return <Notification onDismiss={() => { setConfirmIncoming(false); state.closeConflict() }}>
     <strong>{state.meta?.displayName}</strong>
-    <p>{t(message)}</p>
+    <p>{t(RECOVERY_MESSAGE[state.recovery])}</p>
     {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
     {confirmIncoming && !ioFailure ? <>
       <p>{t('conflictDiscard')}</p>

@@ -50,7 +50,7 @@ it.each([
   installHost(fakeHost({ saveCopy: async () => null }))
   useConfig.setState({ config: { ...config, uiLang: labels.lang } })
   const store = createDocStore()
-  store.setState({ conflict: true })
+  store.setState({ recovery: 'changed' })
   act(() => root.render(<ConflictPanel store={store} />))
   expect(host.textContent).toContain(labels.copy)
   expect(host.textContent).toContain(labels.incoming)

@@ -9,7 +9,7 @@ import { readPreparedTranslation, listPreparedTranslations, validLanguageCode } 
 import { serveFile } from './static'
 import { scanThemes } from '../../themes/discovery'
 
-// Status, code, and message match the native host's refusal of the same write.
+// Status, kind, code, and message match the native host's refusal of the same write.
 const NOT_UTF8_MESSAGE = 'The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.'
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 
@@ -51,15 +51,15 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
   app.get('/themes/*', async (c) => (await serveFile(themesRoot, c.req.path.slice('/themes/'.length))) ?? c.notFound())
   app.get('/api/sessions/preview', async (c) => c.json({ sessionId: 'preview', path: real, displayName: path.basename(real), mtimeMs: (await fs.stat(real)).mtimeMs }))
   app.get('/api/sessions/preview/file', async (c) => {
-    try { return c.json(await readSessionFile(real)) } catch { return c.json({ error: 'file unreadable' }, 410) }
+    try { return c.json(await readSessionFile(real)) } catch { return c.json({ error: 'file unreadable', kind: 'missing' }, 410) }
   })
   app.put('/api/sessions/preview/file', async (c) => {
     const body = await c.req.json<{ content?: unknown; baseVersion?: unknown }>().catch(() => null)
     if (!body || typeof body.content !== 'string' || typeof body.baseVersion !== 'string') return c.json({ error: 'content and baseVersion required' }, 400)
     const result = await writeSessionFile(target, body.content, body.baseVersion)
     if (result.ok) return c.json({ mtimeMs: result.mtimeMs, version: result.version })
-    if ('error' in result) return c.json({ error: result.error, message: NOT_UTF8_MESSAGE }, 422)
-    return c.json({ error: 'file changed on disk', currentMtimeMs: result.currentMtimeMs }, 409)
+    if ('error' in result) return c.json({ error: result.error, kind: 'notUtf8', message: NOT_UTF8_MESSAGE }, 422)
+    return c.json({ error: 'file changed on disk', kind: 'conflict', currentMtimeMs: result.currentMtimeMs }, 409)
   })
   app.get('/api/sessions/preview/translations', async (c) => {
     try { return c.json(await listPreparedTranslations(real, (await readSessionFile(real)).content)) }
@@ -72,8 +72,8 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
       const source = await readSessionFile(real)
       const result = await readPreparedTranslation(real, source.content, lang)
       if (result.status === 'ready') return c.json(result.artifact)
-      return c.json({ error: result.status }, result.status === 'missing' ? 404 : 409)
-    } catch { return c.json({ error: 'file unreadable' }, 410) }
+      return result.status === 'missing' ? c.json({ error: result.status, kind: 'missing' }, 404) : c.json({ error: result.status }, 409)
+    } catch { return c.json({ error: 'file unreadable', kind: 'missing' }, 410) }
   })
   app.get('/api/sessions/preview/events', (c) => streamSSE(c, async (stream) => {
     let running = true
@@ -100,5 +100,7 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
       await stream.sleep(pollMs)
     }
   }))
+  // The preview serves one session; any other session id reads as missing, which the reviewer reports as not found.
+  app.all('/api/sessions/*', (c) => c.json({ error: 'session_not_found', kind: 'missing' }, 404))
   return app
 }

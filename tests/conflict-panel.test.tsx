@@ -85,7 +85,7 @@ it('presents the newer version when an invalidation rejects Use incoming', async
   getFile.mockResolvedValue(file('newest\n', 'v3'))
   read.resolve(file('one\nmiddle\nLAST\n', 'v2'))
   expect(await result).toBe(false)
-  expect(store.getState()).toMatchObject({ conflict: true, saving: false, recoveryError: null, source: 'ONE\nmiddle\nlast\n' })
+  expect(store.getState()).toMatchObject({ recovery: 'changed', saving: false, source: 'ONE\nmiddle\nlast\n' })
   const host = document.createElement('div')
   document.body.append(host)
   const root = createRoot(host)
@@ -113,7 +113,7 @@ it('retains dismissal across invalidations and navigation without hiding file at
   getFile.mockResolvedValue(file('one\nmiddle\nLAST\n', 'v2'))
   await store.getState().load('A')
   expect(store.getState().conflictDismissed).toBe(true)
-  await store.getState().openConflict()
+  store.getState().openConflict()
   expect(store.getState().conflictDismissed).toBe(false)
 })
 
@@ -122,7 +122,7 @@ it('retains the whole local buffer on save-copy cancellation or failure', async 
   expect(await store.getState().saveCopy()).toBeNull()
   saveCopy.mockRejectedValueOnce(new Error('existing destination'))
   expect(await store.getState().saveCopy()).toBeNull()
-  expect(store.getState()).toMatchObject({ conflict: true, source: 'ONE\nmiddle\nlast\n', copyError: true })
+  expect(store.getState()).toMatchObject({ recovery: 'changed', source: 'ONE\nmiddle\nlast\n', copyError: true })
   expect(putFile).not.toHaveBeenCalled()
 })
 
@@ -132,7 +132,7 @@ it('clears a failed ordinary copy once a later write succeeds', async () => {
   store.getState().setSource('edited\n')
   saveCopy.mockRejectedValueOnce(new Error('existing destination'))
   expect(await store.getState().saveCopy()).toBeNull()
-  expect(store.getState()).toMatchObject({ conflict: false, copyError: true })
+  expect(store.getState()).toMatchObject({ recovery: null, copyError: true })
   store.getState().setSource('edited again\n')
   await vi.advanceTimersByTimeAsync(600)
   expect(putFile).toHaveBeenCalledOnce()
@@ -151,7 +151,7 @@ it('switches to the admitted copy only after success, releasing the original buf
     file: file('ONE\nmiddle\nlast\n', 'copy-v1') })
   expect(await operation).toBe('copy')
   expect(await closing).toBe(true)
-  expect(store.getState()).toMatchObject({ sessionId: 'copy', conflict: false, source: 'ONE\nmiddle\nlast\n' })
+  expect(store.getState()).toMatchObject({ sessionId: 'copy', recovery: null, source: 'ONE\nmiddle\nlast\n' })
   expect(store.getState().hasDocument('A')).toBe(false)
   expect(store.getState().pendingDocuments()).toEqual([])
 })
@@ -167,7 +167,7 @@ it('shows dismissible corner recovery, requires discard confirmation, and has no
     expect(host.querySelector('.notification-stack .notification')).not.toBeNull()
     expect(host.querySelector('textarea')).toBeNull()
     await act(async () => button('conflictUseDisk').click())
-    expect(store.getState().conflict).toBe(true)
+    expect(store.getState().recovery).toBe('changed')
     expect(host.textContent).toContain('conflictDiscard')
     await act(async () => button('cancel').click())
     await act(async () => (host.querySelector('[aria-label="dismiss"]') as HTMLButtonElement).click())
@@ -203,13 +203,13 @@ it('retries a failed write only after reading the acknowledged version', async (
   store.getState().setSource('local')
   putFile.mockRejectedValueOnce(new HostError('failure', 'permission denied'))
   await store.getState().prepareToClose()
-  expect(store.getState()).toMatchObject({ conflict: true, recoveryError: 'save' })
+  expect(store.getState()).toMatchObject({ recovery: 'saveFailed' })
   getFile.mockClear(); putFile.mockClear()
   expect(await store.getState().retryRecovery()).toBe(true)
   expect(getFile).toHaveBeenCalledWith('A')
   expect(putFile).toHaveBeenCalledWith('A', 'local', 'v1')
   expect(getFile.mock.invocationCallOrder[0]).toBeLessThan(putFile.mock.invocationCallOrder[0]!)
-  expect(store.getState()).toMatchObject({ conflict: false, savedSource: 'local' })
+  expect(store.getState()).toMatchObject({ recovery: null, savedSource: 'local' })
 })
 
 it('reconciles a failed write whose complete buffer is already on disk', async () => {
@@ -221,7 +221,7 @@ it('reconciles a failed write whose complete buffer is already on disk', async (
     throw new HostError('failure', 'readback failed')
   })
   await store.getState().prepareToClose()
-  expect(store.getState()).toMatchObject({ conflict: false, savedSource: 'local', version: 'v2' })
+  expect(store.getState()).toMatchObject({ recovery: null, savedSource: 'local', version: 'v2' })
   expect(store.getState().pendingDocuments()).toEqual([])
   expect(putFile).toHaveBeenCalledOnce()
 })
@@ -241,6 +241,25 @@ it('keeps Retry available when saving a copy fails after a read failure', async 
     const choices = [...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent)
     expect(choices).toEqual(['conflictSaveCopy', 'retry'])
     expect(host.textContent).toContain('conflictCopyFailed')
-    expect(store.getState().recoveryError).toBe('read')
+    expect(store.getState().recovery).toBe('readFailed')
+  } finally { act(() => root.unmount()); host.remove() }
+})
+
+it.each([
+  ['changed', 'conflictNotice', 'conflictUseDisk'],
+  ['missing', 'conflictMissing', 'retry'],
+  ['readFailed', 'conflictReadFailed', 'retry'],
+  ['saveFailed', 'conflictSaveFailed', 'retry'],
+] as const)('presents %s recovery with its message and choices', async (recovery, message, choice) => {
+  const store = await conflict()
+  store.setState({ recovery })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
+    expect(host.textContent).toContain(message)
+    expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent))
+      .toEqual(['conflictSaveCopy', choice])
   } finally { act(() => root.unmount()); host.remove() }
 })

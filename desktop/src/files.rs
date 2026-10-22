@@ -31,9 +31,22 @@ fn serialize_content<S: serde::Serializer>(bytes: &[u8], serializer: S) -> Resul
     serializer.serialize_str(&String::from_utf8_lossy(bytes))
 }
 
+/// The failure class the document store acts on; it serializes as the UI's `HostFailure`. Only a
+/// missing file is deletion evidence, so other not-found errors, such as a released document, are
+/// plain failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FailureKind {
+    Conflict,
+    Missing,
+    NotUtf8,
+    Failure,
+}
+
 #[derive(Debug, Serialize)]
 pub struct FileError {
     pub status: u16,
+    pub kind: FailureKind,
     pub error: String,
     pub message: String,
 }
@@ -42,9 +55,14 @@ impl FileError {
     pub fn new(status: u16, code: &str, message: impl Into<String>) -> Self {
         Self {
             status,
+            kind: FailureKind::Failure,
             error: code.into(),
             message: message.into(),
         }
+    }
+
+    fn with_kind(self, kind: FailureKind) -> Self {
+        Self { kind, ..self }
     }
 
     pub fn conflict() -> Self {
@@ -53,6 +71,7 @@ impl FileError {
             "file_changed",
             "The file changed or was replaced. Compare the current file before saving.",
         )
+        .with_kind(FailureKind::Conflict)
     }
 
     fn too_large() -> Self {
@@ -74,12 +93,14 @@ impl FileError {
 
 impl From<io::Error> for FileError {
     fn from(error: io::Error) -> Self {
-        let (status, code) = match error.kind() {
-            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory => (404, "file_not_found"),
-            io::ErrorKind::PermissionDenied => (403, "permission_denied"),
-            _ => (500, "file_io_error"),
+        let (status, code, kind) = match error.kind() {
+            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory => {
+                (404, "file_not_found", FailureKind::Missing)
+            }
+            io::ErrorKind::PermissionDenied => (403, "permission_denied", FailureKind::Failure),
+            _ => (500, "file_io_error", FailureKind::Failure),
         };
-        Self::new(status, code, error.to_string())
+        Self::new(status, code, error.to_string()).with_kind(kind)
     }
 }
 
@@ -269,7 +290,8 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
             422,
             "not_utf8",
             "The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.",
-        ));
+        )
+        .with_kind(FailureKind::NotUtf8));
     }
     file.seek(SeekFrom::Start(0))?;
     file.write_all(content.as_bytes())?;
@@ -362,22 +384,53 @@ mod tests {
 
     #[test]
     fn file_errors_have_stable_codes_and_readable_messages() {
-        for (kind, status, code) in [
-            (io::ErrorKind::NotFound, 404, "file_not_found"),
-            (io::ErrorKind::NotADirectory, 404, "file_not_found"),
-            (io::ErrorKind::PermissionDenied, 403, "permission_denied"),
-            (io::ErrorKind::Other, 500, "file_io_error"),
+        for (kind, status, code, failure) in [
+            (io::ErrorKind::NotFound, 404, "file_not_found", "missing"),
+            (
+                io::ErrorKind::NotADirectory,
+                404,
+                "file_not_found",
+                "missing",
+            ),
+            (
+                io::ErrorKind::PermissionDenied,
+                403,
+                "permission_denied",
+                "failure",
+            ),
+            (io::ErrorKind::Other, 500, "file_io_error", "failure"),
         ] {
             let error = FileError::from(io::Error::new(kind, "OS diagnostic"));
             assert_eq!(
                 serde_json::to_value(&error).unwrap(),
                 serde_json::json!({
-                    "status": status, "error": code, "message": "OS diagnostic"
+                    "status": status, "kind": failure, "error": code, "message": "OS diagnostic"
                 })
             );
             if status != 404 {
                 assert_eq!(error.replacement_as_conflict().status, status);
             }
+        }
+    }
+
+    #[test]
+    fn failure_kinds_serialize_as_the_ui_host_failures() {
+        let missing = FileError::from(io::Error::from(io::ErrorKind::NotFound));
+        for (error, kind) in [
+            (FileError::conflict(), "conflict"),
+            (missing.replacement_as_conflict(), "conflict"),
+            (
+                FileError::from(io::Error::from(io::ErrorKind::NotFound)),
+                "missing",
+            ),
+            (
+                FileError::new(422, "not_utf8", "x").with_kind(FailureKind::NotUtf8),
+                "notUtf8",
+            ),
+            (FileError::new(404, "document_not_open", "x"), "failure"),
+            (FileError::new(409, "already_open", "x"), "failure"),
+        ] {
+            assert_eq!(serde_json::to_value(&error).unwrap()["kind"], kind);
         }
     }
 
@@ -416,6 +469,7 @@ mod tests {
             write(&f.file(), "local", &base.version).unwrap_err(),
         ] {
             assert_eq!(error.status, 409);
+            assert_eq!(error.kind, FailureKind::Conflict);
             assert_eq!(error.error, "file_changed");
         }
         assert_eq!(fs::read(&target).unwrap(), b"other bytes");
@@ -430,6 +484,7 @@ mod tests {
             .unwrap_err()
             .replacement_as_conflict();
         assert_ne!(error.status, 409);
+        assert_eq!(error.kind, FailureKind::Failure);
         assert!(matches!(
             error.error.as_str(),
             "file_io_error" | "permission_denied"
@@ -483,6 +538,7 @@ mod tests {
         assert_eq!(base.content(), "caf\u{fffd}\r\n");
         let error = write(&f.file(), "caf\u{fffd}\r\nedit", &base.version).unwrap_err();
         assert_eq!((error.status, error.error.as_str()), (422, "not_utf8"));
+        assert_eq!(error.kind, FailureKind::NotUtf8);
         assert!(!error.message.is_empty());
         assert_eq!(fs::read(f.file()).unwrap(), latin1);
     }

@@ -57,7 +57,10 @@ Native filesystem commands and admission share the blocking-work gate described 
 [`worker.md`](worker.md). Filesystem work runs outside the event loop; response deadlines do not
 cancel operations already running.
 
-Native file and watch failures serialize `status`, stable `error` code, and readable `message`.
+Native file and watch failures serialize `status`, `kind`, stable `error` code, and readable
+`message`. `kind` is the UI's host failure: `conflict` for `file_changed`, `missing` for
+`file_not_found`, `notUtf8` for `not_utf8`, and `failure` otherwise, including a document that is
+no longer open; the UI reads only `kind` to choose recovery.
 The opening inventory commands (`snapshot`, `close_document`, `dismiss_opening_errors`) can fail
 only when their worker fails and report a plain string, like preference commands. Admission
 returns the same code and message per failed path; graphical opening and the host adapter display

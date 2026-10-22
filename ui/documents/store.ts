@@ -3,8 +3,7 @@ import { create } from 'zustand'
 import { applyTextEdits } from '../../document/edits'
 import { detectEol, normalizeToLf, restoreEol, type Eol } from '../../document/eol'
 import type { TextEdit } from '../../document/types'
-import type { FileResponse, SessionMeta } from '../app/hostTypes'
-import { HostError, requireReviewerHost } from '../app/host'
+import { HostError, requireReviewerHost, type FileResponse, type SessionMeta } from '../app/host'
 
 export type ViewMode = 'reading' | 'source'
 
@@ -15,7 +14,11 @@ function setTabTitle(name: string): void {
   if (g.document) g.document.title = name ? `${name} — ${APP_NAME}` : APP_NAME
 }
 
-export type RecoveryError = 'read' | 'save'
+/**
+ * Why a document cannot be safely written: an external change, a path the host reported missing,
+ * or a failed read or write.
+ */
+export type Recovery = 'changed' | 'missing' | 'readFailed' | 'saveFailed'
 
 export interface DocStore {
   sessionId: string | null
@@ -27,12 +30,12 @@ export interface DocStore {
   version: string
   revision: number
   conflictDismissed: boolean
-  recoveryError: RecoveryError | null
   copyError: boolean
   mode: ViewMode
   status: 'loading' | 'ready' | 'error'
   error: string | null
-  conflict: boolean
+  /** Set while the document's file cannot be safely written; `missing` persists until a read succeeds. */
+  recovery: Recovery | null
   /** The file's bytes are not valid UTF-8; the document stays read-only in place and Save As writes a UTF-8 copy. */
   lossy: boolean
   saving: boolean
@@ -40,8 +43,6 @@ export interface DocStore {
   externalVersion: number
   /** Undo for review operations applied outside the editor. */
   history: string[]
-  /** `deleted` is set only on evidence that the path is missing. */
-  diskChange: { deleted: boolean } | null
 
   prepareToClose(ids?: string[]): Promise<boolean>
   pendingDocuments(ids?: string[]): { id: string; name: string; revision: number; copyFailed: boolean }[]
@@ -50,7 +51,7 @@ export interface DocStore {
   load(sessionId: string): Promise<void>
   undo(): void
   notifyDiskChange(deleted?: boolean): void
-  openConflict(): Promise<void>
+  openConflict(): void
   closeConflict(): void
   retryRecovery(): Promise<boolean>
   saveCopy(id?: string, forClose?: boolean): Promise<string | null>
@@ -65,8 +66,8 @@ export interface DocStore {
 }
 
 const documentKeys = [
-  'meta', 'source', 'savedSource', 'eol', 'version', 'revision', 'conflictDismissed', 'recoveryError', 'copyError',
-  'mode', 'conflict', 'lossy', 'saving', 'history', 'diskChange',
+  'meta', 'source', 'savedSource', 'eol', 'version', 'revision', 'conflictDismissed', 'copyError',
+  'mode', 'recovery', 'lossy', 'saving', 'history',
 ] as const satisfies readonly (keyof DocStore)[]
 
 type DocumentState = Pick<DocStore, typeof documentKeys[number]>
@@ -74,8 +75,7 @@ type DocumentState = Pick<DocStore, typeof documentKeys[number]>
 /** Published while no document is active, so commands cannot reach a departed record. */
 const releasedDocument: Omit<DocumentState, 'mode'> = {
   meta: null, source: '', savedSource: '', eol: 'lf', version: '', revision: 0,
-  conflictDismissed: false, recoveryError: null, copyError: false, conflict: false, lossy: false, saving: false,
-  history: [], diskChange: null,
+  conflictDismissed: false, copyError: false, recovery: null, lossy: false, saving: false, history: [],
 }
 
 interface DocumentRecord extends DocumentState {
@@ -83,15 +83,15 @@ interface DocumentRecord extends DocumentState {
   diskSource: string
   autosaveTimer?: ReturnType<typeof setTimeout>
   write?: Promise<boolean>
-  recovery?: Promise<unknown>
+  recoveryOperation?: Promise<unknown>
   diskGeneration: number
   /** An invalidation received while saving; it is read once the operation settles. */
   pendingInvalidation?: { deleted: boolean }
 }
 
-/** Review actions, Markdown-mode typing, and autosave stop while a document is conflicted or lossy. */
-export function editingLocked(state: Pick<DocStore, 'conflict' | 'lossy'>): boolean {
-  return state.conflict || state.lossy
+/** Review actions, Markdown-mode typing, and autosave stop while a document is in recovery or lossy. */
+export function editingLocked(state: Pick<DocStore, 'recovery' | 'lossy'>): boolean {
+  return state.recovery !== null || state.lossy
 }
 
 /** A read of the version already held cannot clear lossiness the host proved by refusing a write. */
@@ -118,8 +118,8 @@ export function createDocStore() {
     const doc = documents.get(id)
     if (!doc) return
     if (patch.source !== undefined && patch.source !== doc.source) patch.revision = doc.revision + 1
-    // Leaving a conflict ends its dismissal and failed copy; a later conflict starts visible.
-    if (patch.conflict === false && doc.conflict) Object.assign(patch, { conflictDismissed: false, copyError: false })
+    // Leaving recovery ends its dismissal and failed copy; a later recovery starts visible.
+    if (patch.recovery === null && doc.recovery !== null) Object.assign(patch, { conflictDismissed: false, copyError: false })
     Object.assign(doc, patch)
     store.setState(activeId === id ? { ...published, ...documentState(doc) } : published)
   }
@@ -144,7 +144,7 @@ export function createDocStore() {
   const writeDocument = async (id: string): Promise<boolean> => {
     clearAutosave(id)
     const doc = documents.get(id)
-    if (!doc || doc.saving || doc.conflict) return false
+    if (!doc || doc.saving || doc.recovery) return false
     const { source, savedSource, eol, version } = doc
     if (source === savedSource) return true
     if (doc.lossy) return false
@@ -155,8 +155,7 @@ export function createDocStore() {
     try {
       const res = await requireReviewerHost().putFile(id, content, version)
       doc.diskSource = content
-      updateDocument(id, { savedSource: source, version: res.version, conflict: false, recoveryError: null,
-        copyError: false, diskChange: null })
+      updateDocument(id, { savedSource: source, version: res.version, recovery: null, copyError: false })
       succeeded = true
       return true
     } catch (err) {
@@ -165,15 +164,13 @@ export function createDocStore() {
         updateDocument(id, { lossy: true })
         return false
       }
-      updateDocument(id, err instanceof HostError && err.kind === 'conflict'
-        ? { conflict: true, recoveryError: null }
-        : { conflict: true, recoveryError: 'save' })
+      updateDocument(id, { recovery: err instanceof HostError && err.kind === 'conflict' ? 'changed' : 'saveFailed' })
       // A rejected write may have partially reached disk; retry must read before writing.
       deferInvalidation(doc, false)
       return false
     } finally {
       doc.diskGeneration++
-      if (succeeded && doc.source !== doc.savedSource && !doc.conflict) schedule(id)
+      if (succeeded && doc.source !== doc.savedSource && !doc.recovery) schedule(id)
       void settle(id)
     }
   }
@@ -189,8 +186,9 @@ export function createDocStore() {
     const doc = documents.get(id)
     if (!doc) return
     if (doc.version === file.version) {
-      const recoveredRead = doc.recoveryError === 'read'
-      updateDocument(id, { diskChange: null, lossy: readLossy(doc, file), ...(recoveredRead ? { conflict: false, recoveryError: null } : {}) })
+      // A held version that reads back resolves a read failure or missing path; a change or failed write stays.
+      const recoveredRead = doc.recovery === 'readFailed' || doc.recovery === 'missing'
+      updateDocument(id, { lossy: readLossy(doc, file), ...(recoveredRead ? { recovery: null } : {}) })
       if (recoveredRead && doc.source !== doc.savedSource) schedule(id)
       return
     }
@@ -200,8 +198,7 @@ export function createDocStore() {
     }
     if (doc.diskSource === file.content) {
       // Metadata can change without changing the base text; keep local edits against the fresh token.
-      updateDocument(id, { version: file.version, lossy: readLossy(doc, file), conflict: false, recoveryError: null,
-        diskChange: null })
+      updateDocument(id, { version: file.version, lossy: readLossy(doc, file), recovery: null })
       if (doc.source !== doc.savedSource) schedule(id)
       return
     }
@@ -210,27 +207,26 @@ export function createDocStore() {
       doc.diskSource = file.content
       updateDocument(id, { source: normalized, savedSource: normalized,
         eol: detectEol(file.content), version: file.version, lossy: readLossy(doc, file),
-        conflict: false, recoveryError: null, diskChange: null,
+        recovery: null,
         // Review undo snapshots predate the external text; replaying one would overwrite it.
         history: normalized === doc.source ? doc.history : [] })
       if (activeId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
     } else {
-      updateDocument(id, { conflict: true, diskChange: { deleted: false }, recoveryError: null })
+      updateDocument(id, { recovery: 'changed' })
     }
   }
   const retainReadFailure = (id: string, err: unknown): void => {
     const doc = documents.get(id)!
     // Only the host's missing result is evidence of deletion; other read failures may be transient.
-    const missing = err instanceof HostError && err.kind === 'missing'
-    updateDocument(id, { conflict: true,
-      diskChange: { deleted: missing || !!doc.diskChange?.deleted }, recoveryError: 'read' })
+    const missing = (err instanceof HostError && err.kind === 'missing') || doc.recovery === 'missing'
+    updateDocument(id, { recovery: missing ? 'missing' : 'readFailed' })
   }
   const readDiskChange = async (id: string, deleted: boolean): Promise<void> => {
     const doc = documents.get(id)
     if (!doc) return
     if (doc.saving) { doc.diskGeneration++; deferInvalidation(doc, deleted); return }
     const request = ++doc.diskGeneration
-    if (deleted) { updateDocument(id, { conflict: true, diskChange: { deleted: true } }); return }
+    if (deleted) { updateDocument(id, { recovery: 'missing' }); return }
     try {
       const file = await requireReviewerHost().getFile(id)
       if (doc.diskGeneration === request) reconcileDisk(id, file)
@@ -240,11 +236,12 @@ export function createDocStore() {
   }
   const recover = async (id: string): Promise<boolean> => {
     const doc = documents.get(id)
-    if (!doc?.conflict || doc.saving) return false
+    if (!doc?.recovery || doc.saving) return false
     clearAutosave(id)
     const request = ++doc.diskGeneration
     const revision = doc.revision
-    updateDocument(id, { saving: true, recoveryError: null })
+    // This read supersedes a failure diagnosis; deletion evidence persists until a read succeeds.
+    updateDocument(id, { saving: true, recovery: doc.recovery === 'missing' ? 'missing' : 'changed' })
     try {
       const file = await requireReviewerHost().getFile(id)
       // A newer invalidation is read when this operation settles and presents the newer version.
@@ -252,7 +249,7 @@ export function createDocStore() {
       const incoming = normalizeToLf(file.content)
       doc.diskSource = file.content
       updateDocument(id, { source: incoming, savedSource: incoming, eol: detectEol(file.content),
-        version: file.version, lossy: readLossy(doc, file), conflict: false, recoveryError: null, diskChange: null,
+        version: file.version, lossy: readLossy(doc, file), recovery: null,
         // Adoption stays reversible so review undo can recover the discarded buffer.
         history: incoming === doc.source ? doc.history : [...doc.history.slice(-49), doc.source] })
       if (activeId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
@@ -267,8 +264,8 @@ export function createDocStore() {
   }
   const trackRecovery = <T,>(id: string, operation: () => Promise<T>): Promise<T> => {
     const doc = documents.get(id)!
-    const promise = operation().finally(() => { if (doc.recovery === promise) doc.recovery = undefined })
-    doc.recovery = promise
+    const promise = operation().finally(() => { if (doc.recoveryOperation === promise) doc.recoveryOperation = undefined })
+    doc.recoveryOperation = promise
     return promise
   }
   const store = create<DocStore>((publish, get) => {
@@ -290,7 +287,7 @@ export function createDocStore() {
       async prepareToClose(ids) {
         const scope = ids ?? [...documents.keys()]
         // In-flight operations finish first; the second pass saves edits made behind them.
-        await Promise.all(scope.map((id) => Promise.all([saveDocument(id), documents.get(id)?.recovery])))
+        await Promise.all(scope.map((id) => Promise.all([saveDocument(id), documents.get(id)?.recoveryOperation])))
         await Promise.all(scope.map(saveDocument))
         return get().pendingDocuments(ids).length === 0
       },
@@ -307,7 +304,7 @@ export function createDocStore() {
         const doc = documents.get(id)
         if (doc) {
           await doc.write
-          await doc.recovery
+          await doc.recoveryOperation
           if (discardRevision === undefined || doc.revision !== discardRevision) {
             await saveDocument(id)
             if (doc.saving || doc.source !== doc.savedSource) return false
@@ -401,7 +398,7 @@ export function createDocStore() {
 
       queueAutosave() {
         const id = get().sessionId
-        if (id && !get().conflict) schedule(id)
+        if (id && !get().recovery) schedule(id)
       },
 
       notifyDiskChange(deleted = false) {
@@ -409,10 +406,10 @@ export function createDocStore() {
         if (id) void readDiskChange(id, deleted)
       },
 
-      needsAttention(id) { return !!documents.get(id)?.conflict },
+      needsAttention(id) { return !!documents.get(id)?.recovery },
 
-      async openConflict() {
-        if (get().conflict) set({ conflictDismissed: false })
+      openConflict() {
+        if (get().recovery) set({ conflictDismissed: false })
       },
 
       closeConflict() { set({ conflictDismissed: true }) },
@@ -434,9 +431,9 @@ export function createDocStore() {
             if (doc.diskGeneration !== request) return false
             updateDocument(id, { saving: false })
             if (file.version === doc.version) {
-              updateDocument(id, { lossy: readLossy(doc, file), conflict: false, recoveryError: null, diskChange: null })
+              updateDocument(id, { lossy: readLossy(doc, file), recovery: null })
             } else reconcileDisk(id, file)
-            return !doc.conflict && await saveDocument(id)
+            return !doc.recovery && await saveDocument(id)
           } catch (err) { retainReadFailure(id, err); return false }
           finally { await settle(id) }
         })
@@ -458,9 +455,9 @@ export function createDocStore() {
             const source = normalizeToLf(copy.file.content)
             documents.set(copy.meta.sessionId, { ...doc, meta: copy.meta, source, savedSource: source,
               eol: detectEol(copy.file.content), diskSource: copy.file.content, version: copy.file.version,
-              lossy: !!copy.file.lossy, conflict: false, conflictDismissed: false, recoveryError: null, copyError: false, saving: false,
-              diskChange: null, history: [], diskGeneration: 0,
-              pendingInvalidation: undefined, write: undefined, recovery: undefined, autosaveTimer: undefined })
+              lossy: !!copy.file.lossy, recovery: null, conflictDismissed: false, copyError: false, saving: false,
+              history: [], diskGeneration: 0,
+              pendingInvalidation: undefined, write: undefined, recoveryOperation: undefined, autosaveTimer: undefined })
             doc.diskGeneration++
             documents.delete(id)
             if (get().sessionId === id && loadRequest === navigation) await get().load(copy.meta.sessionId)

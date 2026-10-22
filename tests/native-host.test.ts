@@ -23,7 +23,7 @@ describe('native reviewer boundary', () => {
 
   it('uses native commands without issuing HTTP requests and retains conflict errors', async () => {
     const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
-      if (command === 'write_document') throw { status: 409, error: 'file_changed' }
+      if (command === 'write_document') throw { status: 409, kind: 'conflict', error: 'file_changed' }
       return args
     }) as NativeBridge['invoke']
     const fetch = vi.fn()
@@ -38,28 +38,29 @@ describe('native reviewer boundary', () => {
   })
 
   it.each([
-    { status: 404, error: 'file_not_found', message: 'No such file or directory' },
-    { status: 404, error: 'document_not_open', message: 'The document is not open.' },
-    { status: 403, error: 'permission_denied', message: 'Permission denied' },
-    { status: 409, error: 'file_changed', message: 'The file changed. Compare before saving.' },
-    { status: 500, error: 'file_io_error', message: 'The disk operation failed' },
-    { status: 422, error: 'not_utf8', message: 'The file is not valid UTF-8.' },
-  ])('preserves structured recovery status and code while displaying the readable message: $error',
+    { status: 404, kind: 'missing', error: 'file_not_found', message: 'No such file or directory' },
+    { status: 404, kind: 'failure', error: 'document_not_open', message: 'The document is not open.' },
+    { status: 403, kind: 'failure', error: 'permission_denied', message: 'Permission denied' },
+    { status: 409, kind: 'conflict', error: 'file_changed', message: 'The file changed. Compare before saving.' },
+    { status: 500, kind: 'failure', error: 'file_io_error', message: 'The disk operation failed' },
+    { status: 422, kind: 'notUtf8', error: 'not_utf8', message: 'The file is not valid UTF-8.' },
+    { status: 409, kind: 'unknown', error: 'future_code', message: 'A kind this UI does not know.' },
+    { status: 409, error: 'file_changed', message: 'A payload without a kind.' },
+  ])('reads the serialized failure kind and displays the readable message: $error ($kind)',
     async (failure) => {
       const invoke = vi.fn().mockRejectedValue(failure)
       const host = createNativeHost({ invoke, listen: vi.fn() }, [])
+      const known = ['conflict', 'missing', 'notUtf8'].includes(String(failure.kind))
       await expect(host.getFile('0')).rejects.toMatchObject({
-        kind: failure.status === 409 ? 'conflict' : failure.error === 'file_not_found' ? 'missing'
-          : failure.error === 'not_utf8' ? 'notUtf8' : 'failure',
-        message: failure.message, data: failure,
+        kind: known ? failure.kind : 'failure', message: failure.message, data: failure,
       })
       await expect(host.putFile('0', 'local', 'base')).rejects.toBeInstanceOf(HostError)
     })
 
   it.each([
-    { status: 403, error: 'permission_denied', message: 'Permission denied', conflict: false },
-    { status: 500, error: 'file_io_error', message: 'Disk operation failed', conflict: false },
-    { status: 409, error: 'file_changed', message: 'Compare the current file', conflict: true },
+    { status: 403, kind: 'failure', error: 'permission_denied', message: 'Permission denied', recovery: 'saveFailed' },
+    { status: 500, kind: 'failure', error: 'file_io_error', message: 'Disk operation failed', recovery: 'saveFailed' },
+    { status: 409, kind: 'conflict', error: 'file_changed', message: 'Compare the current file', recovery: 'changed' },
   ])('retains dirty text and selects the existing recovery path for $error', async (failure) => {
     const invoke = vi.fn(async (command: string) => {
       if (command === 'document_meta') return {
@@ -75,12 +76,11 @@ describe('native reviewer boundary', () => {
     expect(await store.getState().prepareToClose()).toBe(false)
     expect(store.getState()).toMatchObject({
       source: 'local\n', savedSource: 'original\n', version: 'base',
-      saving: false, conflict: true,
+      saving: false, recovery: failure.recovery,
     })
     expect(invoke).toHaveBeenCalledWith('write_document', {
       id: '0', content: 'local\r\n', baseVersion: 'base',
     })
-    expect(store.getState().recoveryError).toBe(failure.conflict ? null : 'save')
   })
 
   it('does not leak a subscription that completes after document navigation', async () => {

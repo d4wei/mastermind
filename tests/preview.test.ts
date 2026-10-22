@@ -79,8 +79,20 @@ it('requires a base version and rejects stale saves after a successful save', as
   const base = await (await request('/api/sessions/preview/file')).json() as { content: string; version: string }
   expect(base.content).toBe('original\r\n')
   expect((await request('/api/sessions/preview/file', 'PUT', { content: 'saved', baseVersion: base.version })).status).toBe(200)
-  expect((await request('/api/sessions/preview/file', 'PUT', { content: 'stale', baseVersion: base.version })).status).toBe(409)
+  const stale = await request('/api/sessions/preview/file', 'PUT', { content: 'stale', baseVersion: base.version })
+  expect(stale.status).toBe(409)
+  expect(await stale.json()).toMatchObject({ kind: 'conflict' })
   expect(await fs.readFile(file, 'utf8')).toBe('saved')
+})
+
+it('serializes the failure kind the reviewer acts on for reads of a missing file or session', async () => {
+  const unknown = await request('/api/sessions/other/file')
+  expect(unknown.status).toBe(404)
+  expect(await unknown.json()).toMatchObject({ kind: 'missing' })
+  await fs.unlink(file)
+  const missing = await request('/api/sessions/preview/file')
+  expect(missing.status).toBe(410)
+  expect(await missing.json()).toMatchObject({ kind: 'missing' })
 })
 
 it('reports lossy decoding only for a file that is not valid UTF-8', async () => {
@@ -98,7 +110,7 @@ it('refuses a changed save to a file that is not valid UTF-8 and keeps an unchan
   expect(unchanged.status).toBe(200)
   const changed = await request('/api/sessions/preview/file', 'PUT', { content: `${base.content}edit`, baseVersion: base.version })
   expect(changed.status).toBe(422)
-  expect(await changed.json()).toEqual({ error: 'not_utf8',
+  expect(await changed.json()).toEqual({ error: 'not_utf8', kind: 'notUtf8',
     message: 'The file is not valid UTF-8, so saving would change bytes outside your edits. Use Save As to write a UTF-8 copy.' })
   expect(await fs.readFile(file)).toEqual(bytes)
 })

@@ -653,10 +653,9 @@ mod tests {
         let docs = Mutex::new(docs);
         let initial = read_registered_document(&docs, "0").unwrap();
         assert_eq!(initial.bytes, b"admitted\r\n");
-        assert_eq!(
-            read_registered_document(&docs, "0").unwrap_err().status,
-            404
-        );
+        let deleted = read_registered_document(&docs, "0").unwrap_err();
+        assert_eq!(deleted.status, 404);
+        assert_eq!(deleted.kind, files::FailureKind::Missing);
         assert!(!path.exists());
         assert!(docs.lock().unwrap().get(0).unwrap().snapshot.is_none());
     }
@@ -665,7 +664,10 @@ mod tests {
     fn reads_require_an_admitted_document_id() {
         let docs = Mutex::new(Documents::default());
         for id in ["0", "-1", "../file.md", "/tmp/file.md"] {
-            assert_eq!(read_registered_document(&docs, id).unwrap_err().status, 404);
+            let error = read_registered_document(&docs, id).unwrap_err();
+            assert_eq!(error.status, 404);
+            // A released or unknown document is not evidence that its file was deleted.
+            assert_eq!(error.kind, files::FailureKind::Failure);
         }
     }
 }

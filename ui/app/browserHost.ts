@@ -1,9 +1,4 @@
-import { HostError, type HostFailure, type ReviewerHost } from './host'
-
-function failureKind(status: number, code?: string): HostFailure {
-  return status === 409 ? 'conflict' : status === 404 || status === 410 ? 'missing'
-    : code === 'not_utf8' ? 'notUtf8' : 'failure'
-}
+import { failureKind, HostError, type ReviewerHost } from './host'
 
 export function createBrowserHost(): ReviewerHost {
   async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -13,12 +8,12 @@ export function createBrowserHost(): ReviewerHost {
     let data: unknown
     try { data = await response.json() }
     catch (error) {
-      if (!response.ok) throw new HostError(failureKind(response.status), response.statusText)
+      if (!response.ok) throw new HostError('failure', response.statusText)
       throw error
     }
     if (!response.ok) {
       const code = data && typeof data === 'object' && 'error' in data ? String(data.error) : undefined
-      throw new HostError(failureKind(response.status, code), code ?? response.statusText, data)
+      throw new HostError(failureKind(data), code ?? response.statusText, data)
     }
     return data as T
   }

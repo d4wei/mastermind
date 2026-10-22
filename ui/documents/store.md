@@ -18,8 +18,8 @@ restore the original line endings.
 
 A host snapshot's `lossy` flag marks bytes that are not valid UTF-8; an absent flag reads as false.
 Such a document is read-only in place: editing entry points are no-ops, autosave never schedules,
-and the UI disables review actions and Markdown-mode typing through `editingLocked`, as for a
-conflict. Every read refreshes the flag, so a file rewritten as UTF-8 becomes editable again; a
+and the UI disables review actions and Markdown-mode typing through `editingLocked`, as during
+recovery. Every read refreshes the flag, so a file rewritten as UTF-8 becomes editable again; a
 read of the version already held keeps a flag the host proved by refusing a write. That refusal
 (`notUtf8`) marks the record lossy instead of entering recovery, since the file is unchanged and
 Retry cannot succeed; any edits already in the buffer stay pending so closing offers Save As.
@@ -27,16 +27,18 @@ Retry cannot succeed; any edits already in the buffer stay pending so closing of
 
 ## Recovery
 
-`conflict` pauses mutations for a file that cannot be safely written. `recoveryError` distinguishes
-read and write failures from a verified external change; `diskChange.deleted` requires evidence
-that the path is missing: a deletion event or a host `missing` read result. Other read failures
-cannot distinguish a missing path from an unreadable one. A failed copy has its own `copyError` and
-does not change that diagnosis. Leaving a conflict clears its dismissal and copy failure; a
-successful write also clears copy failure.
+`recovery` pauses mutations for a file that cannot be safely written and names one reason:
+`changed` for a verified external change, `missing` for a missing path, and `readFailed` or
+`saveFailed` for other read and write failures. `missing` requires evidence: a deletion event or a
+host `missing` read result. Other read failures cannot distinguish a missing path from an
+unreadable one, so a missing diagnosis persists through them until a read succeeds. Reading back
+the held version resolves `readFailed` and `missing`; `changed` and `saveFailed` remain for Retry
+or Use incoming. A failed copy has its own `copyError` and does not change that diagnosis. Leaving
+recovery clears its dismissal and copy failure; a successful write also clears copy failure.
 Reading, copying, navigation, other documents, and closing remain available.
 
-`ConflictPanel` provides two direct choices. A conflicting version offers Save As and Use incoming;
-a failed read/write or missing file offers Retry and Save As. Use incoming replaces the notice with
+`ConflictPanel` provides two direct choices. A `changed` file offers Save As and Use incoming;
+every other recovery offers Retry and Save As. Use incoming replaces the notice with
 confirmation before reading again and adopting the current disk version. No second box opens.
 A newer invalidation rejects adoption; its read then presents the newer version for the same choice.
 Review undo can recover the discarded local buffer until the next external change replaces the

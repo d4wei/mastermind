@@ -109,7 +109,7 @@ it('starts a fresh editor after external replacement and never revives the old b
   const outgoing = editor()
   disk.set(a, 'external\r\n')
   await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
-  expect(useDoc.getState().conflict).toBe(true)
+  expect(useDoc.getState().recovery).toBe('changed')
   await act(async () => { expect(await useDoc.getState().useConflictDisk()).toBe(true) })
   expect(editor()).not.toBe(outgoing)
   expect(editor().state.doc.toString()).toBe('external\n')
