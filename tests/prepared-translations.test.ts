@@ -130,9 +130,27 @@ it.runIf(process.platform !== 'win32')('refuses to read or save through a redire
   await fs.mkdir(path.join(dir, '.mastermind'))
   await fs.mkdir(elsewhere)
   await fs.symlink(elsewhere, path.dirname(translationFile(file, 'zh-CN')))
-  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow('symbolic link')
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow("outside the document's folder")
   expect(await fs.readdir(elsewhere)).toEqual([])
   await fs.writeFile(path.join(elsewhere, path.basename(translationFile(file, 'zh-CN'))), JSON.stringify(await artifactFor()))
   expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'stale' })
   expect(await listPreparedTranslations(file, source)).toEqual([])
+})
+
+it.runIf(process.platform !== 'win32')('creates nothing outside when .mastermind itself is a link', async () => {
+  const outside = path.join(dir, 'outside')
+  await fs.mkdir(outside)
+  await fs.symlink(outside, path.join(dir, '.mastermind'))
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow("outside the document's folder")
+  expect(await fs.readdir(outside)).toEqual([])
+})
+
+it('saves into an existing case-variant translations directory on a case-insensitive volume', async (context) => {
+  await fs.mkdir(path.join(dir, '.Mastermind', 'Translations'), { recursive: true })
+  const caseInsensitive = await fs.access(path.join(dir, '.mastermind')).then(() => true, () => false)
+  if (!caseInsensitive) context.skip()
+  const artifact = await artifactFor()
+  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
+  expect(await fs.readdir(path.join(dir, '.Mastermind', 'Translations'))).toEqual([path.basename(translationFile(file, 'zh-CN'))])
+  expect(await readPreparedTranslation(file, source, 'zh-CN')).toEqual({ status: 'ready', artifact })
 })

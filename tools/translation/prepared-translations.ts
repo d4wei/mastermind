@@ -22,10 +22,21 @@ const ARTIFACT_BYTES = 16 * 1024 * 1024
 const DISCOVERY_BYTES = 32 * 1024 * 1024
 const DISCOVERY_COUNT = 64
 
-/** The artifact directory beside the source, or null when `.mastermind/translations` redirects elsewhere. */
-async function artifactDirectory(realPath: string): Promise<string | null> {
-  const expected = path.join(await fs.realpath(path.dirname(realPath)), '.mastermind', 'translations')
-  return await fs.realpath(expected) === expected ? expected : null
+/**
+ * The artifact directory beside the source, or null when a segment of `.mastermind/translations` is
+ * a link. Each segment is checked with lstat before the next is entered, so a link is never followed,
+ * and with `create` a missing segment is made one level at a time only after its parent passed.
+ */
+async function artifactDirectory(realPath: string, create = false): Promise<string | null> {
+  let directory = await fs.realpath(path.dirname(realPath))
+  for (const segment of ['.mastermind', 'translations']) {
+    directory = path.join(directory, segment)
+    if (create) await fs.mkdir(directory).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error })
+    const stats = await fs.lstat(directory)
+    if (stats.isSymbolicLink()) return null
+    if (!stats.isDirectory()) throw Object.assign(new Error(`${directory} is not a directory`), { code: 'ENOTDIR' })
+  }
+  return directory
 }
 
 /**
@@ -55,8 +66,7 @@ export async function savePreparedTranslation(realPath: string, source: string, 
     throw new Error('translation must match the current source, languages, and complete block structure')
   }
   const artifactPath = translationFile(realPath, targetLang)
-  await fs.mkdir(path.dirname(artifactPath), { recursive: true })
-  if (!(await artifactDirectory(realPath))) throw new Error('translation directory must not be a symbolic link')
+  if (!(await artifactDirectory(realPath, true))) throw new Error("translation directory resolves outside the document's folder")
   const temporary = `${artifactPath}.${crypto.randomUUID()}.tmp`
   try {
     await fs.writeFile(temporary, JSON.stringify(artifact), { flag: 'wx', mode: 0o600 })

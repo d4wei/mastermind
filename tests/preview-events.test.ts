@@ -32,8 +32,9 @@ afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })
 })
 
-async function subscribe(): Promise<() => string[]> {
+async function subscribe(beforeOpening?: () => Promise<void>): Promise<() => string[]> {
   const app = await createPreview(file, path.resolve('themes'), { pollMs: POLL_MS })
+  await beforeOpening?.()
   const response = await app.request('/api/sessions/preview/events', { headers: { host: 'localhost' } })
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
@@ -68,4 +69,21 @@ it('reports a missing file once per deletion and a recreated file as changed', a
   await vi.waitFor(() => expect(events()).toEqual(['file-deleted', 'file-changed']))
   await fs.unlink(file)
   await vi.waitFor(() => expect(events()).toEqual(['file-deleted', 'file-changed', 'file-deleted']))
+})
+
+it('reports a file recreated after the stream opened while it was missing', async () => {
+  const events = await subscribe(() => fs.unlink(file))
+  await vi.waitFor(() => expect(events()).toEqual(['file-deleted']))
+  await fs.writeFile(file, 'restored\n')
+  await vi.waitFor(() => expect(events()).toEqual(['file-deleted', 'file-changed']))
+})
+
+it('reports a file replaced by a directory as missing', async () => {
+  const events = await subscribe()
+  await sleep(POLL_MS * 3)
+  await fs.unlink(file)
+  await fs.mkdir(file)
+  await vi.waitFor(() => expect(events()).toEqual(['file-deleted']))
+  await sleep(POLL_MS * 5)
+  expect(events()).toEqual(['file-deleted'])
 })

@@ -8,8 +8,10 @@ by `document/translation.ts`.
 `savePreparedTranslation` checks the translation fingerprint, language pair, complete IDs, and
 CriticMarkup structure before writing. It rereads the document before atomically replacing the
 artifact with a unique temporary-file rename. It does not merge previous entries, retain partial
-success, or swallow save failures. It refuses to save when `.mastermind/translations` resolves
-anywhere but beside the document. An unrelated document writer can still change the source after
+success, or swallow save failures. It checks each segment of `.mastermind/translations` beside the
+document's real folder without following links, creating a missing segment only after its parent
+passed, and refuses to save when a segment is a link, so nothing is created outside the folder. A
+case variant of an existing directory on a case-insensitive volume is the same directory. An unrelated document writer can still change the source after
 that final check; this is not an atomic transaction across the document and artifact.
 
 Artifacts live beside their documents at `.mastermind/translations/<basename>.<target-code>.json`.

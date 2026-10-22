@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { usableAuthorName } from '../../document/author'
 import { DEFAULT_CONFIG } from '../../ui/settings/defaults'
 import type { MastermindConfig } from '../../ui/settings/types'
 import { readSessionFile, writeSessionFile } from './files'
@@ -9,17 +10,20 @@ import { readPreparedTranslation, listPreparedTranslations, validLanguageCode } 
 import { serveFile } from './static'
 import { scanThemes } from '../../themes/discovery'
 
+// Status, code, and message match the native host's refusal of the same write.
+const NOT_UTF8_MESSAGE = 'The file is not valid UTF-8, so saving would change bytes outside your edits. Save a copy instead.'
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/
 // Keyed by the union so a new interface language fails to compile until it is admitted here.
 const UI_LANGUAGES: Record<MastermindConfig['uiLang'], true> = { en: true, 'zh-CN': true }
 
-/** Admits known keys whose values have the default's type; null rejects the whole patch. */
+/** Admits known keys whose values have the default's type and a usable author name; null rejects the whole patch. */
 function configPatch(patch: object): Partial<MastermindConfig> | null {
   const accepted: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(patch)) {
     if (!Object.hasOwn(DEFAULT_CONFIG, key)) continue
     if (typeof value !== typeof DEFAULT_CONFIG[key as keyof MastermindConfig]) return null
     if (key === 'uiLang' && !Object.hasOwn(UI_LANGUAGES, value as string)) return null
+    if (key === 'authorTag' && usableAuthorName(value as string) !== value) return null
     accepted[key] = value
   }
   return accepted
@@ -69,7 +73,9 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
     const body = await c.req.json<{ content?: unknown; baseVersion?: unknown }>().catch(() => null)
     if (!body || typeof body.content !== 'string' || typeof body.baseVersion !== 'string') return c.json({ error: 'content and baseVersion required' }, 400)
     const result = await writeSessionFile(target, body.content, body.baseVersion)
-    return result.ok ? c.json({ mtimeMs: result.mtimeMs, version: result.version }) : c.json({ error: 'file changed on disk', currentMtimeMs: result.currentMtimeMs }, 409)
+    if (result.ok) return c.json({ mtimeMs: result.mtimeMs, version: result.version })
+    if ('error' in result) return c.json({ error: result.error, message: NOT_UTF8_MESSAGE }, 422)
+    return c.json({ error: 'file changed on disk', currentMtimeMs: result.currentMtimeMs }, 409)
   })
   app.get('/api/sessions/preview/translations', async (c) => {
     try { return c.json(await listPreparedTranslations(real, (await readSessionFile(real)).content)) }
@@ -92,20 +98,20 @@ export async function createPreview(file: string, themesRoot: string, { pollMs =
     let translations = ''
     let deleted = false
     while (running) {
-      const missing = await fs.stat(real).then(() => false, (error: NodeJS.ErrnoException) => error.code === 'ENOENT')
-      if (missing) {
+      const present = await fs.stat(real).then((stats) => stats.isFile(), () => false)
+      if (!present) {
         if (!deleted) await stream.writeSSE({ event: 'file-deleted', data: '{}' })
         deleted = true
       } else {
         try {
           const file = await readSessionFile(real)
-          if (previous && previous !== file.version) await stream.writeSSE({ event: 'file-changed', data: JSON.stringify(file) })
+          if (deleted || (previous && previous !== file.version)) await stream.writeSSE({ event: 'file-changed', data: JSON.stringify(file) })
           previous = file.version
           deleted = false
           const next = JSON.stringify(await listPreparedTranslations(real, file.content))
           if (translations && translations !== next) await stream.writeSSE({ event: 'translations-changed', data: '{}' })
           translations = next
-        } catch { /* A save racing this read, or another transient failure, is retried on the next tick. */ }
+        } catch { /* A read failing after a regular-file stat sends nothing and is retried on the next tick. */ }
       }
       await stream.sleep(pollMs)
     }

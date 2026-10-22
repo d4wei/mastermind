@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, beforeEach, expect, it } from 'vitest'
+import { previewArguments } from '../tools/preview/arguments'
 import { startPreview, type RunningPreview } from '../tools/preview/server'
 
 let dir: string
@@ -47,7 +48,7 @@ it('refuses another local origin on the proxied API and its preflight', async ()
 
 it('resolves the file from the invoking directory and themes from the repository', async () => {
   const child = spawn(process.execPath, ['--import', pathToFileURL(path.resolve('node_modules/tsx/dist/loader.mjs')).href, path.resolve('tools/preview/index.ts'), 'doc.md',
-    '--port', String(await freePort())], { cwd: os.tmpdir(), env: { ...process.env, INIT_CWD: dir }, stdio: ['ignore', 'pipe', 'pipe'] })
+    '--port', String(await freePort())], { cwd: os.tmpdir(), env: { ...process.env, INIT_CWD: dir, npm_lifecycle_event: 'dev' }, stdio: ['ignore', 'pipe', 'pipe'] })
   try {
     const url = await new Promise<string>((resolve, reject) => {
       let output = ''
@@ -70,3 +71,10 @@ it('resolves the file from the invoking directory and themes from the repository
     child.kill('SIGTERM')
   }
 }, 20_000)
+
+it('resolves a relative file against INIT_CWD only when npm started the script', () => {
+  const env = { INIT_CWD: '/stale' }
+  expect(previewArguments(['doc.md'], env, '/here')).toEqual({ file: path.resolve('/here', 'doc.md'), port: 5199 })
+  expect(previewArguments(['doc.md', '--port', '6000'], { ...env, npm_lifecycle_event: 'dev' }, '/here'))
+    .toEqual({ file: path.resolve('/stale', 'doc.md'), port: 6000 })
+})

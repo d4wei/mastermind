@@ -57,9 +57,9 @@ it('admits only the origin of the address the request was sent to', async () => 
   expect((await request('/api/sessions/preview/file', 'GET', undefined, own)).status).toBe(200)
 })
 
-it('stores only own configuration keys whose values match the default types', async () => {
+it('stores only own configuration keys whose values match the default types and a usable author name', async () => {
   const before = await (await request('/api/config')).json()
-  for (const patch of [{ theme: 12345 }, { fontSize: '16' }, { uiLang: 'fr' }, { uiLang: 7 }]) {
+  for (const patch of [{ theme: 12345 }, { fontSize: '16' }, { uiLang: 'fr' }, { uiLang: 7 }, { authorTag: 'a:b' }, { authorTag: ' padded ' }]) {
     expect((await request('/api/config', 'PUT', patch)).status).toBe(400)
   }
   expect((await request('/api/config', 'PUT', { toString: 'x', constructor: 1, unknown: true })).status).toBe(200)
@@ -81,6 +81,18 @@ it('requires a base version and rejects stale saves after a successful save', as
   expect((await request('/api/sessions/preview/file', 'PUT', { content: 'saved', baseVersion: base.version })).status).toBe(200)
   expect((await request('/api/sessions/preview/file', 'PUT', { content: 'stale', baseVersion: base.version })).status).toBe(409)
   expect(await fs.readFile(file, 'utf8')).toBe('saved')
+})
+
+it('refuses a changed save to a file that is not valid UTF-8 and keeps an unchanged save a no-op', async () => {
+  const bytes = Buffer.from([0x61, 0xff, 0x62, 0x0a])
+  await fs.writeFile(file, bytes)
+  const base = await (await request('/api/sessions/preview/file')).json() as { content: string; version: string }
+  const unchanged = await request('/api/sessions/preview/file', 'PUT', { content: base.content, baseVersion: base.version })
+  expect(unchanged.status).toBe(200)
+  const changed = await request('/api/sessions/preview/file', 'PUT', { content: `${base.content}edit`, baseVersion: base.version })
+  expect(changed.status).toBe(422)
+  expect((await changed.json() as { error: string }).error).toBe('not_utf8')
+  expect(await fs.readFile(file)).toEqual(bytes)
 })
 
 it('serves a contained symlink with exact content', async () => {
