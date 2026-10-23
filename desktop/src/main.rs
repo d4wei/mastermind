@@ -10,8 +10,6 @@ mod launcher;
 mod lifecycle;
 mod opening;
 mod preferences;
-#[cfg(feature = "readiness-trace")]
-mod readiness;
 mod setup;
 use tauri::{Emitter, Manager};
 mod host_process;
@@ -85,16 +83,12 @@ fn main() {
             lifecycle::finish_close,
             lifecycle::cancel_close,
             termination::close_ready,
-            #[cfg(feature = "readiness-trace")]
-            readiness::report_readiness
         ])
         .setup(move |app| {
             let setup = Arc::new(setup::Setup::new(preferences::preference_path(
                 app.handle(),
             )?));
             app.manage(setup.clone());
-            #[cfg(feature = "readiness-trace")]
-            app.manage(Arc::new(readiness::Readiness::from_environment()?));
             let invalidations = app.handle().clone();
             app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(move || {
                 let _ = invalidations.emit("document-invalidated", ());

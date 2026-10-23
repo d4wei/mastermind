@@ -436,8 +436,7 @@ The [Windows installed run](https://github.com/d4wei/mastermind/actions/runs/383
 
 ### Document-readiness instrumentation — 2026-10-13
 
-The opt-in [readiness instrument](../../desktop/src/readiness.md) waits for the requested
-original document,
+The opt-in readiness instrument waits for the requested original document,
 matching fixture text, visible layout, fonts, and two animation frames. Its local harness measures
 from launcher invocation until it observes the matching trace. Deterministic tests cover gate
 rejection, article replacement during rendering, one-shot reporting, and cleanup ownership.
@@ -514,6 +513,9 @@ trace delivery and polling. It is not physical first paint or a filesystem-cache
 The fixture differs from the earlier memory workload; the combined performance comparison remains
 incomplete. The initial sandboxed launcher attempt timed out before admission; the recorded trials
 ran outside the shell sandbox.
+
+The instrument was retired on 2026-10-22 because the document selector its trace waited for no
+longer exists in the native reviewer.
 
 ### macOS onboarding and frontmatter — 2026-10-13
 

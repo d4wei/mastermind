@@ -29,14 +29,6 @@ pipe access denial. `check-reviewer-windows.py` drives the installed reviewer us
 `tauri-driver` and a matching Edge driver. The [Windows](../../.github/workflows/native-windows.yml)
 and [Linux](../../.github/workflows/native-linux.yml) workflows install and exercise their packages.
 
-The [readiness contract](../../desktop/src/readiness.md) describes the opt-in instrumented build
-and disposable fixture. Its deterministic checks are:
-
-```sh
-node --test tools/desktop/check-readiness-script.cjs
-python3 tools/desktop/check-readiness-harness.py
-```
-
 `MM_LAUNCH_CHECK_DIR`, `MM_LAUNCH_CHECK_ID`, `MM_LAUNCH_CHECK_DROP_REPLY`, and
 `MM_LAUNCH_CHECK_UI_DELAY_MS` are trusted harness controls inherited from launch validation. They
 select disposable endpoints, drop an acknowledgment, or delay a window; documents cannot choose

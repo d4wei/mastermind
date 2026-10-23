@@ -54,10 +54,6 @@ jobs:
           exit $LASTEXITCODE
       - name: Native unit tests and lint
         run: |
-          node --test check-readiness-script.cjs
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          python check-readiness-harness.py
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo test --manifest-path ../../desktop/Cargo.toml --release --locked --all-features
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           cargo clippy --manifest-path ../../desktop/Cargo.toml --release --locked --all-features --all-targets -- -D warnings

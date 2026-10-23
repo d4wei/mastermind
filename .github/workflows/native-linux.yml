@@ -57,8 +57,6 @@ jobs:
           node tauri.mjs build --bundles deb -- --locked
       - name: Native unit tests and lint
         run: |
-          node --test check-readiness-script.cjs
-          python3 check-readiness-harness.py
           cargo test --manifest-path ../../desktop/Cargo.toml --release --locked --all-features
           cargo clippy --manifest-path ../../desktop/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
       - name: Install the Debian package

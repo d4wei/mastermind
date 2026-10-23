@@ -40,6 +40,5 @@ Other native contracts live beside their implementations: [file I/O](src/files.m
 commands to the document store.
 
 [Desktop tooling](../tools/desktop/README.md) owns disposable process and package checks.
-[Readiness instrumentation](src/readiness.md) requires the `readiness-trace` feature; ordinary
-builds omit its command and initialization script. [Validation results](../tools/desktop/results.md)
-record dated evidence and the remaining hardening and distribution checks.
+[Validation results](../tools/desktop/results.md) record dated evidence and the remaining hardening
+and distribution checks.
