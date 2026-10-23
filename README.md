@@ -72,7 +72,6 @@ Use the repository launcher with its absolute path when invoking it from another
 ```sh
 node bin/mastermind.js open -- plan.md "design notes.md"
 node bin/mastermind.js setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
-npm run build
 node bin/mastermind.js translate-blocks plan.md --source-lang en --target-lang zh-CN
 node bin/mastermind.js translate-blocks plan.md \
   --source-lang en --target-lang zh-CN --save < ready.json
@@ -92,7 +91,6 @@ themselves.
 npm run dev            # native app with a hot-reloading interface
 npm test               # application and tooling tests
 npm run typecheck      # browser and Node configurations
-npm run build          # translation utility
 npm run desktop:build  # native macOS app
 ```
 

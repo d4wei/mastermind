@@ -43,7 +43,6 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 
 - `npm run typecheck` runs both tsconfigs; both must pass. `npm test` before every commit.
 - Build with `npm run desktop:build` before opening files through `bin/mastermind.js` from a clone.
-  Build translation tooling with `npm run build` before using `translate-blocks`.
 - Touch `document/critic/` only with the corpus tests green; it is the most test-covered code.
 - Plan in a `.md` file and review it through mastermind itself (`node bin/mastermind.js open --
   <plan>.md`; optional translation preparation is in `assets/agent/README.md`). Reread the file

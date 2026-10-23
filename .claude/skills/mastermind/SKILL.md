@@ -39,7 +39,7 @@ use the active session's language and context to decide whether translation help
 languages to prepare. If none is useful, open the original. Supply the source language explicitly;
 do not infer it from the language of a newly added comment.
 
-Build the standalone utility with `npm run build` in the checkout before preparation.
+Install the checkout's dependencies with `npm ci` before preparation.
 For each preparation pass, translate the complete document afresh. Read it as a whole, including
 relevant context, even though the output is divided into blocks for display and source anchoring.
 Never fill a new preparation with previously cached block translations.

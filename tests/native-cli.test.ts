@@ -47,16 +47,19 @@ it.skipIf(process.platform === 'win32')('forwards open/setup arguments and waits
   } finally { await fs.rm(dir, { recursive: true, force: true }) }
 })
 
-it('dispatches translation preparation to the built Node helper and keeps its exit code', async () => {
+it('runs the TypeScript translation CLI through the repo\'s tsx and keeps its exit code', async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-translate-launch-'))
   try {
     await fs.mkdir(path.join(dir, 'bin'))
     const wrapper = path.join(dir, 'bin/mastermind.mjs')
     await fs.copyFile('bin/mastermind.js', wrapper)
-    expect((await run(wrapper, ['translate-blocks', 'file.md'])).stderr).toContain('translation build missing')
-    await fs.writeFile(path.join(dir, 'package.json'), '{"type":"module"}')
-    await fs.mkdir(path.join(dir, 'dist/node'), { recursive: true })
-    await fs.writeFile(path.join(dir, 'dist/node/translation-cli.js'), 'setTimeout(() => { console.log(JSON.stringify(process.argv.slice(2))); process.exit(6) }, 30)')
+    const missing = await run(wrapper, ['translate-blocks', 'file.md'])
+    expect(missing.code).toBe(1)
+    expect(missing.stderr).toContain('dependencies missing')
+    await fs.symlink(path.resolve('node_modules'), path.join(dir, 'node_modules'), 'junction')
+    await fs.mkdir(path.join(dir, 'tools/translation'), { recursive: true })
+    const typed = 'const argv: string[] = process.argv.slice(2)\nsetTimeout(() => { console.log(JSON.stringify(argv)); process.exit(6) }, 30)\n'
+    await fs.writeFile(path.join(dir, 'tools/translation/translation-cli.ts'), typed)
     const args = ['file.md', '--source-lang', 'en', '--target-lang', 'zh-CN', '--save']
     const result = await run(wrapper, ['translate-blocks', ...args])
     expect(result.code).toBe(6)

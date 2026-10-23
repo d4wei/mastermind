@@ -13,7 +13,6 @@
     "document",
     "tests",
     "tools/desktop/build-reviewer.mts",
-    "tsup.config.ts",
     "vite.config.ts",
     "vitest.config.ts",
     "tools/translation",

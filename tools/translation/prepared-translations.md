@@ -23,8 +23,8 @@ prepared text is a derived reading artifact, never a store for review feedback.
 The CLI requires both language codes and `.md` or `.markdown` on both the given path and its
 canonical target:
 `node bin/mastermind.js translate-blocks FILE --source-lang CODE --target-lang CODE` emits a fresh
-plan; adding `--save` consumes the complete artifact JSON on stdin. The wrapper invokes the built
-Node helper directly. Review opening is independent of artifact availability and always returns
+plan; adding `--save` consumes the complete artifact JSON on stdin. The wrapper runs the TypeScript
+CLI through tsx. Review opening is independent of artifact availability and always returns
 without a completion wait.
 
 The native host reads artifacts and watches them for changes, as documented in
