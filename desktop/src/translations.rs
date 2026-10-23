@@ -55,8 +55,10 @@ pub fn list(source: &Path) -> Result<Vec<Value>, FileError> {
         let Ok(entry) = entry else { continue };
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        if let Some(language) = name.strip_prefix(&prefix).and_then(|s| s.strip_suffix(".json")) {
-            if language_code(language) { languages.push(language.to_owned()); }
+        if let Some(language) = name.strip_prefix(&prefix).and_then(|s| s.strip_suffix(".json"))
+            && language_code(language)
+        {
+            languages.push(language.to_owned());
         }
     }
     languages.sort();
@@ -82,7 +84,7 @@ mod tests {
         let root = fs::canonicalize(root).unwrap();
         let source = root.join("doc.md");
         assert!(list(&source).unwrap().is_empty());
-        assert_eq!(watch_paths(&source), [root.clone()]);
+        assert_eq!(watch_paths(&source), std::slice::from_ref(&root));
         let dir = root.join(".mastermind/translations");
         fs::create_dir_all(&dir).unwrap();
         assert_eq!(watch_paths(&source).len(), 3);

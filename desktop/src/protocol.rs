@@ -64,6 +64,13 @@ impl Response {
     }
 }
 
+pub fn language_code(code: &str) -> bool {
+    let mut bytes = code.bytes();
+    !code.is_empty() && code.len() <= 64
+        && bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
+        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,11 +129,4 @@ mod tests {
             .is_err()
         );
     }
-}
-
-pub fn language_code(code: &str) -> bool {
-    let mut bytes = code.bytes();
-    !code.is_empty() && code.len() <= 64
-        && bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
-        && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
 }

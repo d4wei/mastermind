@@ -63,11 +63,11 @@ pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wr
 
 #[tauri::command]
 pub fn set_find_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    if let Some(item) = app.menu().and_then(|menu| menu.get("find-document")) {
-        if let Some(item) = item.as_menuitem() {
-            item.set_enabled(enabled)
-                .map_err(|error| error.to_string())?;
-        }
+    if let Some(item) = app.menu().and_then(|menu| menu.get("find-document"))
+        && let Some(item) = item.as_menuitem()
+    {
+        item.set_enabled(enabled)
+            .map_err(|error| error.to_string())?;
     }
     Ok(())
 }
