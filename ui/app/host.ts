@@ -26,7 +26,7 @@ export class HostError extends Error {
   }
 }
 
-/** Both hosts serialize a failure's `kind`; an absent or unknown kind is a plain failure. */
+/** The host serializes a failure's `kind`; an absent or unknown kind is a plain failure. */
 export function failureKind(error: unknown): HostFailure {
   const kind = error && typeof error === 'object' && 'kind' in error ? error.kind : undefined
   return HOST_FAILURES.find((known) => known === kind) ?? 'failure'
@@ -36,20 +36,19 @@ export interface ReviewerHost {
   getSession(id: string): Promise<SessionMeta>
   getFile(id: string): Promise<FileResponse>
   putFile(id: string, content: string, baseVersion: string): Promise<{ version: string }>
-  saveCopy?(id: string, content: string, forClose?: boolean): Promise<{ meta: SessionMeta; file: FileResponse } | null>
+  saveCopy(id: string, content: string, forClose?: boolean): Promise<{ meta: SessionMeta; file: FileResponse } | null>
   subscribe(id: string, listener: (event: HostInvalidation) => void): () => void
   translations(id: string): Promise<unknown[]>
   config(): Promise<ClientConfig>
   updateConfig(patch: Partial<Omit<ClientConfig, 'version'>>): Promise<ClientConfig>
   themes(): Promise<ThemeInfo[]>
-  setAppearance?(color: [number, number, number, number], appearance: ThemeInfo['appearance']): Promise<void>
+  setAppearance(color: [number, number, number, number], appearance: ThemeInfo['appearance']): Promise<void>
 }
 
 let installed: ReviewerHost | null = null
 
-// Each entry point installs its host before mounting any document or preference store.
+// The entry point installs the host before mounting any document or preference store.
 export function installHost(host: ReviewerHost | null): void { installed = host }
-export function reviewerHost(): ReviewerHost | null { return installed }
 
 export function requireReviewerHost(): ReviewerHost {
   if (!installed) throw new Error('Reviewer host is not installed; install a host before mounting the reviewer')

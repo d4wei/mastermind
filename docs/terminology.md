@@ -298,9 +298,8 @@ Use **desktop app / 桌面应用** publicly and **Tauri host / Tauri 宿主** in
 Keep **native host**, **host bridge**, and **IPC** as technical terms, defined on first use. The
 bridge carries specific document operations between the web interface and privileged local code.
 
-Desktop errors describe the failed operation and its recovery action. **Browser development
-preview / 浏览器开发预览** names the foreground developer tool; it is not a background app service.
-Daemon and its lifecycle commands are historical terms.
+Desktop errors describe the failed operation and its recovery action. Daemon and its lifecycle
+commands are historical terms.
 
 ## 12. Appearance and layout
 

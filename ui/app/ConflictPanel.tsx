@@ -3,7 +3,6 @@ import { useT, type MsgKey } from '../i18n'
 import { Notification } from './Notifications'
 import { AlertIcon } from '../icons'
 import { useDoc, type createDocStore, type Recovery } from '../documents/store'
-import { requireReviewerHost } from './host'
 import { navigate } from './route'
 import { transferDrafts } from '../review/drafts'
 
@@ -23,7 +22,7 @@ export function ConflictPanel({ store = useDoc }: Props) {
     if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
     if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
   }
-  const saveCopyButton = requireReviewerHost().saveCopy && <button type="button" className="btn-primary"
+  const saveCopyButton = <button type="button" className="btn-primary"
     onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>
   // Lossiness persists until the file is read back as UTF-8, so its notice has no dismissal.
   if (!state.recovery) return <Notification>

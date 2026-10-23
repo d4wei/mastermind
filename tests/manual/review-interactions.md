@@ -23,12 +23,10 @@ reading view for the selection checks.
 4. **Review actions:** accept or reject the deletion suggestion below and inspect Markdown for the
    corresponding text splice. Add a reply to the existing comment; feedback remains in the file
    with its author. Ordinary successful edits and review actions do not require a success toast.
-5. **Save error notification:** use a disposable copy. In the localhost browser preview, block its
-   save request in browser developer tools. In the native app, remove write permission from the
-   copy while retaining read permission; run as a user for whom that change denies writes. Make an
-   edit and check that the failed save shows an error notice at the bottom left while retaining the
-   local edit and the original disk bytes. Unblock the preview request or restore native write
-   permission, then make another edit to retry. A disk version conflict instead opens the conflict
+5. **Save error notification:** use a disposable copy. Remove write permission from the copy while
+   retaining read permission; run as a user for whom that change denies writes. Make an edit and
+   check that the failed save shows an error notice at the bottom left while retaining the local
+   edit and the original disk bytes. Restore write permission, then make another edit to retry. A disk version conflict instead opens the conflict
    controls; check that separately from a denied or unreachable save.
 6. **Native file toolbar:** on macOS, traffic lights share the file toolbar without a separate
    title strip, with balanced top and left insets. Drag empty toolbar space to move the window;

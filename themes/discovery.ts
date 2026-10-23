@@ -3,6 +3,34 @@ import path from 'node:path'
 import postcss from 'postcss'
 import type { ThemeInfo } from './types'
 
+/** The reviewer serves and ships the themes tree without its TypeScript sources and Markdown docs. */
+export function isThemeAsset(file: string): boolean {
+  return !/\.(?:ts|md)$/i.test(file)
+}
+
+/**
+ * The real path of the theme asset named by `relPath` inside `themesDir`, or null when the name is
+ * excluded or the target is missing, not a regular file, or resolves outside `themesDir` lexically
+ * or through a link.
+ */
+export async function resolveThemeAsset(themesDir: string, relPath: string): Promise<string | null> {
+  if (relPath.includes('\0') || !isThemeAsset(relPath)) return null
+  const within = (root: string, target: string): boolean => {
+    const relative = path.relative(root, target)
+    return relative !== '' && relative.split(path.sep)[0] !== '..' && !path.isAbsolute(relative)
+  }
+  try {
+    const root = await fs.realpath(themesDir)
+    const target = path.resolve(root, relPath)
+    if (!within(root, target)) return null
+    const real = await fs.realpath(target)
+    if (!within(root, real) || !isThemeAsset(real) || !(await fs.stat(real)).isFile()) return null
+    return real
+  } catch {
+    return null
+  }
+}
+
 function paletteMetadata(css: string): Pick<ThemeInfo, 'appearance' | 'swatch'> {
   const colors = new Map<string, string>()
   postcss.parse(css).walkDecls((decl) => { colors.set(decl.prop, decl.value) })

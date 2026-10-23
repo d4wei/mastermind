@@ -34,7 +34,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "tsx tools/preview/index.ts",
+    "dev": "node tools/desktop/tauri.mjs dev",
     "desktop:assets": "node --import tsx tools/desktop/build-reviewer.mts",
     "desktop:build": "npm run desktop:assets && node tools/desktop/tauri.mjs build --bundles app -- --locked",
     "test": "vitest run",
@@ -62,14 +62,12 @@
   },
   "devDependencies": {
     "@asamuzakjp/css-color": "5.1.11",
-    "@hono/node-server": "^2.0.4",
     "@types/mdast": "^4.0.4",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/unist": "^3.0.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "hono": "^4.12.25",
     "jsdom": "^29.1.1",
     "postcss": "8.5.15",
     "tsup": "^8.5.1",

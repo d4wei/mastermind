@@ -20,20 +20,13 @@ Artifacts live beside their documents at `.mastermind/translations/<basename>.<t
 Language codes are validated before entering filenames. The source Markdown remains untouched;
 prepared text is a derived reading artifact, never a store for review feedback.
 
-`listPreparedTranslations` accepts only the current schema and validates each artifact again
-against the supplied source and the target its filename names, without a separate index, within
-a total size and count budget. A redirected or case-variant
-translations directory lists nothing; a symbolic link, a FIFO, a device, or an oversized file is
-skipped without its content being read. Callers supply the current document source; UI callers
-also validate against their local buffer. No read generates text or queues agent work.
-
-The CLI requires both language codes and, like the preview, `.md` or `.markdown` on both the given
-path and its canonical target:
+The CLI requires both language codes and `.md` or `.markdown` on both the given path and its
+canonical target:
 `node bin/mastermind.js translate-blocks FILE --source-lang CODE --target-lang CODE` emits a fresh
 plan; adding `--save` consumes the complete artifact JSON on stdin. The wrapper invokes the built
 Node helper directly. Review opening is independent of artifact availability and always returns
 without a completion wait.
 
-The native equivalent and watch lifecycle are documented in
+The native host reads artifacts and watches them for changes, as documented in
 [`desktop/src/translations.md`](../../desktop/src/translations.md). The UI validates every returned
 artifact against the live buffer before offering or displaying it.

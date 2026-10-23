@@ -89,15 +89,23 @@ themselves.
 ## Develop
 
 ```sh
-npm run dev -- path/to/document.md  # foreground browser preview with Vite
-npm test                           # application and tooling tests
-npm run typecheck                  # browser and Node configurations
-npm run build                      # translation utility
-npm run desktop:build              # native macOS app
+npm run dev            # native app with a hot-reloading interface
+npm test               # application and tooling tests
+npm run typecheck      # browser and Node configurations
+npm run build          # translation utility
+npm run desktop:build  # native macOS app
 ```
 
-The [browser preview](tools/preview/README.md) is explicit development tooling. It opens only the
-file selected at startup and keeps its settings in memory. Stop it with Ctrl-C.
+`npm run dev` runs `tauri dev` through the pinned CLI, which `npm ci --prefix tools/desktop`
+installs. It serves `ui/desktop.html` with Vite on port 5173, then builds and opens the debug host.
+Interface edits apply through hot module replacement; Rust edits rebuild and relaunch the host.
+Open files with the Open button, or from a second shell with `node bin/mastermind.js open -- FILE`,
+which hands them to the running host. Ctrl-C stops both.
+
+The development host claims the same per-user endpoint as the installed app. Quit mastermind before
+`npm run dev`; otherwise the development host exits at once and stops the session with it. A debug
+binary always loads its interface from the development server, so it shows an interface only while
+`npm run dev` is running; `npm run desktop:build` produces the standalone app.
 
 The implementation map is in [the source map](docs/source-map.md). Theme tokens are defined in
 [themes/README.md](themes/README.md), and accepted English and Chinese labels are in

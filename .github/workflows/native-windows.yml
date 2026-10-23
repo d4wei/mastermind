@@ -13,7 +13,6 @@ on:
       - 'ui/**'
       - 'document/**'
       - 'tools/translation/**'
-      - 'tools/preview/**'
       - 'themes/**'
       - 'package-lock.json'
 permissions:

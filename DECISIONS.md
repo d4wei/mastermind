@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-22 — Development runs through `tauri dev` on the native host
+
+**Ruled.** `npm run dev` starts Vite with hot module replacement for the desktop entry and launches
+the Rust host against it, so development exercises the same file services the product ships; the
+browser preview, its HTTP host, its second interface entry point, and the capability-optional host
+contract it required are retired. This supersedes the 2026-10-13 clause that preserved browser
+development as development tooling.
+
+**Beat:** keeping a second file-access implementation with its own guards, event stream, and host
+adapter alive for development alone, and developing the native host without hot reload.
+
 ## 2026-10-22 — Files that are not valid UTF-8 are read-only in place
 
 **Ruled.** The native host decodes such a file lossily for display and refuses an edited write to

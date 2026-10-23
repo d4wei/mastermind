@@ -8,11 +8,10 @@ theme choices cross-fade.
 
 `appearance.ts` samples the root's computed background through an sRGB canvas. This uses the
 browser's color conversion for OKLCH and other CSS color forms rather than maintaining a second
-parser or palette. Browser hosts omit the optional `ReviewerHost.setAppearance` operation.
-The native adapter sends the resulting RGBA bytes and the theme CSS’s `color-scheme` to
-`desktop/src/appearance.rs`. Tauri applies the native appearance so system controls follow the
-selected palette. macOS and Linux apply it app-wide; Windows applies it to the window. The operating
-system owns traffic-light colors and their inactive treatment.
+parser or palette. The native adapter sends the resulting RGBA bytes and the theme CSS’s
+`color-scheme` to `desktop/src/appearance.rs`. Tauri applies the native appearance so system
+controls follow the selected palette. macOS and Linux apply it app-wide; Windows applies it to the
+window. The operating system owns traffic-light colors and their inactive treatment.
 
 On macOS, the command calls WKWebView's public [`setUnderPageBackgroundColor:`][under-page] on the
 UI thread. The macOS title bar overlays the themed file toolbar. A selector check preserves startup

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 
 export type Route = { kind: 'home' } | { kind: 'doc'; sessionId: string }
 
-const DOC_RE = /^\/d\/(preview|[0-9a-f-]+)\/?$/i
+const DOC_RE = /^\/d\/([0-9a-f-]+)\/?$/i
 
 export function parseRoute(pathname: string): Route {
   const doc = DOC_RE.exec(pathname)

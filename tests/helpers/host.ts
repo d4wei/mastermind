@@ -7,11 +7,13 @@ export function fakeHost(overrides: Partial<ReviewerHost> = {}): ReviewerHost {
     getSession: unconfigured,
     getFile: unconfigured,
     putFile: unconfigured,
+    saveCopy: unconfigured,
     subscribe: () => () => {},
     translations: async () => [],
     config: unconfigured,
     updateConfig: unconfigured,
     themes: unconfigured,
+    setAppearance: async () => {},
     ...overrides,
   }
 }

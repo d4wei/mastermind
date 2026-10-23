@@ -212,7 +212,7 @@ export function NativeReviewer() {
         </button>
       </Notice>}
     <CloseDialog />
-    <ToolbarTarget.Provider value={toolbarTarget}><App native onboarding={setupRequired === false ? undefined : setup
+    <ToolbarTarget.Provider value={toolbarTarget}><App onboarding={setupRequired === false ? undefined : setup
       ? <NativeSetup snapshot={setup} onLanguagePreview={setPreviewLanguage}
         onConfirmationStarted={(completion) => {
           setupConfirmation.current = completion
@@ -224,8 +224,9 @@ export function NativeReviewer() {
         setSetupRequired(false)
       }} /> : <div className="center-note" role="status">
         {t('loadingSetup')}
-      </div>} home={<div className="native-home">
+      </div>} /></ToolbarTarget.Provider>
+    {setupRequired === false && route.kind === 'home' && <div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
-    </div>} /></ToolbarTarget.Provider>
+    </div>}
   </Notifications>
 }

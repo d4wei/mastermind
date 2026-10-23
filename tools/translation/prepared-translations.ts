@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { matchPreparedTranslation, prepareTranslation, type PreparedTranslation } from '../../document/translation'
+import { matchPreparedTranslation, prepareTranslation } from '../../document/translation'
 
 export function validLanguageCode(code: string): boolean {
   return code.length <= 64 && /^[A-Za-z][A-Za-z0-9_-]*$/.test(code)
@@ -22,23 +22,19 @@ export async function planTranslation(realPath: string, source: string, sourceLa
     artifactPath: translationFile(realPath, targetLang) }
 }
 
-const ARTIFACT_BYTES = 16 * 1024 * 1024
-const DISCOVERY_BYTES = 32 * 1024 * 1024
-const DISCOVERY_COUNT = 64
-
 /**
  * The artifact directory beside the source, or null when a segment of `.mastermind/translations` is
  * a link. Each segment is checked with lstat before the next is entered, so a link is never followed,
- * and with `create` a missing segment is made one level at a time only after its parent passed. Each
- * segment's on-disk name must match exactly, so a case variant on a case-insensitive volume is refused
- * as the native host refuses it.
+ * and a missing segment is made one level at a time only after its parent passed. Each segment's
+ * on-disk name must match exactly, so a case variant on a case-insensitive volume is refused as the
+ * native host refuses it.
  */
-async function artifactDirectory(realPath: string, create = false): Promise<string | null> {
+async function artifactDirectory(realPath: string): Promise<string | null> {
   let directory = await fs.realpath(path.dirname(realPath))
   for (const segment of ['.mastermind', 'translations']) {
     const parent = directory
     directory = path.join(parent, segment)
-    if (create) await fs.mkdir(directory).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error })
+    await fs.mkdir(directory).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error })
     const stats = await fs.lstat(directory)
     if (stats.isSymbolicLink()) return null
     if (!stats.isDirectory()) throw Object.assign(new Error(`${directory} is not a directory`), { code: 'ENOTDIR' })
@@ -49,25 +45,6 @@ async function artifactDirectory(realPath: string, create = false): Promise<stri
   return directory
 }
 
-/**
- * Reads an artifact only when it is a regular file within the size cap. Links, FIFOs, and devices
- * are refused before opening; the descriptor is opened without following links or blocking and
- * must still be the inode that was checked.
- */
-async function readArtifactBytes(file: string): Promise<Buffer | null> {
-  const checked = await fs.lstat(file)
-  if (!checked.isFile() || checked.size > ARTIFACT_BYTES) return null
-  const { O_RDONLY, O_NOFOLLOW = 0, O_NONBLOCK = 0 } = fs.constants
-  const handle = await fs.open(file, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
-  try {
-    const opened = await handle.stat()
-    if (!opened.isFile() || opened.dev !== checked.dev || opened.ino !== checked.ino || opened.size > ARTIFACT_BYTES) return null
-    return await handle.readFile()
-  } finally {
-    await handle.close()
-  }
-}
-
 export async function savePreparedTranslation(realPath: string, source: string, sourceLang: string,
   targetLang: string, input: unknown): Promise<{ artifactPath: string; written: number }> {
   if (!validLanguageCode(sourceLang) || !validLanguageCode(targetLang)) throw new Error('explicit language codes required')
@@ -76,7 +53,7 @@ export async function savePreparedTranslation(realPath: string, source: string, 
     throw new Error('translation must match the current source, languages, and complete block structure')
   }
   const artifactPath = translationFile(realPath, targetLang)
-  if (!(await artifactDirectory(realPath, true))) {
+  if (!(await artifactDirectory(realPath))) {
     throw new Error(`translation directory must not be a symbolic link and must be named exactly ${translationDirectory(realPath)}`)
   }
   const temporary = `${artifactPath}.${crypto.randomUUID()}.tmp`
@@ -90,42 +67,4 @@ export async function savePreparedTranslation(realPath: string, source: string, 
     await fs.rm(temporary, { force: true })
   }
   return { artifactPath, written: artifact.blocks.length }
-}
-
-/** The artifact in `bytes` when it is current for `source` and names `targetLang`. */
-async function matchArtifact(bytes: Buffer, source: string, targetLang: string): Promise<PreparedTranslation | null> {
-  let input: unknown
-  try { input = JSON.parse(bytes.toString('utf8')) } catch { return null }
-  const artifact = await matchPreparedTranslation(source, input)
-  return artifact?.targetLang === targetLang ? artifact : null
-}
-
-/**
- * Every current artifact beside the document, each read through the guards above within a total
- * byte and count budget. A redirected directory lists nothing.
- */
-export async function listPreparedTranslations(realPath: string, source: string): Promise<PreparedTranslation[]> {
-  try {
-    const directory = await artifactDirectory(realPath)
-    if (!directory) return []
-    const prefix = `${path.basename(realPath)}.`
-    const files = (await fs.readdir(directory)).sort()
-    const artifacts: PreparedTranslation[] = []
-    let bytes = 0
-    for (const name of files) {
-      if (!name.startsWith(prefix) || !name.endsWith('.json')) continue
-      const language = name.slice(prefix.length, -5)
-      if (!validLanguageCode(language)) continue
-      if (artifacts.length === DISCOVERY_COUNT) break
-      try {
-        const content = await readArtifactBytes(path.join(directory, name))
-        if (!content) continue
-        bytes += content.length
-        if (bytes > DISCOVERY_BYTES) break
-        const artifact = await matchArtifact(content, source, language)
-        if (artifact) artifacts.push(artifact)
-      } catch { /* One unreadable artifact must not hide other languages. */ }
-    }
-    return artifacts
-  } catch { return [] }
 }

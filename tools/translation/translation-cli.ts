@@ -8,7 +8,7 @@ function die(code: number, message: string): never {
   process.exit(code)
 }
 const MARKDOWN = /\.(md|markdown)$/i
-/** Admits a Markdown file the way the preview does: both the given path and its target carry the extension. */
+/** Admits a Markdown file only when both the given path and its target carry the extension. */
 function readMarkdown(file: string): { realPath: string; source: string } {
   const requested = path.resolve(file)
   let realPath: string

@@ -73,7 +73,6 @@ Polling never overlaps requests, and an unchanged snapshot leaves renderer state
 notification host. `close.ts` coalesces window close requests and awaits native termination
 cancellation before unlocking the editor. Failed setup confirmation keeps the window available.
 Native lifecycle details live beside the [termination adapter](../../desktop/src/termination.md).
-The browser entry point retains its own unload prompt and localhost adapter.
 
 `NativeSetup.tsx` holds unconfirmed name and language choices separately from saved configuration.
 The native host owns saved-field presence, transient suggestions, and completion; its

@@ -1,12 +1,11 @@
 import { expect, it } from 'vitest'
 import { parseRoute } from '../ui/app/route'
 
-it('opens native documents and the development preview', () => {
+it('opens native documents', () => {
   expect(parseRoute('/d/12')).toEqual({ kind: 'doc', sessionId: '12' })
-  expect(parseRoute('/d/preview')).toEqual({ kind: 'doc', sessionId: 'preview' })
 })
-it('rejects retired workspace routes and document suffixes', () => {
-  for (const path of ['/', '/w/12', '/w/12/d/13', '/d/12/unexpected']) {
+it('rejects retired workspace and preview routes and document suffixes', () => {
+  for (const path of ['/', '/w/12', '/w/12/d/13', '/d/12/unexpected', '/d/preview']) {
     expect(parseRoute(path)).toEqual({ kind: 'home' })
   }
 })

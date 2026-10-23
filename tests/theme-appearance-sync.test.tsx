@@ -75,13 +75,6 @@ it('synchronizes an already-loaded startup stylesheet without waiting for anothe
   expect(setAppearance).toHaveBeenCalledWith([40, 42, 54, 255], 'light')
 })
 
-it('does no native work for hosts without a native background surface', () => {
-  installHost(fakeHost())
-  syncHostAppearance('light')
-  expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled()
-  expect(setAppearance).not.toHaveBeenCalled()
-})
-
 it('uses the loaded theme appearance for native controls when switching between light and dark', () => {
   const info = (id: string, appearance: 'light' | 'dark') => ({ id, name: id, appearance,
     swatch: { bg: '', ink: '', accent: '' } })

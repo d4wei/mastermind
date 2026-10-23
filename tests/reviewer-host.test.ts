@@ -7,7 +7,7 @@ it('requires an installed host instead of falling back to HTTP', async () => {
   installHost(null)
   const fetch = vi.fn()
   vi.stubGlobal('fetch', fetch)
-  expect(() => requireReviewerHost().getFile('preview')).toThrow('Reviewer host is not installed')
+  expect(() => requireReviewerHost().getFile('1')).toThrow('Reviewer host is not installed')
   await expect(useConfig.getState().load()).rejects.toThrow('Reviewer host is not installed')
   await expect(useConfig.getState().update({ uiLang: 'en' })).rejects.toThrow('Reviewer host is not installed')
   expect(fetch).not.toHaveBeenCalled()

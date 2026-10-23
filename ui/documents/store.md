@@ -57,7 +57,7 @@ file, so it queues verification and retains the buffer rather than claiming roll
 Save As obtains its destination from the native host. Cancellation and failure keep the original
 buffer. Success admits the new file and releases the original record, selecting the copy only if
 navigation has not moved elsewhere. Composer drafts transfer separately in memory; they are not
-part of the saved copy. The browser development host has no save picker capability.
+part of the saved copy.
 
 Ordinary writes and recovery operations are tracked separately. Closing awaits both. Invalidations
 during recovery reads reject the operation; invalidations during writes are rechecked afterward, and
@@ -87,7 +87,5 @@ A failed removal retains the record. Pending loads/reads cannot resurrect a clos
 Save As during closing writes a new file without admitting it or replacing the original tab.
 The adapter locks editing and pauses admission activation during close decisions.
 
-`documentLifecycle.ts` runs `prepareToClose` on browser blur and visibility changes. Browser
-unload cannot await writes and asks before leaving pending work. Process termination and crashes
-can lose in-memory work. Composer lifetime is documented in [drafts](../review/drafts.md);
+Process termination and crashes can lose in-memory work. Composer lifetime is documented in [drafts](../review/drafts.md);
 persisted buffers remain deferred in DIRECTION.md.

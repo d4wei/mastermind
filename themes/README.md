@@ -15,6 +15,8 @@ its role cannot be expressed by an existing one.
 reads preview swatches from the palette's background, muted text, and accent. It reads native
 appearance from CSS `color-scheme`. These declarations must be literal values so discovery does
 not need a browser or a second palette. Do not maintain swatch or appearance copies in JSON.
+Discovery also defines the files the reviewer serves in development and ships: the tree without
+its TypeScript sources and Markdown docs.
 
 The [font registry](../ui/theme/fontRegistry.ts) owns font presets, and the
 [asset registry](../ui/theme/fonts.ts) owns their local files and fallback stacks. Code fonts and

@@ -1,9 +1,8 @@
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { planTranslation, savePreparedTranslation, listPreparedTranslations, translationFile } from '../tools/translation/prepared-translations'
+import { planTranslation, savePreparedTranslation, translationFile } from '../tools/translation/prepared-translations'
 
 let dir: string
 let file: string
@@ -29,7 +28,7 @@ it('emits all current blocks on every preparation pass regardless of earlier art
   expect(second.blocks).toEqual(first.blocks)
   expect(second.blocks.some((b) => !b.translatable)).toBe(true)
   expect(second.blocks.filter((b) => b.translatable)).toHaveLength(2)
-  expect(await listPreparedTranslations(file, source)).toEqual([artifact])
+  expect(JSON.parse(await fs.readFile(translationFile(file, 'zh-CN'), 'utf8'))).toEqual(artifact)
 })
 
 it('replaces an artifact atomically without carrying earlier translations into the result', async () => {
@@ -55,7 +54,6 @@ it.each(['partial', 'stale', 'wrong-language', 'legacy'])('rejects a %s artifact
   }
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', invalid[kind])).rejects.toThrow()
   expect(await fs.readFile(translationFile(file, 'zh-CN'))).toEqual(previous)
-  expect(await listPreparedTranslations(file, source)).toEqual([valid])
 })
 
 it('rejects a source change while saving the translation and leaves the earlier artifact intact', async () => {
@@ -99,40 +97,13 @@ it.each(['write', 'rename'])('preserves the previous artifact and cleans tempora
   expect(await fs.readdir(path.dirname(artifactPath))).toEqual([path.basename(artifactPath)])
 })
 
-it('discovers targets independently and ignores foreign, malformed and redirected artifacts', async () => {
-  file = await fs.realpath(file)
-  expect(await listPreparedTranslations(file, source)).toEqual([])
-  const artifact = await artifactFor()
-  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
-  const french = { ...artifact, targetLang: 'fr' }
-  await savePreparedTranslation(file, source, 'en', 'fr', french)
-  await fs.writeFile(translationFile(file, 'ja'), 'invalid')
-  await fs.writeFile(translationFile(file, 'de'), JSON.stringify({ ...artifact, targetLang: 'es' }))
-  if (process.platform !== 'win32') await fs.symlink(translationFile(file, 'fr'), translationFile(file, 'it'))
-  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['fr', 'zh-CN'])
-  expect(await listPreparedTranslations(file, 'Changed source')).toEqual([])
-  await fs.unlink(translationFile(file, 'fr'))
-  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
-})
-
-it.runIf(process.platform !== 'win32')('skips a FIFO or a link to a device without blocking or reading it', async () => {
-  const artifact = await artifactFor()
-  await savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)
-  execFileSync('mkfifo', [translationFile(file, 'de')])
-  await fs.symlink('/dev/zero', translationFile(file, 'fr'))
-  await fs.symlink(translationFile(file, 'zh-CN'), translationFile(file, 'ja'))
-  expect((await listPreparedTranslations(file, source)).map((item) => item.targetLang)).toEqual(['zh-CN'])
-})
-
-it.runIf(process.platform !== 'win32')('refuses to read or save through a redirected translations directory', async () => {
+it.runIf(process.platform !== 'win32')('refuses to save through a redirected translations directory', async () => {
   const elsewhere = path.join(dir, 'elsewhere')
   await fs.mkdir(path.join(dir, '.mastermind'))
   await fs.mkdir(elsewhere)
   await fs.symlink(elsewhere, path.dirname(translationFile(file, 'zh-CN')))
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', await artifactFor())).rejects.toThrow('must not be a symbolic link')
   expect(await fs.readdir(elsewhere)).toEqual([])
-  await fs.writeFile(path.join(elsewhere, path.basename(translationFile(file, 'zh-CN'))), JSON.stringify(await artifactFor()))
-  expect(await listPreparedTranslations(file, source)).toEqual([])
 })
 
 it.runIf(process.platform !== 'win32')('creates nothing outside when .mastermind itself is a link', async () => {
@@ -151,5 +122,4 @@ it('refuses a case-variant translations directory on a case-insensitive volume, 
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', artifact))
     .rejects.toThrow(`named exactly ${path.join(dir, '.mastermind', 'translations')}`)
   expect(await fs.readdir(path.join(dir, '.Mastermind', 'Translations'))).toEqual([])
-  expect(await listPreparedTranslations(file, source)).toEqual([])
 })

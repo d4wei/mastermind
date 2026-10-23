@@ -443,13 +443,13 @@ export function createDocStore() {
         const id = requestedId ?? get().sessionId
         const doc = id ? documents.get(id) : undefined
         const host = requireReviewerHost()
-        if (!id || !doc || doc.saving || !host.saveCopy) return null
+        if (!id || !doc || doc.saving) return null
         clearAutosave(id)
         return trackRecovery(id, async () => {
           const navigation = loadRequest
           updateDocument(id, { saving: true, copyError: false })
           try {
-            const copy = await host.saveCopy!(id, restoreEol(doc.source, doc.eol), forClose)
+            const copy = await host.saveCopy(id, restoreEol(doc.source, doc.eol), forClose)
             if (!copy) return null
             if (forClose) return id
             const source = normalizeToLf(copy.file.content)

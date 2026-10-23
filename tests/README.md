@@ -5,9 +5,8 @@ malformed markup, line endings, and translation validation. DOM tests check rend
 composition, review controls, and real CodeMirror history. Store tests exercise document-owned
 buffers, save and read races, conflict recovery, and shutdown using a fake host.
 
-Host adapters own HTTP or native command adaptation. Node filesystem tests check the development
-preview implementation; Rust tests check the separate native implementation. Similar scenarios at
-those boundaries exercise different code. [Desktop checks](../tools/desktop/README.md) cover process
+Host adapters own native command adaptation; Rust tests check the native filesystem
+implementation. [Desktop checks](../tools/desktop/README.md) cover process
 startup, OS transports, packages, and installed webviews beyond unit tests.
 
 Small helpers under `helpers/` share React mounting, input events, Markdown rendering, and host

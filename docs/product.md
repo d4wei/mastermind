@@ -31,8 +31,9 @@ participation.
 
 Tauri owns native file access and application lifetime while React renders the review interface.
 Graphical onboarding confirms Your name and Interface language; native file opening retains
-documents admitted during setup. The foreground browser preview is development tooling. Signing and
-public distribution identity remain separate from adopting the native application.
+documents admitted during setup. Development runs the same native host against a hot-reloading
+interface. Signing and public distribution identity remain separate from adopting the native
+application.
 
 ## Authoritative references
 

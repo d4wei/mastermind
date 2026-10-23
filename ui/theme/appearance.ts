@@ -1,8 +1,7 @@
-import { reviewerHost } from '../app/host'
+import { requireReviewerHost } from '../app/host'
 
 export function syncHostAppearance(appearance: 'light' | 'dark'): void {
-  const host = reviewerHost()
-  if (!host?.setAppearance) return
+  const host = requireReviewerHost()
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 1
   const context = canvas.getContext('2d', { colorSpace: 'srgb' })

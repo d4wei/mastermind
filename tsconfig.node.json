@@ -12,7 +12,6 @@
   "include": [
     "document",
     "tests",
-    "tools/preview",
     "tools/desktop/build-reviewer.mts",
     "tsup.config.ts",
     "vite.config.ts",
