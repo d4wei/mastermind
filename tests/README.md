@@ -4,6 +4,8 @@ The suite follows behavior across layers. Pure document tests check source offse
 malformed markup, line endings, and translation validation. DOM tests check renderer selection,
 composition, review controls, and real CodeMirror history. Store tests exercise document-owned
 buffers, save and read races, conflict recovery, and shutdown using a fake host.
+The [interface and tooling workflow](../.github/workflows/node.yml) runs both type checks and this
+suite on pushes to `main` and on pull requests that change the code it covers.
 
 Host adapters own native command adaptation; Rust tests check the native filesystem
 implementation. [Desktop checks](../tools/desktop/README.md) cover process
