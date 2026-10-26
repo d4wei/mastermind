@@ -1,8 +1,13 @@
 # Mapping review selections to source
 
 `selection.ts` maps the rendered document's DOM ranges to exact source slices. It uses the
-renderer's `data-ps`/`data-pe` offsets when text matches. When escapes or entities make a leaf's
-rendered length differ from its source, the selected text maps only if it occurs exactly once in
+renderer's `data-ps`/`data-pe` offsets when text matches. A selection within a positioned text leaf
+can also map through removed list/blockquote continuation prefixes and normalized line endings: its DOM
+text must match the parsed text node, and each rendered line must match its source line after only
+those prefixes are removed. This retains exact source bytes across lines and distinguishes repeated
+characters by position. It does not strip arbitrary whitespace or decode entities to guess offsets.
+When escapes or entities make a leaf's rendered length differ from its source, the selected text
+maps only if it occurs exactly once in
 both the rendered and the source text of its window: the narrowest positioned element holding the
 selection, bounded by the nearest positioned element or rendered review mark on each side. Text
 that is not unique within that window is refused, even when it is unique elsewhere in the block.
@@ -29,7 +34,8 @@ rendered text must match its parsed text. Outside those wrappers, selected text 
 slices and the slices must be contiguous: unaccounted source gaps are refused. Reference links and
 other unsupported rendered structures do not become guessed source ranges. A mapping operation
 never parses: it takes the plain tree from the current source's analysis for opaque ranges and
-lazily indexes that tree for formatted blocks; the index is discarded after the operation.
+lazily indexes that tree for formatted blocks and normalized text leaves; the index is discarded
+after the operation.
 
 A selection confined to one text leaf within formatting keeps its exact text range, including the
 windowed unique-substring fallback when rendered entities change that leaf's length.
@@ -54,6 +60,9 @@ rewritten.
 
 `tests/inline-code-selection.test.tsx` exercises the real renderer, selection mapping,
 comment/deletion edits, reparsing, and exact accept/reject splices together.
+
+`tests/wrapped-selection.test.tsx` checks repeated characters and cross-line selections in lists
+and blockquotes, including retained line endings and exact review splices.
 
 `tests/formatted-selection.test.tsx` checks complete and partial formatted selections against the
 real renderer, reparsing, and exact deletion acceptance/rejection, including retained CRLF.

@@ -125,6 +125,50 @@ function lazyPositionedNodes(tree: MarkdownNode): () => Map<string, MarkdownNode
   }
 }
 
+/** Parsed text identifies the leaf; only line endings and container prefixes may differ. */
+function mapTextSelection(
+  range: Range, source: string, positionedNodes: () => Map<string, MarkdownNode>,
+): SelRange | null {
+  const start = normalizePoint(range.startContainer, range.startOffset)
+  const end = normalizePoint(range.endContainer, range.endOffset)
+  if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return null
+  const element = start.node.parentElement
+  if (!element || element.childNodes.length !== 1) return null
+  const from = Number(element.dataset.ps)
+  const to = Number(element.dataset.pe)
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  const parsed = positionedNodes().get(`text:${from}:${to}`)
+  const value = start.node.textContent ?? ''
+  if (!parsed || inlineText(parsed)?.replace(/\r\n?/g, '\n') !== value.replace(/\r\n?/g, '\n')) return null
+  const raw = source.slice(from, to).split(/(\r\n|\r|\n)/)
+  const rendered = value.split(/(\r\n|\r|\n)/)
+  if (raw.length !== rendered.length) return null
+  const offsets: number[] = []
+  let sourceAt = from
+  let renderedAt = 0
+  for (let line = 0; line < raw.length; line += 2) {
+    const rawText = raw[line]!
+    const text = rendered[line]!
+    const prefix = rawText.length - text.length
+    if (prefix < 0 || rawText.slice(prefix) !== text ||
+        (line === 0 ? prefix !== 0 : !/^[ \t>]*$/.test(rawText.slice(0, prefix)))) return null
+    for (let i = 0; i <= text.length; i++) offsets[renderedAt + i] = sourceAt + prefix + i
+    sourceAt += rawText.length
+    renderedAt += text.length
+    const rawBreak = raw[line + 1] ?? ''
+    const renderedBreak = rendered[line + 1] ?? ''
+    for (let i = 1; i <= renderedBreak.length; i++) {
+      offsets[renderedAt + i] = sourceAt + Math.min(i, rawBreak.length)
+    }
+    sourceAt += rawBreak.length
+    renderedAt += renderedBreak.length
+  }
+  const selectedFrom = offsets[start.offset]
+  const selectedTo = offsets[end.offset]
+  if (selectedFrom === undefined || selectedTo === undefined || selectedTo <= selectedFrom) return null
+  return { from: selectedFrom, to: selectedTo, text: source.slice(selectedFrom, selectedTo) }
+}
+
 /** Fully selected positioned wrappers account for syntax absent from the rendered text. */
 function mapFormattedSelection(
   range: Range, block: HTMLElement, source: string, positionedNodes: () => Map<string, MarkdownNode>,
@@ -164,8 +208,13 @@ function mapFormattedSelection(
       const from = pointToOffset(selected.startContainer, selected.startOffset)
       const to = pointToOffset(selected.endContainer, selected.endOffset)
       const rendered = selected.toString()
-      if (from === null || to === null || source.slice(from, to) !== rendered) return false
-      pieces.push({ from, to, rendered })
+      if (from !== null && to !== null && source.slice(from, to) === rendered) {
+        pieces.push({ from, to, rendered })
+      } else {
+        const mapped = mapTextSelection(selected, source, positionedNodes)
+        if (!mapped) return false
+        pieces.push({ from: mapped.from, to: mapped.to, rendered })
+      }
       return true
     }
     return Array.from(node.childNodes).every(visitDom)
@@ -230,12 +279,13 @@ function mapWithinBlock(
   if (block.tagName === 'PRE' || block.matches('.md-frontmatter')) return { error: 'unmapped' }
   const code = selectedInlineCode(range, block, source)
   if (code) return code
-
   let from = pointToOffset(range.startContainer, range.startOffset)
   let to = pointToOffset(range.endContainer, range.endOffset)
 
   const valid = from !== null && to !== null && to > from && source.slice(from, to) === selectedText
   if (!valid) {
+    const text = mapTextSelection(range, source, positionedNodes)
+    if (text && !splitsOpaqueSyntax(text.from, text.to, opaque)) return text
     const formatted = mapFormattedSelection(range, block, source, positionedNodes)
     if (formatted) {
       if (!('error' in formatted)) {
