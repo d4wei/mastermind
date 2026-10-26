@@ -26,6 +26,16 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-25 — Reliable review selections
+
+**Gap.** Selection mapping rejects ordinary formatting boundaries and can silently omit selected
+content. Minimize restrictions to those required by exact source edits and the in-file protocol,
+and make unsupported actions understandable. The audit and proposed quoted-comment fallback are in
+[selection review](docs/selection-review.md).
+
+**Exit:** settle the fallback representation, implement positional mapping and explicit coverage,
+and verify the selection matrix and native interactions; graduate the contract beside the code.
+
 ## 2026-10-22 — Launcher endpoint location
 
 **Gap.** The launcher endpoint directory derives from `TMPDIR` (`desktop/src/endpoint/unix.rs`).
