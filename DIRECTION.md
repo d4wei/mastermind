@@ -26,6 +26,37 @@ entry that has already resolved.
 
 * * *
 
+## 2026-10-29 — Curated font presets
+
+**Bet.** Presets should be complete pairings of display, body, code, and CJK fallback faces, and
+fewer of them; most current presets pair a display face with itself as body text and name no CJK
+face. The recommended set and the preference migration are in
+[curated font presets](docs/font-presets.md).
+
+**Exit:** a ruling on the preset set, then the registry, stacks, and settings ship it and the
+design is deleted.
+
+## 2026-10-29 — Pathological autolink parsing
+
+**Gap.** The pinned `mdast-util-gfm-autolink-literal`, pulled in by `remark-gfm`, is quadratic on
+long runs of `.`, so a crafted file still hangs the renderer after the scanner and label fixes;
+the parse of 20k dots alone takes seconds. A bound on the input is not a fix, since the parser
+runs on every edit.
+
+**Exit:** a pinned upstream release with linear behavior, a pre-parse guard that disables autolink
+literals for such runs, or an accepted limit recorded with its measurement.
+
+## 2026-10-29 — Windows endpoint squatting
+
+**Gap.** The named pipe `\\.\pipe\mastermind-launch-check-<SID>-default` is predictable, and a
+pipe another user created first makes `bind` map `ERROR_ACCESS_DENIED` to the same signal as a
+running host, so the app exits silently and the launcher polls to its deadline. Server identity is
+verified only from the client side, by process ID rather than the pipe object's owner.
+
+**Exit:** on access denial, connect and verify the server's identity before treating it as our own
+host, fail loudly otherwise, and check the pipe object's owner SID; verified on Windows through
+`tools/desktop/check-access.ps1`.
+
 ## 2026-10-25 — Reliable review selections
 
 **Gap.** Selection mapping rejects ordinary formatting boundaries and can silently omit selected
