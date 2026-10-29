@@ -57,15 +57,17 @@ verified only from the client side, by process ID rather than the pipe object's 
 host, fail loudly otherwise, and check the pipe object's owner SID; verified on Windows through
 `tools/desktop/check-access.ps1`.
 
-## 2026-10-25 — Reliable review selections
+## 2026-10-25 — Reliable review selections (updated 2026-10-29)
 
-**Gap.** Selection mapping rejects ordinary formatting boundaries and can silently omit selected
-content. Minimize restrictions to those required by exact source edits and the in-file protocol,
-and make unsupported actions understandable. The audit and proposed quoted-comment fallback are in
+**Gap.** Positional source mapping, formatting-aware fragments, and explained exclusions shipped
+(`af58e6f`); the contract lives in `ui/modes/reading/selection.md`. Still open: the in-file
+representation of a quoted-passage comment for selections that cannot carry a mark, native WebKit
+verification of the fixture matrix, and marks directly against underscore emphasis, which the
+masking sentinels' flanking class refuses rather than silently breaking. The remaining design is in
 [selection review](docs/selection-review.md).
 
-**Exit:** settle the fallback representation, implement positional mapping and explicit coverage,
-and verify the selection matrix and native interactions; graduate the contract beside the code.
+**Exit:** settle the quoted-comment representation or drop it, verify the matrix in the native
+app, and choose mask sentinels whose flanking class matches the delimiters they replace.
 
 ## 2026-10-17 — Local persisted work buffers
 
