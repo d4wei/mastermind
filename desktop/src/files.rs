@@ -547,9 +547,15 @@ mod tests {
     fn snapshots_report_lossy_decoding_for_invalid_utf8_only() {
         let f = Fixture::new();
         fs::write(f.file(), b"caf\xe9\r\n").unwrap();
-        assert_eq!(serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"], true);
+        assert_eq!(
+            serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"],
+            true
+        );
         fs::write(f.file(), b"\xef\xbb\xbfcaf\xc3\xa9\r\n").unwrap();
-        assert_eq!(serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"], false);
+        assert_eq!(
+            serde_json::to_value(read(&f.file()).unwrap()).unwrap()["lossy"],
+            false
+        );
     }
 
     #[cfg(unix)]

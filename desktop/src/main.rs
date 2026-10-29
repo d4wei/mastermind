@@ -3,7 +3,6 @@
 mod admission;
 mod appearance;
 mod document_io;
-mod translations;
 mod endpoint;
 mod files;
 mod launcher;
@@ -11,6 +10,7 @@ mod lifecycle;
 mod opening;
 mod preferences;
 mod setup;
+mod translations;
 use tauri::{Emitter, Manager};
 mod host_process;
 mod termination;
@@ -90,9 +90,11 @@ fn main() {
             )?));
             app.manage(setup.clone());
             let invalidations = app.handle().clone();
-            app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(move || {
-                let _ = invalidations.emit("document-invalidated", ());
-            })?)));
+            app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(
+                move || {
+                    let _ = invalidations.emit("document-invalidated", ());
+                },
+            )?)));
             termination::install(app.handle())?;
             app.set_menu(lifecycle::menu(app.handle())?)?;
             let runtime = tauri::async_runtime::handle();

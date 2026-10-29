@@ -83,7 +83,11 @@ impl<W: Watcher> FileWatch<W> {
             },
             notify::Config::default(),
         )?;
-        Ok(Self { watcher, directories, deferred })
+        Ok(Self {
+            watcher,
+            directories,
+            deferred,
+        })
     }
 
     fn directories(&self) -> std::sync::MutexGuard<'_, Directories> {
@@ -150,7 +154,9 @@ fn admitted_id(docs: &Documents, id: &str) -> Result<usize, FileError> {
 }
 
 fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
-    Ok(PathBuf::from(&docs.get(admitted_id(docs, id)?).unwrap().path))
+    Ok(PathBuf::from(
+        &docs.get(admitted_id(docs, id)?).unwrap().path,
+    ))
 }
 
 #[tauri::command]
@@ -246,7 +252,9 @@ fn save_copy(
         id.to_owned()
     } else {
         let copy_id =
-            docs.lock().unwrap().replace_with_copy(origin, canonical.clone(), saved.clone())?;
+            docs.lock()
+                .unwrap()
+                .replace_with_copy(origin, canonical.clone(), saved.clone())?;
         copy_id.to_string()
     };
     Ok(json!({
@@ -267,10 +275,14 @@ pub async fn save_document_copy(
 ) -> Result<Option<Value>, FileError> {
     let docs = docs.inner().clone();
     let path = admitted(&docs.lock().unwrap(), &id)?;
-    let mut dialog = app.dialog().file().add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS).set_file_name(format!(
-        "{}-copy.md",
-        path.file_stem().unwrap_or_default().to_string_lossy()
-    ));
+    let mut dialog = app
+        .dialog()
+        .file()
+        .add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS)
+        .set_file_name(format!(
+            "{}-copy.md",
+            path.file_stem().unwrap_or_default().to_string_lossy()
+        ));
     if let Some(parent) = path.parent() {
         dialog = dialog.set_directory(parent);
     }
@@ -328,10 +340,12 @@ pub async fn watch_document(
 #[tauri::command]
 pub async fn list_translations(id: String, docs: State<'_>) -> Result<Vec<Value>, FileError> {
     let docs = docs.inner().clone();
-    crate::worker::blocking_work().run(move || {
-        let path = admitted(&docs.lock().unwrap(), &id)?;
-        crate::translations::list(&path)
-    }).await?
+    crate::worker::blocking_work()
+        .run(move || {
+            let path = admitted(&docs.lock().unwrap(), &id)?;
+            crate::translations::list(&path)
+        })
+        .await?
 }
 
 #[cfg(test)]
@@ -357,7 +371,12 @@ mod tests {
         let docs = Mutex::new(docs);
         assert!(save_copy(&docs, "0", &original, "local", false).is_err());
         let html = dir.join("copy.html");
-        assert_eq!(save_copy(&docs, "0", &html, "local", false).unwrap_err().error, "not_markdown");
+        assert_eq!(
+            save_copy(&docs, "0", &html, "local", false)
+                .unwrap_err()
+                .error,
+            "not_markdown"
+        );
         assert!(!html.exists());
         assert_eq!(docs.lock().unwrap().len(), 1);
         let result = save_copy(&docs, "0", &copy, "local", false).unwrap();
@@ -366,7 +385,14 @@ mod tests {
         assert_eq!(docs.lock().unwrap().activation_revision, revision);
         assert!(docs.lock().unwrap().get(0).is_none());
         assert_eq!(
-            docs.lock().unwrap().get(1).unwrap().snapshot.as_ref().unwrap().version,
+            docs.lock()
+                .unwrap()
+                .get(1)
+                .unwrap()
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .version,
             result["file"]["version"].as_str().unwrap()
         );
         assert_eq!(fs::read_to_string(original).unwrap(), "original");
@@ -392,7 +418,12 @@ mod tests {
         let docs = Mutex::new(docs);
         assert!(save_copy(&docs, "0", &original, "local", true).is_err());
         let html = dir.join("copy.html");
-        assert_eq!(save_copy(&docs, "0", &html, "local", true).unwrap_err().error, "not_markdown");
+        assert_eq!(
+            save_copy(&docs, "0", &html, "local", true)
+                .unwrap_err()
+                .error,
+            "not_markdown"
+        );
         assert!(!html.exists());
         let saved = save_copy(&docs, "0", &copy, "local\r\n", true).unwrap();
         assert_eq!(saved["meta"]["sessionId"], "0");
@@ -407,7 +438,8 @@ mod tests {
 
     #[test]
     fn copy_destinations_are_validated_before_creation() {
-        let dir = std::env::temp_dir().join(format!("mastermind-copy-checks-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("mastermind-copy-checks-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         let original = dir.join("original.md");
         let stale = dir.join("stale.md");
@@ -417,7 +449,10 @@ mod tests {
         docs.admit(Request {
             language: None,
             version: VERSION,
-            paths: vec![original.to_str().unwrap().into(), stale.to_str().unwrap().into()],
+            paths: vec![
+                original.to_str().unwrap().into(),
+                stale.to_str().unwrap().into(),
+            ],
         });
         fs::remove_file(&stale).unwrap();
         let docs = Mutex::new(docs);
@@ -447,7 +482,10 @@ mod tests {
 
     impl Watcher for Recording {
         fn new<F: notify::EventHandler>(handler: F, _: notify::Config) -> notify::Result<Self> {
-            Ok(Self { handler: Box::new(handler), calls: Vec::new() })
+            Ok(Self {
+                handler: Box::new(handler),
+                calls: Vec::new(),
+            })
         }
         fn watch(&mut self, path: &Path, _: RecursiveMode) -> notify::Result<()> {
             self.calls.push(("watch", path.to_owned()));
@@ -477,12 +515,18 @@ mod tests {
         watch.watch(&dir.join("doc.md")).unwrap();
         watch.watch(&dir.join("doc.md")).unwrap();
         let modify = notify::Event::new(notify::EventKind::Modify(notify::event::ModifyKind::Any));
-        watch.watcher.handler.handle_event(Ok(modify.add_path(dir.clone())));
+        watch
+            .watcher
+            .handler
+            .handle_event(Ok(modify.add_path(dir.clone())));
         watch.watch(&dir.join("doc.md")).unwrap();
         assert_eq!(watch.watcher.calls, [("watch", dir.clone())]);
         watch.remove(&dir);
         watch.watch(&dir.join("doc.md")).unwrap();
-        assert_eq!(watch.watcher.calls[1..], [("unwatch", dir.clone()), ("watch", dir.clone())]);
+        assert_eq!(
+            watch.watcher.calls[1..],
+            [("unwatch", dir.clone()), ("watch", dir.clone())]
+        );
         // A removal reported while the directory set is locked is deferred, not waited on.
         let held = watch.directories.clone();
         let guard = held.lock().unwrap();
@@ -538,7 +582,11 @@ mod tests {
         stop.store(true, Ordering::Relaxed);
         churn.join().unwrap();
         let _ = fs::remove_dir_all(&base);
-        assert_eq!(last, Some(99), "releasing a watch stalled after round {last:?}");
+        assert_eq!(
+            last,
+            Some(99),
+            "releasing a watch stalled after round {last:?}"
+        );
     }
 
     #[test]

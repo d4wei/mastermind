@@ -11,13 +11,21 @@ use std::{
 pub const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown"];
 
 pub fn require_markdown(path: &std::path::Path) -> Result<(), FileError> {
-    if path.extension().and_then(|extension| extension.to_str()).is_some_and(|extension| {
-        MARKDOWN_EXTENSIONS.iter().any(|allowed| extension.eq_ignore_ascii_case(allowed))
-    }) {
+    if path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            MARKDOWN_EXTENSIONS
+                .iter()
+                .any(|allowed| extension.eq_ignore_ascii_case(allowed))
+        })
+    {
         return Ok(());
     }
     Err(FileError::new(
-        400, "not_markdown", "Choose a Markdown file (.md or .markdown).",
+        400,
+        "not_markdown",
+        "Choose a Markdown file (.md or .markdown).",
     ))
 }
 
@@ -45,7 +53,11 @@ pub struct Documents {
 
 fn utf8_path(path: &Path) -> Result<String, FileError> {
     path.to_str().map(str::to_owned).ok_or_else(|| {
-        FileError::new(400, "unsupported_path_encoding", "The file path is not valid UTF-8.")
+        FileError::new(
+            400,
+            "unsupported_path_encoding",
+            "The file path is not valid UTF-8.",
+        )
     })
 }
 
@@ -67,11 +79,22 @@ impl Documents {
         self.entries.len()
     }
 
-    pub(crate) fn insert(&mut self, path: String, snapshot: Option<crate::files::Snapshot>) -> usize {
+    pub(crate) fn insert(
+        &mut self,
+        path: String,
+        snapshot: Option<crate::files::Snapshot>,
+    ) -> usize {
         let id = self.next_id;
         self.next_id += 1;
         self.ids.insert(path.clone(), id);
-        self.entries.insert(id, Document { path, snapshot, language: None });
+        self.entries.insert(
+            id,
+            Document {
+                path,
+                snapshot,
+                language: None,
+            },
+        );
         id
     }
 
@@ -85,7 +108,11 @@ impl Documents {
         if request.version != VERSION {
             return Response::error("incompatible_version");
         }
-        if request.language.as_ref().is_some_and(|code| !mastermind_launch_check::protocol::language_code(code)) {
+        if request
+            .language
+            .as_ref()
+            .is_some_and(|code| !mastermind_launch_check::protocol::language_code(code))
+        {
             return Response::error("invalid_language");
         }
         if request.paths.is_empty()
@@ -186,7 +213,11 @@ impl Documents {
         canonical: &str,
     ) -> Result<(), FileError> {
         let destination = destination_key(canonical);
-        if self.ids.iter().any(|(path, id)| *id != origin && destination_key(path) == destination) {
+        if self
+            .ids
+            .iter()
+            .any(|(path, id)| *id != origin && destination_key(path) == destination)
+        {
             return Err(FileError::new(
                 409,
                 "already_open",
@@ -227,7 +258,11 @@ impl Documents {
 /// so a copy over an admitted document's deleted path in the other form can register that file
 /// twice.
 fn destination_key(path: &str) -> String {
-    if cfg!(any(target_os = "macos", windows)) { path.to_lowercase() } else { path.to_owned() }
+    if cfg!(any(target_os = "macos", windows)) {
+        path.to_lowercase()
+    } else {
+        path.to_owned()
+    }
 }
 
 /// Validates a Save As destination before creation and returns its canonical path. Exclusive
@@ -237,7 +272,10 @@ pub(crate) fn copy_destination(path: &Path) -> Result<String, FileError> {
     require_markdown(path)?;
     let invalid = || FileError::new(400, "invalid_path", "Choose a file path for the copy.");
     let name = path.file_name().ok_or_else(invalid)?;
-    let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty()).ok_or_else(invalid)?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .ok_or_else(invalid)?;
     utf8_path(path)?;
     utf8_path(&fs::canonicalize(parent)?.join(name))
 }
@@ -252,20 +290,44 @@ mod tests {
     fn only_markdown_documents_enter_the_registry() {
         let fixture = Fixture::new();
         let names = [
-            "valid.md", "UPPER.MD", "long.markdown", "mixed.Markdown",
-            "notebook.html", "notes.txt", "README", "fake.md.html",
+            "valid.md",
+            "UPPER.MD",
+            "long.markdown",
+            "mixed.Markdown",
+            "notebook.html",
+            "notes.txt",
+            "README",
+            "fake.md.html",
         ];
-        for name in names { fs::write(fixture.0.join(name), "# Text").unwrap(); }
+        for name in names {
+            fs::write(fixture.0.join(name), "# Text").unwrap();
+        }
         let mut docs = Documents::default();
         let result = docs.admit(fixture.request(&names));
-        assert!(result.results[..4].iter().all(|result| result.status == "opened"));
-        assert!(result.results[4..].iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+        assert!(
+            result.results[..4]
+                .iter()
+                .all(|result| result.status == "opened")
+        );
+        assert!(
+            result.results[4..]
+                .iter()
+                .all(|result| result.error.as_deref() == Some("not_markdown"))
+        );
         assert_eq!(docs.len(), 4);
-        #[cfg(unix)] {
-            std::os::unix::fs::symlink(fixture.0.join("notebook.html"), fixture.0.join("alias.md")).unwrap();
-            std::os::unix::fs::symlink(fixture.0.join("valid.md"), fixture.0.join("alias.html")).unwrap();
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(fixture.0.join("notebook.html"), fixture.0.join("alias.md"))
+                .unwrap();
+            std::os::unix::fs::symlink(fixture.0.join("valid.md"), fixture.0.join("alias.html"))
+                .unwrap();
             let result = docs.admit(fixture.request(&["alias.md", "alias.html"]));
-            assert!(result.results.iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+            assert!(
+                result
+                    .results
+                    .iter()
+                    .all(|result| result.error.as_deref() == Some("not_markdown"))
+            );
             assert_eq!(docs.len(), 4);
         }
     }
@@ -277,7 +339,12 @@ mod tests {
         fs::create_dir(fixture.0.join("folder.txt")).unwrap();
         let mut docs = Documents::default();
         let result = docs.admit(fixture.request(&["missing.txt", "large.txt", "folder.txt"]));
-        assert!(result.results.iter().all(|result| result.error.as_deref() == Some("not_markdown")));
+        assert!(
+            result
+                .results
+                .iter()
+                .all(|result| result.error.as_deref() == Some("not_markdown"))
+        );
         assert_eq!(docs.len(), 0);
     }
 
@@ -308,7 +375,12 @@ mod tests {
         assert_eq!((error.status, error.error.as_str()), (409, "already_open"));
         assert!(docs.check_copy_destination(1, &stale).is_ok());
         let snapshot = docs.get(0).unwrap().snapshot.clone().unwrap();
-        assert_eq!(docs.replace_with_copy(0, stale, snapshot).unwrap_err().error, "already_open");
+        assert_eq!(
+            docs.replace_with_copy(0, stale, snapshot)
+                .unwrap_err()
+                .error,
+            "already_open"
+        );
         assert_eq!(docs.len(), 2);
         assert!(docs.get(0).unwrap().snapshot.is_some());
     }
@@ -326,10 +398,15 @@ mod tests {
         let destination = copy_destination(&fixture.0.join("copy.md")).unwrap();
         let snapshot = crate::files::read(Path::new(&destination)).unwrap();
         let revision = docs.activation_revision;
-        let id = docs.replace_with_copy(0, destination.clone(), snapshot).unwrap();
+        let id = docs
+            .replace_with_copy(0, destination.clone(), snapshot)
+            .unwrap();
         assert_eq!(docs.get(id).unwrap().path, destination);
         assert_eq!(docs.len(), 2);
-        assert_eq!((docs.active_id, docs.activation_revision), (Some(1), revision));
+        assert_eq!(
+            (docs.active_id, docs.activation_revision),
+            (Some(1), revision)
+        );
     }
 
     #[cfg(any(target_os = "macos", windows))]
@@ -342,7 +419,10 @@ mod tests {
         docs.admit(fixture.request(&["a.md", "stale.md"]));
         fs::remove_file(fixture.0.join("stale.md")).unwrap();
         let alias = copy_destination(&fixture.0.join("STALE.md")).unwrap();
-        assert_eq!(docs.check_copy_destination(0, &alias).unwrap_err().error, "already_open");
+        assert_eq!(
+            docs.check_copy_destination(0, &alias).unwrap_err().error,
+            "already_open"
+        );
     }
 
     struct Fixture(PathBuf);
@@ -381,7 +461,10 @@ mod tests {
         let mut request = fixture.request(&["a.md", "missing.md"]);
         request.language = Some("fr".into());
         docs.admit(request);
-        assert_eq!(docs.entries().filter(|(_, d)| d.language.is_some()).count(), 1);
+        assert_eq!(
+            docs.entries().filter(|(_, d)| d.language.is_some()).count(),
+            1
+        );
         assert_eq!(docs.get(0).unwrap().language.as_deref(), Some("fr"));
         let mut request = fixture.request(&["a.md"]);
         request.language = Some("zh-CN".into());
@@ -412,7 +495,10 @@ mod tests {
         assert_eq!(fs::read_to_string(fixture.0.join("b.md")).unwrap(), "b.md");
         docs.admit(fixture.request(&["b.md"]));
         assert_eq!(docs.active_id, Some(3));
-        assert_eq!(docs.entries().map(|(id, _)| id).collect::<Vec<_>>(), [0, 2, 3]);
+        assert_eq!(
+            docs.entries().map(|(id, _)| id).collect::<Vec<_>>(),
+            [0, 2, 3]
+        );
         docs.close(0, Some(2), docs.activation_revision);
         assert_eq!(docs.active_id, Some(2));
         docs.close(3, Some(3), docs.activation_revision);
@@ -494,8 +580,18 @@ mod tests {
             ["opened", "error", "already_open", "opened"]
         );
         assert_eq!(docs.len(), 2);
-        assert_eq!(PathBuf::from(&docs.get(0).unwrap().path).file_name().unwrap(), "a.md");
-        assert_eq!(PathBuf::from(&docs.get(1).unwrap().path).file_name().unwrap(), "b.md");
+        assert_eq!(
+            PathBuf::from(&docs.get(0).unwrap().path)
+                .file_name()
+                .unwrap(),
+            "a.md"
+        );
+        assert_eq!(
+            PathBuf::from(&docs.get(1).unwrap().path)
+                .file_name()
+                .unwrap(),
+            "b.md"
+        );
         assert_eq!(docs.active_id, Some(0));
         assert_eq!(docs.activation_revision, 1);
     }
@@ -508,7 +604,8 @@ mod tests {
         large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
         fs::create_dir(fixture.0.join("folder.md")).unwrap();
         let mut docs = Documents::default();
-        let response = docs.admit(fixture.request(&["missing.md", "a.md", "folder.md", "large.md"]));
+        let response =
+            docs.admit(fixture.request(&["missing.md", "a.md", "folder.md", "large.md"]));
         let encoded = serde_json::to_value(response).unwrap();
         for (index, code) in [
             (0, "file_not_found"),

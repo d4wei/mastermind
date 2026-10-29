@@ -39,7 +39,7 @@ jobs:
             xvfb xauth dbus-x11
       - name: Install pinned Rust toolchain
         run: |
-          rustup toolchain install 1.98.0 --profile minimal --component clippy
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt
           rustup default 1.98.0
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c
         with:
@@ -58,6 +58,7 @@ jobs:
         run: |
           cargo test --manifest-path ../../desktop/Cargo.toml --release --locked --all-features
           cargo clippy --manifest-path ../../desktop/Cargo.toml --release --locked --all-features --all-targets -- -D warnings
+          cargo fmt --manifest-path ../../desktop/Cargo.toml --check
       - name: Install the Debian package
         run: |
           packages=(../../desktop/target/release/bundle/deb/*.deb)

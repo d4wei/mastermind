@@ -245,7 +245,8 @@ impl Setup {
         } else {
             state.git_name.get_or_insert_with(git_name).clone()
         };
-        let defaults = json!({"authorTag":name,"uiLang":state.ui_default.as_deref().unwrap_or("en")});
+        let defaults =
+            json!({"authorTag":name,"uiLang":state.ui_default.as_deref().unwrap_or("en")});
         let values = FIELDS
             .into_iter()
             .map(|key| {
@@ -477,11 +478,23 @@ mod tests {
     fn retired_translation_preference_is_not_exposed_or_written_back() {
         let fixture = Fixture::new();
         let setup = fixture.setup();
-        std::fs::write(&setup.path, json!({"translationLanguage":"fr","theme":"sepia"}).to_string()).unwrap();
-        assert_eq!(setup.read_preferences().unwrap().unwrap(), json!({"theme":"sepia"}));
-        assert!(setup.patch_preferences(json!({"translationLanguage":"fr"})).is_err());
+        std::fs::write(
+            &setup.path,
+            json!({"translationLanguage":"fr","theme":"sepia"}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            setup.read_preferences().unwrap().unwrap(),
+            json!({"theme":"sepia"})
+        );
+        assert!(
+            setup
+                .patch_preferences(json!({"translationLanguage":"fr"}))
+                .is_err()
+        );
         setup.patch_preferences(json!({"uiLang":"en"})).unwrap();
-        let saved: Value = serde_json::from_str(&std::fs::read_to_string(&setup.path).unwrap()).unwrap();
+        let saved: Value =
+            serde_json::from_str(&std::fs::read_to_string(&setup.path).unwrap()).unwrap();
         assert_eq!(saved, json!({"theme":"sepia","uiLang":"en"}));
     }
 
@@ -495,9 +508,7 @@ mod tests {
         assert_eq!(snapshot.values["uiLang"], "zh-CN");
         assert!(!snapshot.values.contains_key("translationLanguage"));
         assert!(snapshot.saved.values().all(|saved| !saved));
-        let result = setup.suggest(suggestions(
-            json!({"authorTag":"Agent"}),
-        ));
+        let result = setup.suggest(suggestions(json!({"authorTag":"Agent"})));
         assert_eq!(result.setup_results.unwrap()["authorTag"], "accepted");
         let snapshot = setup.protect(vec!["authorTag".into()]).unwrap();
         assert_eq!(snapshot.values["uiLang"], "zh-CN");
@@ -519,9 +530,7 @@ mod tests {
         setup
             .patch_preferences(json!({"uiLang":"en","theme":"serif"}))
             .unwrap();
-        let response = setup.suggest(suggestions(
-            json!({"authorTag":"Agent","uiLang":"zh-CN"}),
-        ));
+        let response = setup.suggest(suggestions(json!({"authorTag":"Agent","uiLang":"zh-CN"})));
         let results = response.setup_results.unwrap();
         assert_eq!(results["authorTag"], "accepted");
         assert_eq!(results["uiLang"], "ignored");
@@ -569,9 +578,7 @@ mod tests {
         );
         let fresh = fixture.setup();
         assert!(!fresh.onboarding_needed().unwrap());
-        let response = fresh.suggest(suggestions(
-            json!({"authorTag":"Agent","uiLang":"en"}),
-        ));
+        let response = fresh.suggest(suggestions(json!({"authorTag":"Agent","uiLang":"en"})));
         assert!(
             response
                 .setup_results

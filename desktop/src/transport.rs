@@ -1,6 +1,6 @@
 use crate::admission::{Documents, MAX_FRAME, Response};
-use mastermind_launch_check::protocol::MAX_REPLY_FRAME;
 use interprocess::local_socket::tokio::{Listener, prelude::*};
+use mastermind_launch_check::protocol::MAX_REPLY_FRAME;
 use mastermind_launch_check::protocol::Operation;
 use std::{
     io,
@@ -18,7 +18,9 @@ const ACCEPT_RETRY_CAP: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Doubles the pause after each consecutive accept failure, up to the cap.
 fn accept_retry_delay(failures: u32) -> std::time::Duration {
-    ACCEPT_RETRY.saturating_mul(1 << failures.saturating_sub(1).min(16)).min(ACCEPT_RETRY_CAP)
+    ACCEPT_RETRY
+        .saturating_mul(1 << failures.saturating_sub(1).min(16))
+        .min(ACCEPT_RETRY_CAP)
 }
 
 async fn frame(stream: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u8>> {
@@ -160,14 +162,24 @@ mod tests {
         .unwrap();
         reply.push(b'\n');
         assert!(reply.len() > MAX_FRAME);
-        let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
-        assert_eq!(runtime.block_on(frame(&reply[..], MAX_REPLY_FRAME)).unwrap(), reply);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        assert_eq!(
+            runtime
+                .block_on(frame(&reply[..], MAX_REPLY_FRAME))
+                .unwrap(),
+            reply
+        );
         assert!(runtime.block_on(frame(&reply[..], MAX_FRAME)).is_err());
     }
 
     #[test]
     fn accept_failures_do_not_stop_the_listener() {
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
         let mut attempts = 0;
         let connection = runtime.block_on(next_connection(|| {
             attempts += 1;
@@ -184,7 +196,10 @@ mod tests {
     #[test]
     fn repeated_accept_failures_back_off_to_a_cap() {
         let delays: Vec<_> = [1, 2, 3, 6, 7, 40, u32::MAX].map(accept_retry_delay).into();
-        assert_eq!(delays[..4], [100, 200, 400, 3200].map(std::time::Duration::from_millis));
+        assert_eq!(
+            delays[..4],
+            [100, 200, 400, 3200].map(std::time::Duration::from_millis)
+        );
         assert!(delays[4..].iter().all(|delay| *delay == ACCEPT_RETRY_CAP));
     }
 
@@ -197,7 +212,11 @@ mod tests {
         let setup = crate::setup::Setup::new(path);
         let docs = Mutex::new(Documents::default());
         let response = dispatch(
-            Operation::Open(Request { language: None, version: VERSION + 1, paths: vec![] }),
+            Operation::Open(Request {
+                language: None,
+                version: VERSION + 1,
+                paths: vec![],
+            }),
             &docs,
             &setup,
         );
@@ -261,7 +280,11 @@ mod tests {
         assert_eq!(response.onboarding_needed, None);
         assert_eq!(response.results[0].status, "already_open");
         assert!(response.error.is_none());
-        std::fs::write(&preferences, b"{\"onboardingCompleted\":true,\"authorTag\":\"Reader\",\"uiLang\":\"en\"}").unwrap();
+        std::fs::write(
+            &preferences,
+            b"{\"onboardingCompleted\":true,\"authorTag\":\"Reader\",\"uiLang\":\"en\"}",
+        )
+        .unwrap();
         assert_eq!(
             dispatch(request(), &docs, &setup).onboarding_needed,
             Some(false)

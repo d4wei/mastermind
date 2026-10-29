@@ -142,7 +142,10 @@ pub fn open(app: &tauri::AppHandle, paths: Vec<Result<PathBuf, String>>) {
 
 #[tauri::command]
 pub fn choose_files(app: tauri::AppHandle) {
-    let mut dialog = app.dialog().file().add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS);
+    let mut dialog = app
+        .dialog()
+        .file()
+        .add_filter("Markdown", crate::admission::MARKDOWN_EXTENSIONS);
     if let Some(window) = app.get_webview_window("main") {
         dialog = dialog.set_parent(&window);
     }
@@ -210,7 +213,12 @@ mod tests {
         docs.active_id = Some(0);
         admit_graphical(&mut docs, vec![Err("Not a local file.".into())]);
         assert_eq!(docs.opening_errors, ["Not a local file."]);
-        assert_eq!(docs.entries().map(|(_, d)| d.path.as_str()).collect::<Vec<_>>(), ["retained"]);
+        assert_eq!(
+            docs.entries()
+                .map(|(_, d)| d.path.as_str())
+                .collect::<Vec<_>>(),
+            ["retained"]
+        );
         assert_eq!(docs.active_id, Some(0));
         admit_graphical(
             &mut docs,
@@ -220,6 +228,11 @@ mod tests {
         );
         assert_eq!(docs.opening_errors.len(), 1);
         assert!(docs.opening_errors[0].starts_with("Open at most"));
-        assert_eq!(docs.entries().map(|(_, d)| d.path.as_str()).collect::<Vec<_>>(), ["retained"]);
+        assert_eq!(
+            docs.entries()
+                .map(|(_, d)| d.path.as_str())
+                .collect::<Vec<_>>(),
+            ["retained"]
+        );
     }
 }
