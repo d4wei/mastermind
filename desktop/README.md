@@ -19,6 +19,17 @@ For Linux use the same command without the feature flag and with `--bundles deb`
 Exact native dependencies are in `Cargo.toml` and `Cargo.lock`; the pinned CLI is in
 `tools/desktop`.
 
+`npm run dev` runs `tauri dev` through the pinned CLI. It serves `ui/desktop.html` with Vite on
+port 5173, then builds and opens the debug host. Interface edits apply through hot module
+replacement; Rust edits rebuild and relaunch the host. Open files with the Open button, or from a
+second shell with `node bin/mastermind.js open -- FILE`, which hands them to the running host.
+Ctrl-C stops both.
+
+The development host claims the same per-user endpoint as the installed app. Quit mastermind before
+`npm run dev`; otherwise the development host exits at once and stops the session with it. A debug
+binary always loads its interface from the development server, so it shows an interface only while
+`npm run dev` is running; `npm run desktop:build` produces the standalone app.
+
 The bundle and reader window are named `mastermind`. The identifier `dev.mastermind.launchcheck`,
 executable `mastermind-launch-check`, and Windows companion `mastermind-launch-console` remain
 provisional until distribution identity is settled. Builds here are not signed or notarized
