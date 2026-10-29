@@ -14,7 +14,7 @@ import { locateThread, rebaseReplies, rebaseThread, refreshReplies, refreshThrea
   type ReplyDraft, type ThreadRef } from '../review/thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { PreparedTranslation } from '../../document/translation'
-import { closeOverlay, openOverlay, useOverlay } from './overlayStore'
+import { closeOverlay, openOverlay, publishCommentRail, useOverlay } from './overlayStore'
 import { MarkGutter } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../document/critic/scanner'
@@ -167,6 +167,24 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     if (narrow) closePanel()
     setRailOpen(true)
   }, [narrow, collapseTable, closePanel])
+  const toggleRail = useCallback(() => {
+    collapseTable()
+    findOpenedRail.current = false
+    setRailOpen((v) => !v)
+    if (narrow) closePanel()
+  }, [narrow, collapseTable, closePanel])
+  // A command raised before this view mounted belongs to no view.
+  const viewCommand = useOverlay((s) => s.viewCommand)
+  const handledCommand = useRef(viewCommand)
+  useEffect(() => {
+    if (viewCommand === handledCommand.current) return
+    handledCommand.current = viewCommand
+    if (!viewCommand) return
+    if (viewCommand.command === 'toggle-comments') { toggleRail(); return }
+    // Panel commands open; they never close a panel already showing.
+    const { open, owner } = useOverlay.getState()
+    if (open !== viewCommand.command || owner !== sessionId) togglePanel(viewCommand.command)
+  }, [viewCommand, toggleRail, togglePanel, sessionId])
   const authorTag = useConfig((s) => s.config?.authorTag) ?? DEFAULT_AUTHOR_TAG
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const cards = analysis?.threads ?? null
@@ -333,6 +351,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const inlineRail = showRail && !narrow && !showTranslated
   const geometry = reading.space ? readingSpace(reading.space, inlineRail) : null
   useReadingMovement(reading.element, geometry?.left, inlineRail)
+  const commentsAvailable = mode === 'reading' && hasThreads && !showTranslated
+  useEffect(() => { publishCommentRail({ available: commentsAvailable, open: commentsAvailable && railOpen }) },
+    [commentsAvailable, railOpen])
+  useEffect(() => () => publishCommentRail({ available: false, open: false }), [])
 
   if (status === 'error') {
     return (
@@ -374,13 +396,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         settings={{ open: panel === 'settings', onToggle: () => togglePanel('settings') }}
         resolved={{ count: resolvedCount, open: panel === 'resolved', onToggle: () => togglePanel('resolved') }}
         railOpen={railOpen}
-        onToggleRail={() => {
-          collapseTable()
-          findOpenedRail.current = false
-          setRailOpen((v) => !v)
-          if (narrow) closePanel()
-        }}
-        commentsAvailable={mode === 'reading' && hasThreads && !showTranslated}
+        onToggleRail={toggleRail}
+        commentsAvailable={commentsAvailable}
       />
       {panel === 'settings' && (
         <Suspense fallback={null}>

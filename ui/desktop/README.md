@@ -48,7 +48,11 @@ Home/End, and Tab reach every file and its actions; focused rows scroll into vie
 list dismiss each other. `file-window.ts` owns only the visible range calculation.
 
 The native Edit → Find entry forwards to the shared
-[Find controller](../find/README.md) and is disabled without a ready document.
+[Find controller](../find/README.md) and is disabled without a ready document. `NativeReviewer.tsx`
+reports the active document, mode, and comment rail to the [native menu](../../desktop/src/menu.md)
+and passes its `menu-action` events to `menu.ts`, which switches the mode, runs Save As, closes the
+active file through the pill's close, or asks the document view to open Settings or Resolved
+discussions or toggle Comments.
 `file-labels.ts` adds parent directories only to distinguish duplicate filenames. The active file's
 full path remains in the native window title and the pill tooltip. On macOS, Tauri's overlay title
 bar hides the separate title strip, retains the traffic lights, and extends the theme behind the

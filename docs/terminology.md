@@ -23,6 +23,7 @@ or data being discussed. Names must stand on their own without the development c
 | Use disk version | Use incoming | 采用外部版本 |
 | Compare versions | Needs attention | 需要处理 |
 | Save a copy | Save As… | 另存为… |
+| Close, for the active file in the menu | Close File | 关闭文件 |
 | Session, in document errors | Open document | 已打开的文档 |
 | Typeface | Font preset | 字体预设 |
 | Code color | Code color scheme | 代码配色 |
@@ -290,6 +291,10 @@ separate smart selection algorithm. Keep `open` as the concise typed command.
 
 Use **Open Markdown files… / 打开 Markdown 文件…** for the file-picker action. Keep the ellipsis
 because choosing files requires another step.
+
+The native menu titles are **File / 文件**, **Edit / 编辑**, **View / 查看**, and **Window / 窗口**.
+Use **Close File / 关闭文件** for closing the active document and **Close Window / 关闭窗口** for
+closing the window.
 
 Use **Open files / 打开的文件**, **Outline / 大纲**, and **Filename / 文件名** for document navigation.
 **Repository / 仓库** means a version-controlled project, not any folder. The workspace tree is

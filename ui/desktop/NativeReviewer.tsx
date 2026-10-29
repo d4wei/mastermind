@@ -4,7 +4,9 @@ import { App } from '../app/App'
 import { navigate, useRoute } from '../app/route'
 import { useDoc } from '../documents/store'
 import { useT } from '../i18n'
-import { requestFind } from '../app/overlayStore'
+import { requestFind, useCommentRail } from '../app/overlayStore'
+import { useConfig } from '../app/configStore'
+import { dispatchMenuAction, isMenuAction, type MenuState } from './menu'
 import { FileIcon } from '../icons'
 import { FileTabs, type OpenDocument } from './FileTabs'
 import { ToolbarTarget } from '../app/ToolbarTarget'
@@ -71,21 +73,37 @@ export function NativeReviewer() {
       value: activePath ? `mastermind - ${activePath}` : 'mastermind',
     }).catch((error) => setError(String(error)))
   }, [activePath])
+  const documentActive = !!activePath && setupRequired === false && documentState.status === 'ready'
+  const commentRail = useCommentRail()
   useEffect(() => {
-    void nativeBridge.invoke('set_find_enabled', { enabled: !!activePath && setupRequired === false && documentState.status === 'ready' })
-      .catch((error) => setError(String(error)))
-  }, [activePath, setupRequired, documentState.status])
+    const state: MenuState = { documentActive, mode: documentState.mode,
+      commentsAvailable: commentRail.available, commentsOpen: commentRail.open }
+    void nativeBridge.invoke('set_menu_state', { ...state }).catch((error) => setError(String(error)))
+  }, [documentActive, documentState.mode, commentRail.available, commentRail.open])
+  const menuContext = useRef({ documentActive, closeActiveFile: () => {} })
   useEffect(() => {
     let disposed = false
-    let stop: (() => void) | undefined
-    void nativeBridge.listen('find-requested', requestFind).then((unlisten) => {
-      if (disposed) unlisten()
-      else stop = unlisten
-    }).catch((error) => setError(String(error)))
-    return () => { disposed = true; stop?.() }
+    const stops: Array<() => void> = []
+    const subscribe = (event: string, handler: (payload?: unknown) => void): void => {
+      void nativeBridge.listen(event, handler).then((unlisten) => {
+        if (disposed) unlisten()
+        else stops.push(unlisten)
+      }).catch((error) => setError(String(error)))
+    }
+    subscribe('find-requested', requestFind)
+    subscribe('menu-action', (action) => {
+      if (isMenuAction(action)) dispatchMenuAction(action, menuContext.current.documentActive, menuContext.current.closeActiveFile)
+    })
+    return () => { disposed = true; stops.forEach((stop) => stop()) }
   }, [])
   const language = setupRequired !== false ? previewLanguage : undefined
   const t = useT(language)
+  const configuredLanguage = useConfig((s) => s.config?.uiLang)
+  // The menu speaks the interface's language, including an unconfirmed setup preview.
+  const menuLanguage = language ?? configuredLanguage ?? 'en'
+  useEffect(() => {
+    void nativeBridge.invoke('set_menu_language', { lang: menuLanguage }).catch((error) => setError(String(error)))
+  }, [menuLanguage])
   useEffect(() => {
     let disposed = false
     let setupRevision = -1
@@ -214,6 +232,12 @@ export function NativeReviewer() {
     fileCloseCompletion.current = completion.then(() => {})
     return completion
   }
+  useLayoutEffect(() => {
+    menuContext.current = { documentActive, closeActiveFile: () => {
+      const file = files.find((item) => item.id === id)
+      if (file) void closeFile(file)
+    } }
+  })
   // Agent closes never prompt and never lock the editor; they wait for any close already running.
   useLayoutEffect(() => {
     answerCloseRequest.current = async ({ ids }) => {

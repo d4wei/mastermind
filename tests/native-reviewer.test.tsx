@@ -16,7 +16,7 @@ vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
 // The route names the active file; the store has no active document while one loads or after it fails.
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate,
   useRoute: () => mocks.id === null ? { kind: 'home' } : { kind: 'doc', sessionId: mocks.id } }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: null, status: mocks.status, needsAttention: () => false }), {
+vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: null, status: mocks.status, mode: 'reading', needsAttention: () => false }), {
   getState: () => ({ notifyDiskChange: vi.fn(),
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [],
     needsAttention: () => false }),
@@ -547,11 +547,13 @@ it('does not re-render the session tree when a poll returns an unchanged snapsho
 })
 
 it('disables native Find at home and forwards its menu event when a document is active', async () => {
+  const menuState = (documentActive: boolean) => ['set_menu_state',
+    { documentActive, mode: 'reading', commentsAvailable: false, commentsOpen: false }]
   await mount()
-  expect(mocks.invoke).toHaveBeenCalledWith('set_find_enabled', { enabled: false })
+  expect(mocks.invoke).toHaveBeenCalledWith(...menuState(false))
   mocks.id = '0'
   await mount()
-  expect(mocks.invoke).toHaveBeenCalledWith('set_find_enabled', { enabled: true })
+  expect(mocks.invoke).toHaveBeenCalledWith(...menuState(true))
   const requests = useOverlay.getState().findRequest
   const listener = mocks.listen.mock.calls.find(([event]) => event === 'find-requested')![1]
   act(() => listener())

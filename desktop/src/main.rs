@@ -8,6 +8,7 @@ mod endpoint;
 mod files;
 mod launcher;
 mod lifecycle;
+mod menu;
 mod opening;
 mod preferences;
 mod setup;
@@ -81,7 +82,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             appearance::set_appearance,
             appearance::set_window_title,
-            lifecycle::set_find_enabled,
+            menu::set_menu_language,
+            menu::set_menu_state,
             opening::snapshot,
             opening::close_document,
             opening::choose_files,
@@ -116,7 +118,9 @@ fn main() {
             .ok();
             app.manage(Arc::new(Mutex::new(watch)));
             termination::install(app.handle())?;
-            app.set_menu(lifecycle::menu(app.handle())?)?;
+            let (menu, menu_handles) = menu::build(app.handle(), menu::Language::default())?;
+            app.set_menu(menu)?;
+            app.manage(menu_handles);
             let runtime = tauri::async_runtime::handle();
             runtime.spawn(transport::serve(
                 listener,
@@ -128,7 +132,7 @@ fn main() {
             lifecycle::create_window(app.handle());
             Ok(())
         })
-        .on_menu_event(lifecycle::menu_event)
+        .on_menu_event(menu::menu_event)
         .on_window_event(lifecycle::window_event)
         .build(tauri::generate_context!())
         .expect("native host failed")

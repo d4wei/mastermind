@@ -42,14 +42,16 @@ and local transport startup; `admission.rs` owns the admitted-document registry;
 handles graphical opening and inventory snapshots; `closing.rs` relays launcher close requests to
 the renderer; `document_io.rs` serves admitted document operations and watches. [Translation
 discovery](src/translations.md) offers available reading versions; `lifecycle.rs` creates the
-window, keeps its navigation within the app's own origin, and dispatches menus, close requests, and
-application events. Setup uses preference persistence directly. `appearance.rs` applies the rendered
+window, keeps its navigation within the app's own origin, and dispatches close requests and
+application events; [`menu.rs`](src/menu.md) builds the localized application menu and routes its
+items. Setup uses preference persistence directly. `appearance.rs` applies the rendered
 theme's background and native light/dark appearance; the [theme adapter](../ui/theme/appearance.md)
 owns its color source and synchronization timing.
 
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),
-[opening](src/opening.md), [setup](src/setup.md), [preferences](src/preferences.md),
+[opening](src/opening.md), [menu](src/menu.md), [setup](src/setup.md),
+[preferences](src/preferences.md),
 [worker execution](src/worker.md), and
 [termination](src/termination.md). The [UI adapter](../ui/desktop/README.md) connects these
 commands to the document store.

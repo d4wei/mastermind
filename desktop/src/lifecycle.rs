@@ -21,57 +21,6 @@ pub fn cancel_close(
     crate::termination::complete(app, false).map_err(|e| e.to_string())
 }
 
-pub fn menu(app: &tauri::AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>> {
-    use tauri::menu::{Menu, SubmenuBuilder};
-    #[cfg(not(target_os = "macos"))]
-    let quit = tauri::menu::MenuItem::with_id(
-        app,
-        "quit-reviewer",
-        "Quit mastermind",
-        true,
-        Some("CmdOrCtrl+Q"),
-    )?;
-    let application = SubmenuBuilder::new(app, "mastermind");
-    #[cfg(target_os = "macos")]
-    let application = application.quit();
-    #[cfg(not(target_os = "macos"))]
-    let application = application.item(&quit);
-    let application = application.build()?;
-    let open = tauri::menu::MenuItem::with_id(
-        app,
-        "open-files",
-        "Open Markdown files…",
-        true,
-        Some("CmdOrCtrl+O"),
-    )?;
-    let file = SubmenuBuilder::new(app, "File").item(&open).build()?;
-    let edit = SubmenuBuilder::new(app, "Edit");
-    #[cfg(target_os = "macos")]
-    let edit = edit.undo().redo().separator();
-    let find =
-        tauri::menu::MenuItem::with_id(app, "find-document", "Find…", false, Some("CmdOrCtrl+F"))?;
-    let edit = edit
-        .cut()
-        .copy()
-        .paste()
-        .select_all()
-        .separator()
-        .item(&find)
-        .build()?;
-    Menu::with_items(app, &[&application, &file, &edit])
-}
-
-#[tauri::command]
-pub fn set_find_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
-    if let Some(item) = app.menu().and_then(|menu| menu.get("find-document"))
-        && let Some(item) = item.as_menuitem()
-    {
-        item.set_enabled(enabled)
-            .map_err(|error| error.to_string())?;
-    }
-    Ok(())
-}
-
 /// The origin the interface loads from: the development server in a development build, otherwise
 /// Tauri's app protocol, which Wry serves as `http://tauri.localhost` on Windows.
 fn app_origin(app: &tauri::AppHandle) -> tauri::Url {
@@ -130,18 +79,6 @@ pub fn create_window(app: &tauri::AppHandle) {
             }
         });
     });
-}
-
-pub fn menu_event(app: &tauri::AppHandle, event: tauri::menu::MenuEvent) {
-    if event.id().as_ref() == "find-document" {
-        let _ = app.emit("find-requested", ());
-    }
-    if event.id().as_ref() == "open-files" {
-        crate::opening::choose_files(app.clone());
-    }
-    if event.id().as_ref() == "quit-reviewer" {
-        let _ = app.emit("close-requested", ());
-    }
 }
 
 pub fn window_event(window: &tauri::Window, event: &tauri::WindowEvent) {

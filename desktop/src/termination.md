@@ -1,7 +1,7 @@
 # Native termination
 
 Window close and application quit ask the React document store to flush pending edits and check all
-retained documents. `lifecycle.rs` owns the menu, native window, and close-event dispatch. Its
+retained documents. `lifecycle.rs` owns the native window and close-event dispatch. Its
 `finish_close` command authorizes exit; `cancel_close` keeps the window and buffers.
 The UI locks editing while the check is in flight and coalesces repeated requests.
 
