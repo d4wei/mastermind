@@ -27,6 +27,9 @@ The optional initial reading-language hint follows [translation discovery](trans
 Stdout contains one JSON reply; diagnostics go to stderr. Replies carry file admission metadata,
 not document contents or feedback. Exit status is zero for a fully successful operation, one for
 per-file failures, two for invalid invocation or request errors, and three for an unknown outcome.
+A host with every connection slot taken replies `busy` without reading the request; a failed host
+worker replies `host_failure`. A setup suggestion whose saved preferences cannot be read or
+validated replies `preferences_unreadable`. Each of these exits two.
 A lost acknowledgment or timeout may follow successful admission. Retrying is safe; the launcher
 never kills the app or rolls back files solely because its connection failed. On Unix the launcher
 starts the app in its own process group, so interrupting or signalling the launcher's group does

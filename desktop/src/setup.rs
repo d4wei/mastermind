@@ -12,8 +12,8 @@ use std::{
 const FIELDS: [&str; 2] = ["authorTag", "uiLang"];
 const COMPLETED: &str = "onboardingCompleted";
 const MAX_AUTHOR_UTF16_UNITS: usize = 64;
-const GIT_NAME_OUTPUT_BYTES: usize = 4096;
-const GIT_NAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
+const SUBPROCESS_OUTPUT_BYTES: usize = 4096;
+const SUBPROCESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[derive(Default)]
 struct Transient {
@@ -118,8 +118,56 @@ fn git_default_name(raw: &str) -> String {
     }
 }
 
+/// Whether spawning `git` can run Git rather than an installer prompt. On macOS `/usr/bin/git` is
+/// a shim that opens the Command Line Tools installer when no developer directory is selected.
+#[cfg(target_os = "macos")]
+fn git_spawn_allowed(
+    resolved: Option<&std::path::Path>,
+    developer_directory_selected: impl FnOnce() -> bool,
+) -> bool {
+    match resolved {
+        Some(git) if git.parent() == Some(std::path::Path::new("/usr/bin")) => {
+            developer_directory_selected()
+        }
+        Some(_) => true,
+        None => false,
+    }
+}
+
+/// Finds the first executable `name` in the directories of `search_path`, as `PATH` lookup does.
+#[cfg(target_os = "macos")]
+fn resolve_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    std::env::split_paths(search_path)
+        .map(|directory| directory.join(name))
+        .find(|candidate| {
+            std::fs::metadata(candidate)
+                .is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+        })
+}
+
+#[cfg(target_os = "macos")]
+fn developer_directory_selected() -> bool {
+    use std::process::{Command, Stdio};
+    let mut command = Command::new("/usr/bin/xcode-select");
+    command
+        .arg("-p")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    bounded_output(command).is_some()
+}
+
 fn git_name() -> String {
     use std::process::{Command, Stdio};
+    #[cfg(target_os = "macos")]
+    {
+        let search_path = std::env::var_os("PATH").unwrap_or_default();
+        let resolved = resolve_executable("git", &search_path);
+        if !git_spawn_allowed(resolved.as_deref(), developer_directory_selected) {
+            return "reviewer".into();
+        }
+    }
     let mut command = Command::new("git");
     command
         .args(["config", "--global", "--get", "user.name"])
@@ -134,37 +182,37 @@ fn git_name() -> String {
     git_name_from(command)
 }
 
-fn git_name_from(mut command: std::process::Command) -> String {
-    let Ok(mut child) = command.spawn() else {
-        return "reviewer".into();
-    };
-    let deadline = std::time::Instant::now() + GIT_NAME_TIMEOUT;
+fn git_name_from(command: std::process::Command) -> String {
+    bounded_output(command)
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .map_or_else(|| "reviewer".into(), |raw| git_default_name(&raw))
+}
+
+/// Runs a command with piped stdout and returns that output when the command succeeds within the
+/// time and output bounds.
+fn bounded_output(mut command: std::process::Command) -> Option<Vec<u8>> {
+    let mut child = command.spawn().ok()?;
+    let deadline = std::time::Instant::now() + SUBPROCESS_TIMEOUT;
     loop {
         match child.try_wait() {
             Ok(Some(status)) if status.success() => {
                 let mut bytes = Vec::new();
-                if child
+                child
                     .stdout
-                    .take()
-                    .unwrap()
-                    .take((GIT_NAME_OUTPUT_BYTES + 1) as u64)
+                    .take()?
+                    .take((SUBPROCESS_OUTPUT_BYTES + 1) as u64)
                     .read_to_end(&mut bytes)
-                    .is_ok()
-                    && bytes.len() <= GIT_NAME_OUTPUT_BYTES
-                    && let Ok(raw) = String::from_utf8(bytes)
-                {
-                    return git_default_name(&raw);
-                }
-                return "reviewer".into();
+                    .ok()?;
+                return (bytes.len() <= SUBPROCESS_OUTPUT_BYTES).then_some(bytes);
             }
-            Ok(Some(_)) => return "reviewer".into(),
+            Ok(Some(_)) => return None,
             Ok(None) if std::time::Instant::now() < deadline => {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return "reviewer".into();
+                return None;
             }
         }
     }
@@ -283,7 +331,7 @@ impl Setup {
         Ok(self.snapshot_locked(&mut state, raw.as_object().unwrap(), ui_default))
     }
 
-    pub fn protect(&self, fields: Vec<String>) -> Result<Snapshot, String> {
+    fn protect(&self, fields: Vec<String>) -> Result<Snapshot, String> {
         if fields.iter().any(|field| !FIELDS.contains(&field.as_str())) {
             return Err("invalid_setup_fields".into());
         }
@@ -309,10 +357,11 @@ impl Setup {
             Err(error) => return Response::error(&error),
         };
         let mut state = self.transient.lock().unwrap();
-        let raw = match self.read_raw() {
-            Ok(raw) => raw.unwrap_or(json!({})),
-            Err(error) => return Response::error(&error),
+        // Read failures carry OS and parser diagnostics; the launcher receives one stable code.
+        let Ok(raw) = self.read_raw() else {
+            return Response::error("preferences_unreadable");
         };
+        let raw = raw.unwrap_or(json!({}));
         let completed = raw[COMPLETED].as_bool().unwrap_or(false);
         let mut results = BTreeMap::new();
         let mut changed = false;
@@ -340,7 +389,7 @@ impl Setup {
         }
     }
 
-    pub fn confirm(&self, values: Value) -> Result<Snapshot, String> {
+    fn confirm(&self, values: Value) -> Result<Snapshot, String> {
         let values = validate(values.as_object().ok_or("invalid_setup_fields")?, true)?;
         let mut state = self.transient.lock().unwrap();
         let mut raw = self.read_raw()?.unwrap_or(json!({}));
@@ -353,7 +402,7 @@ impl Setup {
         Ok(self.snapshot_locked(&mut state, raw.as_object().unwrap(), None))
     }
 
-    pub fn patch_preferences(&self, patch: Value) -> Result<(), String> {
+    fn patch_preferences(&self, patch: Value) -> Result<(), String> {
         let patch = patch.as_object().ok_or("invalid_preferences")?;
         if patch.contains_key(COMPLETED) || patch.contains_key("translationLanguage") {
             return Err("invalid_preferences".into());
@@ -440,28 +489,16 @@ pub async fn confirm_setup(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    struct Fixture(PathBuf);
+    use crate::test_support::TempDir;
+    struct Fixture(TempDir);
     impl Fixture {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "mastermind-setup-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::SeqCst)
-            ));
-            std::fs::create_dir_all(&path).unwrap();
-            Self(path)
+            Self(TempDir::new("setup"))
         }
         fn setup(&self) -> Setup {
             let setup = Setup::new(self.0.join("preferences.json"));
             setup.transient.lock().unwrap().git_name = Some("Default name".into());
             setup
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
         }
     }
     fn suggestions(value: Value) -> SetupRequest {
@@ -625,11 +662,12 @@ mod tests {
         assert!(setup.onboarding_needed().is_err());
         assert!(setup.confirm(values()).is_err());
         assert!(setup.patch_preferences(json!({"theme":"grid"})).is_err());
-        assert!(
+        assert_eq!(
             setup
                 .suggest(suggestions(json!({"authorTag":"Agent"})))
                 .error
-                .is_some()
+                .as_deref(),
+            Some("preferences_unreadable")
         );
         assert_eq!(std::fs::read(&setup.path).unwrap(), b"not JSON");
     }
@@ -778,12 +816,39 @@ mod tests {
         let mut command = Command::new("git");
         command
             .args(["config", "--global", "--get", "user.name"])
-            .current_dir(&fixture.0)
+            .current_dir(fixture.0.path())
             .env("GIT_CONFIG_GLOBAL", global)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         assert_eq!(git_name_from(command), "Global Reader");
         assert_eq!(normalize_name(" @中文 Reader "), "中文 Reader");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn git_runs_on_macos_only_where_it_cannot_open_the_tools_installer() {
+        use std::path::Path;
+        let unreachable = || -> bool { panic!("a Git outside /usr/bin needs no check") };
+        assert!(git_spawn_allowed(
+            Some(Path::new("/opt/homebrew/bin/git")),
+            unreachable
+        ));
+        assert!(git_spawn_allowed(Some(Path::new("/usr/bin/git")), || true));
+        assert!(!git_spawn_allowed(Some(Path::new("/usr/bin/git")), || {
+            false
+        }));
+        assert!(!git_spawn_allowed(None, unreachable));
+        let fixture = Fixture::new();
+        let (empty, tools) = (fixture.0.join("empty"), fixture.0.join("tools"));
+        std::fs::create_dir(&empty).unwrap();
+        std::fs::create_dir(&tools).unwrap();
+        std::fs::write(tools.join("git"), b"").unwrap();
+        let search = std::env::join_paths([&empty, &tools]).unwrap();
+        assert_eq!(resolve_executable("git", &search), None);
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(tools.join("git"), std::fs::Permissions::from_mode(0o755))
+            .unwrap();
+        assert_eq!(resolve_executable("git", &search), Some(tools.join("git")));
     }
 }

@@ -1,7 +1,5 @@
 use crate::files::FileError;
-pub use mastermind_launch_check::protocol::{
-    FileResult, MAX_FILES, MAX_FRAME, Request, Response, VERSION,
-};
+use mastermind_launch_check::protocol::{FileResult, MAX_FILES, Request, Response, VERSION};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -10,7 +8,7 @@ use std::{
 
 pub const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown"];
 
-pub fn require_markdown(path: &std::path::Path) -> Result<(), FileError> {
+fn require_markdown(path: &Path) -> Result<(), FileError> {
     if path
         .extension()
         .and_then(|extension| extension.to_str())
@@ -36,7 +34,7 @@ pub struct Document {
     pub language: Option<String>,
 }
 
-pub enum Admission {
+enum Admission {
     Opened(usize),
     AlreadyOpen(usize),
 }
@@ -98,7 +96,7 @@ impl Documents {
         id
     }
 
-    pub fn remove(&mut self, id: usize) -> Option<Document> {
+    fn remove(&mut self, id: usize) -> Option<Document> {
         let document = self.entries.remove(&id)?;
         self.ids.remove(&document.path);
         Some(document)
@@ -191,7 +189,7 @@ impl Documents {
         self.activation_revision += 1;
     }
 
-    pub(crate) fn open(&mut self, path: &str) -> Result<Admission, FileError> {
+    fn open(&mut self, path: &str) -> Result<Admission, FileError> {
         // The selected name decides the document type before any filesystem access.
         require_markdown(Path::new(path))?;
         let canonical = fs::canonicalize(path)?;
@@ -204,9 +202,7 @@ impl Documents {
         Ok(Admission::Opened(self.insert(display, Some(snapshot))))
     }
 
-    /// Refuses a Save As destination registered to an admitted document other than `origin`, such
-    /// as one whose file was deleted; a copy is never merged into another document. The origin's
-    /// own path is allowed because the copy replaces its entry.
+    /// Refuses a Save As destination registered to another document; see `files.md`.
     pub(crate) fn check_copy_destination(
         &self,
         origin: usize,
@@ -227,11 +223,7 @@ impl Documents {
         Ok(())
     }
 
-    /// Registers a created copy in place of `origin`. The destination is checked again because an
-    /// admission can register the created file before this call. The activation revision is kept:
-    /// a save picker must not steal later navigation. The registry is unlocked during creation, so
-    /// `origin` may have closed meanwhile; the copy exists on disk and was chosen by the person, so
-    /// it is then admitted as an ordinary new document and the active document is left alone.
+    /// Registers a created copy in place of `origin`, as `files.md` specifies for Save As.
     pub(crate) fn replace_with_copy(
         &mut self,
         origin: usize,
@@ -248,15 +240,7 @@ impl Documents {
     }
 }
 
-/// Compares Save As destinations case-insensitively on macOS and Windows, whose default volumes
-/// ignore case. Admitted paths carry their on-disk case from canonicalization, but a destination
-/// that does not exist yet keeps the case the person typed. Lowercasing approximates the volume's
-/// folding rules; on a case-sensitive volume it only refuses a name that differs from an open
-/// document's by case. No Unicode normalization is applied, although APFS and HFS+ treat
-/// canonically equivalent names as one file: a typed destination in a different normalization
-/// form from an admitted path (such as a composed and a decomposed `café.md`) compares unequal,
-/// so a copy over an admitted document's deleted path in the other form can register that file
-/// twice.
+/// The Save As destination comparison key; `files.md` states its case and normalization limits.
 fn destination_key(path: &str) -> String {
     if cfg!(any(target_os = "macos", windows)) {
         path.to_lowercase()
@@ -283,8 +267,7 @@ pub(crate) fn copy_destination(path: &Path) -> Result<String, FileError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static NEXT: AtomicU64 = AtomicU64::new(0);
+    use crate::test_support::TempDir;
 
     #[test]
     fn only_markdown_documents_enter_the_registry() {
@@ -425,16 +408,10 @@ mod tests {
         );
     }
 
-    struct Fixture(PathBuf);
+    struct Fixture(TempDir);
     impl Fixture {
         fn new() -> Self {
-            let path = std::env::temp_dir().join(format!(
-                "mastermind-admission-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            fs::create_dir(&path).unwrap();
-            Self(path)
+            Self(TempDir::new("admission"))
         }
         fn request(&self, names: &[&str]) -> Request {
             Request {
@@ -445,11 +422,6 @@ mod tests {
                     .map(|n| self.0.join(n).to_str().unwrap().to_owned())
                     .collect(),
             }
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -520,25 +492,6 @@ mod tests {
         docs.admit(fixture.request(&["c.md"]));
         docs.close(0, Some(0), revision);
         assert_eq!(docs.active_id, Some(2));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn identity_distinguishes_files_with_identical_content() {
-        let fixture = Fixture::new();
-        let a = fixture.0.join("a.md");
-        let b = fixture.0.join("b.md");
-        fs::write(&a, b"same").unwrap();
-        fs::write(&b, b"same").unwrap();
-        let original = fs::File::open(&a).unwrap();
-        assert_eq!(
-            crate::files::file_identity(&original).unwrap(),
-            crate::files::file_identity(&fs::File::open(&a).unwrap()).unwrap()
-        );
-        assert_ne!(
-            crate::files::file_identity(&original).unwrap(),
-            crate::files::file_identity(&fs::File::open(&b).unwrap()).unwrap()
-        );
     }
 
     #[test]
@@ -684,7 +637,6 @@ mod tests {
             let retained = docs.get(1).unwrap().snapshot.as_ref().unwrap();
             assert_eq!(retained.bytes, snapshot.bytes);
             assert_eq!(retained.version, snapshot.version);
-            assert_eq!(retained.mtime_ms, snapshot.mtime_ms);
         }
     }
 

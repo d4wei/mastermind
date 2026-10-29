@@ -14,6 +14,8 @@ and `uiLang` are accepted. Name and Interface language cannot be null. Unknown f
 suggestion, and invalid values reject the whole request before mutation. Valid fields report
 `accepted` or `ignored` in `setup_results`. Saved fields, protected fields, and completed setup
 ignore agent suggestions. Suggestions never write preferences and disappear when the host exits.
+When saved preferences cannot be read or validated, a suggestion fails with the stable code
+`preferences_unreadable`, and the launcher exits with status two.
 
 Successful opening and setup replies report actual `onboarding_needed`. When preferences cannot be
 read or validated, admission still succeeds and the value is null. Invocation failures, rejected
@@ -43,7 +45,9 @@ Name is trimmed and an initial @ removed, matching Settings. Its allowed charact
 length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces and
 Chinese names remain valid. Interface language accepts the existing supported codes. The initial
 Name uses global Git configuration only, with bounded subprocess time and output; unusable or
-unavailable results use `reviewer`. Git defaults replace forbidden author characters and stop at the
+unavailable results use `reviewer`. On macOS, Git runs only when it resolves outside `/usr/bin` or
+`xcode-select -p` reports a developer directory, because `/usr/bin/git` otherwise opens the Command
+Line Tools installer. Git defaults replace forbidden author characters and stop at the
 author length bound. A repository-local identity is never consulted.
 
 `MM_LAUNCH_CHECK_PREFERENCES` is a trusted test-harness override naming an absolute preference

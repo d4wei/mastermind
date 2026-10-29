@@ -14,6 +14,8 @@ mod translations;
 use tauri::{Emitter, Manager};
 mod host_process;
 mod termination;
+#[cfg(test)]
+mod test_support;
 mod transport;
 mod worker;
 use admission::Documents;
@@ -49,8 +51,14 @@ fn main() {
     let docs = Arc::new(Mutex::new(Documents::default()));
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
-    let builder = builder.on_web_content_process_terminate(|webview| {
+    let renderer_reloads = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_web_content_process_terminate(move |webview| {
         termination::renderer_lost(webview.app_handle());
+        // A reloaded renderer subscribes to close requests again, so the window can close.
+        if termination::should_reload_renderer(&renderer_reloads) {
+            let _ = webview.reload();
+        }
     });
     builder
         .plugin(tauri_plugin_dialog::init())
@@ -90,11 +98,12 @@ fn main() {
             )?));
             app.manage(setup.clone());
             let invalidations = app.handle().clone();
-            app.manage(Arc::new(Mutex::new(document_io::FileWatch::new(
-                move || {
-                    let _ = invalidations.emit("document-invalidated", ());
-                },
-            )?)));
+            let watch = document_io::FileWatch::new(move || {
+                let _ = invalidations.emit("document-invalidated", ());
+            })
+            .inspect_err(|error| eprintln!("File watching is unavailable: {error}"))
+            .ok();
+            app.manage(Arc::new(Mutex::new(watch)));
             termination::install(app.handle())?;
             app.set_menu(lifecycle::menu(app.handle())?)?;
             let runtime = tauri::async_runtime::handle();

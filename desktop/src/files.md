@@ -14,48 +14,55 @@ first webview read receives the admitted snapshot even if the path changed or di
 opening was acknowledged. Subscribing after the document loads triggers a fresh read, retaining that
 base and surfacing subsequent disk changes. Delivering the initial snapshot releases its host copy.
 
-Reads open an existing regular file without following a final symlink or Windows reparse point.
-They compare descriptor metadata before and after reading, then compare a second descriptor at
-the path. Versions include filesystem identity, metadata, and SHA-256 of the raw bytes. The
-Windows identity is the volume and file ID; Unix uses device and inode plus metadata timestamps.
-A changed or replaced path rejects the snapshot. Reads and changed writes share a size limit.
-Unsupported types are checked before opening and again through descriptor metadata. Unix opens
-are nonblocking only until the descriptor is confirmed to be a regular file.
+Reads open an existing regular file without following a final symlink or Windows reparse point. They
+compare descriptor metadata before and after reading, then compare a second descriptor at the path.
+Versions include filesystem identity, metadata, and SHA-256 of the raw bytes. The Windows identity
+is the volume and file ID; Unix uses device and inode plus modification and change timestamps. A
+changed or replaced path rejects the snapshot. Reads and changed writes share a size limit.
+Unsupported types are checked before opening and again through descriptor metadata. Unix opens are
+nonblocking only until the descriptor is confirmed to be a regular file.
 
 A separate write mutex serializes this host's writes, including Save As. The document registry is
-locked only to resolve the admitted path and, for Save As, to check and register the destination,
-so writes do not hold that registry during disk I/O. Each write rechecks its supplied base version
-through the opened descriptor. Missing paths are conflicts and are never recreated.
+locked only to resolve the admitted path and, for Save As, to check and register the destination, so
+writes do not hold that registry during disk I/O. Each write rechecks its supplied base version
+through the opened descriptor. A base whose identity and digest match the current file is accepted
+even when its metadata differs, so a metadata-only change, such as a mode, extended-attribute, or
+sync-agent change to the Unix change time, does not reject the next save; changed bytes or a
+replaced file still conflict. Missing paths are conflicts and are never recreated.
 
-Snapshots reach the UI as `{ mtimeMs, version, content, lossy }`. `content` is lossily decoded
-text; `lossy` is true when the bytes are not valid UTF-8, so the UI can open such a file read-only.
-A UTF-8 byte order mark is valid UTF-8. An unchanged string returns without writing, retaining
-original bytes even when they contain invalid UTF-8. Changed content for a file that is not valid
-UTF-8 is refused with `not_utf8`, because writing it would replace invalid sequences outside the
-edit; Save As can write a UTF-8 copy instead. Changed content is written and truncated through the
-existing descriptor, preserving inode, permissions, and admitted symlink aliases. A second snapshot
-checks the resulting content and path identity before reporting success.
+Snapshots reach the UI as `{ version, content, lossy }`. `content` is lossily decoded text; `lossy`
+is true when the bytes are not valid UTF-8, so the UI can open such a file read-only. A UTF-8 byte
+order mark is valid UTF-8. An unchanged string returns without writing, retaining original bytes
+even when they contain invalid UTF-8. Changed content for a file that is not valid UTF-8 is refused
+with `not_utf8`, because writing it would replace invalid sequences outside the edit; Save As can
+write a UTF-8 copy instead. Changed content is written and truncated through the existing
+descriptor, preserving inode, permissions, and admitted symlink aliases, then synced with
+`sync_data`. A second snapshot checks the resulting content and path identity before reporting
+success.
 
 This is not a filesystem transaction. Unrelated writers do not share the mutex and can intervene
-after validation. A partial write or process failure can leave partial content. No crash-durability
-claim or unconditional overwrite fallback is made. A failed response leaves the UI's local text
+after validation. A partial write or process failure can leave partial content. In-place saves and
+Save As both sync file data before reporting success; a new copy's directory entry is not synced,
+and there is no unconditional overwrite fallback. A failed response leaves the UI's local text
 available for recovery and retry.
 
 Notify watches parent directories so replacing an individual file preserves the directory watch.
 Prepared artifact directories share this lifecycle; see [translation discovery](translations.md).
-Events invalidate the active document; a versioned read decides whether content changed. Read-only
-access events are ignored. Watch errors also invalidate. A removal event for a watched directory
-marks it removed; the next watch request or close releases its registration and a watch request
-registers it again, so a recreated directory is watched once. The event callback never waits on the
-watch set, and watch calls are never made while holding it, because they can join the thread that
-runs the callback. The UI revalidates on focus and at intervals even when watch registration
-succeeds; failed registration uses a faster interval. Inactive documents revalidate on return; their
-saves still check versions. Network filesystem notifications and parent-directory replacement remain
-platform validation work.
+Events invalidate the active document; a versioned read decides whether content changed. Access
+events are ignored, including the close after a write, whose modification is reported separately.
+Watch errors also invalidate. A removal event for a watched directory marks it removed; the next
+watch request or close releases its registration and a watch request registers it again, so a
+recreated directory is watched once. The event callback never waits on the watch set, and watch
+calls are never made while holding it, because they can join the thread that runs the callback. The
+UI revalidates on focus and at intervals even when watch registration succeeds; failed registration
+uses a faster interval. When the platform watcher cannot be created, the host still starts and every
+watch request fails with `watch_failed`. Inactive documents revalidate on return; their saves still
+check versions. Network filesystem notifications and parent-directory replacement remain platform
+validation work.
 
-Native filesystem commands and admission share the blocking-work gate described in
-[`worker.md`](worker.md). Filesystem work runs outside the event loop; response deadlines do not
-cancel operations already running.
+Native filesystem commands run on the blocking-work gate and admissions on a separate admission
+lane, both described in [`worker.md`](worker.md). Filesystem work runs outside the event loop;
+response deadlines do not cancel operations already running.
 
 Native file and watch failures serialize `status`, `kind`, stable `error` code, and readable
 `message`. `kind` is the UI's host failure: `conflict` for `file_changed`, `missing` for
@@ -89,8 +96,10 @@ may remain and is never silently removed or overwritten on retry.
 An ordinary Save As also refuses, before creation, a destination still registered to another
 admitted document, such as one whose file was deleted, with `already_open`; the copy never merges
 into that document. The originating document's own deleted path is allowed, since the copy replaces
-its entry. On macOS and Windows the comparison ignores case, approximating their default volumes;
-it does not normalize Unicode, so on APFS a destination typed in another normalization form than an
+its entry. On macOS and Windows the comparison ignores case, approximating their default volumes,
+because a destination that does not exist yet keeps the case the person typed; on a case-sensitive
+volume this only refuses a name that differs from an admitted document's by case. It does not
+normalize Unicode, so on APFS a destination typed in another normalization form than an
 admitted document's deleted path (a composed versus a decomposed `café.md`) is not recognized as
 that path and the file can be registered twice. After creation the check is repeated, the new file
 is admitted under a fresh ID with the snapshot creation verified, and the original document's

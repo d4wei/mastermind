@@ -17,22 +17,40 @@ static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
 
+/// Decides AppKit's termination reply. `request_check` asks the subscribed renderer to check its
+/// documents and reports whether a check is now pending.
+fn termination_reply(
+    ready: bool,
+    request_check: impl FnOnce() -> bool,
+) -> NSApplicationTerminateReply {
+    // A renderer that has not subscribed, or whose process was lost, holds no recoverable edits.
+    if !ready {
+        return NSApplicationTerminateReply::TerminateNow;
+    }
+    if request_check() {
+        NSApplicationTerminateReply::TerminateLater
+    } else {
+        NSApplicationTerminateReply::TerminateCancel
+    }
+}
+
+fn request_check() -> bool {
+    let Some(app) = APP.get() else {
+        return false;
+    };
+    if PENDING.swap(true, Ordering::SeqCst) || app.emit("close-requested", ()).is_ok() {
+        return true;
+    }
+    PENDING.store(false, Ordering::SeqCst);
+    false
+}
+
 extern "C-unwind" fn should_terminate(
     _: &AnyObject,
     _: Sel,
     _: *mut AnyObject,
 ) -> NSApplicationTerminateReply {
-    if !READY.load(Ordering::SeqCst) {
-        return NSApplicationTerminateReply::TerminateCancel;
-    }
-    let Some(app) = APP.get() else {
-        return NSApplicationTerminateReply::TerminateCancel;
-    };
-    if !PENDING.swap(true, Ordering::SeqCst) && app.emit("close-requested", ()).is_err() {
-        PENDING.store(false, Ordering::SeqCst);
-        return NSApplicationTerminateReply::TerminateCancel;
-    }
-    NSApplicationTerminateReply::TerminateLater
+    termination_reply(READY.load(Ordering::SeqCst), request_check)
 }
 
 fn add_termination_method(class: &AnyClass) -> io::Result<()> {
@@ -117,16 +135,34 @@ mod tests {
         ready();
         disarm();
         assert!(!READY.load(Ordering::SeqCst));
-        // Before the renderer subscribes, a quit cannot wait on an event with no consumer.
+        // Without a subscribed renderer, a quit neither waits on an event with no consumer nor
+        // is refused.
         unsafe {
             let object: objc2::rc::Retained<AnyObject> = msg_send![class, new];
             let result: NSApplicationTerminateReply =
                 msg_send![&object, applicationShouldTerminate: std::ptr::null_mut::<AnyObject>()];
-            assert_eq!(result, NSApplicationTerminateReply::TerminateCancel);
+            assert_eq!(result, NSApplicationTerminateReply::TerminateNow);
         }
         assert_eq!(
             add_termination_method(class).unwrap_err().to_string(),
             "termination_delegate_method_already_exists"
+        );
+    }
+
+    #[test]
+    fn only_a_subscribed_renderer_defers_termination() {
+        let unreachable = || -> bool { panic!("an unloaded renderer is not asked") };
+        assert_eq!(
+            termination_reply(false, unreachable),
+            NSApplicationTerminateReply::TerminateNow
+        );
+        assert_eq!(
+            termination_reply(true, || true),
+            NSApplicationTerminateReply::TerminateLater
+        );
+        assert_eq!(
+            termination_reply(true, || false),
+            NSApplicationTerminateReply::TerminateCancel
         );
     }
 }

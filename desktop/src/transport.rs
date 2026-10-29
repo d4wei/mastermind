@@ -1,7 +1,6 @@
-use crate::admission::{Documents, MAX_FRAME, Response};
+use crate::{admission::Documents, worker::BlockingWork};
 use interprocess::local_socket::tokio::{Listener, prelude::*};
-use mastermind_launch_check::protocol::MAX_REPLY_FRAME;
-use mastermind_launch_check::protocol::Operation;
+use mastermind_launch_check::protocol::{MAX_FRAME, MAX_REPLY_FRAME, Operation, Response, VERSION};
 use std::{
     io,
     path::Path,
@@ -10,13 +9,17 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
+    sync::{OwnedSemaphorePermit, Semaphore},
+};
 
 pub const DEADLINE: std::time::Duration = std::time::Duration::from_secs(10);
 const ACCEPT_RETRY: std::time::Duration = std::time::Duration::from_millis(100);
 const ACCEPT_RETRY_CAP: std::time::Duration = std::time::Duration::from_secs(5);
+const CONNECTION_SLOTS: usize = 16;
+const BUSY_REPLY_DEADLINE: std::time::Duration = std::time::Duration::from_secs(1);
 
-/// Doubles the pause after each consecutive accept failure, up to the cap.
 fn accept_retry_delay(failures: u32) -> std::time::Duration {
     ACCEPT_RETRY
         .saturating_mul(1 << failures.saturating_sub(1).min(16))
@@ -43,10 +46,19 @@ pub async fn exchange(root: &Path, request: &Operation) -> io::Result<Response> 
     }
     (&stream).write_all(&bytes).await?;
     let response: Response = serde_json::from_slice(&frame(&stream, MAX_REPLY_FRAME).await?)?;
-    if response.version != crate::admission::VERSION {
+    if response.version != VERSION {
         return Err(io::Error::other("incompatible_version"));
     }
     Ok(response)
+}
+
+/// Admissions wait in their own lane, so a stalled one cannot take the capacity document commands
+/// need.
+fn lane(request: &Operation) -> &'static BlockingWork {
+    match request {
+        Operation::Open(_) => crate::worker::admission_work(),
+        Operation::Setup(_) => crate::worker::blocking_work(),
+    }
 }
 
 fn dispatch(request: Operation, docs: &Mutex<Documents>, setup: &crate::setup::Setup) -> Response {
@@ -81,6 +93,39 @@ where
     }
 }
 
+async fn respond(
+    request: Operation,
+    docs: Arc<Mutex<Documents>>,
+    setup: Arc<crate::setup::Setup>,
+) -> Response {
+    lane(&request)
+        .run(move || dispatch(request, &docs, &setup))
+        .await
+        .unwrap_or_else(|_| Response::error("host_failure"))
+}
+
+async fn write_reply(mut stream: impl AsyncWrite + Unpin, response: &Response) {
+    let mut bytes = serde_json::to_vec(response).unwrap();
+    bytes.push(b'\n');
+    let _ = stream.write_all(&bytes).await;
+}
+
+/// Takes a connection slot, or refuses the connection with `busy` so the launcher reports a
+/// definite refusal rather than an unknown outcome.
+async fn take_slot(
+    slots: &Arc<Semaphore>,
+    stream: impl AsyncWrite + Unpin,
+) -> Option<OwnedSemaphorePermit> {
+    match slots.clone().try_acquire_owned() {
+        Ok(permit) => Some(permit),
+        Err(_) => {
+            let busy = Response::error("busy");
+            let _ = tokio::time::timeout(BUSY_REPLY_DEADLINE, write_reply(stream, &busy)).await;
+            None
+        }
+    }
+}
+
 pub async fn serve(
     listener: Listener,
     docs: Arc<Mutex<Documents>>,
@@ -90,10 +135,10 @@ pub async fn serve(
     let drop_reply = Arc::new(AtomicBool::new(
         std::env::var_os("MM_LAUNCH_CHECK_DROP_REPLY").is_some(),
     ));
-    let slots = Arc::new(tokio::sync::Semaphore::new(16));
+    let slots = Arc::new(Semaphore::new(CONNECTION_SLOTS));
     loop {
         let stream = next_connection(|| listener.accept()).await;
-        let Ok(permit) = slots.clone().try_acquire_owned() else {
+        let Some(permit) = take_slot(&slots, &stream).await else {
             continue;
         };
         let docs = docs.clone();
@@ -106,10 +151,7 @@ pub async fn serve(
                 let response = match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
                     serde_json::from_slice::<Operation>(&bytes).map_err(io::Error::from)
                 }) {
-                    Ok(request) => crate::worker::blocking_work()
-                        .run(move || dispatch(request, &docs, &setup))
-                        .await
-                        .unwrap(),
+                    Ok(request) => respond(request, docs, setup).await,
                     Err(_) => Response::error("invalid_request"),
                 };
                 if response
@@ -122,9 +164,7 @@ pub async fn serve(
                 if drop_reply.swap(false, Ordering::SeqCst) {
                     return;
                 }
-                let mut bytes = serde_json::to_vec(&response).unwrap();
-                bytes.push(b'\n');
-                let _ = (&stream).write_all(&bytes).await;
+                write_reply(&stream, &response).await;
             };
             let _ = tokio::time::timeout(DEADLINE, work).await;
         });
@@ -134,7 +174,8 @@ pub async fn serve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admission::{Request, VERSION};
+    use crate::test_support::TempDir;
+    use mastermind_launch_check::protocol::{MAX_FILES, Request};
 
     #[test]
     fn replies_for_requests_within_the_frame_limit_are_accepted() {
@@ -142,12 +183,12 @@ mod tests {
         let request = serde_json::to_vec(&Operation::Open(Request {
             language: None,
             version: VERSION,
-            paths: vec![path.clone(); crate::admission::MAX_FILES],
+            paths: vec![path.clone(); MAX_FILES],
         }))
         .unwrap();
         assert!(request.len() < MAX_FRAME);
         let mut reply = serde_json::to_vec(&Response {
-            results: (0..crate::admission::MAX_FILES)
+            results: (0..MAX_FILES)
                 .map(|_| mastermind_launch_check::protocol::FileResult {
                     path: path.clone(),
                     canonical: Some(path.clone()),
@@ -205,11 +246,8 @@ mod tests {
 
     #[test]
     fn rejected_requests_report_unknown_setup_state() {
-        let path = std::env::temp_dir().join(format!(
-            "mastermind-transport-rejected-{}.json",
-            std::process::id()
-        ));
-        let setup = crate::setup::Setup::new(path);
+        let dir = TempDir::new("transport-rejected");
+        let setup = crate::setup::Setup::new(dir.join("preferences.json"));
         let docs = Mutex::new(Documents::default());
         let response = dispatch(
             Operation::Open(Request {
@@ -226,11 +264,8 @@ mod tests {
 
     #[test]
     fn setup_operations_do_not_wait_for_the_document_registry() {
-        let path = std::env::temp_dir().join(format!(
-            "mastermind-transport-missing-preferences-{}.json",
-            std::process::id()
-        ));
-        let setup = Arc::new(crate::setup::Setup::new(path));
+        let dir = TempDir::new("transport-missing-preferences");
+        let setup = Arc::new(crate::setup::Setup::new(dir.join("preferences.json")));
         let docs = Arc::new(Mutex::new(Documents::default()));
         let guard = docs.lock().unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
@@ -252,15 +287,7 @@ mod tests {
 
     #[test]
     fn admission_remains_successful_when_completion_is_unknown_and_reports_saved_completion() {
-        let root = std::env::temp_dir().join(format!(
-            "mastermind-transport-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        std::fs::create_dir(&root).unwrap();
+        let root = TempDir::new("transport");
         let path = root.join("document.md");
         let preferences = root.join("preferences.json");
         std::fs::write(&path, b"# Exact\r\n").unwrap();
@@ -290,6 +317,94 @@ mod tests {
             Some(false)
         );
         assert_eq!(std::fs::read(&path).unwrap(), b"# Exact\r\n");
-        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_stalled_admission_leaves_gate_capacity_for_other_commands() {
+        use std::time::Duration;
+        let dir = TempDir::new("transport-stalled-admission");
+        let setup = Arc::new(crate::setup::Setup::new(dir.join("preferences.json")));
+        let docs = Arc::new(Mutex::new(Documents::default()));
+        let open = || {
+            Operation::Open(Request {
+                language: None,
+                version: VERSION,
+                paths: vec![dir.join("missing.md").to_str().unwrap().into()],
+            })
+        };
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+            let stalled = tokio::spawn(lane(&open()).run(move || {
+                started_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+            }));
+            tokio::time::timeout(Duration::from_secs(2), started_rx)
+                .await
+                .unwrap()
+                .unwrap();
+            let queued = tokio::spawn(respond(open(), docs.clone(), setup.clone()));
+            let setup_request = Operation::Setup(mastermind_launch_check::protocol::SetupRequest {
+                version: VERSION,
+                setup: serde_json::from_value(serde_json::json!({"authorTag":"Reader"})).unwrap(),
+            });
+            let command = respond(setup_request, docs.clone(), setup.clone());
+            let response = tokio::time::timeout(Duration::from_secs(2), command)
+                .await
+                .unwrap();
+            assert!(response.error.is_none());
+            assert!(!queued.is_finished());
+            release_tx.send(()).unwrap();
+            stalled.await.unwrap().unwrap();
+            let admitted = tokio::time::timeout(Duration::from_secs(2), queued)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(admitted.results[0].error.as_deref(), Some("file_not_found"));
+        });
+    }
+
+    #[test]
+    fn a_full_host_replies_busy_instead_of_dropping_the_connection() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let slots = Arc::new(Semaphore::new(1));
+            let held = take_slot(&slots, tokio::io::sink()).await.unwrap();
+            let (mut launcher, host) = tokio::io::duplex(4096);
+            assert!(take_slot(&slots, host).await.is_none());
+            let reply: Response =
+                serde_json::from_slice(&frame(&mut launcher, MAX_REPLY_FRAME).await.unwrap())
+                    .unwrap();
+            assert_eq!(reply.error.as_deref(), Some("busy"));
+            assert_eq!(reply.version, VERSION);
+            drop(held);
+            assert!(take_slot(&slots, tokio::io::sink()).await.is_some());
+        });
+    }
+
+    #[test]
+    fn a_failed_worker_replies_host_failure() {
+        let dir = TempDir::new("transport-host-failure");
+        let setup = Arc::new(crate::setup::Setup::new(dir.join("preferences.json")));
+        let docs = Arc::new(Mutex::new(Documents::default()));
+        let poison = docs.clone();
+        // A registry poisoned by an earlier panic makes the admission worker panic.
+        let _ = std::thread::spawn(move || {
+            let _guard = poison.lock().unwrap();
+            panic!("registry poisoned");
+        })
+        .join();
+        let request = Operation::Open(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![dir.join("document.md").to_str().unwrap().into()],
+        });
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let response = runtime.block_on(respond(request, docs, setup));
+        assert_eq!(response.error.as_deref(), Some("host_failure"));
     }
 }

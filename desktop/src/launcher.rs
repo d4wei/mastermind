@@ -1,8 +1,7 @@
-use crate::{
-    admission::{MAX_FILES, MAX_FRAME, Request, Response, VERSION},
-    host_process, transport,
+use crate::{host_process, transport};
+use mastermind_launch_check::protocol::{
+    MAX_FILES, MAX_FRAME, Operation, Request, Response, SetupRequest, VERSION,
 };
-use mastermind_launch_check::protocol::{Operation, SetupRequest};
 use std::{io, path::PathBuf};
 
 fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {

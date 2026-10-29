@@ -50,31 +50,29 @@ pub(crate) fn write_preferences_file(path: PathBuf, config: Value) -> Result<(),
     let temp = path.with_extension("json.tmp");
     let mut file = fs::File::create(&temp).map_err(|e| e.to_string())?;
     // Sync before renaming so the replaced path never names an unwritten file after a crash.
-    file.write_all(&bytes)
+    let replaced = file
+        .write_all(&bytes)
         .and_then(|()| file.sync_all())
-        .map_err(|e| e.to_string())?;
-    fs::rename(&temp, path).map_err(|e| e.to_string())
+        .and_then(|()| fs::rename(&temp, path));
+    if let Err(error) = replaced {
+        let _ = fs::remove_file(&temp);
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
     use serde_json::json;
     use std::sync::Arc;
 
     #[test]
     fn preference_reads_accept_the_limit_and_reject_larger_files_without_changes() {
-        let root = std::env::temp_dir().join(format!(
-            "mastermind-preference-limit-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = TempDir::new("preference-limit");
         let path = root.join("reviewer.json");
         assert!(read_preferences_file(path.clone()).unwrap().is_none());
-        fs::create_dir(&root).unwrap();
         let at_limit = format!(
             "{{\"value\":\"{}\"}}",
             "x".repeat(MAX_PREFERENCE_BYTES - 12)
@@ -94,19 +92,11 @@ mod tests {
         assert_eq!(fs::read(&path).unwrap(), oversized.as_bytes());
         fs::write(&path, b"invalid JSON").unwrap();
         assert!(read_preferences_file(path.clone()).is_err());
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn concurrent_preferences_writes_leave_one_complete_object() {
-        let root = std::env::temp_dir().join(format!(
-            "mastermind-preferences-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = TempDir::new("preferences");
         let path = root.join("reviewer.json");
         let start = Arc::new(std::sync::Barrier::new(9));
         let writers = (0..8)
@@ -127,6 +117,17 @@ mod tests {
         assert!(saved["index"].as_u64().unwrap() < 8);
         assert_eq!(saved["value"], "x".repeat(1024));
         assert!(!path.with_extension("json.tmp").exists());
-        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_failed_replacement_removes_its_temporary_file() {
+        let root = TempDir::new("preferences-failed-replacement");
+        // A nonempty directory at the preference path makes the final rename fail.
+        let path = root.join("reviewer.json");
+        fs::create_dir(&path).unwrap();
+        fs::write(path.join("kept"), b"").unwrap();
+        assert!(write_preferences_file(path.clone(), json!({"theme": "paper"})).is_err());
+        assert!(!path.with_extension("json.tmp").exists());
+        assert!(path.join("kept").exists());
     }
 }

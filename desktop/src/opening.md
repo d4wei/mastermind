@@ -11,12 +11,14 @@ person's selection. Failed requests retain the prior selection. The native host 
 show, unminimize, and focus the window after admission; OS focus policy may decline that request.
 Before window creation, selection remains in the registry for the first renderer snapshot.
 
-`opening.rs` converts graphical inputs into the same bounded request. Conversion and per-file
-failures remain in the inventory snapshot until dismissed or replaced by another graphical request.
-Cancellation of a native dialog does nothing. Launcher errors remain in its JSON response.
-File reads run outside the event loop. The registry mutex serializes admissions. Guarded saves
-serialize on a separate write mutex and hold the registry only to resolve the admitted path and,
-for Save As, to check and register the destination.
+`opening.rs` converts graphical inputs into the same request under the same file-count bound; they
+never cross the transport, so its frame limit does not apply. Conversion and per-file failures
+remain in the inventory snapshot until dismissed or replaced by another graphical request.
+Cancellation of a native dialog does nothing. Launcher errors remain in its JSON response. File
+reads run outside the event loop. The registry mutex serializes admissions, which run on the
+admission lane described in [`worker.md`](worker.md). Guarded saves serialize on a separate write
+mutex and hold the registry only to resolve the admitted path and, for Save As, to check and
+register the destination.
 
 The pinned [Tauri dialog plugin](https://v2.tauri.app/plugin/dialog/) supplies the native multi-file
 picker; Rust opens the selected files through the application's admission checks. The frontend has

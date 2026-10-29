@@ -1,20 +1,16 @@
-use serde::Serialize;
+use serde::{Serialize, ser::SerializeStruct};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{File, Metadata, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
     path::Path,
-    time::UNIX_EPOCH,
 };
 
 pub const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct Snapshot {
-    pub mtime_ms: f64,
     pub version: String,
-    #[serde(rename = "content", serialize_with = "serialize_content")]
     pub bytes: Vec<u8>,
     /// The bytes are not valid UTF-8, so `content` replaced invalid sequences and edits cannot be
     /// saved in place.
@@ -27,8 +23,15 @@ impl Snapshot {
     }
 }
 
-fn serialize_content<S: serde::Serializer>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&String::from_utf8_lossy(bytes))
+/// The UI receives decoded `content`, never the raw bytes.
+impl Serialize for Snapshot {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut snapshot = serializer.serialize_struct("Snapshot", 3)?;
+        snapshot.serialize_field("version", &self.version)?;
+        snapshot.serialize_field("content", &self.content())?;
+        snapshot.serialize_field("lossy", &self.lossy)?;
+        snapshot.end()
+    }
 }
 
 /// The failure class the document store acts on; it serializes as the UI's `HostFailure`. Only a
@@ -65,7 +68,7 @@ impl FileError {
         Self { kind, ..self }
     }
 
-    pub fn conflict() -> Self {
+    fn conflict() -> Self {
         Self::new(
             409,
             "file_changed",
@@ -182,6 +185,12 @@ fn open(path: &Path, write: bool) -> Result<File, FileError> {
     Ok(file)
 }
 
+/// Leading `stamp` fields that name the file rather than describe its metadata.
+#[cfg(unix)]
+const IDENTITY_FIELDS: usize = 2;
+#[cfg(windows)]
+const IDENTITY_FIELDS: usize = 1;
+
 fn stamp(file: &File, meta: &Metadata) -> io::Result<String> {
     #[cfg(unix)]
     {
@@ -227,12 +236,6 @@ fn finish_snapshot(
         return Err(FileError::conflict());
     }
     Ok(Snapshot {
-        mtime_ms: after
-            .modified()?
-            .duration_since(UNIX_EPOCH)
-            .map_err(io::Error::other)?
-            .as_secs_f64()
-            * 1000.0,
         version: format!("{token}:{:x}", Sha256::digest(&bytes)),
         lossy: std::str::from_utf8(&bytes).is_err(),
         bytes,
@@ -270,14 +273,26 @@ pub fn create_copy(path: &Path, content: &str) -> Result<Snapshot, FileError> {
     Ok(saved)
 }
 
-// Callers serialize writes for each admitted path. Other processes do not share that lock.
+/// Whether two versions name the same file with the same bytes, whatever its metadata. A
+/// metadata-only change, such as a mode or extended-attribute change, alters the Unix change time
+/// but leaves the content the supplied base describes.
+fn same_file_and_bytes(current: &str, supplied: &str) -> bool {
+    let current: Vec<&str> = current.split(':').collect();
+    let supplied: Vec<&str> = supplied.split(':').collect();
+    current.len() == supplied.len()
+        && current.len() > IDENTITY_FIELDS
+        && current[..IDENTITY_FIELDS] == supplied[..IDENTITY_FIELDS]
+        && current.last() == supplied.last()
+}
+
+// Callers hold one host-wide write lock. Other processes do not share it.
 pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot, FileError> {
     if content.len() as u64 > MAX_FILE_BYTES {
         return Err(FileError::too_large());
     }
     let mut file = open(path, true).map_err(FileError::replacement_as_conflict)?;
     let base = snapshot(&mut file, path).map_err(FileError::replacement_as_conflict)?;
-    if base.version != base_version {
+    if base.version != base_version && !same_file_and_bytes(&base.version, base_version) {
         return Err(FileError::conflict());
     }
     // The UI edits lossy-decoded text: an unchanged string retains the original bytes, and a
@@ -296,14 +311,16 @@ pub fn write(path: &Path, content: &str, base_version: &str) -> Result<Snapshot,
     file.seek(SeekFrom::Start(0))?;
     file.write_all(content.as_bytes())?;
     file.set_len(content.len() as u64)?;
+    file.sync_data()?;
     let written = snapshot(&mut file, path).map_err(FileError::replacement_as_conflict)?;
     if written.content() != content {
         return Err(FileError::conflict());
     }
     Ok(written)
 }
+
 #[cfg(windows)]
-pub fn file_identity(file: &File) -> io::Result<(u64, [u8; 16])> {
+fn file_identity(file: &File) -> io::Result<(u64, [u8; 16])> {
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
         FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx,
@@ -328,31 +345,18 @@ pub fn file_identity(file: &File) -> io::Result<(u64, [u8; 16])> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::TempDir;
     use std::fs;
-    use std::sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    };
-    static NEXT: AtomicU64 = AtomicU64::new(0);
-    struct Fixture(std::path::PathBuf);
+    use std::sync::{Arc, Mutex};
+    struct Fixture(TempDir);
     impl Fixture {
         fn new() -> Self {
-            let dir = std::env::temp_dir().join(format!(
-                "mastermind-files-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            fs::create_dir(&dir).unwrap();
+            let dir = TempDir::new("files");
             fs::write(dir.join("document.md"), b"original\r\n").unwrap();
             Self(dir)
         }
         fn file(&self) -> std::path::PathBuf {
             self.0.join("document.md")
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -441,7 +445,7 @@ mod tests {
             read(&f.0.join("missing")).unwrap_err().error,
             "file_not_found"
         );
-        assert_eq!(read(&f.0).unwrap_err().error, "not_supported_file");
+        assert_eq!(read(f.0.path()).unwrap_err().error, "not_supported_file");
         let original = fs::read(f.file()).unwrap();
         let file = File::options().write(true).open(f.file()).unwrap();
         file.set_len(MAX_FILE_BYTES + 1).unwrap();
@@ -523,7 +527,10 @@ mod tests {
         let payload = serde_json::to_value(&base).unwrap();
         assert_eq!(payload["content"], "\u{feff}a\r\n\u{fffd}");
         assert!(payload.get("bytes").is_none());
-        assert!(payload["mtimeMs"].is_number());
+        assert_eq!(
+            payload.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["content", "lossy", "version"]
+        );
         let saved = write(&f.file(), &base.content(), &base.version).unwrap();
         assert_eq!(saved.version, base.version);
         assert_eq!(fs::read(f.file()).unwrap(), bytes);
@@ -599,6 +606,36 @@ mod tests {
             409
         );
         assert_eq!(fs::read(f.file()).unwrap(), b"external\r\n");
+    }
+
+    #[test]
+    fn a_file_modified_before_1970_can_be_read_and_saved() {
+        let f = Fixture::new();
+        let before_epoch = std::time::UNIX_EPOCH - std::time::Duration::from_secs(86_400);
+        File::options()
+            .write(true)
+            .open(f.file())
+            .unwrap()
+            .set_modified(before_epoch)
+            .unwrap();
+        assert!(fs::metadata(f.file()).unwrap().modified().unwrap() < std::time::UNIX_EPOCH);
+        let base = read(&f.file()).unwrap();
+        assert_eq!(base.bytes, b"original\r\n");
+        write(&f.file(), "edited\r\n", &base.version).unwrap();
+        assert_eq!(fs::read(f.file()).unwrap(), b"edited\r\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_metadata_only_change_does_not_reject_the_next_save() {
+        use std::os::unix::fs::PermissionsExt;
+        let f = Fixture::new();
+        let base = read(&f.file()).unwrap();
+        let saved = write(&f.file(), "first edit\r\n", &base.version).unwrap();
+        fs::set_permissions(f.file(), fs::Permissions::from_mode(0o640)).unwrap();
+        assert_ne!(read(&f.file()).unwrap().version, saved.version);
+        write(&f.file(), "second edit\r\n", &saved.version).unwrap();
+        assert_eq!(fs::read(f.file()).unwrap(), b"second edit\r\n");
     }
 
     #[test]
@@ -723,5 +760,23 @@ mod tests {
             413
         );
         assert_eq!(fs::read(f.file()).unwrap(), base.bytes);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn identity_distinguishes_files_with_identical_content() {
+        let dir = TempDir::new("identity");
+        let (a, b) = (dir.join("a.md"), dir.join("b.md"));
+        fs::write(&a, b"same").unwrap();
+        fs::write(&b, b"same").unwrap();
+        let original = File::open(&a).unwrap();
+        assert_eq!(
+            file_identity(&original).unwrap(),
+            file_identity(&File::open(&a).unwrap()).unwrap()
+        );
+        assert_ne!(
+            file_identity(&original).unwrap(),
+            file_identity(&File::open(&b).unwrap()).unwrap()
+        );
     }
 }

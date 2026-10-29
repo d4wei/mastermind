@@ -33,7 +33,8 @@ fn directory(source: &Path) -> Result<PathBuf, FileError> {
     Ok(path)
 }
 
-fn read(source: &Path, language: &str) -> Result<Value, FileError> {
+/// Reads one artifact from the canonical `directory` and returns it with its size on disk.
+fn read(directory: &Path, source: &Path, language: &str) -> Result<(Value, usize), FileError> {
     if !language_code(language) {
         return Err(FileError::new(
             400,
@@ -41,7 +42,7 @@ fn read(source: &Path, language: &str) -> Result<Value, FileError> {
             "The translation language is invalid.",
         ));
     }
-    let path = directory(source)?.join(format!(
+    let path = directory.join(format!(
         "{}.{}.json",
         source.file_name().unwrap().to_string_lossy(),
         language
@@ -68,7 +69,7 @@ fn read(source: &Path, language: &str) -> Result<Value, FileError> {
             "The translation language does not match its filename.",
         ));
     }
-    Ok(value)
+    Ok((value, raw.bytes.len()))
 }
 
 pub fn list(source: &Path) -> Result<Vec<Value>, FileError> {
@@ -79,7 +80,7 @@ pub fn list(source: &Path) -> Result<Vec<Value>, FileError> {
     };
     let prefix = format!("{}.", source.file_name().unwrap().to_string_lossy());
     let mut languages = Vec::new();
-    for entry in fs::read_dir(dir)? {
+    for entry in fs::read_dir(&dir)? {
         let Ok(entry) = entry else { continue };
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
@@ -95,8 +96,8 @@ pub fn list(source: &Path) -> Result<Vec<Value>, FileError> {
     let mut bytes = 0;
     let mut artifacts = Vec::new();
     for language in languages {
-        if let Ok(value) = read(source, &language) {
-            bytes += value.to_string().len();
+        if let Ok((value, size)) = read(&dir, source, &language) {
+            bytes += size;
             if bytes > MAX_TOTAL_BYTES || artifacts.len() == MAX_TRANSLATIONS {
                 break;
             }
@@ -111,13 +112,11 @@ mod tests {
     use super::*;
     #[test]
     fn discovers_independent_languages_and_directory_creation() {
-        let root =
-            std::env::temp_dir().join(format!("mastermind-translations-{}", std::process::id()));
-        fs::create_dir_all(&root).unwrap();
-        let root = fs::canonicalize(root).unwrap();
+        let root = crate::test_support::TempDir::new("translations");
+        let root = root.path();
         let source = root.join("doc.md");
         assert!(list(&source).unwrap().is_empty());
-        assert_eq!(watch_paths(&source), std::slice::from_ref(&root));
+        assert_eq!(watch_paths(&source), [root]);
         let dir = root.join(".mastermind/translations");
         fs::create_dir_all(&dir).unwrap();
         assert_eq!(watch_paths(&source).len(), 3);
@@ -138,14 +137,13 @@ mod tests {
         )
         .unwrap();
         fs::rename(dir.join("replacement"), dir.join("doc.md.fr.json")).unwrap();
-        assert_eq!(read(&source, "fr").unwrap()["replacement"], true);
-        assert!(read(&source, "../fr").is_err());
+        assert_eq!(read(&dir, &source, "fr").unwrap().0["replacement"], true);
+        assert!(read(&dir, &source, "../fr").is_err());
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(dir.join("doc.md.fr.json"), dir.join("doc.md.it.json"))
                 .unwrap();
-            assert!(read(&source, "it").is_err());
+            assert!(read(&dir, &source, "it").is_err());
         }
-        fs::remove_dir_all(root).unwrap();
     }
 }

@@ -10,11 +10,12 @@ JSON parsing. Oversized preferences are rejected without rewriting the file. Pre
 failures keep their string response shape; document and admission errors use the structured shape.
 
 Writes sync a temporary file in the same directory, then rename it over the preference path, so
-readers see either the previous or the new complete object. The rename itself is not synced, and it
-replaces a symlinked preference path with a regular file. The writer mutex
-protects that temporary path from competing writes within this host. This is separate from the
-setup mutex, which protects the complete read-modify-write operation.
+readers see either the previous or the new complete object. A failed write removes its temporary
+file. The rename itself is not synced, and it replaces a symlinked preference path with a regular
+file. The writer mutex protects that temporary path from competing writes within this host. This is
+separate from the setup mutex, which protects the complete read-modify-write operation.
 
 The trusted absolute test-harness path override and saved-choice semantics are described in
 [`setup.md`](setup.md). Tests check the preference byte boundary, concurrent complete writes,
-patch preservation, malformed-file protection, and confirmation retry.
+patch preservation, malformed-file protection, confirmation retry, and temporary-file removal after
+a failed replacement.

@@ -1,4 +1,5 @@
-use crate::admission::{Documents, MAX_FILES, MAX_FRAME, Request, Response, VERSION};
+use crate::admission::Documents;
+use mastermind_launch_check::protocol::{MAX_FILES, Request, VERSION};
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -56,7 +57,7 @@ pub async fn close_document(
     active_id: Option<usize>,
     activation_revision: u64,
     state: tauri::State<'_, Arc<Mutex<Documents>>>,
-    watch: tauri::State<'_, Arc<Mutex<crate::document_io::FileWatch>>>,
+    watch: tauri::State<'_, crate::document_io::SharedWatch>,
 ) -> Result<Snapshot, String> {
     let state = state.inner().clone();
     let watch = watch.inner().clone();
@@ -64,7 +65,7 @@ pub async fn close_document(
         .run(move || {
             let mut docs = state.lock().unwrap();
             docs.close(id, active_id, activation_revision);
-            watch.lock().unwrap().retain_documents(&docs);
+            crate::document_io::retain_watches(&watch, &docs);
             Snapshot::from_documents(&docs)
         })
         .await
@@ -102,16 +103,11 @@ fn admit_graphical(docs: &mut Documents, paths: Vec<Result<PathBuf, String>>) {
         })
         .collect::<Vec<_>>();
     if !paths.is_empty() {
-        let request = Request {
+        let response = docs.admit(Request {
             language: None,
             version: VERSION,
             paths,
-        };
-        let response = if serde_json::to_vec(&request).unwrap().len() + 1 > MAX_FRAME {
-            Response::error("request_too_large")
-        } else {
-            docs.admit(request)
-        };
+        });
         errors.extend(response.error);
         errors.extend(response.results.into_iter().filter_map(|result| {
             result.error.map(|code| {
@@ -128,7 +124,7 @@ pub fn open(app: &tauri::AppHandle, paths: Vec<Result<PathBuf, String>>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let focus_app = app.clone();
-        if crate::worker::blocking_work()
+        if crate::worker::admission_work()
             .run(move || {
                 admit_graphical(&mut docs.lock().unwrap(), paths);
             })
@@ -179,8 +175,8 @@ mod tests {
 
     #[test]
     fn graphical_opening_shares_admission_and_reports_partial_failures() {
-        let path =
-            std::env::temp_dir().join(format!("mastermind-graphical-{}.md", std::process::id()));
+        let dir = crate::test_support::TempDir::new("graphical");
+        let path = dir.join("document.md");
         std::fs::write(&path, b"original\r\n").unwrap();
         let mut docs = Documents::default();
         admit_graphical(
@@ -203,7 +199,6 @@ mod tests {
             docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             b"original\r\n"
         );
-        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]

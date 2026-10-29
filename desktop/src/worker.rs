@@ -2,6 +2,8 @@ use std::sync::{Arc, OnceLock};
 use tokio::sync::Semaphore;
 
 const BLOCKING_CAPACITY: usize = 16;
+/// Admissions serialize on the document registry, so a second permit would only add a waiter.
+const ADMISSION_CAPACITY: usize = 1;
 
 #[derive(Clone)]
 pub struct BlockingWork {
@@ -30,9 +32,16 @@ impl BlockingWork {
     }
 }
 
+/// The gate for document commands, preferences, and setup.
 pub fn blocking_work() -> &'static BlockingWork {
     static WORK: OnceLock<BlockingWork> = OnceLock::new();
     WORK.get_or_init(|| BlockingWork::new(BLOCKING_CAPACITY))
+}
+
+/// The lane for launcher and graphical admissions, separate from `blocking_work`.
+pub fn admission_work() -> &'static BlockingWork {
+    static WORK: OnceLock<BlockingWork> = OnceLock::new();
+    WORK.get_or_init(|| BlockingWork::new(ADMISSION_CAPACITY))
 }
 
 #[cfg(test)]
@@ -118,6 +127,45 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(gate.slots.available_permits(), 1);
+        });
+    }
+
+    #[test]
+    fn a_caller_cancelled_while_waiting_releases_nothing() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let gate = BlockingWork::new(1);
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let (release_tx, release_rx) = mpsc::channel();
+            let holder = {
+                let gate = gate.clone();
+                tokio::spawn(async move {
+                    gate.run(move || {
+                        started_tx.send(()).unwrap();
+                        release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                    })
+                    .await
+                })
+            };
+            tokio::time::timeout(Duration::from_secs(2), started_rx)
+                .await
+                .unwrap()
+                .unwrap();
+            let ran = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let waiting_ran = ran.clone();
+            let waiting = Box::pin(
+                gate.run(move || waiting_ran.store(true, std::sync::atomic::Ordering::SeqCst)),
+            );
+            assert!(
+                tokio::time::timeout(Duration::from_millis(30), waiting)
+                    .await
+                    .is_err()
+            );
+            assert_eq!(gate.slots.available_permits(), 0);
+            release_tx.send(()).unwrap();
+            holder.await.unwrap().unwrap();
+            assert_eq!(gate.slots.available_permits(), 1);
+            assert!(!ran.load(std::sync::atomic::Ordering::SeqCst));
         });
     }
 
