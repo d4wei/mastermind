@@ -1,9 +1,10 @@
-import type { Parent, PhrasingContent, Root } from 'mdast'
+import type { Parent, PhrasingContent, Root, Text } from 'mdast'
 import type { Node } from 'unist'
 import type { MaskResult, Sentinels } from '../critic/mask'
 // Container prefixes belong to the enclosing Markdown node, not displayed atom content.
 import { stripLinePrefixes } from '../critic/scanner'
 import type { CriticSpan } from '../critic/types'
+import { sliceRuns, type TextProvenance, type TextRun } from './provenance'
 
 /* ---- custom mdast node shapes ------------------------------------------ */
 
@@ -116,23 +117,17 @@ function synthPosition(span: CriticSpan) {
 }
 
 /**
- * Source offset of a masked text node's value index 0, when value indices map
- * one for one onto the source. Masking preserves length, so the node's own
- * offsets are exact; a value shorter than its source extent has decoded
- * entities or escapes, or dropped source the parser does not keep in text:
- * container prefixes, the indentation of continuation lines, and the spaces
- * before a soft line break.
+ * A text piece holding value `[at, at + value.length)` of a split text node. The piece takes the
+ * source runs of that part of the node and the extent they span; without runs for the node, or
+ * when the piece would cut a decoded escape or reference, it stays unpositioned.
  */
-function valueOrigin(node: Node, value: string): number | undefined {
-  const start = node.position?.start.offset
-  const end = node.position?.end.offset
-  if (start === undefined || end === undefined) return undefined
-  return end - start === value.length ? start : undefined
-}
-
-function textNode(value: string, origin?: number, at = 0): PhrasingContent {
-  const node = { type: 'text', value } as PhrasingContent
-  if (origin !== undefined) node.position = offsetPosition(origin + at, origin + at + value.length)
+function textNode(value: string, provenance: TextProvenance, runs: readonly TextRun[] | undefined, at: number): PhrasingContent {
+  const node: Text = { type: 'text', value }
+  const own = runs && sliceRuns(runs, at, at + value.length)
+  if (own) {
+    node.position = offsetPosition(own[0]!.sourceStart, own.at(-1)!.sourceEnd)
+    provenance.set(node, own)
+  }
   return node
 }
 
@@ -175,12 +170,14 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
  * delimiters land at different tree depths never borrows another span.
  *
  * Wrappers and atoms take their span's offsets. Text pieces split from a
- * masked text node, literal delimiters included, take offsets within that
- * node when `valueOrigin` finds an exact mapping, and stay unpositioned
- * otherwise. Link and image attributes are then restored from the source
+ * masked text node, literal delimiters included, take the node's source runs
+ * for their part of its value from `provenance` (`textNode`), and record them
+ * there. Link and image attributes are then restored from the source
  * (`restoreAttributeSources`).
  */
-export function criticTransform(tree: Root, original: string, spans: readonly CriticSpan[], mask: MaskResult): void {
+export function criticTransform(
+  tree: Root, original: string, spans: readonly CriticSpan[], mask: MaskResult, provenance: TextProvenance,
+): void {
   const seg = buildSegmenter(mask.sentinels)
   const streams: Streams = {
     byKind: {
@@ -226,17 +223,17 @@ export function criticTransform(tree: Root, original: string, spans: readonly Cr
         emit(child as PhrasingContent)
         continue
       }
-      const origin = valueOrigin(child, (child as { value: string }).value)
+      const runs = provenance?.get(child as Text)
       for (const s of segs) {
         switch (s.t) {
           case 'plain':
-            emit(textNode(s.value, origin, s.at))
+            emit(textNode(s.value, provenance, runs, s.at))
             break
           case 'open': {
             // Marks never nest, so an open frame's closer lies at another depth.
             restoreFrame()
             const span = streams.byKind[s.kind][cursors[s.kind]]
-            const literal = textNode(OPEN_TEXT[s.kind], origin, s.at)
+            const literal = textNode(OPEN_TEXT[s.kind], provenance, runs, s.at)
             if (!span) {
               emit(literal)
               break
@@ -250,7 +247,7 @@ export function criticTransform(tree: Root, original: string, spans: readonly Cr
             const span = streams.byKind[s.kind][closeCursors[s.kind]++]
             if (!frame || frame.span !== span) {
               restoreFrame()
-              emit(textNode(CLOSE_TEXT[s.kind], origin, s.at))
+              emit(textNode(CLOSE_TEXT[s.kind], provenance, runs, s.at))
               break
             }
             const done = frame

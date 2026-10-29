@@ -177,7 +177,7 @@ function renderPhrasing(node: PhrasingContent, key: number, ctx: PresentedCtx): 
       )
     case 'inlineCode':
       return (
-        <code key={key} className="md-inline-code" {...posAttrs(node)}>
+        <code key={key} className="md-inline-code" data-atom="code" {...posAttrs(node)}>
           {node.value}
         </code>
       )
@@ -196,6 +196,7 @@ function renderPhrasing(node: PhrasingContent, key: number, ctx: PresentedCtx): 
           title={node.title ?? undefined}
           loading="lazy"
           decoding="async"
+          data-atom="image"
           {...posAttrs(node)}
         />
       )
@@ -203,7 +204,7 @@ function renderPhrasing(node: PhrasingContent, key: number, ctx: PresentedCtx): 
       return <br key={key} />
     case 'footnoteReference':
       return (
-        <sup key={key} className="md-footnote-ref">
+        <sup key={key} className="md-footnote-ref" data-atom="label" {...posAttrs(node)}>
           [{node.identifier}]
         </sup>
       )
@@ -211,13 +212,13 @@ function renderPhrasing(node: PhrasingContent, key: number, ctx: PresentedCtx): 
       return <Fragment key={key}>{renderInline(node.children, ctx)}</Fragment>
     case 'imageReference':
       return (
-        <span key={key} className="md-muted">
+        <span key={key} className="md-muted" data-atom="label" {...posAttrs(node)}>
           [image: {node.alt ?? node.identifier}]
         </span>
       )
     case 'html':
       return node.value.startsWith('<!--') ? null : (
-        <code key={key} className="md-inline-code">
+        <code key={key} className="md-inline-code" data-atom="code" {...posAttrs(node)}>
           {node.value}
         </code>
       )
@@ -348,7 +349,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
     case 'footnoteDefinition':
       return (
         <div key={key} className="md-footnote-def" {...posAttrs(node)}>
-          <sup>[{node.identifier}]</sup>{' '}
+          <sup data-generated="">[{node.identifier}]</sup>{' '}
           {node.children.map((child, i) => renderBlock(child, i, ctx))}
         </div>
       )

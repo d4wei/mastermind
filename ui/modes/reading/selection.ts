@@ -1,410 +1,397 @@
-import type { Node as MarkdownNode, Parent } from 'unist'
-import { visit } from 'unist-util-visit'
+import type { Nodes, Parent, Root, Text as MarkdownText } from 'mdast'
 import type { CriticSpan, Range as SourceRange } from '../../../document/critic/types'
 import type { Analysis } from '../../../document/markdown/analyze'
 import { excludedRanges } from '../../../document/markdown/exclusions'
+import { sourceEndAt, sourceStartAt, type TextRun } from '../../../document/markdown/provenance'
 
+/** An exact source slice a review mark may wrap. */
 export interface SelRange {
   from: number
   to: number
   text: string
 }
 
-type SelError = 'empty' | 'unmapped'
-type SelResult = SelRange | { error: SelError }
-type MultiSelResult = { ranges: SelRange[] } | { error: SelError }
+/** Why a visible part of a selection cannot take part in a review mark. */
+export type ExclusionReason =
+  /** Inside an existing suggestion or discussion, where marks would nest. */
+  | 'existing-mark'
+  /** Display labels the Markdown does not contain, such as footnote numbers. */
+  | 'generated-text'
+  /** Code blocks, raw HTML, and frontmatter, where delimiters would be literal. */
+  | 'opaque-block'
+  /** Part of inline code, which is reviewed as a whole span. */
+  | 'partial-code'
+  /** Part of a link whose text is also its address or reference label. */
+  | 'partial-link'
+  /** A selection across translated blocks, which a translated comment cannot quote. */
+  | 'multiple-translated-blocks'
+  /** Rendered text with no exact source position. */
+  | 'no-provenance'
 
-const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,td,th,blockquote,pre,.md-frontmatter'
+export interface ExcludedSegment {
+  /** The selected rendered text left out. */
+  text: string
+  reason: ExclusionReason
+}
+
+/** What a settled selection covers in the source revision it was mapped against. */
+export interface SelectionCoverage {
+  status: 'covered'
+  /** The exact source the segments index. */
+  revision: string
+  /** The selected rendered text. */
+  quote: string
+  /** Markable source slices in source order, each within one text block. */
+  segments: SelRange[]
+  /** Selected text left out of every segment, in document order. */
+  excluded: ExcludedSegment[]
+}
+
+export type SelectionMapping =
+  /** Nothing is selected in the document: an empty selection, or one outside it. */
+  | { status: 'inactive' }
+  /** The selected DOM was rendered from another revision; map again once it re-renders. */
+  | { status: 'outdated' }
+  | SelectionCoverage
+
+type MappingAnalysis = Pick<Analysis, 'plain' | 'tree' | 'provenance' | 'spans'>
+
+/* ---- the reading tree's selectable structure ----------------------------- */
+
+/**
+ * Inline syntax that hides delimiters around rendered content. `locked` content cannot hold a
+ * delimiter: an autolink's text is its address, and a shortcut or collapsed reference's text is
+ * the label that finds its definition.
+ */
+interface Wrapper {
+  start: number
+  end: number
+  contentStart: number
+  contentEnd: number
+  locked: boolean
+}
+
+interface TextBlock {
+  wrappers: Wrapper[]
+}
+
+interface Leaf {
+  node: MarkdownText
+  start: number
+  end: number
+  runs: readonly TextRun[] | undefined
+  block: TextBlock
+  inMark: boolean
+}
+
+interface Atom {
+  start: number
+  end: number
+  block: TextBlock
+  inMark: boolean
+}
+
+interface SelectableIndex {
+  leaves: Map<number, Leaf>
+  atoms: Map<number, Atom>
+}
+
+const TEXT_BLOCKS = new Set(['paragraph', 'heading', 'tableCell'])
+const WRAPPERS = new Set(['strong', 'emphasis', 'delete', 'link', 'linkReference'])
+const ATOMS = new Set(['inlineCode', 'html', 'image', 'imageReference', 'footnoteReference'])
+const CRITIC_WRAPPERS = new Set(['criticInsert', 'criticDelete', 'criticHighlight'])
+
+function extent(node: { position?: Nodes['position'] }): { start: number; end: number } | null {
+  const start = node.position?.start.offset
+  const end = node.position?.end.offset
+  return start === undefined || end === undefined ? null : { start, end }
+}
+
+function wrapperOf(node: Parent, source: string): Wrapper | null {
+  const own = extent(node)
+  if (!own) return null
+  const first = node.children[0] && extent(node.children[0])
+  const last = node.children.at(-1) && extent(node.children.at(-1)!)
+  const autolink = node.type === 'link' && source[own.start] !== '['
+  const label = node.type === 'linkReference' && (node as { referenceType?: string }).referenceType !== 'full'
+  return {
+    ...own,
+    contentStart: first?.start ?? own.start,
+    contentEnd: last?.end ?? own.end,
+    locked: autolink || label || !first || !last,
+  }
+}
+
+const indexes = new WeakMap<Root, SelectableIndex>()
+
+/** Indexes each text block's leaves, atoms, and wrappers once per reading tree. */
+function selectableIndex(tree: Root, source: string, provenance: MappingAnalysis['provenance']): SelectableIndex {
+  const cached = indexes.get(tree)
+  if (cached) return cached
+  const index: SelectableIndex = { leaves: new Map(), atoms: new Map() }
+  const phrasing = (node: Nodes, block: TextBlock, inMark: boolean): void => {
+    const own = extent(node)
+    if (node.type === 'text') {
+      if (own) index.leaves.set(own.start, { node, ...own, runs: provenance.get(node), block, inMark })
+      return
+    }
+    if (ATOMS.has(node.type)) {
+      if (own) index.atoms.set(own.start, { ...own, block, inMark })
+      return
+    }
+    if (WRAPPERS.has(node.type)) {
+      const wrapper = wrapperOf(node as Parent, source)
+      if (wrapper) block.wrappers.push(wrapper)
+    }
+    const mark = inMark || CRITIC_WRAPPERS.has(node.type)
+    for (const child of (node as Partial<Parent>).children ?? []) phrasing(child, block, mark)
+  }
+  const blocks = (node: Nodes): void => {
+    if (TEXT_BLOCKS.has(node.type)) {
+      const block: TextBlock = { wrappers: [] }
+      for (const child of (node as Parent).children) phrasing(child, block, false)
+      return
+    }
+    for (const child of (node as Partial<Parent>).children ?? []) blocks(child)
+  }
+  blocks(tree)
+  indexes.set(tree, index)
+  return index
+}
+
+/* ---- reading the DOM ----------------------------------------------------- */
+
 /** Rendered review marks; their hidden delimiters make rendered and source text diverge. */
 const MARK_SELECTOR = '.critic[data-span-index]'
+/** Rendered blocks whose source is opaque to review marks. */
+const OPAQUE_SELECTOR = 'pre, .md-frontmatter'
 
-function closestBlock(node: Node): HTMLElement | null {
-  const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement
-  return el?.closest('.md-frontmatter') ?? el?.closest(BLOCK_SELECTOR) ?? null
+interface Piece {
+  from: number
+  to: number
+  /** The selected rendered text the piece maps. */
+  rendered: string
+  block: TextBlock
 }
 
-function normalizePoint(node: Node, offset: number): { node: Node; offset: number } {
-  let current = node
-  let off = offset
-  while (current.nodeType === Node.ELEMENT_NODE) {
-    const el = current as HTMLElement
-    if (off < el.childNodes.length) {
-      current = el.childNodes[off]!
-      off = 0
-    } else if (el.childNodes.length > 0) {
-      current = el.childNodes[el.childNodes.length - 1]!
-      off = current.nodeType === Node.TEXT_NODE ? (current.textContent?.length ?? 0) : current.childNodes.length
-    } else {
-      break
-    }
-  }
-  return { node: current, offset: off }
+type Item = { piece: Piece } | ExcludedSegment
+
+/** The selected part of a text node that intersects `range`. */
+function selectedText(range: Range, text: Text): [number, number] {
+  const from = text === range.startContainer ? range.startOffset : 0
+  const to = text === range.endContainer ? range.endOffset : text.length
+  return [from, Math.max(from, to)]
 }
 
-/** The source extent a rendered element records in `data-ps`/`data-pe`; null when either is missing. */
-function positionedExtent(el: HTMLElement): { from: number; to: number } | null {
-  const from = Number(el.dataset.ps)
-  const to = Number(el.dataset.pe)
-  return Number.isFinite(from) && Number.isFinite(to) ? { from, to } : null
+function textNodes(root: Node): Text[] {
+  const walker = root.ownerDocument!.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const nodes: Text[] = []
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text)
+  return nodes
 }
 
-/** Escapes and entities can make rendered offsets differ from source offsets. */
-function pointToOffset(rawNode: Node, rawOffset: number): number | null {
-  const { node, offset } = normalizePoint(rawNode, rawOffset)
-  if (node.nodeType !== Node.TEXT_NODE) return null
-  const el = node.parentElement
-  if (!el) return null
-  const span = el.closest('[data-ps]') as HTMLElement | null
-  const extent = span && positionedExtent(span)
-  if (!span || !extent) return null
-  const value = span.textContent ?? ''
-  if (extent.to - extent.from !== value.length) return null
-  let prefix = 0
-  let walker: Node | null = span.firstChild
-  while (walker && walker !== node) {
-    prefix += walker.textContent?.length ?? 0
-    walker = walker.nextSibling
-  }
-  if (!walker) return null
-  return extent.from + prefix + offset
+function positioned(element: Element): { start: number; end: number } | null {
+  const start = Number((element as HTMLElement).dataset.ps)
+  const end = Number((element as HTMLElement).dataset.pe)
+  return element.hasAttribute('data-ps') && Number.isFinite(start) && Number.isFinite(end) ? { start, end } : null
 }
 
-/** Code is atomic for review: put delimiters outside its backticks, never inside them. */
-function selectedInlineCode(range: Range, block: HTMLElement, source: string): SelRange | null {
-  for (const code of block.querySelectorAll<HTMLElement>('code.md-inline-code')) {
-    const content = code.ownerDocument.createRange()
-    const start = normalizePoint(code, 0)
-    const end = normalizePoint(code, code.childNodes.length)
-    content.setStart(start.node, start.offset)
-    content.setEnd(end.node, end.offset)
-    if (range.toString() !== code.textContent ||
-        range.compareBoundaryPoints(Range.START_TO_START, content) > 0 ||
-        range.compareBoundaryPoints(Range.END_TO_END, content) < 0) continue
-    const extent = positionedExtent(code)
-    if (extent && extent.to > extent.from) return { ...extent, text: source.slice(extent.from, extent.to) }
-  }
-  return null
+function overlapsSpan(from: number, to: number, spans: readonly CriticSpan[]): boolean {
+  return spans.some((span) => from < span.end && to > span.start)
 }
 
-/** A surrounding mark can contain code, but neither delimiter may land inside it. */
-function splitsOpaqueSyntax(from: number, to: number, opaque: readonly SourceRange[]): boolean {
-  return opaque.some((r) =>
-    (r.start < from && from < r.end) || (r.start < to && to < r.end))
-}
-
-const INLINE_FORMAT_TYPES: Record<string, string> = {
-  STRONG: 'strong', EM: 'emphasis', DEL: 'delete', A: 'link', CODE: 'inlineCode',
-}
-
-function comparePoints(first: Range, firstEnd: boolean, second: Range, secondEnd: boolean): number {
-  const a = first.cloneRange()
-  const b = second.cloneRange()
-  a.collapse(!firstEnd)
-  b.collapse(!secondEnd)
-  return a.compareBoundaryPoints(Range.START_TO_START, b)
-}
-
-function inlineText(node: MarkdownNode): string | null {
-  if (node.type === 'text' || node.type === 'inlineCode') return (node as MarkdownNode & { value: string }).value
-  if (!Object.values(INLINE_FORMAT_TYPES).includes(node.type)) return null
-  const values = (node as Parent).children.map(inlineText)
-  return values.some((value) => value === null) ? null : values.join('')
-}
-
-function lazyPositionedNodes(tree: MarkdownNode): () => Map<string, MarkdownNode> {
-  let positioned: Map<string, MarkdownNode> | undefined
-  return () => {
-    if (positioned) return positioned
-    const nodes = new Map<string, MarkdownNode>()
-    visit(tree, (node) => {
-      const from = node.position?.start.offset
-      const to = node.position?.end.offset
-      if (from !== undefined && to !== undefined) nodes.set(`${node.type}:${from}:${to}`, node)
-    })
-    positioned = nodes
-    return positioned
-  }
-}
-
-/** Parsed text identifies the leaf; only line endings and container prefixes may differ. */
-function mapTextSelection(
-  range: Range, source: string, positionedNodes: () => Map<string, MarkdownNode>,
-): SelRange | null {
-  const start = normalizePoint(range.startContainer, range.startOffset)
-  const end = normalizePoint(range.endContainer, range.endOffset)
-  if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return null
-  const element = start.node.parentElement
-  if (!element || element.childNodes.length !== 1) return null
-  const extent = positionedExtent(element)
-  if (!extent) return null
-  const { from, to } = extent
-  const parsed = positionedNodes().get(`text:${from}:${to}`)
-  const value = start.node.textContent ?? ''
-  if (!parsed || inlineText(parsed)?.replace(/\r\n?/g, '\n') !== value.replace(/\r\n?/g, '\n')) return null
-  const raw = source.slice(from, to).split(/(\r\n|\r|\n)/)
-  const rendered = value.split(/(\r\n|\r|\n)/)
-  if (raw.length !== rendered.length) return null
-  const offsets: number[] = []
-  let sourceAt = from
-  let renderedAt = 0
-  for (let line = 0; line < raw.length; line += 2) {
-    const rawText = raw[line]!
-    const text = rendered[line]!
-    const prefix = rawText.length - text.length
-    if (prefix < 0 || rawText.slice(prefix) !== text ||
-        (line === 0 ? prefix !== 0 : !/^[ \t>]*$/.test(rawText.slice(0, prefix)))) return null
-    for (let i = 0; i <= text.length; i++) offsets[renderedAt + i] = sourceAt + prefix + i
-    sourceAt += rawText.length
-    renderedAt += text.length
-    const rawBreak = raw[line + 1] ?? ''
-    const renderedBreak = rendered[line + 1] ?? ''
-    for (let i = 1; i <= renderedBreak.length; i++) {
-      offsets[renderedAt + i] = sourceAt + Math.min(i, rawBreak.length)
-    }
-    sourceAt += rawBreak.length
-    renderedAt += renderedBreak.length
-  }
-  const selectedFrom = offsets[start.offset]
-  const selectedTo = offsets[end.offset]
-  if (selectedFrom === undefined || selectedTo === undefined || selectedTo <= selectedFrom) return null
-  return { from: selectedFrom, to: selectedTo, text: source.slice(selectedFrom, selectedTo) }
-}
-
-/** Fully selected positioned wrappers account for syntax absent from the rendered text. */
-function mapFormattedSelection(
-  range: Range, block: HTMLElement, source: string, positionedNodes: () => Map<string, MarkdownNode>,
-): SelResult | null {
-  const formats = Array.from(block.querySelectorAll<HTMLElement>('strong[data-ps],em[data-ps],del[data-ps],a[data-ps],code.md-inline-code[data-ps]'))
-  if (!formats.some((element) => range.intersectsNode(element))) return null
-  const positioned = positionedNodes()
-  const pieces: { from: number; to: number; rendered: string }[] = []
-  const visitDom = (node: Node): boolean => {
-    const content = block.ownerDocument.createRange()
-    content.selectNodeContents(node)
-    const start = normalizePoint(content.startContainer, content.startOffset)
-    const end = normalizePoint(content.endContainer, content.endOffset)
-    content.setStart(start.node, start.offset)
-    content.setEnd(end.node, end.offset)
-    if (comparePoints(range, false, content, true) >= 0 ||
-        comparePoints(range, true, content, false) <= 0) return true
-    if (node instanceof HTMLElement && formats.includes(node)) {
-      const complete = comparePoints(range, false, content, false) <= 0 &&
-        comparePoints(range, true, content, true) >= 0
-      if (complete) {
-        const extent = positionedExtent(node)
-        const markdown = extent && positioned.get(`${INLINE_FORMAT_TYPES[node.tagName]}:${extent.from}:${extent.to}`)
-        if (!extent || !markdown || inlineText(markdown) !== node.textContent) return false
-        pieces.push({ ...extent, rendered: node.textContent ?? '' })
-        return true
-      }
-      // Crossing a partial wrapper would strand its opening or closing syntax outside the mark.
-      if (node.tagName === 'CODE' || comparePoints(range, false, content, false) < 0 ||
-          comparePoints(range, true, content, true) > 0) return false
-    }
-    if (node.nodeType === Node.TEXT_NODE) {
-      const selected = content.cloneRange()
-      if (comparePoints(range, false, content, false) > 0) selected.setStart(range.startContainer, range.startOffset)
-      if (comparePoints(range, true, content, true) < 0) selected.setEnd(range.endContainer, range.endOffset)
-      const from = pointToOffset(selected.startContainer, selected.startOffset)
-      const to = pointToOffset(selected.endContainer, selected.endOffset)
-      const rendered = selected.toString()
-      if (from !== null && to !== null && source.slice(from, to) === rendered) {
-        pieces.push({ from, to, rendered })
-      } else {
-        const mapped = mapTextSelection(selected, source, positionedNodes)
-        if (!mapped) return false
-        pieces.push({ from: mapped.from, to: mapped.to, rendered })
-      }
-      return true
-    }
-    return Array.from(node.childNodes).every(visitDom)
-  }
-  if (!visitDom(block) || !pieces.length || pieces.map((piece) => piece.rendered).join('') !== range.toString()) {
-    return { error: 'unmapped' }
-  }
-  // Only AST-verified complete wrappers may bridge hidden Markdown syntax; other source gaps refuse.
-  if (pieces.some((piece, index) => index > 0 && pieces[index - 1]!.to !== piece.from)) return { error: 'unmapped' }
-  const from = pieces[0]!.from
-  const to = pieces.at(-1)!.to
-  return { from, to, text: source.slice(from, to) }
-}
-
-/** CommonMark character references and backslash escapes. */
-const ENCODED_LITERAL = /&(?:[A-Za-z][A-Za-z0-9]{1,31}|#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6});|\\[!-/:-@[-`{-~]/g
+/** Thrown when a positioned element disagrees with the analysis it is mapped against. */
+class Outdated extends Error {}
 
 /**
- * Escapes and entities change a leaf's rendered length, so its offsets cannot be read directly.
- * The selected text then maps only when it occurs exactly once in both the rendered and the source
- * text of its window: the narrowest positioned element holding the selection, narrowed to the extent
- * between the nearest positioned elements or review marks on either side. A unique match outside
- * that window may be a different occurrence than the one the reader selected. A source match that
- * overlaps a character reference or backslash escape is refused.
+ * Walks the selected text and images in document order, turning each into a source piece or an
+ * excluded segment. Throws `Outdated` when a positioned element disagrees with the analysis.
  */
-function uniqueOccurrence(
-  range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], text: string,
-): number | null {
+function readItems(range: Range, index: SelectableIndex, spans: readonly CriticSpan[]): Item[] {
   const common = range.commonAncestorContainer
-  const holder = (common.nodeType === Node.ELEMENT_NODE ? common as Element : common.parentElement)
-    ?.closest<HTMLElement>('[data-ps]')
-  const scope = holder && block.contains(holder) ? holder : block
-  const scopeExtent = positionedExtent(scope)
-  if (!scopeExtent) return null
-  let { from, to } = scopeExtent
-  const rendered = scope.ownerDocument.createRange()
-  rendered.selectNodeContents(scope)
-  for (const neighbor of scope.querySelectorAll<HTMLElement>(`[data-ps], ${MARK_SELECTOR}`)) {
-    const span = neighbor.matches(MARK_SELECTOR) ? spans[Number(neighbor.dataset.spanIndex)] : undefined
-    const bound = span ? { from: span.start, to: span.end } : positionedExtent(neighbor)
-    if (!bound) return null
-    const { from: start, to: end } = bound
-    const extent = scope.ownerDocument.createRange()
-    extent.selectNode(neighbor)
-    // Elements holding or crossing the selection bound nothing; nested neighbors never widen a bound.
-    if (comparePoints(extent, true, range, false) <= 0) {
-      if (end > from) { from = end; rendered.setStartAfter(neighbor) }
-    } else if (comparePoints(extent, false, range, true) >= 0) {
-      if (start < to) { to = start; rendered.setEndBefore(neighbor) }
-    }
-  }
-  const occursOnce = (haystack: string): number | null => {
-    const first = haystack.indexOf(text)
-    return first === -1 || haystack.indexOf(text, first + 1) !== -1 ? null : first
-  }
-  const window = from <= to ? source.slice(from, to) : null
-  const offset = window === null ? null : occursOnce(window)
-  if (offset === null || occursOnce(rendered.toString()) === null) return null
-  // Source text inside a reference or escape renders as other characters, so a match there is a
-  // different occurrence than the selection, and delimiters placed in it would split the syntax.
-  for (const literal of window!.matchAll(ENCODED_LITERAL)) {
-    if (literal.index < offset + text.length && offset < literal.index + literal[0].length) return null
-  }
-  return from + offset
-}
-
-
-function mapWithinBlock(
-  range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], opaque: readonly SourceRange[],
-  positionedNodes: () => Map<string, MarkdownNode>,
-): SelResult {
-  const selectedText = range.toString()
-  if (selectedText.length === 0) return { error: 'empty' }
-  if (block.tagName === 'PRE' || block.matches('.md-frontmatter')) return { error: 'unmapped' }
-  const code = selectedInlineCode(range, block, source)
-  if (code) return code
-  let from = pointToOffset(range.startContainer, range.startOffset)
-  let to = pointToOffset(range.endContainer, range.endOffset)
-
-  const valid = from !== null && to !== null && to > from && source.slice(from, to) === selectedText
-  if (!valid) {
-    const text = mapTextSelection(range, source, positionedNodes)
-    if (text && !splitsOpaqueSyntax(text.from, text.to, opaque)) return text
-    const formatted = mapFormattedSelection(range, block, source, positionedNodes)
-    if (formatted) {
-      if (!('error' in formatted)) {
-        if (splitsOpaqueSyntax(formatted.from, formatted.to, opaque)) return { error: 'unmapped' }
-        return formatted
-      }
-      const start = normalizePoint(range.startContainer, range.startOffset)
-      const end = normalizePoint(range.endContainer, range.endOffset)
-      // A single text leaf can use the existing substring fallback without bridging hidden syntax.
-      if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return formatted
-    }
-    const fallback = uniqueOccurrence(range, block, source, spans, selectedText)
-    if (fallback === null) return { error: 'unmapped' }
-    from = fallback
-    to = from + selectedText.length
-  }
-
-  if (splitsOpaqueSyntax(from!, to!, opaque)) return { error: 'unmapped' }
-  return { from: from!, to: to!, text: selectedText }
-}
-
-function overlapsMark(r: SelRange, spans: readonly CriticSpan[]): boolean {
-  return spans.some((s) => r.from < s.end && r.to > s.start)
-}
-
-/** Includes the common ancestor itself, which is the outer item when a selection enters a nested list. */
-function blocksBetween(range: Range, startBlock: HTMLElement, endBlock: HTMLElement): HTMLElement[] {
-  const ca = range.commonAncestorContainer
-  const root = (ca.nodeType === Node.ELEMENT_NODE ? ca : ca.parentElement) as HTMLElement | null
+  const root = common.nodeType === Node.ELEMENT_NODE ? common as Element : common.parentElement
   if (!root) return []
-  const all = [
-    ...(root.matches(BLOCK_SELECTOR) ? [root] : []),
-    ...root.querySelectorAll<HTMLElement>(BLOCK_SELECTOR),
-  ].filter((block) => !block.parentElement?.closest('.md-frontmatter'))
-  const si = all.indexOf(startBlock)
-  const ei = all.indexOf(endBlock)
-  if (si === -1 || ei === -1) return []
-  return all.slice(Math.min(si, ei), Math.max(si, ei) + 1)
-}
-
-/**
- * Ends the range in the last text before `element`. A boundary placed between elements would
- * otherwise normalize forward into `element`'s first text and map to an offset past hidden syntax.
- */
-function endBefore(range: Range, block: HTMLElement, element: Element): void {
-  const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT)
-  let last: Text | null = null
-  for (let node = walker.nextNode(); node && element.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING;
-    node = walker.nextNode()) last = node as Text
-  if (last) range.setEnd(last, last.length)
-  else range.setEndBefore(element)
-}
-
-/** The parts of a block's selected range outside rendered review marks, in document order. */
-function outsideMarks(sub: Range, block: HTMLElement): Range[] {
-  const pieces: Range[] = []
-  const rest = sub.cloneRange()
-  for (const mark of block.querySelectorAll(MARK_SELECTOR)) {
-    if (!rest.intersectsNode(mark)) continue
-    const before = rest.cloneRange()
-    endBefore(before, block, mark)
-    pieces.push(before)
-    rest.setStartAfter(mark)
+  const items: Item[] = []
+  const handledAtoms = new Set<Element>()
+  const exclude = (text: string, reason: ExclusionReason): void => {
+    if (!text.trim()) return
+    const last = items.at(-1)
+    if (last && 'reason' in last && last.reason === reason) last.text += text
+    else items.push({ text, reason })
   }
-  pieces.push(rest)
-  return pieces
+  const atom = (element: Element): void => {
+    handledAtoms.add(element)
+    const at = positioned(element)
+    const entry = at && index.atoms.get(at.start)
+    if (!at || !entry || entry.end !== at.end) throw new Outdated()
+    const texts = textNodes(element)
+    const selected = texts.map((text) => range.intersectsNode(text) ? text.data.slice(...selectedText(range, text)) : '').join('')
+    const complete = texts.length === 0 || (range.isPointInRange(texts[0]!, 0) &&
+      range.isPointInRange(texts.at(-1)!, texts.at(-1)!.length))
+    if (entry.inMark || overlapsSpan(entry.start, entry.end, spans)) {
+      // An image shows no text, so its alternative text stands for it.
+      if (texts.length) exclude(selected, 'existing-mark')
+      else items.push({ text: element.getAttribute('alt') ?? '', reason: 'existing-mark' })
+    } else if (complete) items.push({ piece: { from: entry.start, to: entry.end, rendered: selected, block: entry.block } })
+    else exclude(selected, (element as HTMLElement).dataset.atom === 'label' ? 'generated-text' : 'partial-code')
+  }
+  const walker = root.ownerDocument!.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
+  for (let node: Node | null = root; node; node = walker.nextNode()) {
+    if (!range.intersectsNode(node)) continue
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if ((node as Element).matches('img[data-atom]')) atom(node as Element)
+      continue
+    }
+    const text = node as Text
+    const [from, to] = selectedText(range, text)
+    if (from >= to) continue
+    const selected = text.data.slice(from, to)
+    const parent = text.parentElement!
+    const atomElement = parent.closest('[data-atom]')
+    if (parent.closest(MARK_SELECTOR)) exclude(selected, 'existing-mark')
+    else if (parent.closest(OPAQUE_SELECTOR)) exclude(selected, 'opaque-block')
+    else if (parent.closest('[data-generated]')) exclude(selected, 'generated-text')
+    else if (atomElement) { if (!handledAtoms.has(atomElement)) atom(atomElement) }
+    else if (parent.matches('span[data-ps]')) items.push(leafItem(text, from, to, parent, index, spans))
+    else exclude(selected, 'no-provenance')
+  }
+  return items
 }
 
 /**
- * A block's sub-range excludes rendered review marks and nested blocks; the pieces that remain map
- * independently, and unmappable pieces are skipped while the others stay markable. `analysis`
- * describes `source`.
+ * Maps offsets in a leaf's rendered text to its parsed value; null when the two differ beyond line
+ * endings, which an HTML parse of the rendered markup normalizes to LF.
  */
-export function rangeToSourceRanges(range: Range, source: string,
-  { plain, spans }: Pick<Analysis, 'plain' | 'spans'>): MultiSelResult {
-  if (range.collapsed) return { error: 'empty' }
-  if (range.toString().length === 0) return { error: 'empty' }
+function valueOffsets(rendered: string, value: string): ((offset: number) => number) | null {
+  if (rendered === value) return (offset) => offset
+  if (rendered !== value.replace(/\r\n?/g, '\n')) return null
+  const offsets: number[] = []
+  let at = 0
+  for (let index = 0; index < rendered.length; index++) {
+    offsets.push(at)
+    at += value.startsWith('\r\n', at) ? 2 : 1
+  }
+  offsets.push(at)
+  return (offset) => offsets[offset]!
+}
 
-  const startBlock = closestBlock(range.startContainer)
-  const endBlock = closestBlock(range.endContainer)
-  if (!startBlock || !endBlock) return { error: 'unmapped' }
+function leafItem(
+  text: Text, from: number, to: number, span: Element, index: SelectableIndex, spans: readonly CriticSpan[],
+): Item {
+  const at = positioned(span)
+  const leaf = at && index.leaves.get(at.start)
+  const valueAt = leaf && at && leaf.end === at.end && valueOffsets(span.textContent ?? '', leaf.node.value)
+  if (!valueAt) throw new Outdated()
+  let prefix = 0
+  for (let sibling = span.firstChild; sibling && sibling !== text; sibling = sibling.nextSibling) {
+    prefix += sibling.textContent?.length ?? 0
+  }
+  const selected = text.data.slice(from, to)
+  if (leaf.inMark) return { text: selected, reason: 'existing-mark' }
+  const start = leaf.runs && sourceStartAt(leaf.runs, valueAt(prefix + from))
+  const end = leaf.runs && sourceEndAt(leaf.runs, valueAt(prefix + to))
+  if (start == null || end == null || end <= start) return { text: selected, reason: 'no-provenance' }
+  // A recognized mark the transform left literal still owns its source; marks must not nest in it.
+  if (overlapsSpan(start, end, spans)) return { text: selected, reason: 'existing-mark' }
+  return { piece: { from: start, to: end, rendered: selected, block: leaf.block } }
+}
 
-  const blocks = startBlock === endBlock ? [startBlock] : blocksBetween(range, startBlock, endBlock)
-  if (blocks.length === 0) return { error: 'unmapped' }
+/* ---- planning segments ---------------------------------------------------- */
 
-  const ranges: SelRange[] = []
-  const opaque = excludedRanges(plain)
-  const positionedNodes = lazyPositionedNodes(plain)
-  for (const block of blocks) {
-    const sub = block.ownerDocument.createRange()
-    sub.selectNodeContents(block)
-    if (block === startBlock) sub.setStart(range.startContainer, range.startOffset)
-    if (block === endBlock) sub.setEnd(range.endContainer, range.endOffset)
-    // A container block's own text precedes its nested blocks, which map as blocks themselves.
-    const nested = block.querySelector(BLOCK_SELECTOR)
-    if (nested && sub.intersectsNode(nested)) endBefore(sub, block, nested)
-    for (const piece of outsideMarks(sub, block)) {
-      if (piece.collapsed || piece.toString().trim().length === 0) continue
-      const r = mapWithinBlock(piece, block, source, spans, opaque, positionedNodes)
-      // Marks without a rendered element to split at, such as literal marks and unanchored
-      // highlights, must not be nested inside or crossed.
-      if ('error' in r || overlapsMark(r, spans)) continue
-      ranges.push(r)
+interface Plan {
+  segments: { range: SelRange; rendered: string }[]
+  excluded: ExcludedSegment[]
+}
+
+/**
+ * Splits consecutive pieces of one text block into the fewest segments whose delimiters keep every
+ * wrapper's syntax intact. A segment may contain whole wrappers, sit inside one wrapper's content,
+ * or lie beside it; a wrapper the pieces only partly cover splits them at its content boundary, which
+ * the parser identified. Existing marks between pieces split them too. Pieces inside locked content
+ * that a segment does not wrap whole are excluded.
+ */
+function plan(pieces: Piece[], spans: readonly CriticSpan[], source: string, out: Plan): void {
+  if (!pieces.length) return
+  const wrappers = pieces[0]!.block.wrappers
+  let from = pieces[0]!.from
+  let to = pieces.at(-1)!.to
+  // Pieces that run from one edge of a wrapper's content past its other edge select it completely,
+  // so the segment takes the syntax on that edge as well.
+  for (let extended = true; extended;) {
+    extended = false
+    for (const wrapper of wrappers) {
+      if (from === wrapper.contentStart && to > wrapper.contentEnd && wrapper.start < from) { from = wrapper.start; extended = true }
+      if (to === wrapper.contentEnd && from < wrapper.contentStart && wrapper.end > to) { to = wrapper.end; extended = true }
     }
   }
+  const splitAt = (inFirst: (piece: Piece) => boolean): void => {
+    const first = pieces.filter(inFirst)
+    plan(first, spans, source, out)
+    plan(pieces.slice(first.length), spans, source, out)
+  }
+  const span = spans.find((mark) => from < mark.end && to > mark.start)
+  if (span) return splitAt((piece) => piece.to <= span.start)
+  for (const wrapper of wrappers) {
+    if ((from <= wrapper.start && to >= wrapper.end) || to <= wrapper.start || from >= wrapper.end) continue
+    if (from >= wrapper.contentStart && to <= wrapper.contentEnd) {
+      if (!wrapper.locked) continue
+      out.excluded.push({ text: pieces.map((piece) => piece.rendered).join(''), reason: 'partial-link' })
+      return
+    }
+    return splitAt((piece) => (from < wrapper.start ? piece.to <= wrapper.start : piece.to <= wrapper.contentEnd))
+  }
+  out.segments.push({ range: { from, to, text: source.slice(from, to) }, rendered: pieces.map((piece) => piece.rendered).join('') })
+}
 
-  if (ranges.length === 0) return { error: 'unmapped' }
-  ranges.sort((a, b) => a.from - b.from)
-  return { ranges }
+/** A guard for a reading tree that diverges from the plain parse: no delimiter lands in opaque source. */
+function splitsOpaqueSyntax(from: number, to: number, opaque: readonly SourceRange[]): boolean {
+  return opaque.some((r) => (r.start < from && from < r.end) || (r.start < to && to < r.end))
+}
+
+/**
+ * Maps a DOM selection in a rendered `analysis` of `source` to the source slices review marks can
+ * wrap, accounting for every visible selected segment left out and why. `root`, when given, bounds
+ * the document; a selection outside it, or with no visible text, is inactive.
+ */
+export function mapSelection(range: Range, source: string, analysis: MappingAnalysis, root?: Node | null): SelectionMapping {
+  const quote = range.toString()
+  if (range.collapsed || !quote.trim()) return { status: 'inactive' }
+  if (root && !root.contains(range.commonAncestorContainer)) return { status: 'inactive' }
+  const index = selectableIndex(analysis.tree, source, analysis.provenance)
+  let items: Item[]
+  try {
+    items = readItems(range, index, analysis.spans)
+  } catch (error) {
+    if (error instanceof Outdated) return { status: 'outdated' }
+    throw error
+  }
+  const segments: SelRange[] = []
+  const excluded: ExcludedSegment[] = []
+  const opaque = excludedRanges(analysis.plain)
+  // Pieces join only within one text block and never across excluded text.
+  let run: Piece[] = []
+  const flush = (): void => {
+    const planned: Plan = { segments: [], excluded: [] }
+    plan(run, analysis.spans, source, planned)
+    run = []
+    for (const { range: segment, rendered } of planned.segments) {
+      if (!rendered.trim()) continue
+      if (splitsOpaqueSyntax(segment.from, segment.to, opaque)) excluded.push({ text: rendered, reason: 'no-provenance' })
+      else segments.push(segment)
+    }
+    excluded.push(...planned.excluded)
+  }
+  for (const item of items) {
+    if ('piece' in item) {
+      if (run.length && run[0]!.block !== item.piece.block) flush()
+      run.push(item.piece)
+    } else {
+      flush()
+      excluded.push(item)
+    }
+  }
+  flush()
+  if (!segments.length && !excluded.length) return { status: 'inactive' }
+  segments.sort((a, b) => a.from - b.from)
+  return { status: 'covered', revision: source, quote, segments, excluded }
 }

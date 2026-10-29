@@ -26,6 +26,8 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const [composing, setComposing] = useDraftState('translated:composing', false)
   const [body, setBody] = useDraftState('translated:body', '')
   const [placement, setPlacement] = useState<Placement | null>(null)
+  /** Where a selection across translated blocks is explained; a translated comment quotes one block. */
+  const [spanning, setSpanning] = useState<Placement | null>(null)
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const busy = useRef(false)
@@ -34,6 +36,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   useEffect(() => {
     const change = () => {
       if (composingRef.current) return
+      setSpanning(null)
       const selected = window.getSelection()
       if (!selected || selected.isCollapsed || selected.rangeCount !== 1) { setSelection(null); return }
       const range = selected.getRangeAt(0)
@@ -41,10 +44,16 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
         ?.closest<HTMLElement>('[data-trans-block-id]')
       const first = block(range.startContainer)
       const last = block(range.endContainer)
-      if (!first || first !== last || !containerRef.current?.contains(first)) { setSelection(null); return }
+      const container = containerRef.current
+      if (!first || !last || !container?.contains(first) || !container.contains(last)) { setSelection(null); return }
       const quote = selected.toString()
       if (!quote.trim()) { setSelection(null); return }
       const rect = range.getBoundingClientRect()
+      if (first !== last) {
+        setSelection(null)
+        setSpanning({ top: rect.top, left: rect.left })
+        return
+      }
       setSelection({ artifact, blockId: first.dataset.transBlockId!, quote })
       setPlacement({ top: rect.top, left: rect.left })
       setError(false)
@@ -101,6 +110,12 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const composer = useRef<HTMLDivElement>(null)
   useDraftGuard('translated', t('comment'), composing && !!body.trim(),
     () => { requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus()) }, close)
+  if (!selection && spanning) {
+    return <div className="sel-toolbar" style={{ top: Math.max(8, spanning.top - 44),
+      left: Math.max(8, Math.min(spanning.left, window.innerWidth - 280)) }}>
+      <p className="sel-note">{t('selectionTranslatedBlocks')}</p>
+    </div>
+  }
   if (!selection || !placement) return null
   return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, placement.top - (composing ? 150 : 44)),
     left: Math.max(8, Math.min(placement.left, window.innerWidth - 280)) }}

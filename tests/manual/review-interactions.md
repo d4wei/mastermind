@@ -11,15 +11,18 @@ reading view for the selection checks.
    ends at the next heading of equal or shallower depth. Matching depends on the heading title,
    not its depth; the trailing Notes heading should remain ordinary.
 2. **Cross-block comments:** select from the first selection paragraph into the second. Choose
-   Comment and submit a short message. Only the first markable source range becomes a highlighted
-   comment anchor; the remaining selected ranges stay unchanged. Inspect Markdown to check the
-   `{==…==}{>>…<<}` pair, then undo to restore the copy.
+   Comment and check that the composer says the comment attaches to the first selected part. Submit
+   a short message. Only the first markable source range becomes a highlighted comment anchor; the
+   remaining selected ranges stay unchanged. Inspect Markdown to check the `{==…==}{>>…<<}` pair,
+   then undo to restore the copy.
 3. **Cross-block changes:** repeat that selection and choose Suggest change. Each editable fragment
    gets a replacement field. Edit one field and clear another to suggest replacement and deletion,
    without enclosing paragraph separators. Unchanged fields produce no mark. Try selections from a
-   paragraph into a list and from a list into the table as well. Existing marks and text that cannot
-   be mapped safely to source may split or limit the ranges. An entirely unmarkable selection should
-   not offer an actionable toolbar. Undo should restore the whole operation at once.
+   paragraph into a list and from a list into the table as well, and from plain text into part of a
+   bold or linked phrase: the fields cover the selected text on each side, and the formatting syntax
+   stays intact. Existing marks, code, and labels split or limit the ranges, and the toolbar says
+   what it leaves out. An entirely unmarkable selection shows only that explanation, with no actions.
+   Undo should restore the whole operation at once.
 4. **Review actions:** accept or reject the deletion suggestion below and inspect Markdown for the
    corresponding text splice. Add a reply to the existing comment; feedback remains in the file
    with its author. Ordinary successful edits and review actions do not require a success toast.

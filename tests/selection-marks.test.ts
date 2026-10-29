@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { SelRange } from '../ui/modes/reading/selection'
-import { commentBodyFits, commentEdits, changeEdits, replyEdits } from '../ui/modes/reading/marks'
+import { changeVerdict, commentBodyFits, commentEdits, commentVerdict, changeEdits, replyEdits } from '../ui/modes/reading/marks'
 import { applyTextEdits } from '../document/edits'
 import { scan, group } from '../document/critic/scanner'
 import { scanMarkdown } from '../document/markdown/scan'
+import { analyzeMarkdown } from '../document/markdown/analyze'
 
 const SOURCE = 'First paragraph.\n\nSecond paragraph.'
 // A realistic cross-block selection: from "paragraph." in block 0 through
@@ -112,10 +113,36 @@ describe('marks verified in the edited source', () => {
     // Unfencing the first line releases the fenced mark and lets the last fence swallow the next one.
     const source = '```\n{++a++}\n```\n{++b++}\n'
     const fence: SelRange[] = [{ from: 0, to: 3, text: '```' }]
-    const spans = scanMarkdown(source)
-    expect(scanMarkdown(applyTextEdits(source, [{ from: 0, to: 3, insert: '{--```--}' }]))).toHaveLength(spans.length + 1)
-    expect(changeEdits(source, fence, [''], spans)).toBeNull()
+    const analysis = analyzeMarkdown(source)
+    expect(scanMarkdown(applyTextEdits(source, [{ from: 0, to: 3, insert: '{--```--}' }]))).toHaveLength(analysis.spans.length + 1)
+    expect(changeEdits(source, fence, [''], analysis)).toBeNull()
     expect(changeEdits(source, fence, [''])).toBeNull()
+  })
+})
+
+describe('Markdown structure around new marks', () => {
+  const SHORTCUT = '[foo] bar\n\n[foo]: /url'
+  const LABEL: SelRange[] = [{ from: 1, to: 3, text: 'fo' }]
+
+  it('refuses a comment or suggestion inside a reference label, which would unlink it', () => {
+    expect(commentVerdict(SHORTCUT, LABEL, 'me', 'x')).toEqual({ refused: 'formatting' })
+    expect(changeVerdict(SHORTCUT, LABEL, [''])).toEqual({ refused: 'formatting' })
+    expect(changeVerdict(SHORTCUT, LABEL, ['ba'])).toEqual({ refused: 'formatting' })
+    expect(scanMarkdown(applyTextEdits(SHORTCUT, [{ from: 1, to: 3, insert: '{--fo--}' }]))).toHaveLength(1)
+  })
+
+  it('accepts the same marks around the whole reference', () => {
+    const whole: SelRange[] = [{ from: 0, to: 5, text: '[foo]' }]
+    expect(commentVerdict(SHORTCUT, whole, 'me', 'x')).toEqual({ edits: [{ from: 0, to: 5, insert: '{==[foo]==}{>>@me: x<<}' }] })
+    expect(changeVerdict(SHORTCUT, whole, [''])).toEqual({ edits: [{ from: 0, to: 5, insert: '{--[foo]--}' }] })
+  })
+
+  it('refuses a highlight that would end the emphasis it holds, but not a substitution of it', () => {
+    const source = 'x _a_ y'
+    const ranges: SelRange[] = [{ from: 0, to: 5, text: 'x _a_' }]
+    expect(commentVerdict(source, ranges, 'me', 'x')).toEqual({ refused: 'formatting' })
+    expect(changeVerdict(source, ranges, [''])).toEqual({ refused: 'formatting' })
+    expect(changeVerdict(source, ranges, ['z'])).toEqual({ edits: [{ from: 0, to: 5, insert: '{~~x _a_~>z~~}' }] })
   })
 })
 
@@ -125,7 +152,7 @@ describe('comment bodies and discussions', () => {
   it('refuses a new comment that would join a point comment beside the selection', () => {
     const source = 'Ship it Friday{>>@agent: is Friday firm?<<} please.\n'
     const friday: SelRange[] = [{ from: 8, to: 14, text: 'Friday' }]
-    expect(commentEdits(source, friday, 'me', 'prefer Monday', scanMarkdown(source))).toBeNull()
+    expect(commentEdits(source, friday, 'me', 'prefer Monday', analyzeMarkdown(source))).toBeNull()
     expect(commentEdits(source, friday, 'me', 'prefer Monday')).toBeNull()
     expect(commentEdits(source, [{ from: 0, to: 4, text: 'Ship' }], 'me', 'ok')).not.toBeNull()
   })

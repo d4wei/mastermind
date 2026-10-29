@@ -5,13 +5,11 @@ import { rangeBetween } from './helpers/dom'
 import { renderMarkdown } from './helpers/markdown'
 import { applyTextEdits } from '../document/edits'
 import { analyzeMarkdown } from '../document/markdown/analyze'
-import { parseMarkdown } from '../document/markdown/processor'
-import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { mapSelection, type SelRange, type SelectionMapping } from '../ui/modes/reading/selection'
 import { commentEdits } from '../ui/modes/reading/marks'
 
-// Mirrors the renderer's output: each block carries data-ps/data-pe and wraps its
-// text in a span with matching data-ps/data-pe, so pointToOffset's length-equality
-// fast path applies.
+// Mirrors the renderer's output: each block carries data-ps/data-pe and wraps its text in a leaf span
+// with matching data-ps/data-pe.
 const SOURCE = 'First paragraph.\n\nSecond paragraph.'
 
 function build(): { root: HTMLElement; t0: Text; t1: Text } {
@@ -25,39 +23,40 @@ function build(): { root: HTMLElement; t0: Text; t1: Text } {
   return { root, t0: s0!.firstChild as Text, t1: s1!.firstChild as Text }
 }
 
+function segments(mapping: SelectionMapping): SelRange[] {
+  if (mapping.status !== 'covered') throw new Error(`expected coverage, got ${mapping.status}`)
+  return mapping.segments
+}
 
-describe('rangeToSourceRanges', () => {
-  it('single-block selection yields one range', () => {
+describe('mapSelection', () => {
+  it('maps a single-block selection to one segment', () => {
     const { t0 } = build()
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, analyzeMarkdown(SOURCE))
-    expect('ranges' in res && res.ranges).toEqual([{ from: 6, to: 15, text: 'paragraph' }])
+    expect(mapSelection(rangeBetween(t0, 6, t0, 15), SOURCE, analyzeMarkdown(SOURCE))).toEqual({
+      status: 'covered', revision: SOURCE, quote: 'paragraph', segments: [{ from: 6, to: 15, text: 'paragraph' }], excluded: [],
+    })
   })
 
-  it('cross-block selection yields one range per block (start→end, start→end point)', () => {
+  it('maps a cross-block selection to one segment per block', () => {
     const { t0, t1 } = build()
-    // from "paragraph." in block 0 through "Second paragraph" in block 1
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t1, 16), SOURCE, analyzeMarkdown(SOURCE))
-    if (!('ranges' in res)) throw new Error(`expected ranges, got ${res.error}`)
-    expect(res.ranges).toEqual([
+    const mapped = segments(mapSelection(rangeBetween(t0, 6, t1, 16), SOURCE, analyzeMarkdown(SOURCE)))
+    expect(mapped).toEqual([
       { from: 6, to: 16, text: 'paragraph.' },
       { from: 18, to: 34, text: 'Second paragraph' },
     ])
-    // the slices are exactly what the source says — never a guess
-    for (const r of res.ranges) expect(SOURCE.slice(r.from, r.to)).toBe(r.text)
+    for (const r of mapped) expect(SOURCE.slice(r.from, r.to)).toBe(r.text)
   })
 
-  it('hides (errors) only when nothing in the selection is markable', () => {
+  it('accounts for text inside an existing mark instead of hiding the selection', () => {
     const { t0 } = build()
-    // a single-block selection sitting entirely inside an existing mark
-    const res = rangeToSourceRanges(rangeBetween(t0, 6, t0, 15), SOURCE, { plain: parseMarkdown(SOURCE), spans: [
-      { kind: 'highlight', start: 4, end: 16, innerStart: 6, innerEnd: 15 },
-    ] })
-    expect(res).toEqual({ error: 'unmapped' })
+    const analysis = { ...analyzeMarkdown(SOURCE), spans: [{ kind: 'highlight' as const, start: 4, end: 16, innerStart: 6, innerEnd: 15 }] }
+    expect(mapSelection(rangeBetween(t0, 6, t0, 15), SOURCE, analysis)).toMatchObject({
+      status: 'covered', segments: [], excluded: [{ text: 'paragraph', reason: 'existing-mark' }],
+    })
   })
 
-  it('empty / collapsed selection is rejected', () => {
+  it('treats an empty or collapsed selection as inactive', () => {
     const { t0 } = build()
-    expect(rangeToSourceRanges(rangeBetween(t0, 6, t0, 6), SOURCE, analyzeMarkdown(SOURCE))).toEqual({ error: 'empty' })
+    expect(mapSelection(rangeBetween(t0, 6, t0, 6), SOURCE, analyzeMarkdown(SOURCE))).toEqual({ status: 'inactive' })
   })
 })
 
@@ -72,128 +71,116 @@ function contents(element: Element): Range {
 }
 
 describe('selections across rendered review marks', () => {
-  it.each(['Alpha {++beta++} gamma', 'Alpha{>>c<<} gamma', 'Alpha {~~a~>b~~} gamma'])(
-    'maps the text on either side of the mark: %s', (source) => {
-      const rendered = renderMarkdown(source)
-      const { host } = rendered
-      const before = source.slice(0, source.indexOf('{'))
-      const after = source.slice(source.lastIndexOf('}') + 1)
-      expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)).toEqual({ ranges: [
-        { from: 0, to: before.length, text: before },
-        { from: source.length - after.length, to: source.length, text: after },
-      ] })
-    },
-  )
+  it.each([
+    ['Alpha {++beta++} gamma', ['existing-mark']],
+    ['Alpha{>>c<<} gamma', []],
+    ['Alpha {~~a~>b~~} gamma', ['existing-mark']],
+  ])('maps the text on either side of the mark: %s', (source, reasons) => {
+    const rendered = renderMarkdown(source)
+    const before = source.slice(0, source.indexOf('{'))
+    const after = source.slice(source.lastIndexOf('}') + 1)
+    const mapped = mapSelection(contents(rendered.host.querySelector('p')!), source, rendered)
+    expect(mapped).toMatchObject({ segments: [
+      { from: 0, to: before.length, text: before },
+      { from: source.length - after.length, to: source.length, text: after },
+    ] })
+    expect(mapped.status === 'covered' && mapped.excluded.map((item) => item.reason)).toEqual(reasons)
+  })
 
   it('keeps the block containing a mark when the selection continues into the next block', () => {
     const source = 'Alpha {++beta++} gamma\n\nSecond paragraph.'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const range = rangeBetween(textOf(host, 'p > span'), 0, textOf(host, 'p > span', 2), 6)
-    expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [
+    const range = rangeBetween(textOf(rendered.host, 'p > span'), 0, textOf(rendered.host, 'p > span', 2), 6)
+    expect(segments(mapSelection(range, source, rendered))).toEqual([
       { from: 0, to: 6, text: 'Alpha ' },
       { from: 16, to: 22, text: ' gamma' },
       { from: 24, to: 30, text: 'Second' },
-    ] })
+    ])
   })
 
-  it('drops whitespace-only pieces between adjacent marks', () => {
+  it('drops whitespace-only segments between adjacent marks', () => {
     const source = 'Alpha {++beta++} {--delta--} gamma'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const mapped = rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)
-    expect(mapped).toEqual({ ranges: [{ from: 0, to: 6, text: 'Alpha ' }, { from: 28, to: 34, text: ' gamma' }] })
+    expect(segments(mapSelection(contents(rendered.host.querySelector('p')!), source, rendered)))
+      .toEqual([{ from: 0, to: 6, text: 'Alpha ' }, { from: 28, to: 34, text: ' gamma' }])
   })
 
-  it('maps text beside a mark by exact offsets where the substring fallback would refuse', () => {
-    // The entity changes the paragraph's rendered length, and both pieces recur inside the mark.
+  it('maps text beside a mark by position when the same text recurs inside it', () => {
     const source = 'Alpha {++beta *Alpha &amp; gamma*++} gamma'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    expect(rangeToSourceRanges(contents(host.querySelector('p')!), source, rendered)).toEqual({ ranges: [
+    expect(segments(mapSelection(contents(rendered.host.querySelector('p')!), source, rendered))).toEqual([
       { from: 0, to: 6, text: 'Alpha ' },
       { from: 36, to: 42, text: ' gamma' },
-    ] })
+    ])
   })
 
-  it('refuses a selection entirely inside an insertion', () => {
+  it('explains a selection entirely inside an insertion', () => {
     const source = 'Alpha {++beta++} gamma'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const inserted = host.querySelector('ins')!.firstChild!.firstChild as Text
-    expect(rangeToSourceRanges(rangeBetween(inserted, 1, inserted, 3), source, rendered)).toEqual({ error: 'unmapped' })
+    const inserted = rendered.host.querySelector('ins')!.firstChild!.firstChild as Text
+    expect(mapSelection(rangeBetween(inserted, 1, inserted, 3), source, rendered)).toMatchObject({
+      status: 'covered', segments: [], excluded: [{ text: 'et', reason: 'existing-mark' }],
+    })
   })
 })
 
 describe('selections across nested list items', () => {
   it('maps the parent text when a selection enters a nested item', () => {
     const source = '- parent item\n  - child item'
-    const { host } = renderMarkdown(source)
-    const range = rangeBetween(textOf(host, 'li > span'), 0, textOf(host, 'li li > span'), 5)
-    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [
+    const rendered = renderMarkdown(source)
+    const range = rangeBetween(textOf(rendered.host, 'li > span'), 0, textOf(rendered.host, 'li li > span'), 5)
+    expect(segments(mapSelection(range, source, rendered))).toEqual([
       { from: 2, to: 13, text: 'parent item' },
       { from: 18, to: 23, text: 'child' },
-    ] })
+    ])
   })
 
   it('keeps an outer item\'s own text when the selection continues past its nested list', () => {
     const source = '- one\n  - one.a\n- two'
-    const { host } = renderMarkdown(source)
-    const range = rangeBetween(textOf(host, 'li > span'), 0, textOf(host, 'li > span', 2), 3)
-    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ ranges: [
+    const rendered = renderMarkdown(source)
+    const range = rangeBetween(textOf(rendered.host, 'li > span'), 0, textOf(rendered.host, 'li > span', 2), 3)
+    expect(segments(mapSelection(range, source, rendered))).toEqual([
       { from: 2, to: 5, text: 'one' },
       { from: 10, to: 15, text: 'one.a' },
       { from: 18, to: 21, text: 'two' },
-    ] })
+    ])
   })
 })
 
-describe('substring fallback for leaves whose rendered length differs from source', () => {
+describe('decoded text mapped by provenance', () => {
   it.each([
-    ['AT&amp;T and AT&T', 'AT&T'],
-    ['5 \\* 3 and 5 * 3', '5 * 3'],
-    ['- a\\*b\n  - a*b', 'a*b'],
-  ])('refuses an occurrence it cannot tell apart: %s', (source, selected) => {
-    const { host } = renderMarkdown(source)
-    const leaf = textOf(host, 'p > span, li > span')
-    expect(leaf.data.startsWith(selected)).toBe(true)
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, selected.length), source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
-  })
-
-  it.each([
-    ['\\*x\\*{>>c<<} and *x*', '*x*'],
-    ['Tom &amp; Jerry{>>c<<} and [l](u "Tom & Jerry")', 'Tom & Jerry'],
-  ])('bounds an unpositioned piece beside a mark to its own source: %s', (source, piece) => {
+    ['AT&amp;T and AT&T', 'AT&T', 'AT&amp;T'],
+    ['5 \\* 3 and 5 * 3', '5 * 3', '5 \\* 3'],
+    ['- a\\*b\n  - a*b', 'a*b', 'a\\*b'],
+  ])('maps the first of two identical renderings to its own source: %s', (source, selected, expected) => {
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const whole = document.createRange()
-    whole.selectNodeContents(host.querySelector('p')!)
-    const result = rangeToSourceRanges(whole, source, rendered)
-    const ranges = 'ranges' in result ? result.ranges : []
-    expect(ranges.every((range) => range.text !== piece || range.to <= rendered.spans[0]!.start)).toBe(true)
-    const leaf = textOf(host, 'p > span')
-    expect(leaf.data).toBe(piece)
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, piece.length), source, rendered)).toEqual({ error: 'unmapped' })
+    const leaf = textOf(rendered.host, 'p > span, li > span')
+    expect(leaf.data.startsWith(selected)).toBe(true)
+    const from = source.indexOf(expected)
+    expect(segments(mapSelection(rangeBetween(leaf, 0, leaf, selected.length), source, rendered)))
+      .toEqual([{ from, to: from + expected.length, text: expected }])
   })
 
   it.each([
-    ['Write &amp;lt; to get &lt; here.', '&lt'],
-    ['Price \\$5 or $', '$5'],
-  ])('refuses a source match inside a character reference or escape: %s', (source, selected) => {
-    const { host } = renderMarkdown(source)
-    const leaf = textOf(host, 'p > span')
-    const at = leaf.data.indexOf(selected)
-    expect(at).not.toBe(-1)
-    expect(rangeToSourceRanges(rangeBetween(leaf, at, leaf, at + selected.length), source, analyzeMarkdown(source)))
-      .toEqual({ error: 'unmapped' })
+    ['\\*x\\*{>>c<<} and *x*', '\\*x\\*'],
+    ['Tom &amp; Jerry{>>c<<} and [l](u "Tom & Jerry")', 'Tom &amp; Jerry'],
+  ])('maps a decoded piece beside a mark to its own source: %s', (source, expected) => {
+    const rendered = renderMarkdown(source)
+    const leaf = textOf(rendered.host, 'p > span')
+    expect(segments(mapSelection(rangeBetween(leaf, 0, leaf, leaf.length), source, rendered)))
+      .toEqual([{ from: 0, to: expected.length, text: expected }])
   })
 
-  it('maps text that occurs once in both the rendered leaf and its source', () => {
-    const source = 'AT&amp;T rocks'
-    const { host } = renderMarkdown(source)
-    const leaf = textOf(host, 'p > span')
-    expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 2), source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 0, to: 2, text: 'AT' }] })
-    expect(rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, analyzeMarkdown(source))).toEqual({ ranges: [{ from: 9, to: 14, text: 'rocks' }] })
+  it.each([
+    ['Write &amp;lt; to get &lt; here.', '&lt', '&amp;lt'],
+    ['Price \\$5 or $', '$5', '\\$5'],
+  ])('keeps a decoded character whole at a selection edge: %s', (source, selected, expected) => {
+    const rendered = renderMarkdown(source)
+    const leaf = textOf(rendered.host, 'p > span')
+    const at = leaf.data.indexOf(selected)
+    const from = source.indexOf(expected)
+    expect(segments(mapSelection(rangeBetween(leaf, at, leaf, at + selected.length), source, rendered)))
+      .toEqual([{ from, to: from + expected.length, text: expected }])
   })
 })
 
@@ -201,25 +188,30 @@ describe('comment round trip', () => {
   it('refuses a comment whose selected text would close the new highlight early', () => {
     const source = 'Type a ==} here.'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const leaf = textOf(host, 'p > span')
-    const mapped = rangeToSourceRanges(rangeBetween(leaf, 5, leaf, 10), source, rendered)
-    if (!('ranges' in mapped)) throw new Error(mapped.error)
-    expect(mapped.ranges).toEqual([{ from: 5, to: 10, text: 'a ==}' }])
-    expect(commentEdits(source, mapped.ranges, 'me', 'hi')).toBeNull()
+    const leaf = textOf(rendered.host, 'p > span')
+    const mapped = segments(mapSelection(rangeBetween(leaf, 5, leaf, 10), source, rendered))
+    expect(mapped).toEqual([{ from: 5, to: 10, text: 'a ==}' }])
+    expect(commentEdits(source, mapped, 'me', 'hi')).toBeNull()
   })
 
   it('anchors a comment on ordinary selected text', () => {
     const source = 'Type a ==} here.'
     const rendered = renderMarkdown(source)
-    const { host } = rendered
-    const leaf = textOf(host, 'p > span')
-    const mapped = rangeToSourceRanges(rangeBetween(leaf, 0, leaf, 4), source, rendered)
-    if (!('ranges' in mapped)) throw new Error(mapped.error)
-    const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'me', 'hi')!)
+    const leaf = textOf(rendered.host, 'p > span')
+    const mapped = segments(mapSelection(rangeBetween(leaf, 0, leaf, 4), source, rendered))
+    const updated = applyTextEdits(source, commentEdits(source, mapped, 'me', 'hi')!)
     expect(updated).toBe('{==Type==}{>>@me: hi<<} a ==} here.')
     expect(analyzeMarkdown(updated).items).toMatchObject([
       { type: 'thread', anchor: { start: 0, end: 10 }, comments: [{ author: 'me', body: 'hi' }] },
     ])
+  })
+})
+
+it('accounts for an image inside an existing mark by its alternative text', () => {
+  const source = 'See {++![chart](c.png)++} here.'
+  const rendered = renderMarkdown(source)
+  expect(mapSelection(contents(rendered.host.querySelector('p')!), source, rendered)).toMatchObject({
+    segments: [{ from: 0, to: 4, text: 'See ' }, { from: 25, to: 31, text: ' here.' }],
+    excluded: [{ text: 'chart', reason: 'existing-mark' }],
   })
 })

@@ -1,84 +1,109 @@
 # Mapping review selections to source
 
-`selection.ts` maps the rendered document's DOM ranges to exact source slices. It uses the
-renderer's `data-ps`/`data-pe` offsets when text matches. A selection within a positioned text leaf
-can also map through removed list/blockquote continuation prefixes and normalized line endings: its DOM
-text must match the parsed text node, and each rendered line must match its source line after only
-those prefixes are removed. This retains exact source bytes across lines and distinguishes repeated
-characters by position. It does not strip arbitrary whitespace or decode entities to guess offsets.
-When escapes or entities make a leaf's rendered length differ from its source, the selected text
-maps only if it occurs exactly once in
-both the rendered and the source text of its window: the narrowest positioned element holding the
-selection, bounded by the nearest positioned element or rendered review mark on each side. Text
-that is not unique within that window is refused, even when it is unique elsewhere in the block.
-A source match that overlaps a character reference or backslash escape is refused too: it renders
-as different characters, so it is another occurrence, and delimiters inside it would split it.
-Comments anchor to the first mapped range.
+`selection.ts` maps a settled DOM selection in the rendered document to the exact source slices a
+review mark may wrap, and accounts for every visible selected piece it leaves out. Mapping never
+parses: it reads the analysis of the current source, whose reading tree carries each text node's
+positional provenance (`document/markdown/provenance.ts`, described in
+[review boundaries](../../../document/markdown/scan.md)), and indexes that tree once per analysis.
 
-A selection splits first at block boundaries, then within each block at rendered review marks
-(`.critic[data-span-index]`). The pieces outside the marks map independently; whitespace-only and
-unmappable pieces are skipped while the rest stay markable, and a selection wholly inside a mark
-yields nothing. A mapped range that still overlaps a review span, such as a mark that rendered
-literally, is dropped. Unanchored highlights render as plain text without a
-`.critic[data-span-index]` element, so a piece across one overlaps its span and maps nothing. A
-container block such as a list item with a nested list contributes only its own text before the
-first nested block; the nested blocks map as blocks of their own, including when the selection's
-common ancestor is the container itself.
+## Results
 
-Frontmatter properties or their literal fallback form one opaque block. Selections beginning
-there can continue into body text, but only the body portion receives review ranges. Nested raw
-source does not displace the metadata wrapper when enumerating blocks across a selection.
+`mapSelection` returns one of three results. **Inactive** means nothing is selected in the
+document: a collapsed or whitespace-only selection, or one outside the given root. It needs no
+toolbar and no explanation. **Outdated** means a positioned element disagrees with the analysis, so
+the DOM was rendered from another revision; the caller keeps its state and maps again after the
+render that follows the source change. Neither is a mapping failure.
 
-Selections that cross complete emphasis, strong, strikethrough, link, or inline-code wrappers retain
-those wrappers' exact Markdown source, rather than comparing their syntax with plain rendered text.
-The DOM positions must match nodes from the existing Markdown parser, and each complete wrapper's
-rendered text must match its parsed text. Outside those wrappers, selected text maps to exact source
-slices and the slices must be contiguous: unaccounted source gaps are refused. Reference links and
-other unsupported rendered structures do not become guessed source ranges. A mapping operation
-never parses: it takes the plain tree from the current source's analysis for opaque ranges and
-lazily indexes that tree for formatted blocks and normalized text leaves; the index is discarded
-after the operation.
+**Covered** carries the source revision the offsets index, the selected quote, the mapped segments
+in source order, and the excluded segments in document order, each with a reason:
 
-A selection confined to one text leaf within formatting keeps its exact text range, including the
-windowed unique-substring fallback when rendered entities change that leaf's length.
-A selection that crosses only part of a formatting wrapper is refused, so a mark cannot strand an
-opening or closing delimiter. Splitting those partial selections into several ranges is deferred.
-Text the renderer splits around a review mark keeps exact offsets when its parsed text node's value
-spans exactly its source; a node whose entities or escapes decode, or whose container prefixes are
-dropped, leaves its pieces unpositioned, and they fall back to the unique-substring rule, which a
-piece crossing a formatting wrapper cannot satisfy.
+| Reason | Selected text |
+| --- | --- |
+| `existing-mark` | Inside an existing suggestion or discussion, or source a recognized mark owns |
+| `generated-text` | Display labels absent from the Markdown, such as footnote numbers |
+| `opaque-block` | Fenced or indented code, raw HTML blocks, and frontmatter |
+| `partial-code` | Part of inline code or inline HTML, which is reviewed whole |
+| `partial-link` | Part of an autolink or of a shortcut or collapsed reference label |
+| `no-provenance` | Rendered text without exact positional provenance |
 
-A complete inline-code selection includes the source backticks in its range. CriticMarkup wraps
-that range, so the anchor and comment delimiters stay outside code. Rendered code may normalize
-padding or line breaks; the source range retains those original bytes. Partial code selections
-are not markable, since inserting delimiters inside code makes them literal and expanding a partial
-selection would silently change the scope of a suggested deletion. Select the whole code span.
-Fenced code is not an inline review target.
+`multiple-translated-blocks` belongs to the translated view, which has its own selection path.
+A covered result with excluded segments is a partial mapping, never ordinary success; one with no
+segments offers no action. Whitespace-only segments and exclusions are dropped.
 
-Selection actions check Markdown's opaque source ranges before emitting a mark;
-new delimiters cannot fall inside code, HTML, or frontmatter. Code examples containing literal
-CriticMarkup continue to render as code. Existing malformed/literal text is not automatically
-rewritten.
+## The rendered DOM contract
 
-`tests/inline-code-selection.test.tsx` exercises the real renderer, selection mapping,
-comment/deletion edits, reparsing, and exact accept/reject splices together.
+The renderer gives each text leaf a `span[data-ps][data-pe]` holding its source extent. Inline
+code, inline HTML, images, image references, and footnote references carry `data-atom` and their
+extent; footnote-definition labels carry `data-generated`. Review marks render as
+`.critic[data-span-index]`, and code and HTML blocks as `pre`, with frontmatter in
+`.md-frontmatter`. A leaf's rendered text must equal its parsed value, up to line endings an HTML
+parse normalized to LF; otherwise the result is outdated.
 
-`tests/wrapped-selection.test.tsx` checks repeated characters and cross-line selections in lists
-and blockquotes, including retained line endings and exact review splices.
+## Pieces
 
-`tests/formatted-selection.test.tsx` checks complete and partial formatted selections against the
-real renderer, reparsing, and exact deletion acceptance/rejection, including retained CRLF.
+Each selected text node becomes a piece or an exclusion. A leaf maps its selected value range
+through its provenance runs: a selection edge never splits a decoded character reference or
+backslash escape, a start at the head of a continuation line falls after its container prefix, and
+an end there falls before it. Repeated or decoded text maps by position, never by searching for
+equal text. A complete atom maps to its whole extent, so inline-code delimiters stay outside code;
+a partial atom is excluded. An image the selection crosses is covered whole.
+
+## Segments
+
+Pieces join into segments only within one text block (paragraph, heading, or table cell) and never
+across excluded text, so each mark fits the scanner's block windows. Within a run, planning splits
+pieces only at parser-identified boundaries:
+
+- A wrapper (strong, emphasis, strikethrough, link, or reference link) wholly inside a segment
+  keeps its exact syntax. Pieces that run from one edge of a wrapper's content past its other edge
+  select it completely, so the segment takes that edge's syntax.
+- A wrapper the pieces only partly cover splits them at its content boundary, so marks wrap the
+  selected text on each side and the wrapper's delimiters stay intact.
+- An existing mark between pieces splits them, so marks never nest.
+- Pieces inside locked content that a segment does not wrap whole are excluded as `partial-link`.
+
+A guard drops any segment whose delimiters would land inside source the plain parse treats as
+opaque, which can only happen if the reading tree diverged from it. Comments anchor to the first
+segment.
+
+## Verifying marks
+
+`marks.ts` checks every comment, reply, and suggestion in the full edited source before it can be
+submitted. The edited source must reparse with exactly the intended marks starting inside each
+insert and every existing mark at its shifted offsets with unchanged extents; a new comment must add
+exactly one discussion. The edited reading tree must also match the original's structure
+(`document/markdown/structure.ts`) with the new marks unwrapped, and with each substitution and the
+source it replaces left out, since a substitution shows its old text verbatim. A refusal names
+`markup` or `formatting`. The masked reading parse sees a sentinel beside a delimiter, so a mark
+directly against underscore emphasis can end it there; such marks are refused as `formatting`.
+
+## The toolbar
 
 The selection toolbar debounces browser selection changes until a composer owns its captured
-anchor. Entering or dismissing a composer cancels pending checks; delayed checks also verify that
-no composer has taken ownership. Actions flush a pending valid selection so rapid reselection uses
-the latest passage. A toolbar retained only for its exit animation cannot start a new composer.
-Escape dismisses pending work as well as the visible controls. A shown toolbar re-reads its surviving
-selection when the source changes, since no selection event follows. Draft text remains intact across
-focus changes, scrolling, and source updates; submission still requires the captured source. A
-comment, change, or reply cannot be submitted unless the whole edited source reparses with exactly
-the intended marks starting inside each insert, every existing mark at its shifted offsets with
-unchanged extents, and no other mark. A new comment must also add exactly one discussion, so it
-cannot join a comment already beside the selection. Composers show the verdict for their deferred
-text, reusing it until the source, selection, or text changes, and name a body line that opens block
-syntax as the reason; submission verifies the final text.
+anchor. Entering or dismissing a composer cancels pending checks; delayed checks also verify that no
+composer has taken ownership. Actions flush a pending selection so rapid reselection uses the
+latest passage. A toolbar retained only for its exit animation cannot start a new composer. Escape
+dismisses pending work as well as the visible controls. A shown toolbar re-reads its surviving
+selection when the source changes, since no selection event follows, and keeps its state through an
+outdated read.
+
+A selection with segments offers Comment and Suggest change; with exclusions it also says, beside
+the actions and in the composer, that only part of the selection can be marked and why. A selection
+with no segments shows only the reasons. A comment composer for several segments says the comment
+attaches to the first. Draft text remains intact across focus changes, scrolling, and source
+updates; submission still requires the captured source. Composers show the verdict for their
+deferred text, reusing it until the source, selection, or text changes, and name a body line that
+opens block syntax, markup that would not reparse, or a mark that would change the surrounding
+formatting; submission verifies the final text. Stale drafts and paused editing keep their own
+messages. Selection limits never raise global notifications.
+
+## Tests
+
+`tests/selection-matrix.test.tsx` renders each fixture with the React client, selects it forward
+and backward with text and element endpoints, asserts its segments and exclusion reasons, and
+round-trips a comment, a deletion, and a substitution: rejection restores the original bytes and
+acceptance performs exactly the proposed change. It also covers inactivity, outdated renders, rapid
+reselection, and the toolbar's explanations. `tests/selection-ranges.test.ts`,
+`formatted-selection.test.tsx`, `inline-code-selection.test.tsx`, and `wrapped-selection.test.tsx`
+check marks, decoded text, wrappers, code, and container continuations in detail;
+`tests/selection-marks.test.ts` checks edit verification.

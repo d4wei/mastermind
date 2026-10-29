@@ -5,7 +5,7 @@ import { applyTextEdits } from '../document/edits'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveAll } from '../document/critic/resolve'
 import { commentEdits, changeEdits } from '../ui/modes/reading/marks'
-import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { mapSelection } from '../ui/modes/reading/selection'
 
 it('maps a selection across a hard-wrapped task-list continuation', () => {
   const source = '- [ ] **Check.** Compare the available plans for new\n  readers before choosing a default.'
@@ -22,7 +22,7 @@ it('maps a selection across a hard-wrapped task-list continuation', () => {
   range.setEnd(leaf, text.indexOf(' before'))
   const from = source.indexOf('available')
   const to = source.indexOf(' before')
-  expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [{ from, to, text: source.slice(from, to) }] })
+  expect(mapSelection(range, source, rendered)).toMatchObject({ segments: [{ from, to, text: source.slice(from, to) }], excluded: [] })
 })
 
 it.each(['\n', '\r\n', '\r'])('maps repeated single characters by position after a continuation (%j)', (newline) => {
@@ -34,7 +34,7 @@ it.each(['\n', '\r\n', '\r'])('maps repeated single characters by position after
   const range = document.createRange()
   range.setStart(leaf, offset); range.setEnd(leaf, offset + 1)
   const from = source.lastIndexOf('Read')
-  expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [{ from, to: from + 1, text: 'R' }] })
+  expect(mapSelection(range, source, rendered)).toMatchObject({ segments: [{ from, to: from + 1, text: 'R' }] })
 })
 
 it.each([
@@ -48,15 +48,15 @@ it.each([
   const value = leaf.textContent!
   const range = document.createRange()
   range.setStart(leaf, value.indexOf('plans')); range.setEnd(leaf, value.indexOf(' before'))
-  const mapped = rangeToSourceRanges(range, source, rendered)
-  if (!('ranges' in mapped)) throw new Error(mapped.error)
+  const mapped = mapSelection(range, source, rendered)
+  if (mapped.status !== 'covered') throw new Error(mapped.status)
   const from = source.indexOf('plans'); const to = source.indexOf(' before')
-  expect(mapped.ranges).toEqual([{ from, to, text: source.slice(from, to) }])
-  const comments = commentEdits(source, mapped.ranges, 'Alex', 'Check this.')
+  expect(mapped.segments).toEqual([{ from, to, text: source.slice(from, to) }])
+  const comments = commentEdits(source, mapped.segments, 'Alex', 'Check this.')
   expect(comments).not.toBeNull()
   const commented = renderMarkdown(applyTextEdits(source, comments!))
   expect(commented.items).toMatchObject([{ type: 'thread', comments: [{ author: 'Alex', body: 'Check this.' }] }])
-  const changes = changeEdits(source, mapped.ranges, [''])
+  const changes = changeEdits(source, mapped.segments, [''])
   expect(changes).not.toBeNull()
   const changed = applyTextEdits(source, changes!)
   const spans = analyzeMarkdown(changed).spans
@@ -69,7 +69,7 @@ it('maps complete formatting beside a wrapped text leaf without losing indentati
   const rendered = renderMarkdown(source)
   const range = document.createRange()
   range.selectNodeContents(rendered.host.querySelector('li')!)
-  expect(rangeToSourceRanges(range, source, rendered)).toEqual({ ranges: [
+  expect(mapSelection(range, source, rendered)).toMatchObject({ segments: [
     { from: 2, to: source.length, text: source.slice(2) },
   ] })
 })

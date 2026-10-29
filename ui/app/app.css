@@ -419,6 +419,17 @@ button:disabled {
 }
 
 
+/* A short explanation of what the selection leaves out; it wraps below the actions. */
+.sel-toolbar { flex-wrap: wrap; }
+.sel-toolbar > .sel-note {
+  flex: 1 1 100%;
+  max-width: calc(var(--space-unit) * 70);
+  margin: 0;
+  padding: var(--space-unit) calc(var(--space-unit) * 2.5);
+  color: var(--color-invert-text-muted);
+  font-size: var(--font-size-xs);
+}
+
 .sel-composer {
   display: flex;
   flex-direction: column;

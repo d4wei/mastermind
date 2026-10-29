@@ -7,7 +7,7 @@ import { segmentBlocks } from '../document/blocks'
 import { applyTextEdits } from '../document/edits'
 import { acceptEdit } from '../document/critic/resolve'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
-import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { mapSelection } from '../ui/modes/reading/selection'
 import { metadataProperties } from '../ui/modes/reading/Frontmatter'
 
 const metadata = '---\ntitle: "{>>literal<<}"\nitems:\n  - one\n  - two\n---'
@@ -66,14 +66,17 @@ describe('YAML frontmatter', () => {
     const root = render(source)
     const metadataRange = document.createRange()
     metadataRange.selectNodeContents(root.querySelector('dd')!)
-    expect(rangeToSourceRanges(metadataRange, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
+    expect(mapSelection(metadataRange, source, analyzeMarkdown(source))).toMatchObject({
+      segments: [], excluded: [{ reason: 'opaque-block' }],
+    })
     const body = root.querySelector('p')!
     const crossing = document.createRange()
     crossing.setStart(root.querySelector('dt')!.firstChild!, 0)
     const bodyText = document.createTreeWalker(body, NodeFilter.SHOW_TEXT).nextNode()!
     crossing.setEnd(bodyText, 4)
-    const mapped = rangeToSourceRanges(crossing, source, analyzeMarkdown(source))
-    expect(mapped).toEqual({ ranges: [{ from: prefix.length, to: prefix.length + 4, text: 'Body' }] })
+    const mapped = mapSelection(crossing, source, analyzeMarkdown(source))
+    expect(mapped).toMatchObject({ segments: [{ from: prefix.length, to: prefix.length + 4, text: 'Body' }],
+      excluded: [{ reason: 'opaque-block' }] })
     const { spans } = analyzeMarkdown(source)
     expect(spans).toHaveLength(1)
     expect(applyTextEdits(source, [acceptEdit(source, spans[0]!)])).toBe(prefix + 'Body addition.' + eol)
@@ -105,7 +108,9 @@ describe('YAML frontmatter', () => {
     const root = render(source)
     const range = document.createRange()
     range.selectNodeContents(root.querySelector('.md-frontmatter')!)
-    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
+    expect(mapSelection(range, source, analyzeMarkdown(source))).toMatchObject({
+      segments: [], excluded: [{ reason: 'opaque-block' }],
+    })
   })
 
   it('preserves metadata as an untranslated source block', async () => {

@@ -72,9 +72,13 @@ async function submitComment(button: HTMLButtonElement) {
   })
   await act(async () => { button.click(); button.click(); await changed })
 }
-it('rejects a selection spanning translated blocks', () => {
+it('explains instead of offering a comment for a selection spanning translated blocks', () => {
   select(true)
-  expect(host.querySelector('.sel-toolbar')).toBeNull()
+  expect(host.querySelector('.sel-toolbar')!.textContent).toBe('Select text within one translated block to comment.')
+  expect(host.querySelector('.sel-toolbar button')).toBeNull()
+  select()
+  expect(host.querySelector('.sel-toolbar .sel-note')).toBeNull()
+  expect(host.querySelector('.sel-toolbar button')!.textContent).toBe('Comment')
 })
 it('comments on one translated block with exact quote/language and one undoable source edit', async () => {
   const submit = compose()

@@ -4,8 +4,13 @@ import { describe, expect, it } from 'vitest'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { applyTextEdits } from '../document/edits'
 import { resolveAll } from '../document/critic/resolve'
-import { rangeToSourceRanges } from '../ui/modes/reading/selection'
+import { mapSelection, type SelRange, type SelectionMapping } from '../ui/modes/reading/selection'
 import { changeEdits, commentEdits } from '../ui/modes/reading/marks'
+
+function segments(mapping: SelectionMapping): SelRange[] {
+  if (mapping.status !== 'covered') throw new Error(`expected coverage, got ${mapping.status}`)
+  return mapping.segments
+}
 
 
 function select(node: Node, from = 0, to = node.textContent!.length) {
@@ -22,10 +27,9 @@ describe('reviewing inline code', () => {
       const rendered = renderMarkdown(source)
       const { host } = rendered
       const range = select(host.querySelector('code')!.firstChild!)
-      const mapped = rangeToSourceRanges(range, source, rendered)
-      if (!('ranges' in mapped)) throw new Error(mapped.error)
-      expect(mapped.ranges).toEqual([{ from: 4, to: 4 + code.length, text: code }])
-      const updated = applyTextEdits(source, commentEdits(source, mapped.ranges, 'Alex', 'Keep `open` focused.')!)
+      const mapped = segments(mapSelection(range, source, rendered))
+      expect(mapped).toEqual([{ from: 4, to: 4 + code.length, text: code }])
+      const updated = applyTextEdits(source, commentEdits(source, mapped, 'Alex', 'Keep `open` focused.')!)
       expect(updated).toBe(`Try {==${code}==}{>>@Alex: Keep \`open\` focused.<<} now.`)
       const next = renderMarkdown(updated)
       expect(next.items).toHaveLength(1)
@@ -33,7 +37,7 @@ describe('reviewing inline code', () => {
       expect(next.host.textContent).not.toContain('{==')
       expect(next.host.textContent).not.toContain('Keep `open` focused.')
       expect(next.host.querySelector('code')!.textContent).toBe(host.querySelector('code')!.textContent)
-      const deletion = applyTextEdits(source, changeEdits(source, mapped.ranges, mapped.ranges.map(() => ''))!)
+      const deletion = applyTextEdits(source, changeEdits(source, mapped, mapped.map(() => ''))!)
       const deletionSpans = analyzeMarkdown(deletion).spans
       expect(deletionSpans).toHaveLength(1)
       expect(resolveAll(deletion, deletionSpans, 'reject')).toBe(source)
@@ -46,34 +50,35 @@ describe('reviewing inline code', () => {
     const { host } = renderMarkdown(source)
     const range = document.createRange()
     range.selectNode(host.querySelector('code')!)
-    const mapped = rangeToSourceRanges(range, source, analyzeMarkdown(source))
-    expect(mapped).toEqual({ ranges: [{ from: 4, to: 13, text: '`command`' }] })
+    expect(segments(mapSelection(range, source, analyzeMarkdown(source)))).toEqual([{ from: 4, to: 13, text: '`command`' }])
   })
 
   it('does not expand a partial code selection into a deletion of the entire code', () => {
     const source = 'Try `open -- docs/plan.md` now.'
     const { host } = renderMarkdown(source)
     const range = select(host.querySelector('code')!.firstChild!, 0, 4)
-    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
+    expect(mapSelection(range, source, analyzeMarkdown(source))).toMatchObject({
+      segments: [], excluded: [{ text: 'open', reason: 'partial-code' }],
+    })
   })
 
   it('does not offer marks inside fenced code', () => {
     const source = '```sh\ncommand\n```'
     const { host } = renderMarkdown(source)
     const range = select(host.querySelector('code')!.firstChild!)
-    expect(rangeToSourceRanges(range, source, analyzeMarkdown(source))).toEqual({ error: 'unmapped' })
+    expect(mapSelection(range, source, analyzeMarkdown(source))).toMatchObject({
+      segments: [], excluded: [{ text: 'command', reason: 'opaque-block' }],
+    })
   })
 
   it('retains selected comments around code and does not nest marks around an existing anchor', () => {
     const source = '`command`'
     const { host } = renderMarkdown(source)
-    const mapped = rangeToSourceRanges(select(host.querySelector('code')!.firstChild!), source, analyzeMarkdown(source))
-    if (!('ranges' in mapped)) throw new Error(mapped.error)
-    const ranges = mapped.ranges
+    const ranges = segments(mapSelection(select(host.querySelector('code')!.firstChild!), source, analyzeMarkdown(source)))
     const updated = applyTextEdits(source, commentEdits(source, ranges, 'Alex', 'Review this.')!)
     const next = renderMarkdown(updated)
     expect(next.spans).toHaveLength(2)
     const selection = select(next.host.querySelector('code')!.firstChild!)
-    expect(rangeToSourceRanges(selection, updated, next)).toEqual({ error: 'unmapped' })
+    expect(mapSelection(selection, updated, next)).toMatchObject({ segments: [], excluded: [{ reason: 'existing-mark' }] })
   })
 })

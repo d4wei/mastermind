@@ -181,11 +181,13 @@ describe('criticTransform via analyzeMarkdown', () => {
     expect(pieces).toContainEqual({ value: '++}', from: 10, to: 13 })
   })
 
-  it('leaves pieces unpositioned when decoding changed the text node length', () => {
-    const { tree } = analyzeMarkdown('AT&amp;T {++ins++} after')
-    const texts = collect(tree, 'text') as unknown as { value: string; position?: unknown }[]
-    expect(texts.map((t) => t.value)).toEqual(['AT&T ', 'ins', ' after'])
-    for (const text of texts) expect(text.position).toBeUndefined()
+  it('positions pieces of decoded or prefixed text from their provenance', () => {
+    expect(textPieces(analyzeMarkdown('AT&amp;T {++ins++} after').tree)).toEqual([
+      { value: 'AT&T ', from: 0, to: 9 }, { value: 'ins', from: 12, to: 15 }, { value: ' after', from: 18, to: 24 },
+    ])
+    expect(textPieces(analyzeMarkdown('> first {++one\n> two++}').tree)).toEqual([
+      { value: 'first ', from: 2, to: 8 }, { value: 'one\ntwo', from: 11, to: 20 },
+    ])
   })
 
   it('plain documents pass through untouched', () => {

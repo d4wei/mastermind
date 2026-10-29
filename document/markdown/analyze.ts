@@ -4,6 +4,7 @@ import { group, threadCards } from '../critic/scanner'
 import type { CriticSpan, ReviewItem, ThreadCard } from '../critic/types'
 import { criticTransform } from './critic-mdast'
 import { parseMarkdown } from './processor'
+import { TextProvenance, recordProvenance } from './provenance'
 import { scanMarkdownTree } from './scan'
 
 /** A review mark the overview gutter points at: a suggestion, or a discussion's first span. */
@@ -18,6 +19,8 @@ export interface Analysis {
   plain: Root
   /** The reading tree, with review marks as critic nodes; `plain` itself when there are no marks. */
   tree: Root
+  /** The source runs of the reading tree's text nodes; text without exact provenance has none. */
+  provenance: TextProvenance
   spans: CriticSpan[]
   items: ReviewItem[]
   threads: ThreadCard[]
@@ -27,17 +30,23 @@ export interface Analysis {
 /**
  * Parses the source once as plain Markdown to find its review marks, and once more with the marks
  * masked, so that critic nodes replace them without changing the Markdown structure around them.
+ * Text provenance is aligned against the source the reading tree was parsed from, before the
+ * review transform splits its text nodes.
  */
 export function analyzeMarkdown(source: string): Analysis {
   const plain = parseMarkdown(source)
   const sentinels = pickSentinels(source)
   // Without free sentinels the marks cannot be masked; the source then reads as plain Markdown.
   const spans = sentinels ? scanMarkdownTree(source, plain) : []
+  const provenance = new TextProvenance()
   let tree = plain
   if (spans.length > 0) {
     const mask = maskSource(source, spans, sentinels!)
     tree = parseMarkdown(mask.masked)
-    criticTransform(tree, source, spans, mask)
+    recordProvenance(tree, mask.masked, provenance)
+    criticTransform(tree, source, spans, mask, provenance)
+  } else {
+    recordProvenance(tree, source, provenance)
   }
   const items = group(spans, source)
   const spanIndex = new Map(spans.map((span, index) => [span, index]))
@@ -47,5 +56,5 @@ export function analyzeMarkdown(source: string): Analysis {
     if (item.type === 'thread') return [{ spanIndex: spanIndex.get(item.anchor ?? item.comments[0]!.span)!, kind: 'comment' }]
     return [{ spanIndex: spanIndex.get(item.span)!, kind: item.span.kind as MarkTick['kind'] }]
   })
-  return { plain, tree, spans, items, threads: threadCards(items, spanIndex, source), ticks }
+  return { plain, tree, provenance, spans, items, threads: threadCards(items, spanIndex, source), ticks }
 }

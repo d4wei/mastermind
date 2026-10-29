@@ -19,7 +19,7 @@ import type { TextEdit } from '../../document/types'
 
 interface Props {
   readOnly?: boolean
-  analysis: Pick<Analysis, 'spans' | 'threads'>
+  analysis: Pick<Analysis, 'spans' | 'threads' | 'tree' | 'provenance'>
   /** The source `analysis` describes. */
   source: string
   docRef: RefObject<HTMLElement | null>
@@ -39,8 +39,9 @@ interface Props {
 
 const CARD_GAP = 8
 
-export function CommentRail({ analysis: { spans, threads: cards }, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
+export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
   onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false }: Props) {
+  const cards = analysis.threads
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
   const ime = useCompositionGuard()
@@ -165,15 +166,15 @@ export function CommentRail({ analysis: { spans, threads: cards }, source, docRe
   // Null marks a reply whose insert would not reparse as one comment in place; it stays editable
   // but cannot submit, and a body whose own lines break the mark says so.
   const pendingReply = (card: ThreadCard, text: string): TextEdit[] | null =>
-    readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text, spans)
+    readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text, analysis)
   // Verifying reparses the document, so the open composer's verdict follows its deferred text and
   // is kept across renders that change neither; submission verifies the final text.
   const composerCard = cards.find((card) => card.spanIndex === activeSpan && card.key === replyFor)
   const composerText = useDeferredValue(composerCard ? draftText(composerCard) : '')
   const composerEnd = composerCard?.thread.end
   const composerVerified = useMemo(() => composerEnd === undefined || readOnly || !composerText.trim() ? null
-    : replyEdits(source, composerEnd, authorTag, composerText, spans),
-  [composerEnd, composerText, readOnly, source, authorTag, spans])
+    : replyEdits(source, composerEnd, authorTag, composerText, analysis),
+  [composerEnd, composerText, readOnly, source, authorTag, analysis])
   const submitReply = (card: ThreadCard) => {
     const edits = pendingReply(card, draftText(card))
     if (!edits || !edit(edits, card)) return

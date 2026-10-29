@@ -11,8 +11,8 @@ Host adapters own native command adaptation; Rust tests check the native filesys
 implementation. [Desktop checks](../tools/desktop/README.md) cover process
 startup, OS transports, packages, and installed webviews beyond unit tests.
 
-Small helpers under `helpers/` share React mounting, input events, Markdown rendering, and host
-setup. Each test keeps its own source bytes, timing decisions, and expected result visible.
+Small helpers under `helpers/` share React mounting, input events, document selections, Markdown
+rendering, and host setup. Each test keeps its own source bytes, timing decisions, and expected result visible.
 
 [Manual interactions](manual/review-interactions.md) covers visual and native input checks. Use
 copies of that document or the reading samples in `fixtures/` for exploratory checks. The fixture
