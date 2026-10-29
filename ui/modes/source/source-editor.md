@@ -9,8 +9,8 @@ reverted to identical text, invalidates old editor history through the document 
 Each mount creates a fresh `EditorView` and transaction adapter. The adapter updates the view and
 pushes document changes into the store only while the captured document and external version are
 current. No callback tied to an old mount lives in the retained state. Cleanup retains state,
-unregisters only its own flusher and outline callbacks, and destroys the view; it never flushes stale content
-over an adopted buffer. Views and DOM nodes are not cached.
+disposes its search binding, clears only its own outline report, and destroys the view; it never
+flushes stale content over an adopted buffer. Views and DOM nodes are not cached.
 
 CodeMirror history remains separate from the store's undo stack for review operations performed
 outside Markdown mode. Retention uses the existing CodeMirror history extension and adds no second

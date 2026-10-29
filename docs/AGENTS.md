@@ -2,8 +2,6 @@
 
 - Put depth here only when it has no closer home beside the code; use this directory primarily for
   self-contained designs and plans for work not yet built.
-- Name human-facing documents in lowercase-kebab form, such as `<topic>.md`; reserve ALL-CAPS names
-  for agent-operating docs and canonical project ledgers.
 - Start every living forward design with this frontmatter:
 
 ```

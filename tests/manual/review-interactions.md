@@ -26,8 +26,9 @@ reading view for the selection checks.
 5. **Save error notification:** use a disposable copy. Remove write permission from the copy while
    retaining read permission; run as a user for whom that change denies writes. Make an edit and
    check that the failed save shows an error notice at the bottom left while retaining the local
-   edit and the original disk bytes. Restore write permission, then make another edit to retry. A disk version conflict instead opens the conflict
-   controls; check that separately from a denied or unreachable save.
+   edit and the original disk bytes. Restore write permission, then make another edit to retry. A
+   disk version conflict instead opens the conflict controls; check that separately from a denied or
+   unreachable save.
 6. **Native file toolbar:** on macOS, traffic lights share the file toolbar without a separate
    title strip, with balanced top and left insets. Drag empty toolbar space to move the window;
    Open, file pills, close buttons, and document controls should remain clickable. Open three
@@ -98,10 +99,10 @@ example for selection checks that include the end of a literal block.
 Use a disposable copy with a long filename. Check widths of 320, 768, and 1440 pixels with English
 and Chinese interface labels, a prepared translation, and light and dark themes.
 
-- Document controls remain at the top right, with Settings and Resolved in the overflow menu. In
-  the native app, the square Open button and file pills stay at the top left. Long filenames clip,
-  pills that do not fit move into a counted overflow list that keeps the active file visible, and
-  the active file's full path appears in the native window title.
+- Document controls remain at the top right, with Settings and Resolved in the overflow menu. The
+  square Open button and file pills stay at the top left. Long filenames clip, pills that do not fit
+  move into a counted overflow list that keeps the active file visible, and the active file's full
+  path appears in the native window title.
   Hover an inactive file pill: its background and text respond while the active pill stays distinct.
 - The compact outline shows heading ticks and the current section. Hover, click, or focus opens the
   heading list; Escape closes it and returns keyboard focus to the trigger. Scroll the document and
@@ -121,11 +122,9 @@ and Chinese interface labels, a prepared translation, and light and dark themes.
 - Open settings, resolved history, comments, and Find. Panels fit the viewport and scroll inside;
   Find wraps. In a disposable conflict test, the bottom-left recovery notice coexists with Find
   and clears the toolbar.
-- In the embedded browser, the host's bottom input does not cover document controls. Return any
-  viewport override to its normal size after checking.
-- In the native app, overscroll the top and bottom in light and dark themes, then change themes
-  and repeat. The revealed surface matches the current page background in both reading modes.
-  File controls, outline, and open overlay panels stay fixed throughout scrolling and overscroll.
+- Overscroll the top and bottom in light and dark themes, then change themes and repeat. The
+  revealed surface matches the current page background in both reading modes. File controls,
+  outline, and open overlay panels stay fixed throughout scrolling and overscroll.
 - Hover paragraphs and move along their right edges: no section action menu should appear.
   Select text instead and check that Comment and Suggest change remain available.
 

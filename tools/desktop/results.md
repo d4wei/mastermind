@@ -542,9 +542,10 @@ splice in the disposable source file, with CRLF and all other bytes preserved.
 ### Adoption consolidation — 2026-10-13
 
 At `1d14dea`, the native host was promoted to the application package (then `src-tauri/`) and built
-the reviewer by default. The macOS bundle and window were named `mastermind`; distribution identifiers remain provisional. Desktop checks live in
-`tools/desktop/`. The repository launcher opens the native app. Browser development uses a separate
-foreground preview, and translation preparation remains a standalone Node utility.
+the reviewer by default. The macOS bundle and window were named `mastermind`; distribution
+identifiers remain provisional. Desktop checks live in `tools/desktop/`. The repository launcher
+opens the native app. Browser development uses a separate foreground preview, and translation
+preparation remains a standalone Node utility.
 
 After relocation, all 483 application tests and both TypeScript configurations passed. The 57
 release Rust tests, formatting, and Clippy passed, along with four readiness script checks and two

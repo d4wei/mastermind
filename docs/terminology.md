@@ -86,7 +86,7 @@ one side of translation; 源码 also suggests program code.
 
 Keep **Original / 原文** and **Translation / 译文** for document language views. Show a language name
 when the available translation is known. Reading language remains a useful description of this
-view choice, not another name for the persistent translation preference.
+per-document view choice; it is not a saved preference.
 
 Example: “Open Markdown to edit the original text.” / “切换到 Markdown 编辑原文。”
 Example: “Show original.” / “显示原文。”
@@ -252,7 +252,8 @@ Use **document buffer** for unsaved in-memory text, and **review state** for the
 Example: “This document is no longer open. Open the file again.”
 Use **Restore open files / 恢复已打开的文件** for the deferred public capability, and **review-state
 restoration** for its technical scope. Naming does not decide which buffers, positions, or panels
-persist; restoration remains deferred in [DIRECTION.md][direction].
+persist; the local persisted work buffers entry in [DIRECTION.md][direction] carries the open
+question.
 
 Blank-draft creation is retired; do not introduce an untitled-document workflow through
 terminology changes.
@@ -310,8 +311,7 @@ Use **Font preset / 字体预设**: it selects heading and body font families, h
 heading letter spacing. For example, the Bricolage preset uses Bricolage Grotesque for headings and
 Inter for body text. Some presets use the same family for both. If the feature later selects only a
 font, label it Font. Use `fontPreset` for the preference, `FontPreset` for its type, and
-`FONT_PRESETS` for the registry. The preference migration is defined in
-[the configuration contract][preferences].
+`FONT_PRESETS` for the registry.
 
 Use **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
 established feature name is [syntax highlighting][syntax-highlighting], but this control selects its
@@ -372,8 +372,7 @@ binding `DECISIONS.md` ledger.
 | Keep mine, Reload (discard mine), Save anyway | Retired controls; historical descriptions only |
 | Squad, light/heavy track | Historical provenance, not current product vocabulary |
 
-Do not turn an abandoned feature into a naming problem. The inherited marketing site describes the
-original release; its Hand back text remains historical until a site refresh is explicitly scoped.
+Do not turn an abandoned feature into a naming problem.
 “Upstream” and “fork” remain precise in attributed provenance and contribution discussions.
 
 ## 15. Brand and distribution identity

@@ -3,7 +3,8 @@
 `main.tsx` installs the native host before mounting the existing React reviewer. `host.ts` adapts
 Tauri commands to `app/host.ts`; failures become host-level conflict, missing, not-UTF-8, or failure
 results.
-The document store does not interpret native command envelopes or HTTP statuses. Prepared
+The document store does not interpret native command envelopes or numeric statuses; it reads only
+the failure `kind`. Prepared
 translations pass through the shared TypeScript freshness and source-mapping checks. Theme assets
 are bundled, and preferences use the native application config directory.
 
@@ -67,12 +68,13 @@ selected. A close whose next file never becomes active still releases the close 
 release their document, composer, and editor state. The
 [native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
 
-Inventory snapshots retain graphical opening errors until dismissal or the next graphical request.
-A newer activation revision selects the admitted file; repeated polls preserve manual selection.
-Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native opening, setup, and command errors share the application's
-notification host. `close.ts` coalesces window close requests and awaits native termination
-cancellation before unlocking the editor. Failed setup confirmation keeps the window available.
-Native lifecycle details live beside the [termination adapter](../../desktop/src/termination.md).
+Inventory snapshots retain graphical opening errors until dismissal or the next graphical request. A
+newer activation revision selects the admitted file; repeated polls preserve manual selection.
+Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native
+opening, setup, and command errors share the application's notification host. `close.ts` coalesces
+window close requests and awaits native termination cancellation before unlocking the editor. Failed
+setup confirmation keeps the window available. Native lifecycle details live beside the [termination
+adapter](../../desktop/src/termination.md).
 
 `NativeSetup.tsx` holds unconfirmed name and language choices separately from saved configuration.
 The native host owns saved-field presence, transient suggestions, and completion; its
@@ -103,12 +105,12 @@ and remaining platform checks live in [tools/desktop](../../tools/desktop/README
 ## Empty home
 
 With no open files after onboarding, the home displays the two-line block-letter wordmark and one
-Open Markdown files… control (打开 Markdown 文件… in Chinese). The home button combines the file
-icon, label, and platform Open shortcut. The wordmark retains a horizontal slit between its rows.
-`home-motion.ts` drifts each complete row independently, sends the rows beyond opposite window
-edges when the first file is admitted, and fades the outgoing and incoming screens. Cancelling the
-picker or failing to open a file leaves home in place. The last document fades only after saving
-and native close succeed, and only when home will replace it rather than setup; ordinary document switching has no screen transition. The Open button
-changes between home and toolbar placement without position animation. Reduced motion skips drift
-and screen transitions. Unmount cancels pending animations and animation frames. The native window
-drag area remains available in both states.
+Open Markdown files… control (打开 Markdown 文件… in Chinese). The home button combines the file icon,
+label, and platform Open shortcut. The wordmark retains a horizontal slit between its rows.
+`home-motion.ts` drifts each complete row independently, sends the rows beyond opposite window edges
+when the first file is admitted, and fades the outgoing and incoming screens. Cancelling the picker
+or failing to open a file leaves home in place. The last document fades only after saving and native
+close succeed, and only when home will replace it rather than setup; ordinary document switching has
+no screen transition. The Open button changes between home and toolbar placement without position
+animation. Reduced motion skips drift and screen transitions. Unmount cancels pending animations and
+animation frames. The native window drag area remains available in both states.

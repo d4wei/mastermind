@@ -25,8 +25,9 @@ provisional until distribution identity is settled. Builds here are not signed o
 releases.
 
 `main.rs` assembles the native states and command handlers. `launcher.rs` handles command parsing
-and local transport startup; `opening.rs` owns the admitted-document snapshot; `document_io.rs`
-serves admitted document operations and watches. [Translation discovery](src/translations.md)
+and local transport startup; `admission.rs` owns the admitted-document registry; `opening.rs`
+handles graphical opening and inventory snapshots; `document_io.rs` serves admitted document
+operations and watches. [Translation discovery](src/translations.md)
 offers available reading versions; `lifecycle.rs` creates the window and dispatches menus, close
 requests, and application events. Setup uses preference persistence directly.
 `appearance.rs` applies the rendered theme's background and native light/dark appearance;

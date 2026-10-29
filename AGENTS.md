@@ -25,16 +25,15 @@
 
 ## The product's invariants
 
-The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` ruling first.
+The tests check these; a change that needs one relaxed is a `DECISIONS.md` ruling first.
 
 - The file on disk is the single source of truth and the only channel: no database, no sync, no
   accounts, no network beyond localhost. Review feedback round-trips through the file as
   CriticMarkup.
 - Opening and saving an unedited file reproduces it byte for byte, line endings included; accepting
   or rejecting a mark is an exact source splice, never a re-render.
-- Nothing reaches disk without the user's acceptance: agent and assist suggestions render on screen
-  only.
-- `document/` is imported by translation tooling and both UI hosts; keep it isomorphic.
+- Nothing reaches disk without the user's acceptance; suggestions render on screen only.
+- `document/` is imported by translation tooling and the desktop interface; keep it isomorphic.
 - Components reference `var(--*)` only; colors and spacing live in `themes/common.css` and
   `themes/*/tokens.css`, whose roles `themes/README.md` fixes. Review marks are the only color in
   the document body.
@@ -43,7 +42,8 @@ The tests enforce these; a change that needs one relaxed is a `DECISIONS.md` rul
 
 - `npm run typecheck` runs both tsconfigs; both must pass. `npm test` before every commit.
 - Build with `npm run desktop:build` before opening files through `bin/mastermind.js` from a clone.
-- Touch `document/critic/` only with the corpus tests green; it is the most test-covered code.
+- Touch `document/critic/` only with the `tests/critic-*` suites green; it is the most test-covered
+  code.
 - Plan in a `.md` file and review it through mastermind itself (`node bin/mastermind.js open --
   <plan>.md`; optional translation preparation is in `assets/agent/README.md`). Reread the file
   when the user returns with feedback, and revise it directly.

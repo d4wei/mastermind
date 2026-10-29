@@ -12,7 +12,7 @@ focused review; navigation and controls should leave room for the text. The
 [theme contract](../themes/README.md) defines the visual system. Review colors distinguish proposed
 insertions, deletions, highlights, and comment anchors from ordinary prose.
 
-Reading and source views share one document buffer. Accepting or rejecting a mark changes its exact
+Read and Markdown views share one document buffer. Accepting or rejecting a mark changes its exact
 source span. Edits save continuously; a reviewer can work across files without a separate completion
 action for each one. People and agents can both contribute author-tagged replies. Resolved
 conversations remain as hidden history in the Markdown file; deleting a comment removes it.

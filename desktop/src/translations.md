@@ -8,9 +8,10 @@ against the current UI buffer. A malformed target does not hide other targets.
 `translations.rs` checks language syntax, canonical containment, regular files, filename/target
 identity, per-file bounds, and bounded aggregate output. Redirected directories, directories whose
 on-disk names differ from `.mastermind/translations` (such as a case variant on a case-insensitive
-volume), and artifact symlinks are rejected; the CLI applies the same rule. Language and discovery limits live in the implementation; the source format
-remains in `document/translation.ts`. Submitting a comment on a translated passage lists the
-artifacts again and validates the captured language's artifact before writing.
+volume), and artifact symlinks are rejected; the CLI applies the same rule. Language and discovery
+limits live in the implementation; the source format remains in `document/translation.ts`.
+Submitting a comment on a translated passage lists the artifacts again and validates the captured
+language's artifact before writing.
 
 The existing nonrecursive watcher covers the source parent and available `.mastermind` and
 `translations` directories. Invalidation rechecks these paths, so a previously absent directory

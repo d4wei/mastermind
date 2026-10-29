@@ -6,13 +6,13 @@ read generation, and pending invalidation. Editor callbacks belong to one docume
 external-buffer revision.
 
 The source editor writes every change through to the store synchronously, so navigation and saves
-never flush it. Loading an unvisited document releases the departing record from the published
-state at once; until the load succeeds no document is active, and commands reach no record, including
+never flush it. Loading an unvisited document releases the departing record from the published state
+at once; until the load succeeds no document is active, and commands reach no record, including
 after a failed load. Retained documents revalidate on return. Read generations reject stale
 completions. Saves update their originating record even after navigation and schedule another write
-if its buffer changed during the request. Clean external changes reload automatically and clear review
-undo, whose snapshots predate the external text. Unedited files are not written; ordinary writes
-restore the original line endings.
+if its buffer changed during the request. Clean external changes reload automatically and clear
+review undo, whose snapshots predate the external text. Unedited files are not written; ordinary
+writes restore the original line endings.
 
 ## Files that are not valid UTF-8
 
@@ -27,16 +27,17 @@ Retry cannot succeed; any edits already in the buffer stay pending so closing of
 
 ## Recovery
 
-`recovery` pauses mutations for a file that cannot be safely written and names one reason:
-`changed` for a verified external change, `missing` for a missing path, and `readFailed` or
-`saveFailed` for other read and write failures. `missing` requires evidence: a deletion event or a
-host `missing` read result. Other read failures cannot distinguish a missing path from an
-unreadable one, so a missing diagnosis persists through them until a read succeeds. Reading back
-the held version resolves `readFailed` and `missing` and leaves `changed` and `saveFailed` for Retry
-or Use incoming. A deletion event or a failed read replaces any diagnosis with `missing` or
-`readFailed`, which a later read of the held version then clears. A failed copy has its own `copyError` and does not change that diagnosis. Leaving
-recovery clears its dismissal and copy failure; a successful write also clears copy failure.
-Reading, copying, navigation, other documents, and closing remain available.
+`recovery` pauses mutations for a file that cannot be safely written and names one reason: `changed`
+for a verified external change, `missing` for a missing path, and `readFailed` or `saveFailed` for
+other read and write failures. `missing` requires evidence: a deletion event or a host `missing`
+read result. Other read failures cannot distinguish a missing path from an unreadable one, so a
+missing diagnosis persists through them until a read succeeds. Reading back the held version
+resolves `readFailed` and `missing` and leaves `changed` and `saveFailed` for Retry or Use incoming.
+A deletion event or a failed read replaces any diagnosis with `missing` or `readFailed`, which a
+later read of the held version then clears. A failed copy has its own `copyError` and does not
+change that diagnosis. Leaving recovery clears its dismissal and copy failure; a successful write
+also clears copy failure. Reading, copying, navigation, other documents, and closing remain
+available.
 
 `ConflictPanel` provides two direct choices. A `changed` file offers Save As and Use incoming;
 every other recovery offers Retry and Save As. Use incoming replaces the notice with
@@ -87,5 +88,5 @@ A failed removal retains the record. Pending loads/reads cannot resurrect a clos
 Save As during closing writes a new file without admitting it or replacing the original tab.
 The adapter locks editing and pauses admission activation during close decisions.
 
-Process termination and crashes can lose in-memory work. Composer lifetime is documented in [drafts](../review/drafts.md);
-persisted buffers remain deferred in DIRECTION.md.
+Process termination and crashes can lose in-memory work. Composer lifetime is documented in
+[drafts](../review/drafts.md); persisted buffers remain deferred in DIRECTION.md.

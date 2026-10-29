@@ -26,11 +26,13 @@ supplied by the current source instead. `matchPreparedTranslation` accepts unkno
 wrong fields/types, missing or duplicate IDs, a different fingerprint, empty translations, and
 changed active CriticMarkup suggestion structure. Suggestion text may translate; mark kinds and
 order must remain, and so must the ordered literal delimiter tokens outside opaque source that pair
-with no active mark, so prose that mentions a delimiter stays translatable. Suggestion discovery and literal exclusions reuse the same plain
-Markdown tree for each exact block string; projected narrative and original source keep separate trees. Each translation must retain one block of the original outer kind,
-including Markdown heading/list syntax. Hidden HTML, fenced code, and incompatible block splitting
-are rejected; ordinary inline formatting remains allowed. The helper returns sanitized artifact data
-only after checking every block. Callers also check artifact languages against the requested roles.
+with no active mark, so prose that mentions a delimiter stays translatable. Suggestion discovery and
+literal exclusions reuse the same plain Markdown tree for each exact block string; projected
+narrative and original source keep separate trees. Each translation must retain one block of the
+original outer kind, including Markdown heading/list syntax. Hidden HTML, fenced code, and
+incompatible block splitting are rejected; ordinary inline formatting remains allowed. The helper
+returns sanitized artifact data only after checking every block. Callers also check artifact
+languages against the requested roles.
 
 ## Comments on translated selections
 

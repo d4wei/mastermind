@@ -18,7 +18,7 @@ Use this entry shape:
 ```
 ## YYYY-MM-DD — <the ruling, stated as settled fact>
 
-**<Ruled | Measured | Ratified>** (<optional external pointer>). <why, in a clause.>
+**<Ruled | Measured | Ratified>.** (<optional external pointer>) <why, in a clause.>
 
 **Beat:** <what this ruling beat.>
 ```
@@ -28,6 +28,15 @@ Use this entry shape:
 - Omit the pointer when the entry's own commit contains all necessary provenance.
 
 * * *
+
+## 2026-10-29 — Earlier conflict and browser-development rulings are superseded
+
+**Ruled.** The 2026-10-15 and 2026-10-17 conflict rulings replace the 2026-10-10 rulings on
+reviewed-version conflict application and on retaining both versions for a dirty buffer, and the
+2026-10-22 development ruling replaces the browser-development clause of the 2026-10-10 Tauri
+ruling; later entries left those supersessions implicit.
+
+**Beat:** rewriting the immutable earlier entries, or leaving contradictory rulings live.
 
 ## 2026-10-29 — Unix launcher endpoints live in the user's runtime directory
 
@@ -186,7 +195,6 @@ a second input. This refines the preceding editor-conventional close ruling for 
 **Beat:** ordinary Save All prompts in an autosaving editor, hidden recovery choices, and duplicated
 draft editors that disconnect a close decision from the work being interrupted.
 
-
 ## 2026-10-17 — Follow familiar editor save and close conventions
 
 **Ruled.** Closing saved work is silent. When closing would lose unsaved work, offer the familiar
@@ -197,7 +205,6 @@ behavior takes precedence over a custom recovery workflow; session restoration r
 
 **Beat:** trapping the user behind unresolved conflicts, or inventing a two-stage discard-and-exit
 flow with its own terminology.
-
 
 ## 2026-10-17 — Animate the home wordmark as two intact rows
 

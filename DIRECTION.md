@@ -66,7 +66,8 @@ supersedes the general session-restoration deferral without adopting a storage m
 **Gap.** The reported comment-triggered warning has not been reproduced. A transient-read recovery
 defect and three plausible triggers were fixed: a metadata-only change to a mixed line-ending file
 and a native missing-file read misread as a failure (`6b5cdde`), and a preview save racing the
-event poll reported as deletion (`27ac137`). None is confirmed as the cause. Recovery and exit
+event poll reported as deletion (`27ac137`; the preview is since retired). None is confirmed as
+the cause. Recovery and exit
 follow the [document contract](ui/documents/store.md). Capture the source revision, pending write,
 watcher event, and native error classification if the warning recurs.
 
@@ -114,7 +115,6 @@ settings storage.
 ## 2026-10-10 — Markdown wrapping stays manual
 
 **Deferral.** Project Markdown is hard-wrapped at 100 columns by hand. Automatic formatting must
-exclude `tests/fixtures/*.md`, whose bytes are inputs to round-trip tests. No wrapping hook is
-installed.
+exclude `tests/fixtures/*.md`, which are preserved source samples. No wrapping hook is installed.
 
 **Exit:** a formatter with path exclusions is adopted, or the wrapping requirement is dropped.

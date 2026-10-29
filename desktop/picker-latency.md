@@ -1,7 +1,8 @@
 # File picker latency
 
 Measured on macOS on 2026-10-14 using the release app, Tauri dialog 2.7.1, and rfd 0.16.0.
-These are diagnostic samples, not benchmarks or cross-platform claims.
+These are diagnostic samples, not benchmarks or cross-platform claims. This is a historical
+measurement record: correct facts or links in place and add new measurements as dated sections.
 
 `opening::choose_files` immediately requests a parented dialog. Admission starts after selection;
 the UI's opening-snapshot polling does not gate picker presentation. Timing around the command,

@@ -21,8 +21,7 @@ constraints.
 
 The controls' measured height feeds `--bar-clear` in `app.css`; content, navigation, notices, and
 panels clear that space. Outline navigation also accounts for the current toolbar rectangle. Print
-styles omit controls and their reserved space. Keeping controls at the top avoids browser hosts
-that overlay an input near the bottom of the viewport.
+styles omit controls and their reserved space.
 
 `Navigator` shows a compact heading-tick strip when the document has at least two headings, with
 the current section highlighted. Inactive bars shorten at every heading depth; the active section
@@ -78,7 +77,7 @@ Find controls wrap to fit narrow widths. Long source/code lines can still scroll
 content areas.
 
 Regression tests cover both interface languages, overflow access, narrow comments, outline
-expansion and progress, and scroll clearance. The manual browser procedure lives in
+expansion and progress, and scroll clearance. The manual checklist lives in
 `tests/manual/review-interactions.md`.
 
 ## Reading and review presentation

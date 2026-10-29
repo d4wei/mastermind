@@ -16,13 +16,14 @@ Reference-link labels are not excluded. A mark inside the label of `[x][label]`,
 reference such as `[{++a++}]` with a matching definition, stays active, and once masked the label
 no longer matches its definition, so the reading view shows the brackets as text without the link.
 
-Unsupported spans remain literal source and do not enter review actions, counts, source highlighting,
-or translation's annotation removal. `analyzeMarkdown` parses the source plainly, scans that tree
-with `scanMarkdownTree`, masks the marks, parses the masked source, and passes the same span list
-and mask to `criticTransform`; a source without marks keeps its plain tree as the reading tree.
-`scanMarkdownTree` accepts the plain tree of the exact source being scanned; the masked reading
-tree is unsuitable for exclusions or review boundaries. Accepting or rejecting valid neighboring suggestions leaves unsupported source bytes intact.
-Split a proposed edit into separate marks for each text block to make it reviewable.
+Unsupported spans remain literal source and do not enter review actions, counts, source
+highlighting, or translation's annotation removal. `analyzeMarkdown` parses the source plainly,
+scans that tree with `scanMarkdownTree`, masks the marks, parses the masked source, and passes the
+same span list and mask to `criticTransform`; a source without marks keeps its plain tree as the
+reading tree. `scanMarkdownTree` accepts the plain tree of the exact source being scanned; the
+masked reading tree is unsuitable for exclusions or review boundaries. Accepting or rejecting valid
+neighboring suggestions leaves unsupported source bytes intact. Split a proposed edit into separate
+marks for each text block to make it reviewable.
 
 The raw scanner in `../critic/scanner.ts` only recognizes delimiter syntax within the windows it is
 given (the whole string by default); it has no notion of blank lines or blocks. Use it directly for
