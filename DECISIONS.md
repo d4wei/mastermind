@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-29 — Unix launcher endpoints live in the user's runtime directory
+
+**Ruled.** The endpoint root is `confstr(_CS_DARWIN_USER_TEMP_DIR)` on macOS and `XDG_RUNTIME_DIR` on
+Linux, with the process temporary directory only as a fallback, so every launch path of one user
+resolves the same host and no other user can create the root; `MM_LAUNCH_CHECK_DIR` remains the
+harness override.
+
+**Beat:** deriving the root from `TMPDIR`, which a shell can override and so split a launcher from
+the desktop-launched host, and whose `/tmp` fallback another user could pre-create.
+
 ## 2026-10-22 — Development runs through `tauri dev` on the native host
 
 **Ruled.** `npm run dev` starts Vite with hot module replacement for the desktop entry and launches

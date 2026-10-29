@@ -9,7 +9,10 @@ output without attaching a console to the GUI.
 `protocol.rs` owns the version, request and reply frame bounds, request bounds, strict request
 envelopes, and reply fields. Open and setup are distinct operations; unknown or mixed fields reject
 the request. The transport checks versions before admission. `endpoint/` scopes local sockets or
-named pipes to the OS user; endpoint existence does not authorize reading arbitrary files.
+named pipes to the OS user; endpoint existence does not authorize reading arbitrary files. On
+Unix the socket lives under the user's runtime directory, which macOS reports through `confstr`
+and Linux publishes as `XDG_RUNTIME_DIR`, so a shell that overrides `TMPDIR` still reaches the
+desktop-launched host.
 
 For a valid opening request, results retain input order and distinguish `opened`, `already_open`,
 and `error`. Admission checks existing regular files, obtains an initial versioned snapshot, and
