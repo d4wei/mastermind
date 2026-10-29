@@ -29,8 +29,9 @@ pipe access denial. `check-reviewer-windows.py` drives the installed reviewer us
 `tauri-driver` and a matching Edge driver. The [Windows](../../.github/workflows/native-windows.yml)
 and [Linux](../../.github/workflows/native-linux.yml) workflows install and exercise their packages.
 
-`MM_LAUNCH_CHECK_DIR`, `MM_LAUNCH_CHECK_ID`, `MM_LAUNCH_CHECK_DROP_REPLY`, and
-`MM_LAUNCH_CHECK_UI_DELAY_MS` are trusted harness controls inherited from launch validation. They
-select disposable endpoints, drop an acknowledgment, or delay a window; documents cannot choose
-them. [Results](results.md) record dated observations and the remaining hardening and distribution
+`MM_LAUNCH_CHECK_DIR`, `MM_LAUNCH_CHECK_ID`, `MM_LAUNCH_CHECK_DROP_REPLY`,
+`MM_LAUNCH_CHECK_UI_DELAY_MS`, and `MM_LAUNCH_CHECK_ATTACH_ONLY` are trusted harness controls
+inherited from launch validation. They select disposable endpoints, drop an acknowledgment, delay
+a window, or keep a launcher from starting a host, as `bin/mastermind.js` sets for a debug build;
+documents cannot choose them. [Results](results.md) record dated observations and the remaining hardening and distribution
 checks. Build success alone does not establish a production distribution release.

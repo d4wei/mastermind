@@ -2,6 +2,7 @@
 
 mod admission;
 mod appearance;
+mod closing;
 mod document_io;
 mod endpoint;
 mod files;
@@ -49,12 +50,16 @@ fn main() {
         }
     };
     let docs = Arc::new(Mutex::new(Documents::default()));
+    let close_requests = Arc::new(closing::CloseRequests::default());
     let builder = tauri::Builder::default();
     #[cfg(target_os = "macos")]
     let renderer_reloads = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(move |webview| {
         termination::renderer_lost(webview.app_handle());
+        webview
+            .state::<Arc<closing::CloseRequests>>()
+            .renderer_lost();
         // A reloaded renderer subscribes to close requests again, so the window can close.
         if termination::should_reload_renderer(&renderer_reloads) {
             let _ = webview.reload();
@@ -65,9 +70,13 @@ fn main() {
         .on_page_load(|webview, payload| {
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
                 termination::renderer_lost(webview.app_handle());
+                webview
+                    .state::<Arc<closing::CloseRequests>>()
+                    .renderer_lost();
             }
         })
         .manage(docs.clone())
+        .manage(close_requests.clone())
         .manage(lifecycle::CloseGate::default())
         .invoke_handler(tauri::generate_handler![
             appearance::set_appearance,
@@ -91,6 +100,8 @@ fn main() {
             lifecycle::finish_close,
             lifecycle::cancel_close,
             termination::close_ready,
+            closing::close_requests_ready,
+            closing::complete_close_request,
         ])
         .setup(move |app| {
             let setup = Arc::new(setup::Setup::new(preferences::preference_path(
@@ -111,6 +122,7 @@ fn main() {
                 listener,
                 docs,
                 setup,
+                close_requests,
                 app.handle().clone(),
             ));
             lifecycle::create_window(app.handle());

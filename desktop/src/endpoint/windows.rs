@@ -108,6 +108,12 @@ pub fn bind(path: &Path) -> io::Result<(Option<File>, Listener)> {
     Ok((None, listener))
 }
 
+/// The pipe's security descriptor admits only this user, so accepted clients need no further
+/// check; `connect` verifies the server's identity.
+pub fn authorize_peer(_: &Stream) -> io::Result<()> {
+    Ok(())
+}
+
 pub async fn connect(path: &Path) -> io::Result<Stream> {
     let stream = Stream::connect(path.to_fs_name::<GenericFilePath>()?).await?;
     let pid = stream

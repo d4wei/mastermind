@@ -5,7 +5,8 @@ import { failureKind, HostError, type ReviewerHost } from '../app/host'
 
 export interface NativeBridge {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>
-  listen(event: string, handler: () => void): Promise<() => void>
+  /** `handler` receives the event's payload; events without one deliver null. */
+  listen(event: string, handler: (payload?: unknown) => void): Promise<() => void>
 }
 
 export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): ReviewerHost {

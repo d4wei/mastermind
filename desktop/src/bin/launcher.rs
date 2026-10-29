@@ -49,10 +49,7 @@ fn main() {
     let mut stdout = io::stdout().lock();
     if let Err(error) = stdout.write_all(&response).and_then(|_| stdout.flush()) {
         // A partial frame cannot be repaired by appending a second response.
-        let _ = writeln!(
-            stderr,
-            "Opening outcome unknown: response delivery failed: {error}"
-        );
+        let _ = writeln!(stderr, "Outcome unknown: response delivery failed: {error}");
         std::process::exit(3);
     }
     std::process::exit(code);

@@ -68,6 +68,13 @@ selected. A close whose next file never becomes active still releases the close 
 release their document, composer, and editor state. The
 [native registry](../../desktop/src/opening.md) owns stable IDs and watch removal.
 
+`agent-close.ts` answers the host's agent close requests without prompting and without locking
+editing. It flushes saves for the named documents, then keeps open any with an unfinished draft,
+unsaved or failed-save edits, or a recovery state, and closes the rest through the same native
+close and selection handling as a file pill. A request waits for a close already running and is
+answered as unavailable while the window is closing. The
+[launch protocol](../../desktop/src/protocol.md#closing) defines the results.
+
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request. A
 newer activation revision selects the admitted file; repeated polls preserve manual selection.
 Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native

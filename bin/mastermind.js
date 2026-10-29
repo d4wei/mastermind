@@ -7,12 +7,13 @@ import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
-if (!['open', 'setup', 'translate-blocks'].includes(args[0])) {
-  console.error('Usage: mastermind open [--language CODE] -- FILE... | mastermind setup --suggest JSON | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save]')
+if (!['open', 'close', 'setup', 'translate-blocks'].includes(args[0])) {
+  console.error('Usage: mastermind open [--language CODE] -- FILE... | mastermind close -- FILE... | mastermind setup --suggest JSON | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save]')
   process.exit(2)
 }
 let command
 let forwarded
+let env = process.env
 if (args[0] === 'translate-blocks') {
   // Resolved against the repo, not the cwd: agents invoke this wrapper from arbitrary directories.
   let tsx
@@ -29,16 +30,19 @@ if (args[0] === 'translate-blocks') {
   const candidates = process.platform === 'darwin'
     ? [path.join(root, 'desktop', 'target', 'release', 'bundle', 'macos', 'mastermind.app', 'Contents', 'MacOS', name)]
     : [path.join(root, 'desktop', 'target', 'release', name)]
-  // A debug binary loads its interface from the `npm run dev` server, so this fallback shows one only while that server runs.
-  candidates.push(path.join(root, 'desktop', 'target', 'debug', name))
+  const debug = path.join(root, 'desktop', 'target', 'debug', name)
+  candidates.push(debug)
   command = candidates.find(existsSync)
   if (!command) {
     console.error('mastermind: native build missing. Run `npm run desktop:build` in the mastermind repo.')
     process.exit(1)
   }
+  // A debug host trusts whatever page answers on the development server's port, so the fallback
+  // only hands files to the host `npm run dev` already started and never starts one itself.
+  if (command === debug) env = { ...env, MM_LAUNCH_CHECK_ATTACH_ONLY: '1' }
   forwarded = args
 }
-const child = spawn(command, forwarded, { stdio: 'inherit' })
+const child = spawn(command, forwarded, { stdio: 'inherit', env })
 child.on('error', (error) => { console.error(`mastermind: ${error.message}`); process.exitCode = 1 })
 child.on('exit', (code, signal) => {
   if (signal) process.kill(process.pid, signal)

@@ -24,7 +24,9 @@ for translation. Build the source checkout with `npm run desktop:build` first. A
 lets the session agent choose which files need review; explicit paths take precedence. Pass the
 chosen paths together; each receives an admission result. People configure appearance, their name,
 and Interface language in Settings. Reading language is chosen from the available versions of each
-document; people do not need to operate the CLI.
+document; people do not need to operate the CLI. When the person hands documents back, the agent
+rereads them and closes the ones it opened with `close -- FILE...`; a file with unfinished work in
+the reader stays open and reports `blocked`.
 
 The preparing agent supplies complete, fresh translations when wanted. Explicit requests override
 its discretion, including several target languages or no translation. It reads the whole document

@@ -1,15 +1,43 @@
 use crate::{host_process, transport};
 use mastermind_launch_check::protocol::{
-    MAX_FILES, MAX_FRAME, Operation, Request, Response, SetupRequest, VERSION,
+    CloseRequest, FileResult, MAX_FILES, MAX_FRAME, Operation, Request, Response, SetupRequest,
+    VERSION, exit_status,
 };
 use std::{io, path::PathBuf};
+
+const USAGE: &str = "usage: mastermind-launch-check open [--language CODE] -- FILE... | close -- FILE... | setup --suggest JSON_OBJECT";
+
+/// Set by the repository launcher when it falls back to a debug binary, whose interface comes from
+/// the development server's origin; such a launcher hands files only to a host already running.
+const ATTACH_ONLY: &str = "MM_LAUNCH_CHECK_ATTACH_ONLY";
+
+/// Paths after `--`, resolved against the invoking directory.
+fn file_arguments(args: &[std::ffi::OsString]) -> io::Result<Vec<String>> {
+    if args.is_empty() || args.len() > MAX_FILES {
+        return Err(io::Error::other(USAGE));
+    }
+    let cwd = std::env::current_dir()?;
+    args.iter()
+        .map(|arg| {
+            let path = cwd.join(arg);
+            path.to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| io::Error::other("unsupported_path_encoding"))
+        })
+        .collect()
+}
+
+fn within_frame(request: Operation) -> io::Result<Operation> {
+    if serde_json::to_vec(&request)?.len() + 1 > MAX_FRAME {
+        return Err(io::Error::other("request_too_large"));
+    }
+    Ok(request)
+}
 
 fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
     if args.first().is_some_and(|arg| arg == "setup") {
         if args.len() != 3 || args[1] != "--suggest" {
-            return Err(io::Error::other(
-                "usage: mastermind-launch-check setup --suggest JSON_OBJECT",
-            ));
+            return Err(io::Error::other(USAGE));
         }
         let raw = args[2]
             .to_str()
@@ -18,14 +46,19 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
             return Err(io::Error::other("request_too_large"));
         }
         let setup = serde_json::from_str(raw)?;
-        let request = Operation::Setup(SetupRequest {
+        return within_frame(Operation::Setup(SetupRequest {
             version: VERSION,
             setup,
-        });
-        if serde_json::to_vec(&request)?.len() + 1 > MAX_FRAME {
-            return Err(io::Error::other("request_too_large"));
+        }));
+    }
+    if args.first().is_some_and(|arg| arg == "close") {
+        if args.get(1).is_none_or(|arg| arg != "--") {
+            return Err(io::Error::other(USAGE));
         }
-        return Ok(request);
+        return within_frame(Operation::Close(CloseRequest {
+            version: VERSION,
+            close: file_arguments(&args[2..])?,
+        }));
     }
     let (offset, language) = if args.get(1).is_some_and(|arg| arg == "--language") {
         let language = args
@@ -39,32 +72,56 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
     };
     if args.first().is_none_or(|arg| arg != "open")
         || args.get(offset - 1).is_none_or(|arg| arg != "--")
-        || args.len() <= offset
-        || args.len() - offset > MAX_FILES
     {
-        return Err(io::Error::other(
-            "usage: mastermind-launch-check open [--language CODE] -- FILE...",
-        ));
+        return Err(io::Error::other(USAGE));
     }
-    let cwd = std::env::current_dir()?;
-    let paths = args[offset..]
-        .iter()
-        .map(|arg| {
-            let path = cwd.join(arg);
-            path.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| io::Error::other("unsupported_path_encoding"))
-        })
-        .collect::<io::Result<Vec<_>>>()?;
-    let request = Request {
+    within_frame(Operation::Open(Request {
         language,
         version: VERSION,
-        paths,
-    };
-    if serde_json::to_vec(&request)?.len() + 1 > MAX_FRAME {
-        return Err(io::Error::other("request_too_large"));
+        paths: file_arguments(&args[offset..])?,
+    }))
+}
+
+/// What the launcher does when no host accepts its first connection.
+#[derive(Debug, PartialEq)]
+enum WithoutHost {
+    Spawn,
+    /// No host holds documents, so a close has nothing to close.
+    NothingOpen,
+    /// Starting a host is not this launcher's to do.
+    NotRunning,
+}
+
+fn without_host(request: &Operation, attach_only: bool) -> WithoutHost {
+    if matches!(request, Operation::Close(_)) {
+        WithoutHost::NothingOpen
+    } else if attach_only {
+        WithoutHost::NotRunning
+    } else {
+        WithoutHost::Spawn
     }
-    Ok(Operation::Open(request))
+}
+
+fn nothing_open(request: &Operation) -> Response {
+    let Operation::Close(request) = request else {
+        unreachable!("only a close request is answered without a host");
+    };
+    Response {
+        results: request
+            .close
+            .iter()
+            .map(|path| FileResult {
+                path: path.clone(),
+                canonical: None,
+                status: "not_open".into(),
+                error: None,
+                message: None,
+                reason: None,
+            })
+            .collect(),
+        error: None,
+        ..Response::error("")
+    }
 }
 
 async fn launch(root: PathBuf, request: Operation) -> io::Result<Response> {
@@ -77,6 +134,16 @@ async fn launch(root: PathBuf, request: Operation) -> io::Result<Response> {
                 io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
             ) => {}
         Err(error) => return Err(error),
+    }
+    match without_host(&request, std::env::var_os(ATTACH_ONLY).is_some()) {
+        WithoutHost::Spawn => {}
+        WithoutHost::NothingOpen => return Ok(nothing_open(&request)),
+        WithoutHost::NotRunning => {
+            eprintln!(
+                "No mastermind host is running. Start one with `npm run dev`, or build the app with `npm run desktop:build`."
+            );
+            return Ok(Response::error("host_not_running"));
+        }
     }
     let mut child = host_process::spawn()?;
     loop {
@@ -113,17 +180,11 @@ pub fn dispatch(root: PathBuf, args: Vec<std::ffi::OsString>) -> ! {
         .block_on(async { tokio::time::timeout(transport::DEADLINE, launch(root, request)).await });
     let (response, code) = match result {
         Ok(Ok(response)) => {
-            let code = if response.error.is_some() {
-                2
-            } else if response.results.iter().any(|r| r.status == "error") {
-                1
-            } else {
-                0
-            };
+            let code = exit_status(&response);
             (response, code)
         }
         result => {
-            eprintln!("Opening outcome unknown: {result:?}");
+            eprintln!("Outcome unknown: {result:?}");
             (Response::error("outcome_unknown"), 3)
         }
     };
@@ -162,6 +223,68 @@ mod tests {
         ] {
             assert!(request(args).is_err());
         }
+    }
+
+    #[test]
+    fn close_cli_resolves_paths_without_requiring_markdown() {
+        let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
+        let Operation::Close(close) =
+            request(args(&["close", "--", "notes.txt", "a b.md"])).unwrap()
+        else {
+            panic!("expected close");
+        };
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(
+            close.close,
+            [cwd.join("notes.txt"), cwd.join("a b.md")]
+                .map(|path| path.to_str().unwrap().to_owned())
+        );
+        let too_many: Vec<String> = (0..=MAX_FILES).map(|index| format!("{index}.md")).collect();
+        let mut over = vec!["close", "--"];
+        over.extend(too_many.iter().map(String::as_str));
+        for invalid in [
+            args(&["close", "--"]),
+            args(&["close", "file.md"]),
+            args(&["close", "--language", "fr", "--", "file.md"]),
+            args(&over),
+        ] {
+            assert!(request(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn only_a_launcher_allowed_to_start_a_host_spawns_one() {
+        let open = Operation::Open(Request {
+            language: None,
+            version: VERSION,
+            paths: vec!["/document.md".into()],
+        });
+        let setup = Operation::Setup(SetupRequest {
+            version: VERSION,
+            setup: Default::default(),
+        });
+        let close = Operation::Close(CloseRequest {
+            version: VERSION,
+            close: vec!["/one.md".into(), "/two.md".into()],
+        });
+        assert_eq!(without_host(&open, false), WithoutHost::Spawn);
+        assert_eq!(without_host(&setup, false), WithoutHost::Spawn);
+        assert_eq!(without_host(&open, true), WithoutHost::NotRunning);
+        assert_eq!(without_host(&setup, true), WithoutHost::NotRunning);
+        for attach_only in [false, true] {
+            assert_eq!(without_host(&close, attach_only), WithoutHost::NothingOpen);
+        }
+        let reply = nothing_open(&close);
+        assert_eq!(exit_status(&reply), 0);
+        assert_eq!(
+            reply
+                .results
+                .iter()
+                .map(|result| (result.path.as_str(), result.status.as_str()))
+                .collect::<Vec<_>>(),
+            [("/one.md", "not_open"), ("/two.md", "not_open")]
+        );
+        assert_eq!(exit_status(&Response::error("host_not_running")), 2);
     }
 
     #[test]

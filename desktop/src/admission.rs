@@ -31,6 +31,9 @@ pub struct Document {
     pub path: String,
     /// The admission snapshot, released when the renderer first reads it.
     pub snapshot: Option<crate::files::Snapshot>,
+    /// The file admission read; later reads and writes refuse a file that does not continue it.
+    /// Only test fixtures register a document without one.
+    pub identity: Option<crate::files::Identity>,
     pub language: Option<String>,
 }
 
@@ -72,6 +75,11 @@ impl Documents {
         self.entries.get_mut(&id)
     }
 
+    /// The document admitted under this canonical path.
+    pub fn find(&self, canonical: &str) -> Option<usize> {
+        self.ids.get(canonical).copied()
+    }
+
     #[cfg(test)]
     pub fn len(&self) -> usize {
         self.entries.len()
@@ -89,6 +97,7 @@ impl Documents {
             id,
             Document {
                 path,
+                identity: snapshot.as_ref().map(|snapshot| snapshot.identity.clone()),
                 snapshot,
                 language: None,
             },
@@ -143,6 +152,7 @@ impl Documents {
                         status: status.into(),
                         error: None,
                         message: None,
+                        reason: None,
                     }
                 }
                 Err(error) => FileResult {
@@ -151,6 +161,7 @@ impl Documents {
                     status: "error".into(),
                     error: Some(error.error),
                     message: Some(error.message),
+                    reason: None,
                 },
             })
             .collect();
@@ -198,7 +209,7 @@ impl Documents {
             return Ok(Admission::AlreadyOpen(id));
         }
         require_markdown(&canonical)?;
-        let snapshot = crate::files::read(&canonical)?;
+        let snapshot = crate::files::read(&canonical, None)?;
         Ok(Admission::Opened(self.insert(display, Some(snapshot))))
     }
 
@@ -379,7 +390,7 @@ mod tests {
         assert_eq!(docs.active_id, Some(1));
         fs::write(fixture.0.join("copy.md"), "a").unwrap();
         let destination = copy_destination(&fixture.0.join("copy.md")).unwrap();
-        let snapshot = crate::files::read(Path::new(&destination)).unwrap();
+        let snapshot = crate::files::read(Path::new(&destination), None).unwrap();
         let revision = docs.activation_revision;
         let id = docs
             .replace_with_copy(0, destination.clone(), snapshot)

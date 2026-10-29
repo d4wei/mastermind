@@ -1,4 +1,4 @@
-use crate::{admission::Documents, worker::BlockingWork};
+use crate::{admission::Documents, closing::Renderer, worker::BlockingWork};
 use interprocess::local_socket::tokio::{Listener, prelude::*};
 use mastermind_launch_check::protocol::{MAX_FRAME, MAX_REPLY_FRAME, Operation, Response, VERSION};
 use std::{
@@ -9,6 +9,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
+use tauri::Emitter;
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     sync::{OwnedSemaphorePermit, Semaphore},
@@ -38,6 +39,7 @@ async fn frame(stream: impl AsyncRead + Unpin, limit: usize) -> io::Result<Vec<u
 }
 
 pub async fn exchange(root: &Path, request: &Operation) -> io::Result<Response> {
+    // `connect` checks that the host runs as this user before the request is sent.
     let stream = crate::endpoint::connect(root).await?;
     let mut bytes = serde_json::to_vec(request)?;
     bytes.push(b'\n');
@@ -57,7 +59,7 @@ pub async fn exchange(root: &Path, request: &Operation) -> io::Result<Response> 
 fn lane(request: &Operation) -> &'static BlockingWork {
     match request {
         Operation::Open(_) => crate::worker::admission_work(),
-        Operation::Setup(_) => crate::worker::blocking_work(),
+        Operation::Setup(_) | Operation::Close(_) => crate::worker::blocking_work(),
     }
 }
 
@@ -65,6 +67,8 @@ fn dispatch(request: Operation, docs: &Mutex<Documents>, setup: &crate::setup::S
     let mut response = match request {
         Operation::Open(request) => docs.lock().unwrap().admit(request),
         Operation::Setup(request) => setup.suggest(request),
+        // `respond` sends closes to the renderer; answering one here could not consult it.
+        Operation::Close(_) => Response::error("invalid_request"),
     };
     // A rejected request reports unknown setup state, like invocation failures.
     if response.error.is_none() {
@@ -97,7 +101,11 @@ async fn respond(
     request: Operation,
     docs: Arc<Mutex<Documents>>,
     setup: Arc<crate::setup::Setup>,
+    renderer: Renderer,
 ) -> Response {
+    if let Operation::Close(request) = request {
+        return crate::closing::close(request, docs, setup, &renderer).await;
+    }
     lane(&request)
         .run(move || dispatch(request, &docs, &setup))
         .await
@@ -130,14 +138,25 @@ pub async fn serve(
     listener: Listener,
     docs: Arc<Mutex<Documents>>,
     setup: Arc<crate::setup::Setup>,
+    close_requests: Arc<crate::closing::CloseRequests>,
     app: tauri::AppHandle,
 ) {
+    let emitter = app.clone();
+    let renderer = Renderer {
+        requests: close_requests,
+        emit: Arc::new(move |event| emitter.emit(crate::closing::RENDERER_EVENT, event).is_ok()),
+        deadline: crate::closing::RENDERER_DEADLINE,
+    };
     let drop_reply = Arc::new(AtomicBool::new(
         std::env::var_os("MM_LAUNCH_CHECK_DROP_REPLY").is_some(),
     ));
     let slots = Arc::new(Semaphore::new(CONNECTION_SLOTS));
     loop {
         let stream = next_connection(|| listener.accept()).await;
+        if let Err(error) = crate::endpoint::authorize_peer(&stream) {
+            eprintln!("Launcher connection refused: {error}");
+            continue;
+        }
         let Some(permit) = take_slot(&slots, &stream).await else {
             continue;
         };
@@ -145,19 +164,25 @@ pub async fn serve(
         let setup = setup.clone();
         let app = app.clone();
         let drop_reply = drop_reply.clone();
+        let renderer = renderer.clone();
         tokio::spawn(async move {
             let _permit = permit;
             let work = async {
-                let response = match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
+                let (opening, response) = match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
                     serde_json::from_slice::<Operation>(&bytes).map_err(io::Error::from)
                 }) {
-                    Ok(request) => respond(request, docs, setup).await,
-                    Err(_) => Response::error("invalid_request"),
+                    Ok(request) => (
+                        matches!(request, Operation::Open(_)),
+                        respond(request, docs, setup, renderer).await,
+                    ),
+                    Err(_) => (false, Response::error("invalid_request")),
                 };
-                if response
-                    .results
-                    .iter()
-                    .any(|result| result.canonical.is_some())
+                // Only opening raises the window; closing leaves the person's focus alone.
+                if opening
+                    && response
+                        .results
+                        .iter()
+                        .any(|result| result.canonical.is_some())
                 {
                     crate::opening::focus(&app);
                 }
@@ -177,6 +202,14 @@ mod tests {
     use crate::test_support::TempDir;
     use mastermind_launch_check::protocol::{MAX_FILES, Request};
 
+    fn no_renderer() -> Renderer {
+        Renderer {
+            requests: Arc::default(),
+            emit: Arc::new(|_| false),
+            deadline: std::time::Duration::ZERO,
+        }
+    }
+
     #[test]
     fn replies_for_requests_within_the_frame_limit_are_accepted() {
         let path = format!("/{}", "p".repeat(699));
@@ -195,6 +228,7 @@ mod tests {
                     status: "already_open".into(),
                     error: None,
                     message: None,
+                    reason: None,
                 })
                 .collect(),
             error: None,
@@ -344,12 +378,12 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let queued = tokio::spawn(respond(open(), docs.clone(), setup.clone()));
+            let queued = tokio::spawn(respond(open(), docs.clone(), setup.clone(), no_renderer()));
             let setup_request = Operation::Setup(mastermind_launch_check::protocol::SetupRequest {
                 version: VERSION,
                 setup: serde_json::from_value(serde_json::json!({"authorTag":"Reader"})).unwrap(),
             });
-            let command = respond(setup_request, docs.clone(), setup.clone());
+            let command = respond(setup_request, docs.clone(), setup.clone(), no_renderer());
             let response = tokio::time::timeout(Duration::from_secs(2), command)
                 .await
                 .unwrap();
@@ -404,7 +438,7 @@ mod tests {
             paths: vec![dir.join("document.md").to_str().unwrap().into()],
         });
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let response = runtime.block_on(respond(request, docs, setup));
+        let response = runtime.block_on(respond(request, docs, setup, no_renderer()));
         assert_eq!(response.error.as_deref(), Some("host_failure"));
     }
 }

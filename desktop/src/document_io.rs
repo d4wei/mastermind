@@ -1,6 +1,6 @@
 use crate::{
     admission::Documents,
-    files::{self, FileError, Snapshot},
+    files::{self, FileError, Identity, Snapshot},
 };
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde_json::{Value, json};
@@ -189,9 +189,13 @@ fn admitted_id(docs: &Documents, id: &str) -> Result<usize, FileError> {
 }
 
 fn admitted(docs: &Documents, id: &str) -> Result<PathBuf, FileError> {
-    Ok(PathBuf::from(
-        &docs.get(admitted_id(docs, id)?).unwrap().path,
-    ))
+    Ok(admitted_file(docs, id)?.0)
+}
+
+/// An admitted document's canonical path and the identity its file must continue.
+fn admitted_file(docs: &Documents, id: &str) -> Result<(PathBuf, Option<Identity>), FileError> {
+    let document = docs.get(admitted_id(docs, id)?).unwrap();
+    Ok((PathBuf::from(&document.path), document.identity.clone()))
 }
 
 #[tauri::command]
@@ -211,16 +215,16 @@ pub async fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileErr
 }
 
 fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
-    let path = {
+    let (path, identity) = {
         let mut docs = docs.lock().unwrap();
         let index = admitted_id(&docs, id)?;
         let document = docs.get_mut(index).unwrap();
         if let Some(snapshot) = document.snapshot.take() {
             return Ok(snapshot);
         }
-        PathBuf::from(&document.path)
+        (PathBuf::from(&document.path), document.identity.clone())
     };
-    files::read(&path)
+    files::read(&path, identity.as_ref())
 }
 
 #[tauri::command]
@@ -236,11 +240,11 @@ static DOCUMENT_WRITES: Mutex<()> = Mutex::new(());
 fn serialized_write<T>(
     docs: &Mutex<Documents>,
     id: &str,
-    write: impl FnOnce(PathBuf) -> Result<T, FileError>,
+    write: impl FnOnce(PathBuf, Option<Identity>) -> Result<T, FileError>,
 ) -> Result<T, FileError> {
     let _write = DOCUMENT_WRITES.lock().unwrap();
-    let path = admitted(&docs.lock().unwrap(), id)?;
-    write(path)
+    let (path, identity) = admitted_file(&docs.lock().unwrap(), id)?;
+    write(path, identity)
 }
 
 #[tauri::command]
@@ -253,8 +257,8 @@ pub async fn write_document(
     let docs = docs.inner().clone();
     crate::worker::blocking_work()
         .run(move || {
-            serialized_write(&docs, &id, |path| {
-                files::write(&path, &content, &base_version)
+            serialized_write(&docs, &id, |path, identity| {
+                files::write(&path, &content, &base_version, identity.as_ref())
             })
         })
         .await?
@@ -691,7 +695,7 @@ mod tests {
         let (release_tx, release_rx) = mpsc::channel();
         let first_docs = docs.clone();
         let first = std::thread::spawn(move || {
-            serialized_write(&first_docs, "0", |path| {
+            serialized_write(&first_docs, "0", |path, _| {
                 first_started_tx.send(path).unwrap();
                 release_rx.recv_timeout(Duration::from_secs(5)).unwrap();
                 Ok(())
@@ -707,7 +711,7 @@ mod tests {
         assert!(docs.try_lock().is_ok());
         let (second_started_tx, second_started_rx) = mpsc::channel();
         let second = std::thread::spawn(move || {
-            serialized_write(&docs, "0", |_| {
+            serialized_write(&docs, "0", |_, _| {
                 second_started_tx.send(()).unwrap();
                 Ok(())
             })

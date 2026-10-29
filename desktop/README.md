@@ -27,8 +27,10 @@ Ctrl-C stops both.
 
 The development host claims the same per-user endpoint as the installed app. Quit mastermind before
 `npm run dev`; otherwise the development host exits at once and stops the session with it. A debug
-binary always loads its interface from the development server, so it shows an interface only while
-`npm run dev` is running; `npm run desktop:build` produces the standalone app.
+binary always loads its interface, with full command access, from whatever answers on the
+development server's port. When `bin/mastermind.js` finds only a debug build, it therefore hands
+files only to a host `npm run dev` already started and never starts one; without a running host it
+exits with `host_not_running`. `npm run desktop:build` produces the standalone app.
 
 The bundle and reader window are named `mastermind`. The identifier `dev.mastermind.launchcheck`,
 executable `mastermind-launch-check`, and Windows companion `mastermind-launch-console` remain
@@ -37,12 +39,13 @@ releases.
 
 `main.rs` assembles the native states and command handlers. `launcher.rs` handles command parsing
 and local transport startup; `admission.rs` owns the admitted-document registry; `opening.rs`
-handles graphical opening and inventory snapshots; `document_io.rs` serves admitted document
-operations and watches. [Translation discovery](src/translations.md)
-offers available reading versions; `lifecycle.rs` creates the window and dispatches menus, close
-requests, and application events. Setup uses preference persistence directly.
-`appearance.rs` applies the rendered theme's background and native light/dark appearance;
-the [theme adapter](../ui/theme/appearance.md) owns its color source and synchronization timing.
+handles graphical opening and inventory snapshots; `closing.rs` relays launcher close requests to
+the renderer; `document_io.rs` serves admitted document operations and watches. [Translation
+discovery](src/translations.md) offers available reading versions; `lifecycle.rs` creates the
+window, keeps its navigation within the app's own origin, and dispatches menus, close requests, and
+application events. Setup uses preference persistence directly. `appearance.rs` applies the rendered
+theme's background and native light/dark appearance; the [theme adapter](../ui/theme/appearance.md)
+owns its color source and synchronization timing.
 
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),

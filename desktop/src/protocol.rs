@@ -23,11 +23,20 @@ pub struct SetupRequest {
     pub setup: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
+/// Asks the reader to close the admitted documents these paths name, as `protocol.md` describes.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CloseRequest {
+    pub version: u32,
+    pub close: Vec<String>,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Operation {
     Open(Request),
     Setup(SetupRequest),
+    Close(CloseRequest),
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -38,6 +47,9 @@ pub struct FileResult {
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Why a close is `blocked`; absent for every other status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -61,6 +73,22 @@ impl Response {
             results: vec![],
             error: Some(error.into()),
         }
+    }
+}
+
+/// The launcher's exit status for a reply: two for a request-level error, one when any file failed
+/// or a close was blocked, zero otherwise.
+pub fn exit_status(response: &Response) -> i32 {
+    if response.error.is_some() {
+        2
+    } else if response
+        .results
+        .iter()
+        .any(|result| matches!(result.status.as_str(), "error" | "blocked"))
+    {
+        1
+    } else {
+        0
     }
 }
 
@@ -111,12 +139,52 @@ mod tests {
             .unwrap(),
             Operation::Setup(_)
         ));
+        let Operation::Close(close) = serde_json::from_value::<Operation>(
+            serde_json::json!({"version":VERSION,"close":["/document.md"]}),
+        )
+        .unwrap() else {
+            panic!("expected close");
+        };
+        assert_eq!(close.close, ["/document.md"]);
         for invalid in [
             serde_json::json!({"version":VERSION,"paths":[],"setup":{}}),
             serde_json::json!({"version":VERSION,"setup":{},"extra":true}),
+            serde_json::json!({"version":VERSION,"close":[],"paths":[]}),
+            serde_json::json!({"version":VERSION,"close":[],"force":true}),
+            serde_json::json!({"close":["/document.md"]}),
         ] {
             assert!(serde_json::from_value::<Operation>(invalid).is_err());
         }
+    }
+
+    #[test]
+    fn exit_status_counts_blocked_closes_as_failures() {
+        let result = |status: &str| FileResult {
+            path: "/document.md".into(),
+            canonical: None,
+            status: status.into(),
+            error: None,
+            message: None,
+            reason: (status == "blocked").then(|| "unsaved_edits".into()),
+        };
+        let reply = |statuses: &[&str]| Response {
+            results: statuses.iter().map(|status| result(status)).collect(),
+            error: None,
+            ..Response::error("")
+        };
+        assert_eq!(exit_status(&reply(&["closed", "not_open"])), 0);
+        assert_eq!(exit_status(&reply(&["opened", "already_open"])), 0);
+        assert_eq!(exit_status(&reply(&["closed", "blocked"])), 1);
+        assert_eq!(exit_status(&reply(&["error", "closed"])), 1);
+        assert_eq!(exit_status(&Response::error("host_not_running")), 2);
+        let blocked = serde_json::to_value(result("blocked")).unwrap();
+        assert_eq!(blocked["reason"], "unsaved_edits");
+        assert!(
+            serde_json::to_value(result("closed"))
+                .unwrap()
+                .get("reason")
+                .is_none()
+        );
     }
 
     #[test]

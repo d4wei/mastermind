@@ -18,7 +18,8 @@ vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate,
   useRoute: () => mocks.id === null ? { kind: 'home' } : { kind: 'doc', sessionId: mocks.id } }))
 vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: null, status: mocks.status, needsAttention: () => false }), {
   getState: () => ({ notifyDiskChange: vi.fn(),
-    prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [] }),
+    prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [],
+    needsAttention: () => false }),
 }) }))
 vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign((select: (state: unknown) => unknown) =>
   select({ config: { uiLang: mocks.chinese ? 'zh-CN' : 'en' } }), {
@@ -398,6 +399,41 @@ it('keeps editing locked when quit arrives during a file close', async () => {
   await act(async () => finishWindow(true))
   expect(host.inert).toBe(false)
   expect(mocks.invoke).toHaveBeenCalledWith('finish_close')
+})
+
+const requestClose = async (request: number, ids: string[]) => {
+  const answer = mocks.listen.mock.calls.find(([event]) => event === 'close-files-requested')![1] as (payload: unknown) => void
+  await act(async () => answer({ request, ids }))
+}
+
+it('closes files an agent names through the native close without a dialog', async () => {
+  mocks.id = '0'
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot()
+    : command === 'close_document' ? { ...snapshot(1, 1), files: [snapshot().files[1]] }
+    : other(command))
+  await mount()
+  expect(mocks.invoke).toHaveBeenCalledWith('close_requests_ready')
+  await requestClose(4, ['0', '7'])
+  expect(mocks.prepareToClose).toHaveBeenCalledWith(['0'])
+  expect(mocks.invoke).toHaveBeenCalledWith('close_document', { id: 0, activeId: 0, activationRevision: 0 })
+  expect(mocks.invoke).toHaveBeenCalledWith('complete_close_request', { requestId: 4, results: [
+    { id: '0', status: 'closed' }, { id: '7', status: 'error', error: 'document_not_open' },
+  ] })
+  expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
+  expect(document.querySelector('dialog[open]')).toBeNull()
+  expect(host.inert).toBe(false)
+})
+
+it('answers an agent close as unavailable while the window is closing', async () => {
+  mocks.prepareToClose.mockImplementation(() => new Promise<boolean>(() => {}))
+  await mount()
+  const quit = mocks.listen.mock.calls.find(([event]) => event === 'close-requested')![1] as () => void
+  await act(async () => quit())
+  await requestClose(5, ['0'])
+  expect(mocks.invoke).toHaveBeenCalledWith('complete_close_request', { requestId: 5, results: [
+    { id: '0', status: 'blocked', reason: 'renderer_unavailable' },
+  ] })
+  expect(mocks.invoke.mock.calls.some(([command]) => command === 'close_document')).toBe(false)
 })
 
 it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(

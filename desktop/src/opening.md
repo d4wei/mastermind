@@ -38,6 +38,12 @@ revision so older inventory responses cannot restore a removed pill. Directory w
 when no admitted file uses the directory; failed removals remain eligible for retry on the next
 close. Watch registration and removal share the registry lock.
 
+A launcher `close` reaches `close_document` only through the renderer. `closing.rs` resolves each
+path to an admitted ID under the registry lock and asks the subscribed renderer; the renderer
+subscribes with `close_requests_ready`, and page navigation or a lost web content process
+unsubscribes it and fails waiting requests. The [launch protocol](protocol.md#closing) owns the
+results.
+
 The host retains admitted documents without a total session limit. Inventory polling and raw OS
 error details remain bounded hardening work. See the [observations](../../tools/desktop/results.md)
 for packaged behavior actually exercised.

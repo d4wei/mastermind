@@ -16,6 +16,14 @@ base and surfacing subsequent disk changes. Delivering the initial snapshot rele
 
 Reads open an existing regular file without following a final symlink or Windows reparse point. They
 compare descriptor metadata before and after reading, then compare a second descriptor at the path.
+Admitted paths are canonical, and every read and write first checks that the path still
+canonicalizes to itself, so a parent directory swapped for a symlink is a conflict. On Unix the
+open then walks the path one directory at a time without following links, so a swap after that
+check cannot redirect it; Windows has only the check. Admission registers the file's identity, and
+later reads and writes refuse, as conflicts, a file that does not continue it: a file on another
+device or volume, or on Unix a replacement another user owns or that has a second hard link. A
+replacement the same user renamed into place, as editors, `git`, and `sed -i` save, continues the
+document.
 Versions include filesystem identity, metadata, and SHA-256 of the raw bytes. The Windows identity
 is the volume and file ID; Unix uses device and inode plus modification and change timestamps. A
 changed or replaced path rejects the snapshot. Reads and changed writes share a size limit.

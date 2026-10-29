@@ -30,25 +30,52 @@ fn darwin_user_temp_dir() -> Option<PathBuf> {
     Some(PathBuf::from(OsString::from_vec(buffer)))
 }
 
+/// The owner of `path` when it is a directory rather than a symlink to one.
+fn directory_owner(path: &Path) -> Option<u32> {
+    use std::os::unix::fs::MetadataExt;
+    fs::symlink_metadata(path)
+        .ok()
+        .filter(|meta| meta.is_dir())
+        .map(|meta| meta.uid())
+}
+
 /// The directory under which every launch path of one user resolves the same endpoint.
 ///
 /// `TMPDIR` is per process, so a launcher run from a shell that overrides it would otherwise look
 /// beside a different endpoint than a desktop-launched host and start a second one. macOS reports
-/// the user's temporary directory through `confstr`, which ignores the environment; Linux session
-/// managers publish `XDG_RUNTIME_DIR`, which only its user can create. Without either, the process
-/// temporary directory remains the root, and `discover` still refuses a directory another user
-/// pre-created there.
-fn user_runtime_root(env: impl Fn(&str) -> Option<OsString>) -> PathBuf {
+/// the user's temporary directory through `confstr`, which ignores the environment. Linux tries the
+/// session's `XDG_RUNTIME_DIR`, the systemd runtime directory `/run/user/<uid>` when the user owns
+/// it, then the user's cache directory; none of these can be created by another user. Only when
+/// every candidate is unavailable does the process temporary directory remain the root, and
+/// `discover` still refuses a directory another user pre-created there.
+fn user_runtime_root(
+    env: impl Fn(&str) -> Option<OsString>,
+    uid: u32,
+    owner: impl Fn(&Path) -> Option<u32>,
+) -> PathBuf {
     #[cfg(target_os = "macos")]
-    if let Some(root) = darwin_user_temp_dir() {
-        return root;
+    {
+        // The Linux candidates do not apply.
+        let _ = (uid, owner);
+        if let Some(root) = darwin_user_temp_dir() {
+            return root;
+        }
     }
     #[cfg(not(target_os = "macos"))]
-    if let Some(root) = env("XDG_RUNTIME_DIR")
-        .map(PathBuf::from)
-        .filter(|r| r.is_absolute())
     {
-        return root;
+        let absolute = |name: &str| env(name).map(PathBuf::from).filter(|r| r.is_absolute());
+        if let Some(root) = absolute("XDG_RUNTIME_DIR") {
+            return root;
+        }
+        let systemd = PathBuf::from(format!("/run/user/{uid}"));
+        if owner(&systemd) == Some(uid) {
+            return systemd;
+        }
+        if let Some(root) =
+            absolute("XDG_CACHE_HOME").or_else(|| absolute("HOME").map(|home| home.join(".cache")))
+        {
+            return root;
+        }
     }
     env("TMPDIR")
         .filter(|dir| !dir.is_empty())
@@ -63,10 +90,15 @@ pub fn discover() -> io::Result<PathBuf> {
     let path = std::env::var_os("MM_LAUNCH_CHECK_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            user_runtime_root(|name| std::env::var_os(name))
+            user_runtime_root(|name| std::env::var_os(name), uid, directory_owner)
                 .join(format!("mastermind-launch-check-{uid}"))
         });
-    match fs::DirBuilder::new().mode(0o700).create(&path) {
+    // A cache root may not exist yet; missing parents are created private to the user.
+    match fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&path)
+    {
         Ok(()) => {}
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {}
         Err(e) => return Err(e),
@@ -118,8 +150,30 @@ pub fn bind(root: &Path) -> io::Result<(Option<File>, Listener)> {
     Ok((Some(owner), listener))
 }
 
+/// Refuses a peer whose effective user is not this process's. The private directory already keeps
+/// other users from reaching the socket; this check holds even if that directory's permissions
+/// are loosened or the socket is reached through an inherited descriptor.
+fn require_same_user(peer: Option<u32>, uid: u32) -> io::Result<()> {
+    if peer == Some(uid) {
+        Ok(())
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "unexpected_endpoint_owner",
+        ))
+    }
+}
+
+/// Checks that the other end of `stream` runs as this process's effective user.
+pub fn authorize_peer(stream: &Stream) -> io::Result<()> {
+    // geteuid has no arguments or borrowed memory and only reads the effective user identity.
+    require_same_user(stream.peer_creds()?.euid(), unsafe { libc::geteuid() })
+}
+
 pub async fn connect(root: &Path) -> io::Result<Stream> {
-    Stream::connect(root.join("launch.sock").to_fs_name::<GenericFilePath>()?).await
+    let stream = Stream::connect(root.join("launch.sock").to_fs_name::<GenericFilePath>()?).await?;
+    authorize_peer(&stream)?;
+    Ok(stream)
 }
 
 #[cfg(test)]
@@ -134,33 +188,70 @@ mod tests {
         }
     }
 
+    fn owned_by<'a>(dirs: &'a [(&'a str, u32)]) -> impl Fn(&Path) -> Option<u32> + 'a {
+        move |path| {
+            dirs.iter()
+                .find(|(dir, _)| Path::new(dir) == path)
+                .map(|(_, owner)| *owner)
+        }
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn runtime_root_ignores_tmpdir_on_macos() {
         let system = darwin_user_temp_dir().expect("confstr reports the user temporary directory");
         assert!(system.is_absolute());
-        assert_eq!(user_runtime_root(env_with(&[("TMPDIR", "/one")])), system);
-        assert_eq!(user_runtime_root(env_with(&[("TMPDIR", "/two")])), system);
-        assert_eq!(user_runtime_root(env_with(&[])), system);
+        let root = |vars| user_runtime_root(env_with(vars), 501, owned_by(&[]));
+        assert_eq!(root(&[("TMPDIR", "/one")]), system);
+        assert_eq!(
+            root(&[("TMPDIR", "/two"), ("HOME", "/Users/reader")]),
+            system
+        );
+        assert_eq!(root(&[]), system);
     }
 
     #[cfg(not(target_os = "macos"))]
     #[test]
-    fn runtime_root_prefers_the_session_runtime_directory() {
+    fn runtime_root_prefers_directories_only_the_user_can_create() {
+        let root = |vars: &[(&str, &str)], dirs: &[(&str, u32)]| {
+            user_runtime_root(env_with(vars), 1000, owned_by(dirs))
+        };
+        let session = [
+            ("XDG_RUNTIME_DIR", "/session"),
+            ("HOME", "/home/reader"),
+            ("TMPDIR", "/one"),
+        ];
         assert_eq!(
-            user_runtime_root(env_with(&[
-                ("XDG_RUNTIME_DIR", "/run/user/1000"),
-                ("TMPDIR", "/one")
-            ])),
+            root(&session, &[("/run/user/1000", 1000)]),
+            PathBuf::from("/session")
+        );
+        let fallback = [
+            ("XDG_RUNTIME_DIR", "relative"),
+            ("HOME", "/home/reader"),
+            ("TMPDIR", "/one"),
+        ];
+        assert_eq!(
+            root(&fallback, &[("/run/user/1000", 1000)]),
             PathBuf::from("/run/user/1000")
         );
+        // A runtime directory another user owns, or none at all, falls through to the cache.
         assert_eq!(
-            user_runtime_root(env_with(&[
-                ("XDG_RUNTIME_DIR", "relative"),
-                ("TMPDIR", "/one")
-            ])),
-            PathBuf::from("/one")
+            root(&fallback, &[("/run/user/1000", 0)]),
+            PathBuf::from("/home/reader/.cache")
         );
+        assert_eq!(root(&fallback, &[]), PathBuf::from("/home/reader/.cache"));
+        let cache = [
+            ("XDG_CACHE_HOME", "/cache"),
+            ("HOME", "/home/reader"),
+            ("TMPDIR", "/one"),
+        ];
+        assert_eq!(root(&cache, &[]), PathBuf::from("/cache"));
+        let relative = [
+            ("XDG_CACHE_HOME", "cache"),
+            ("HOME", "home"),
+            ("TMPDIR", "/one"),
+        ];
+        assert_eq!(root(&relative, &[]), PathBuf::from("/one"));
     }
 
     #[test]
@@ -169,15 +260,57 @@ mod tests {
         if darwin_user_temp_dir().is_some() {
             return;
         }
-        assert_eq!(
-            user_runtime_root(env_with(&[("TMPDIR", "/one")])),
-            PathBuf::from("/one")
-        );
-        assert_eq!(
-            user_runtime_root(env_with(&[("TMPDIR", "")])),
-            PathBuf::from("/tmp")
-        );
-        assert_eq!(user_runtime_root(env_with(&[])), PathBuf::from("/tmp"));
+        let root = |vars| user_runtime_root(env_with(vars), 1000, owned_by(&[]));
+        assert_eq!(root(&[("TMPDIR", "/one")]), PathBuf::from("/one"));
+        assert_eq!(root(&[("TMPDIR", "")]), PathBuf::from("/tmp"));
+        assert_eq!(root(&[]), PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn the_runtime_directory_must_be_a_real_directory() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = crate::test_support::TempDir::new("runtime-owner");
+        let uid = fs::metadata(dir.path()).unwrap().uid();
+        assert_eq!(directory_owner(dir.path()), Some(uid));
+        std::os::unix::fs::symlink(dir.path(), dir.join("link")).unwrap();
+        fs::write(dir.join("file"), b"").unwrap();
+        for path in ["link", "file", "missing"] {
+            assert_eq!(directory_owner(&dir.join(path)), None);
+        }
+    }
+
+    #[test]
+    fn peers_must_run_as_the_same_user() {
+        assert!(require_same_user(Some(501), 501).is_ok());
+        for peer in [Some(0), Some(502), None] {
+            let error = require_same_user(peer, 501).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            assert_eq!(error.to_string(), "unexpected_endpoint_owner");
+        }
+    }
+
+    #[test]
+    fn both_ends_of_a_loopback_exchange_verify_the_peer() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        // Socket paths are short-lived and bounded in length, so this root stays near `/tmp`.
+        let root = PathBuf::from(format!("/tmp/mm-peer-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let (_owner, listener) = bind(&root).unwrap();
+            let server = tokio::spawn(async move {
+                let stream = listener.accept().await.unwrap();
+                authorize_peer(&stream).unwrap();
+                let mut stream = stream;
+                stream.write_all(b"hello").await.unwrap();
+            });
+            let mut client = connect(&root).await.unwrap();
+            let mut message = [0; 5];
+            client.read_exact(&mut message).await.unwrap();
+            assert_eq!(&message, b"hello");
+            server.await.unwrap();
+        });
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

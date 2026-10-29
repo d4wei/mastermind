@@ -29,6 +29,29 @@ Use this entry shape:
 
 * * *
 
+## 2026-10-29 — Agents close the documents they handed out, through the renderer
+
+**Ruled.** `close -- FILE...` names explicit paths and returns a result per path in input order;
+closing an unopened file reports `not_open` and succeeds, so retries are safe. The host only asks
+the renderer, which closes a document after saving it and keeps open, as `blocked`, any with an
+unfinished draft, unsaved edits, or a recovery state, or when it cannot answer. No option discards
+work. The skill closes only files it opened or was asked to address, after rereading them.
+
+**Beat:** closing the native record alone, which would strand unsaved buffers and drafts in the
+renderer; and an agent closing every open file, including ones the person or another session
+opened.
+
+## 2026-10-29 — Admitted documents refuse redirected paths and foreign replacements
+
+**Ruled.** Each read and write of an admitted document requires its path to canonicalize to the
+admitted path, opens it on Unix without following any link, and refuses a file on another device
+or volume, or on Unix a replacement another user owns or that has a second hard link. A
+same-user replacement renamed into place continues the document.
+
+**Beat:** pinning the admitted inode, which would leave every document an editor, `git`, or
+`sed -i` saved by rename stuck in recovery; and trusting the path alone, which let anyone able to
+write an ancestor directory redirect the next autosave.
+
 ## 2026-10-29 — Earlier conflict and browser-development rulings are superseded
 
 **Ruled.** The 2026-10-15 and 2026-10-17 conflict rulings replace the 2026-10-10 rulings on
@@ -40,13 +63,14 @@ ruling; later entries left those supersessions implicit.
 
 ## 2026-10-29 — Unix launcher endpoints live in the user's runtime directory
 
-**Ruled.** The endpoint root is `confstr(_CS_DARWIN_USER_TEMP_DIR)` on macOS and `XDG_RUNTIME_DIR` on
-Linux, with the process temporary directory only as a fallback, so every launch path of one user
-resolves the same host and no other user can create the root; `MM_LAUNCH_CHECK_DIR` remains the
-harness override.
+**Ruled.** The endpoint root is `confstr(_CS_DARWIN_USER_TEMP_DIR)` on macOS; on Linux it is
+`XDG_RUNTIME_DIR`, then `/run/user/<uid>` when that directory exists and the user owns it, then
+`XDG_CACHE_HOME` or `~/.cache`. Every launch path of one user resolves the same host, and no other
+user can create any of these roots; `MM_LAUNCH_CHECK_DIR` remains the harness override.
 
 **Beat:** deriving the root from `TMPDIR`, which a shell can override and so split a launcher from
-the desktop-launched host, and whose `/tmp` fallback another user could pre-create.
+the desktop-launched host, and whose `/tmp` fallback another user could pre-create; that fallback
+remains only on macOS when `confstr` fails, or on Linux with no absolute home directory.
 
 ## 2026-10-22 — Development runs through `tauri dev` on the native host
 

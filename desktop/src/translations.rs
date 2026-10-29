@@ -54,7 +54,7 @@ fn read(directory: &Path, source: &Path, language: &str) -> Result<(Value, usize
             "Translation files must not be symbolic links.",
         ));
     }
-    let raw = files::read(&path)?;
+    let raw = files::read(&path, None)?;
     let value: Value = serde_json::from_str(&raw.content()).map_err(|_| {
         FileError::new(
             409,

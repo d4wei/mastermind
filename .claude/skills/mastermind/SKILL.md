@@ -30,6 +30,18 @@ for invalid invocation, and 3 (`outcome_unknown`) when the reply was lost; admis
 so retrying after 3 is safe. A file that is not valid UTF-8 opens with replacement characters, but
 saving any edit to it is refused (`not_utf8`); Save As writes a UTF-8 copy.
 
+## Close reviewed documents
+
+When the person hands documents back to you, reread them, then close the ones you opened or were
+asked to address so the person does not keep editing a file you are rewriting:
+`node /path/to/mastermind/bin/mastermind.js close -- FILE...`. Never close other open files; they
+may belong to the person or another session. Each result is `closed`, `not_open` (already closed;
+closing is idempotent), `blocked` with a `reason`, or `error`. `blocked` means the person still has
+work there: an unfinished draft, unsaved edits, a recovery choice, or a reader that could not
+answer. Do not override it; tell the person which file stayed open and why. Exit status is 0 when
+every file is closed or not open, 1 when any is blocked or failed, 2 for invalid invocation, and 3
+when the reply was lost.
+
 ## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.

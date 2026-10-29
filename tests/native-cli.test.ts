@@ -38,11 +38,12 @@ it.skipIf(process.platform === 'win32')('forwards open/setup arguments and waits
     await fs.copyFile('bin/mastermind.js', wrapper)
     const native = path.join(dir, 'desktop/target/debug/mastermind-launch-check')
     await fs.mkdir(path.dirname(native), { recursive: true })
-    await fs.writeFile(native, `#!${process.execPath}\nsetTimeout(() => { console.log(JSON.stringify(process.argv.slice(2))); process.exit(7) }, 30)\n`, { mode: 0o755 })
-    for (const args of [['open', '--', 'a file.md'], ['setup', '--suggest', '{"theme":"grid"}']]) {
+    await fs.writeFile(native, `#!${process.execPath}\nsetTimeout(() => { console.log(JSON.stringify([process.env.MM_LAUNCH_CHECK_ATTACH_ONLY, ...process.argv.slice(2)])); process.exit(7) }, 30)\n`, { mode: 0o755 })
+    for (const args of [['open', '--', 'a file.md'], ['close', '--', 'a file.md'], ['setup', '--suggest', '{"theme":"grid"}']]) {
       const result = await run(wrapper, args)
       expect(result.code).toBe(7)
-      expect(JSON.parse(result.stdout)).toEqual(args)
+      // The debug fallback may only reach a host that `npm run dev` already started.
+      expect(JSON.parse(result.stdout)).toEqual(['1', ...args])
     }
   } finally { await fs.rm(dir, { recursive: true, force: true }) }
 })
@@ -78,8 +79,8 @@ it.skipIf(process.platform !== 'darwin')('prefers the macOS bundle executable ov
     ]) {
       const binary = path.join(dir, 'desktop/target', location!, 'mastermind-launch-check')
       await fs.mkdir(path.dirname(binary), { recursive: true })
-      await fs.writeFile(binary, `#!${process.execPath}\nconsole.log('${label}')\n`, { mode: 0o755 })
+      await fs.writeFile(binary, `#!${process.execPath}\nconsole.log('${label}', process.env.MM_LAUNCH_CHECK_ATTACH_ONLY ?? 'may start')\n`, { mode: 0o755 })
     }
-    expect((await run(wrapper, ['setup'])).stdout.trim()).toBe('bundle')
+    expect((await run(wrapper, ['setup'])).stdout.trim()).toBe('bundle may start')
   } finally { await fs.rm(dir, { recursive: true, force: true }) }
 })
