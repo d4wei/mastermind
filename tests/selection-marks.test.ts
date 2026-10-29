@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SelRange } from '../ui/modes/reading/selection'
-import { commentEdits, changeEdits, replyEdits } from '../ui/modes/reading/marks'
+import { commentBodyFits, commentEdits, changeEdits, replyEdits } from '../ui/modes/reading/marks'
 import { applyTextEdits } from '../document/edits'
 import { scan, group } from '../document/critic/scanner'
 import { scanMarkdown } from '../document/markdown/scan'
@@ -117,4 +117,29 @@ describe('marks verified in the edited source', () => {
     expect(changeEdits(source, fence, [''], spans)).toBeNull()
     expect(changeEdits(source, fence, [''])).toBeNull()
   })
+})
+
+describe('comment bodies and discussions', () => {
+  const HELLO: SelRange[] = [{ from: 0, to: 5, text: 'Hello' }]
+
+  it('refuses a new comment that would join a point comment beside the selection', () => {
+    const source = 'Ship it Friday{>>@agent: is Friday firm?<<} please.\n'
+    const friday: SelRange[] = [{ from: 8, to: 14, text: 'Friday' }]
+    expect(commentEdits(source, friday, 'me', 'prefer Monday', scanMarkdown(source))).toBeNull()
+    expect(commentEdits(source, friday, 'me', 'prefer Monday')).toBeNull()
+    expect(commentEdits(source, [{ from: 0, to: 4, text: 'Ship' }], 'me', 'ok')).not.toBeNull()
+  })
+
+  it('collapses runs of whitespace-only lines in a comment body', () => {
+    expect(commentBodyFits('me', 'a\n  \n  \nb')).toBe(true)
+    expect(commentEdits('Hello world.\n', HELLO, 'me', 'a\n  \n  \nb'))
+      .toEqual([{ from: 0, to: 5, insert: '{==Hello==}{>>@me: a\nb<<}' }])
+  })
+
+  it.each(['see:\n- one', 'see:\n# heading', 'see:\n> quote', 'see:\n```'])(
+    'reports a body line that opens block syntax: %j', (body) => {
+      expect(commentBodyFits('me', body)).toBe(false)
+      expect(commentEdits('Hello world.\n', HELLO, 'me', body)).toBeNull()
+    },
+  )
 })

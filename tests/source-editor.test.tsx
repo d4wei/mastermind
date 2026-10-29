@@ -48,7 +48,7 @@ beforeEach(async () => {
     id, displayName: id, path: id,
   }) as never)
   vi.mocked(getFile).mockReset().mockImplementation(async (id) => ({
-    content: disk.get(id)!, version: `${id}:${disk.get(id)}`, mtimeMs: 1,
+    content: disk.get(id)!, version: `${id}:${disk.get(id)}`,
   }))
   vi.mocked(putFile).mockReset().mockResolvedValue({ version: 'saved' })
   await useDoc.getState().load(a)
@@ -157,6 +157,28 @@ it('navigates through editor geometry without requiring an off-screen line in th
   expect(nav.source).toBeNull()
 })
 
+it('keeps a lone carriage return byte for byte when typing elsewhere', async () => {
+  disk.set(a, 'a\rb\nc\n')
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  const view = editor()
+  expect(view.state.doc.length).toBe(useDoc.getState().source.length)
+  act(() => view.dispatch({ changes: { from: view.state.doc.length, insert: 'Z' } }))
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  expect(vi.mocked(putFile).mock.calls.at(-1)?.[1]).toBe('a\rb\nc\nZ')
+})
+
+it('retains editor state for a buffer whose carriage returns precede a CRLF', async () => {
+  disk.set(a, 'x\r\r\ny\r\n')
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  expect(editor().state.doc.length).toBe(useDoc.getState().source.length)
+  act(() => editor().dispatch({ changes: { from: 0, insert: 'w' } }))
+  act(() => useDoc.getState().setMode('reading'))
+  act(() => useDoc.getState().setMode('source'))
+  expect(undoDepth(editor().state)).toBe(1)
+  await act(async () => { await vi.advanceTimersByTimeAsync(600) })
+  expect(vi.mocked(putFile).mock.calls.at(-1)?.[1]).toBe('wx\r\r\ny\r\n')
+})
+
 it('discards editor undo when its document closes', async () => {
   act(() => editor().dispatch({ changes: { from: 5, insert: ' edited' } }))
   expect(undoDepth(editor().state)).toBe(1)
@@ -191,7 +213,7 @@ it('applies a lock that began in reading mode to the retained editor state', () 
 
 it('freezes Markdown-mode typing when a read reports the file is not valid UTF-8', async () => {
   const view = editor()
-  vi.mocked(getFile).mockResolvedValueOnce({ content: 'alpha', version: 'lossy', mtimeMs: 2, lossy: true })
+  vi.mocked(getFile).mockResolvedValueOnce({ content: 'alpha', version: 'lossy', lossy: true })
   await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
   expect(useDoc.getState().lossy).toBe(true)
   expect(view.contentDOM.getAttribute('contenteditable')).toBe('false')

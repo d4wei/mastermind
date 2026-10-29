@@ -86,6 +86,8 @@ export function SourceEditor({ onOutline }: { onOutline: Dispatch<SetStateAction
       ? retained.state : EditorState.create({
           doc: entry,
           extensions: [
+            // Only LF separates lines; a lone CR is document text that typing must not rewrite.
+            EditorState.lineSeparator.of('\n'),
             history(),
             editing.of(editingState(editingLocked(useDoc.getState()))),
             keymap.of([...defaultKeymap, ...historyKeymap]),

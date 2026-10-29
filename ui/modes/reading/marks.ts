@@ -1,16 +1,28 @@
 import { applyTextEdits, shiftAt } from '../../../document/edits'
 import { scanMarkdown } from '../../../document/markdown/scan'
+import { group } from '../../../document/critic/scanner'
 import type { CriticSpan } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
 import type { SelRange } from './selection'
 
-/** Comment bodies must not contain a closer or a blank line. */
+/** Comment bodies must not contain a closer or a blank line; whitespace-only lines count as blank. */
 function sanitizeComment(text: string): string {
-  return text.trim().replace(/\n[ \t]*\n+/g, '\n').replaceAll('<<}', '<< }')
+  return text.trim().replace(/\n(?:[ \t]*\n)+/g, '\n').replaceAll('<<}', '<< }')
 }
 
 function commentMark(authorTag: string, body: string): string {
   return `{>>@${authorTag}: ${sanitizeComment(body)}<<}`
+}
+
+/**
+ * Whether the comment mark stays one comment inside a plain paragraph. A continuation line that
+ * opens Markdown block syntax (a list item, heading, quote, or fence) ends the paragraph, and with
+ * it the mark, wherever the comment is placed.
+ */
+export function commentBodyFits(authorTag: string, body: string): boolean {
+  const mark = commentMark(authorTag, body)
+  const spans = scanMarkdown(`x${mark}`)
+  return spans.length === 1 && spans[0]!.kind === 'comment' && spans[0]!.start === 1 && spans[0]!.end === 1 + mark.length
 }
 
 /** A mark an edit must produce, with offsets relative to the start of its insert. */
@@ -40,14 +52,16 @@ function sameSpan(a: CriticSpan | undefined, b: CriticSpan): boolean {
  * other span appears or disappears.
  */
 function verifiedInPlace(
-  source: string, spans: readonly CriticSpan[] | undefined, marks: readonly MarkEdit[],
+  source: string, spans: readonly CriticSpan[] | undefined, marks: readonly MarkEdit[], newThreads?: number,
 ): TextEdit[] | null {
   if (!marks.length) return []
   const edits = marks.map(({ edit }) => edit)
   const before = spans ?? scanMarkdown(source)
-  const after = scanMarkdown(applyTextEdits(source, edits))
+  const updated = applyTextEdits(source, edits)
+  const after = scanMarkdown(updated)
   const intended = marks.reduce((count, mark) => count + mark.spans.length, 0)
   if (after.length !== before.length + intended) return null
+  if (newThreads !== undefined && threadCount(after, updated) !== threadCount(before, source) + newThreads) return null
   const byStart = new Map(after.map((span) => [span.start, span]))
   for (const span of before) {
     const moved = mappedSpan(span, edits)
@@ -69,9 +83,14 @@ function verifiedInPlace(
   return edits
 }
 
+function threadCount(spans: readonly CriticSpan[], text: string): number {
+  return group(spans, text).filter((item) => item.type === 'thread').length
+}
+
 /**
  * Only the first fragment anchors the discussion; extra bare highlights would be invisible.
- * Returns null when the edited source would not parse as that highlight followed by its comment.
+ * Returns null when the edited source would not parse as that highlight followed by its comment,
+ * or when the new discussion would join a comment already beside the selection.
  */
 export function commentEdits(
   source: string, ranges: readonly SelRange[], authorTag: string, body: string, spans?: readonly CriticSpan[],
@@ -86,7 +105,7 @@ export function commentEdits(
       { kind: 'highlight', start: 0, end: highlight.length, innerStart: 3, innerEnd: 3 + anchor.text.length },
       { kind: 'comment', start: highlight.length, end: insert.length },
     ],
-  }])
+  }], 1)
 }
 
 /** Returns null when the edited source would not parse as exactly that reply comment. */

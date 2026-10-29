@@ -34,12 +34,19 @@ interface PresentedCtx extends RenderCtx {
   commentMarkers?: ReadonlySet<number>
 }
 
+/** A backward scan; a trailing-run regex backtracks quadratically on long runs that do not end the text. */
+function trimTrailingPeriodsAndSpace(text: string): string {
+  let end = text.length
+  while (end > 0 && (text[end - 1] === '.' || /\s/.test(text[end - 1]!))) end--
+  return text.slice(0, end)
+}
+
 function deletionProps(
   ctx: PresentedCtx,
   text: string,
 ): { tabIndex: 0; role: 'button'; 'aria-label': string } | Record<string, never> {
   if (!ctx.markLabels) return {}
-  const body = text.replace(/[.\s]+$/, '')
+  const body = trimTrailingPeriodsAndSpace(text)
   return { tabIndex: 0, role: 'button', 'aria-label': `${ctx.markLabels.deletion}: ${body}. ${ctx.markLabels.hint}` }
 }
 

@@ -11,6 +11,9 @@ artifact with a unique temporary-file rename. It does not merge previous entries
 success, or swallow save failures. It checks each segment of `.mastermind/translations` beside the
 document's real folder without following links, creating a missing segment only after its parent
 passed, and refuses to save when a segment is a link, so nothing is created outside the folder.
+Just before the rename it resolves the temporary file's folder again and refuses unless it is still
+the checked folder, so a segment swapped for a link after the check cannot redirect the artifact; a
+temporary file that moved away with a swapped folder is beyond reach of its path and stays there.
 Each segment's on-disk name must be exactly `.mastermind` and `translations`; a case variant on a
 case-insensitive volume is refused, as `desktop/src/translations.rs` refuses it, so the CLI never
 writes where the app will not read. An unrelated document writer can still change the source after

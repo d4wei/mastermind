@@ -47,7 +47,7 @@ export interface DocStore {
   saving: boolean
   /** External buffer changes invalidate editor instances; editor input retains their history. */
   externalVersion: number
-  /** Undo for review operations applied outside the editor. */
+  /** Undo for review operations applied outside the editor; editor typing clears it. */
   history: string[]
 
   prepareToClose(ids?: string[]): Promise<boolean>
@@ -384,7 +384,8 @@ export function createDocStore() {
 
       setSourceFromEditor(source) {
         if (editingLocked(get()) || source === get().source) return
-        set({ source })
+        // The editor owns undo for its typing; a review snapshot from before it would discard that typing.
+        set({ source, history: [] })
         get().queueAutosave()
       },
 

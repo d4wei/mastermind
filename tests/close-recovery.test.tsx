@@ -11,7 +11,7 @@ import { DraftScope, pendingDrafts, releaseDrafts, focusDraft, transferDrafts, u
   useDraftValue } from '../ui/review/drafts'
 
 const getFile = vi.fn(), putFile = vi.fn(), saveCopy = vi.fn()
-const file = (content: string, version = content) => ({ content, version, mtimeMs: 1 })
+const file = (content: string, version = content) => ({ content, version })
 let view: ReturnType<typeof createReactHost>
 beforeEach(() => {
   vi.useFakeTimers()

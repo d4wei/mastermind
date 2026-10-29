@@ -9,7 +9,7 @@ const putFile = vi.fn()
 let store: ReturnType<typeof createDocStore>
 
 async function load(content = 'hello'): Promise<void> {
-  getFile.mockResolvedValue({ content, mtimeMs: 100, version: 'base' })
+  getFile.mockResolvedValue({ content, version: 'base' })
   await store.getState().load('s1')
 }
 

@@ -229,12 +229,16 @@ function mapFormattedSelection(
   return { from, to, text: source.slice(from, to) }
 }
 
+/** CommonMark character references and backslash escapes. */
+const ENCODED_LITERAL = /&(?:[A-Za-z][A-Za-z0-9]{1,31}|#[0-9]{1,7}|#[xX][0-9A-Fa-f]{1,6});|\\[!-/:-@[-`{-~]/g
+
 /**
  * Escapes and entities change a leaf's rendered length, so its offsets cannot be read directly.
  * The selected text then maps only when it occurs exactly once in both the rendered and the source
  * text of its window: the narrowest positioned element holding the selection, narrowed to the extent
  * between the nearest positioned elements or review marks on either side. A unique match outside
- * that window may be a different occurrence than the one the reader selected.
+ * that window may be a different occurrence than the one the reader selected. A source match that
+ * overlaps a character reference or backslash escape is refused.
  */
 function uniqueOccurrence(
   range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], text: string,
@@ -266,9 +270,17 @@ function uniqueOccurrence(
     const first = haystack.indexOf(text)
     return first === -1 || haystack.indexOf(text, first + 1) !== -1 ? null : first
   }
-  const offset = from <= to ? occursOnce(source.slice(from, to)) : null
-  return offset === null || occursOnce(rendered.toString()) === null ? null : from + offset
+  const window = from <= to ? source.slice(from, to) : null
+  const offset = window === null ? null : occursOnce(window)
+  if (offset === null || occursOnce(rendered.toString()) === null) return null
+  // Source text inside a reference or escape renders as other characters, so a match there is a
+  // different occurrence than the selection, and delimiters placed in it would split the syntax.
+  for (const literal of window!.matchAll(ENCODED_LITERAL)) {
+    if (literal.index < offset + text.length && offset < literal.index + literal[0].length) return null
+  }
+  return from + offset
 }
+
 
 function mapWithinBlock(
   range: Range, block: HTMLElement, source: string, spans: readonly CriticSpan[], opaque: readonly SourceRange[],

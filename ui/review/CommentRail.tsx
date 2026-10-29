@@ -1,5 +1,5 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
-import { replyEdits } from '../modes/reading/marks'
+import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
@@ -163,7 +163,7 @@ export function CommentRail({ analysis: { spans, threads: cards }, source, docRe
     collapse()
   }
   // Null marks a reply whose insert would not reparse as one comment in place; it stays editable
-  // but cannot submit.
+  // but cannot submit, and a body whose own lines break the mark says so.
   const pendingReply = (card: ThreadCard, text: string): TextEdit[] | null =>
     readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text, spans)
   // Verifying reparses the document, so the open composer's verdict follows its deferred text and
@@ -265,6 +265,8 @@ export function CommentRail({ analysis: { spans, threads: cards }, source, docRe
               if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); submitReply(card) }
               if (event.key === 'Escape') { event.stopPropagation(); collapse() }
             }} />
+          {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&
+            <p role="alert">{t('commentBodyInvalid')}</p>}
           <div className="rail-actions">
             <button type="button" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
             <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}

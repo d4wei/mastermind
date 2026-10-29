@@ -12,7 +12,7 @@ const getFile = vi.fn()
 const putFile = vi.fn()
 const saveCopy = vi.fn()
 vi.mock('../ui/i18n', () => ({ useT: () => (key: string) => key }))
-const file = (content: string, version: string) => ({ content, version, mtimeMs: 1 })
+const file = (content: string, version: string) => ({ content, version })
 function deferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((r) => { resolve = r })

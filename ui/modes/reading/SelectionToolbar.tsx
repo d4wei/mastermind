@@ -11,7 +11,7 @@ import { useCompositionGuard } from '../../util/composition'
 import { cssMs } from '../../util/css-tokens'
 import { rangeToSourceRanges, type SelRange } from './selection'
 import { documentViewport } from '../../util/scroll'
-import { commentEdits, changeEdits } from './marks'
+import { commentBodyFits, commentEdits, changeEdits } from './marks'
 
 /** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
 const FALLBACK_EXIT_MS = 120
@@ -244,7 +244,8 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
                 onKeyDown={composerKey} />
             </label>)}
           </>}
-          {edits === null && <p role="alert">{t(composing === 'comment' ? 'commentInvalid' : 'changeInvalid')}</p>}
+          {edits === null && <p role="alert">{t(composing === 'change' ? 'changeInvalid'
+            : commentBodyFits(authorTag, deferredComment) ? 'commentInvalid' : 'commentBodyInvalid')}</p>}
           <div className="sel-composer-actions">
             <button type="button" onClick={() => {
               cancelSelectionCheck()

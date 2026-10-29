@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { maskSource } from '../document/critic/mask'
+import { maskSource, pickSentinels } from '../document/critic/mask'
+import { analyzeMarkdown } from '../document/markdown/analyze'
 import { scan } from '../document/critic/scanner'
 
 describe('maskSource', () => {
@@ -62,12 +63,26 @@ describe('maskSource', () => {
     expect(masked).toContain(sentinels.neutral[1])
   })
 
-  it('throws only when every sentinel pool is exhausted', () => {
+  it('finds sentinels anywhere in the Private Use Area that the source leaves free', () => {
+    let crowded = ''
+    for (const base of [0xe000, 0xe010, 0xe020, 0xe030, 0xe040]) crowded += String.fromCharCode(base)
+    const text = `# Notes ${crowded}\n\nHello {++world++}\n`
+    const sentinels = pickSentinels(text)!
+    const chosen = [...Object.values(sentinels.open), ...Object.values(sentinels.close), ...sentinels.neutral]
+    expect(new Set(chosen).size).toBe(8)
+    for (const sentinel of chosen) expect(text).not.toContain(sentinel)
+    expect(analyzeMarkdown(text).spans).toHaveLength(1)
+  })
+
+  it('reads the source as plain Markdown when fewer than eight Private Use code points are free', () => {
     let everything = ''
-    for (const base of [0xe000, 0xe010, 0xe020, 0xe030, 0xe040]) {
-      for (let off = 0; off < 8; off++) everything += String.fromCharCode(base + off)
-    }
+    for (let code = 0xe000; code <= 0xf8ff; code++) everything += String.fromCharCode(code)
+    expect(pickSentinels(everything)).toBeNull()
     expect(() => maskSource(everything, [])).toThrow()
-    expect(() => maskSource(everything.slice(0, -8), [])).not.toThrow()
+    const source = `${everything.slice(0, -7)}\n\nHello {++world++}\n`
+    const analysis = analyzeMarkdown(source)
+    expect(analysis.spans).toEqual([])
+    expect(analysis.tree).toBe(analysis.plain)
+    expect(analyzeMarkdown(`${everything.slice(0, -8)}\n\nHello {++world++}\n`).spans).toHaveLength(1)
   })
 })

@@ -41,6 +41,25 @@ body {
   flex: 1;
   min-height: 0;
 }
+.session-fallback {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 3);
+  padding: calc(var(--space-unit) * 6);
+}
+.session-fallback p { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.session-fallback-source {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
 .document-scroll {
   flex: 1;
   min-height: 0;
@@ -503,7 +522,7 @@ button:disabled {
 
 .md-code {
   font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
+  font-size: var(--md-font-size-sm);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -698,7 +717,7 @@ button:disabled {
 .md-root th {
   font-family: var(--font-body);
   font-weight: var(--weight-medium);
-  font-size: var(--font-size-sm);
+  font-size: var(--md-font-size-sm);
   text-align: left;
 }
 
@@ -745,7 +764,7 @@ button:disabled {
 }
 
 .md-footnote-def {
-  font-size: var(--font-size-sm);
+  font-size: var(--md-font-size-sm);
 }
 
 /* ---------- CriticMarkup ---------- */
@@ -1397,7 +1416,7 @@ input[type='checkbox'] {
     margin-top: calc(var(--space-unit) * 8);
     padding-top: calc(var(--space-unit) * 4);
     border-top: 1px solid var(--color-border);
-    font-size: var(--font-size-sm);
+    font-size: var(--md-font-size-sm);
   }
 
   .print-footnotes h2 {

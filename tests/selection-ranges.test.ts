@@ -176,6 +176,18 @@ describe('substring fallback for leaves whose rendered length differs from sourc
     expect(rangeToSourceRanges(rangeBetween(leaf, 0, leaf, piece.length), source, rendered)).toEqual({ error: 'unmapped' })
   })
 
+  it.each([
+    ['Write &amp;lt; to get &lt; here.', '&lt'],
+    ['Price \\$5 or $', '$5'],
+  ])('refuses a source match inside a character reference or escape: %s', (source, selected) => {
+    const { host } = renderMarkdown(source)
+    const leaf = textOf(host, 'p > span')
+    const at = leaf.data.indexOf(selected)
+    expect(at).not.toBe(-1)
+    expect(rangeToSourceRanges(rangeBetween(leaf, at, leaf, at + selected.length), source, analyzeMarkdown(source)))
+      .toEqual({ error: 'unmapped' })
+  })
+
   it('maps text that occurs once in both the rendered leaf and its source', () => {
     const source = 'AT&amp;T rocks'
     const { host } = renderMarkdown(source)

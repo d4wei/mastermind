@@ -59,9 +59,11 @@ Complete shadow tokens supply panel and popover elevation.
 ## Typography and layout
 
 Font presets override reading fonts, heading weight, and letter spacing. Markdown headings use
-body-relative sizes; shared block, heading, and list gaps establish the reading rhythm. Comment
-cards use the system UI font independently of reading preferences. The home wordmark uses a fixed
-monospace stack and line height that preserve its horizontal slit.
+body-relative sizes; shared block, heading, and list gaps establish the reading rhythm. All
+document-body text sizes from `--font-size-body` (`--md-font-size-sm` or `em`) so the font size
+setting scales it, while application chrome keeps the fixed `--font-size-sm/xs/micro` rem tokens.
+Comment cards use the system UI font independently of reading preferences. The home wordmark uses a
+fixed monospace stack and line height that preserve its horizontal slit.
 
 Controls and panel labels use sentence case. Letter-spaced uppercase is reserved for small section
 labels. Corner roles are shared across palettes:

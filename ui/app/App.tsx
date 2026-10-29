@@ -6,6 +6,7 @@ import { ThemeEffects } from '../theme/ThemeProvider'
 import { useConfig } from './configStore'
 import { useRoute } from './route'
 import { TableExpansionProvider } from '../modes/reading/TableExpansion'
+import { SessionErrorBoundary } from './SessionErrorBoundary'
 import { SessionView } from './SessionView'
 
 /** Renders inside NativeReviewer, which provides the notification surface, close dialog, and home view. */
@@ -25,7 +26,9 @@ export function App({ onboarding }: { onboarding?: ReactNode }) {
       <ThemeEffects />
       {onboarding ?? (route.kind === 'doc' && (
         <AppFrame>
-          <SessionView key={route.sessionId} sessionId={route.sessionId} />
+          <SessionErrorBoundary key={route.sessionId}>
+            <SessionView sessionId={route.sessionId} />
+          </SessionErrorBoundary>
         </AppFrame>
       ))}
       {saveFailed && <Notice error>{t('configSaveFailed')}</Notice>}

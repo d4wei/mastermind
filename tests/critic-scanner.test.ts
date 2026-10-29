@@ -194,3 +194,24 @@ describe('spaced author tags', () => {
     expect(parseAuthor(body)).toEqual({ author: null, body })
   })
 })
+
+describe('scan cost', () => {
+  it.each([
+    ['deletion openers without a closer', '{--'.repeat(70_000)],
+    ['substitution openers sharing one far closer', '{~~'.repeat(70_000) + '~~}'],
+    ['comment openers inside one window', 'x {>>'.repeat(40_000)],
+  ])('scans 200 KB of %s in linear time', (_label, text) => {
+    expect(text.length).toBeGreaterThanOrEqual(200_000)
+    const started = performance.now()
+    scan(text)
+    expect(performance.now() - started).toBeLessThan(2000)
+  })
+
+  it('pairs each opener with the first closer after it once earlier searches are reused', () => {
+    const text = '{~~a~~} {~~b~>c~~} {++d {++e++} {--f'
+    expect(scan(text).map((span) => [span.kind, text.slice(span.start, span.end)])).toEqual([
+      ['sub', '{~~b~>c~~}'], ['ins', '{++d {++e++}'],
+    ])
+    expect(scan('`{--` x {--y--}', [{ start: 0, end: 5 }]).map((span) => span.start)).toEqual([8])
+  })
+})

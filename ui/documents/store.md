@@ -11,8 +11,9 @@ at once; until the load succeeds no document is active, and commands reach no re
 after a failed load. Retained documents revalidate on return. Read generations reject stale
 completions. Saves update their originating record even after navigation and schedule another write
 if its buffer changed during the request. Clean external changes reload automatically and clear
-review undo, whose snapshots predate the external text. Unedited files are not written; ordinary
-writes restore the original line endings.
+review undo, whose snapshots predate the external text. Markdown-mode typing clears review undo
+for the same reason: the editor keeps its own history, and review undo never reaches past typing.
+Unedited files are not written; ordinary writes restore the original line endings.
 
 ## Files that are not valid UTF-8
 

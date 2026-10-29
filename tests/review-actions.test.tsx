@@ -162,7 +162,7 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   expect(edit).toHaveBeenCalledTimes(1)
 })
 
-it('disables a reply whose backtick would pair with code after the thread', () => {
+it('disables a reply whose backtick would pair with code after the thread or whose line opens a list', () => {
   const source = '{==context==}{>>@Da Wei: question<<} then `code` here.'
   render(source)
   click('Reply')
@@ -177,8 +177,14 @@ it('disables a reply whose backtick would pair with code after the thread', () =
   expect(submit().disabled).toBe(true)
   act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
   expect(edit).not.toHaveBeenCalled()
+  expect(host.querySelector('.rail-reply [role="alert"]')).toBeNull()
+  type('see:\n- one')
+  expect(submit().disabled).toBe(true)
+  expect(host.querySelector('.rail-reply [role="alert"]')!.textContent)
+    .toBe('A comment line cannot start with a list, heading, quote, or code fence marker.')
   type('use `x`')
   expect(submit().disabled).toBe(false)
+  expect(host.querySelector('.rail-reply [role="alert"]')).toBeNull()
   act(() => submit().click())
   expect(store.getState().source).toBe('{==context==}{>>@Da Wei: question<<}{>>@reviewer: use `x`<<} then `code` here.')
 })

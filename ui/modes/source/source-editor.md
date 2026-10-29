@@ -12,9 +12,13 @@ current. No callback tied to an old mount lives in the retained state. Cleanup r
 disposes its search binding, clears only its own outline report, and destroys the view; it never
 flushes stale content over an adopted buffer. Views and DOM nodes are not cached.
 
+The editor's line separator is LF only, so its text equals the store's buffer: a lone CR or a CR
+before CRLF stays document text instead of being normalized by the first keystroke.
+
 CodeMirror history remains separate from the store's undo stack for review operations performed
-outside Markdown mode. Retention uses the existing CodeMirror history extension and adds no second
-source-editor undo stack. The cache has the same app lifetime as retained document buffers.
+outside Markdown mode; typing clears that review undo. Retention uses the existing CodeMirror
+history extension and adds no second source-editor undo stack. The cache has the same app lifetime
+as retained document buffers.
 
 Outline navigation uses CodeMirror's line-block geometry rather than requiring a rendered DOM line.
 The mounted view reports heading-position and scroll callbacks to the document view through

@@ -1,3 +1,4 @@
+import type { ListItem, Root, RootContent } from 'mdast'
 import { scanMarkdown, scanMarkdownTree } from './markdown/scan'
 import { usableAuthorName } from './author'
 import { segmentBlocks } from './blocks'
@@ -172,10 +173,38 @@ export async function translatedCommentEdit(source: string, request: TranslatedC
   if (!block) return null
   const payload = encodeComment({ language: request.language, quote: request.quote, comment: request.body })
   const insert = `{>>@${request.author}: ${COMMENT_PREFIX}${payload}<<}`
-  const edit = { from: block.end, to: block.end, insert }
-  // A point comment must remain a complete active mark at the original block boundary.
+  const tree = parseMarkdown(source)
+  const at = commentOffset(blockAt(tree, block.start), block.end)
+  const edit = { from: at, to: at, insert }
+  // A point comment must remain a complete active mark, and its block must keep its kind and depth.
   const updated = applyTextEdits(source, [edit])
-  if (!scanMarkdown(updated).some((span) => span.kind === 'comment' &&
-    span.start === block.end && span.end === block.end + insert.length)) return null
+  const updatedTree = parseMarkdown(updated)
+  if (!scanMarkdownTree(updated, updatedTree).some((span) => span.kind === 'comment' &&
+    span.start === at && span.end === at + insert.length)) return null
+  if (blockShape(blockAt(tree, block.start)) !== blockShape(blockAt(updatedTree, block.start))) return null
   return edit
+}
+
+/** The top-level block or list item of `tree` that starts at `start`, as `segmentBlocks` divides it. */
+function blockAt(tree: Root, start: number): RootContent | ListItem | undefined {
+  for (const node of tree.children) {
+    if (node.type === 'list') {
+      const item = node.children.find((child) => child.position?.start.offset === start)
+      if (item) return item
+    } else if (node.position?.start.offset === start) return node
+  }
+  return undefined
+}
+
+function blockShape(node: RootContent | ListItem | undefined): string {
+  return node ? `${node.type}:${node.type === 'heading' ? node.depth : ''}` : ''
+}
+
+/**
+ * Where a point comment joins its block: a heading's content ends before a setext underline or a
+ * closing `#` sequence, which the comment must not follow; every other block takes it at its end.
+ */
+function commentOffset(node: RootContent | ListItem | undefined, blockEnd: number): number {
+  if (node?.type !== 'heading') return blockEnd
+  return node.children.at(-1)?.position?.end.offset ?? blockEnd
 }

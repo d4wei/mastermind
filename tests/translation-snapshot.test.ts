@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { group } from '../document/critic/scanner'
 import { applyTextEdits } from '../document/edits'
+import { parseMarkdown } from '../document/markdown/processor'
 import { scanMarkdown } from '../document/markdown/scan'
 import { resolveThreadEdits } from '../document/review-archive'
 import { matchPreparedTranslation, parseTranslatedComment, prepareTranslation, translatedCommentEdit, type PreparedTranslation } from '../document/translation'
@@ -210,6 +211,28 @@ describe('translated selection point comments', () => {
     const updated = applyTextEdits(source, [edit!])
     const span = scanMarkdown(updated)[0]!
     expect(parseTranslatedComment(updated.slice(span.innerStart, span.innerEnd).replace(/^@A: /, ''))).toEqual({ language: 'zh', quote, comment: 'body ` text' })
+  })
+
+  it('places heading feedback before a setext underline or closing sequence and keeps the heading', async () => {
+    for (const [source, depth, content] of [['Title\n=====\n\nBody', 1, 'Title'], ['Title\n---\n\nBody', 2, 'Title'],
+      ['# Title #', 1, '# Title'], ['## Title ##\r\n', 2, '## Title']] as const) {
+      const projection = await prepareTranslation(source)
+      const edit = await translatedCommentEdit(source, { blockId: 'b1', sourceHash: projection.sourceHash,
+        quote: '标题', language: 'zh', author: 'A', body: 'note' })
+      expect(edit?.from).toBe(content.length)
+      const updated = applyTextEdits(source, [edit!])
+      const heading = parseMarkdown(updated).children[0]!
+      expect(heading.type === 'heading' && heading.depth).toBe(depth)
+      expect(scanMarkdown(updated).map((span) => span.kind)).toEqual(['comment'])
+    }
+  })
+
+  it('refuses feedback that would change its block into another kind', async () => {
+    const source = '#\n\nBody'
+    const projection = await prepareTranslation(source)
+    expect(projection.blocks[0]!.kind).toBe('heading')
+    expect(await translatedCommentEdit(source, { blockId: 'b1', sourceHash: projection.sourceHash,
+      quote: '标题', language: 'zh', author: 'A', body: 'note' })).toBeNull()
   })
 
   it('keeps ordinary comments and malformed encoded records unchanged', () => {

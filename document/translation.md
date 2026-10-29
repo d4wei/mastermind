@@ -38,10 +38,12 @@ languages against the requested roles.
 
 `translatedCommentEdit` accepts the expected fingerprint, one block ID, the exact selected quote,
 its language, the author, and the authored comment. It re-prepares current source, checks the
-fingerprint and block, and returns a single point-comment insertion at that source block's end. It
-rejects literal blocks, unsafe author tags, invalid language codes, and an insertion that would not
-be a complete active comment. Callers must still reject a response whose owning document or source
-revision changed while this asynchronous preparation ran.
+fingerprint and block, and returns a single point-comment insertion at that source block's end; a
+heading takes it at the end of its content, before a setext underline or closing `#` sequence. It
+rejects literal blocks, unsafe author tags, invalid language codes, an insertion that would not be a
+complete active comment, and one that would change its block's kind or heading depth. Callers must
+still reject a response whose owning document or source revision changed while this asynchronous
+preparation ran.
 
 The comment's body is a single-line encoded record:
 

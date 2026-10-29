@@ -1,5 +1,5 @@
 import type { Root } from 'mdast'
-import { maskSource } from '../critic/mask'
+import { maskSource, pickSentinels } from '../critic/mask'
 import { group, threadCards } from '../critic/scanner'
 import type { CriticSpan, ReviewItem, ThreadCard } from '../critic/types'
 import { criticTransform } from './critic-mdast'
@@ -30,10 +30,12 @@ export interface Analysis {
  */
 export function analyzeMarkdown(source: string): Analysis {
   const plain = parseMarkdown(source)
-  const spans = scanMarkdownTree(source, plain)
+  const sentinels = pickSentinels(source)
+  // Without free sentinels the marks cannot be masked; the source then reads as plain Markdown.
+  const spans = sentinels ? scanMarkdownTree(source, plain) : []
   let tree = plain
   if (spans.length > 0) {
-    const mask = maskSource(source, spans)
+    const mask = maskSource(source, spans, sentinels!)
     tree = parseMarkdown(mask.masked)
     criticTransform(tree, source, spans, mask)
   }

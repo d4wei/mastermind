@@ -55,7 +55,7 @@ export function scan(
   const spans: CriticSpan[] = []
   const excludeAt = makeExcludeLookup(exclude)
 
-  const findToken = (token: string, from: number, limit: number): number => {
+  const searchToken = (token: string, from: number, limit: number): number => {
     let k = from
     while (k < limit) {
       const j = text.indexOf(token, k)
@@ -71,6 +71,17 @@ export function scan(
   }
 
   for (const { start, end: limit } of within) {
+    // Searches within a window start at nondecreasing offsets, and a search's answer holds for any
+    // later start up to that answer (a miss holds for every later start), so openers without
+    // closers cost one pass per token rather than one pass each.
+    const searched = new Map<string, { from: number; found: number }>()
+    const findToken = (token: string, from: number): number => {
+      const last = searched.get(token)
+      if (last && from >= last.from && (last.found === -1 || from <= last.found)) return last.found
+      const found = searchToken(token, from, limit)
+      searched.set(token, { from, found })
+      return found
+    }
     let i = start
     while (i < limit) {
       const brace = text.indexOf('{', i)
@@ -96,8 +107,8 @@ export function scan(
       const innerStart = i + 3
 
       if (kind === 'sub') {
-        const firstCloser = findToken(CLOSERS.sub, innerStart, limit)
-        const sep = findToken('~>', innerStart, limit)
+        const firstCloser = findToken(CLOSERS.sub, innerStart)
+        const sep = findToken('~>', innerStart)
         if (firstCloser === -1 || sep === -1 || sep >= firstCloser) {
           i += 1
           continue
@@ -117,7 +128,7 @@ export function scan(
         continue
       }
 
-      const closer = findToken(CLOSERS[kind], innerStart, limit)
+      const closer = findToken(CLOSERS[kind], innerStart)
       if (closer === -1) {
         i += 1
         continue

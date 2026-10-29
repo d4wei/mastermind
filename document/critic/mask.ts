@@ -10,28 +10,34 @@ export interface Sentinels {
   close: Record<'ins' | 'del' | 'highlight', string>
 }
 
-/** Candidate Private Use Area bases; each pool consumes 8 consecutive codepoints. */
-const BASES = [0xe000, 0xe010, 0xe020, 0xe030, 0xe040]
-const POOL_SIZE = 8
+/** The Basic Multilingual Plane's Private Use Area, searched upward for sentinels. */
+const PRIVATE_USE_FIRST = 0xe000
+const PRIVATE_USE_LAST = 0xf8ff
+const SENTINEL_COUNT = 8
 
-function sentinelsFromBase(base: number): Sentinels {
-  const ch = (offset: number) => String.fromCharCode(base + offset)
+/**
+ * Eight distinct Private Use Area code points absent from `text`, lowest first; null when the text
+ * uses all but fewer than eight. Masking is equal-length per UTF-16 code unit, so a sentinel must be
+ * one code unit and the supplementary Private Use planes cannot serve.
+ */
+export function pickSentinels(text: string): Sentinels | null {
+  const used = new Set<number>()
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i)
+    if (code >= PRIVATE_USE_FIRST && code <= PRIVATE_USE_LAST) used.add(code)
+  }
+  const free: string[] = []
+  for (let code = PRIVATE_USE_FIRST; code <= PRIVATE_USE_LAST && free.length < SENTINEL_COUNT; code++) {
+    if (!used.has(code)) free.push(String.fromCharCode(code))
+  }
+  if (free.length < SENTINEL_COUNT) return null
+  const [n0, insOpen, insClose, delOpen, delClose, highlightOpen, highlightClose, n1] = free as
+    [string, string, string, string, string, string, string, string]
   return {
-    neutral: [ch(0), ch(7)],
-    open: { ins: ch(1), del: ch(3), highlight: ch(5) },
-    close: { ins: ch(2), del: ch(4), highlight: ch(6) },
+    neutral: [n0, n1],
+    open: { ins: insOpen, del: delOpen, highlight: highlightOpen },
+    close: { ins: insClose, del: delClose, highlight: highlightClose },
   }
-}
-
-function pickSentinels(text: string): Sentinels {
-  for (const base of BASES) {
-    let clash = false
-    for (let off = 0; off < POOL_SIZE && !clash; off++) {
-      if (text.includes(String.fromCharCode(base + off))) clash = true
-    }
-    if (!clash) return sentinelsFromBase(base)
-  }
-  throw new Error('source uses every sentinel codepoint pool (PUA-heavy file) — cannot mask')
 }
 
 /**
@@ -74,6 +80,7 @@ export interface MaskResult {
  */
 export function maskSource(text: string, spans: readonly CriticSpan[], sentinels?: Sentinels): MaskResult {
   const s = sentinels ?? pickSentinels(text)
+  if (!s) throw new Error('source uses nearly every Private Use Area code point; no sentinels remain to mask it')
   const chars = text.split('')
   let atomOrdinal = 0
   for (const span of spans) {

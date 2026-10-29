@@ -11,6 +11,8 @@ maps only if it occurs exactly once in
 both the rendered and the source text of its window: the narrowest positioned element holding the
 selection, bounded by the nearest positioned element or rendered review mark on each side. Text
 that is not unique within that window is refused, even when it is unique elsewhere in the block.
+A source match that overlaps a character reference or backslash escape is refused too: it renders
+as different characters, so it is another occurrence, and delimiters inside it would split it.
 Comments anchor to the first mapped range.
 
 A selection splits first at block boundaries, then within each block at rendered review marks
@@ -76,5 +78,7 @@ selection when the source changes, since no selection event follows. Draft text 
 focus changes, scrolling, and source updates; submission still requires the captured source. A
 comment, change, or reply cannot be submitted unless the whole edited source reparses with exactly
 the intended marks starting inside each insert, every existing mark at its shifted offsets with
-unchanged extents, and no other mark. Composers show the verdict for their deferred text, reusing
-it until the source, selection, or text changes; submission verifies the final text.
+unchanged extents, and no other mark. A new comment must also add exactly one discussion, so it
+cannot join a comment already beside the selection. Composers show the verdict for their deferred
+text, reusing it until the source, selection, or text changes, and name a body line that opens block
+syntax as the reason; submission verifies the final text.

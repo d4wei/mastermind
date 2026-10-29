@@ -2,7 +2,10 @@
 import { act } from 'react'
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { renderMarkdown } from './helpers/markdown'
+import { analyzeMarkdown } from '../document/markdown/analyze'
+import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { createReactHost, removeReactHost } from './helpers/dom'
 import { scrollToSpan } from '../ui/util/scroll'
 import { themeTokens } from './helpers/themes'
@@ -70,4 +73,18 @@ it('uses equal prose gaps, body-relative headings, and tight nested list margins
     expect(getComputedStyle(host.querySelector('h1')!).marginTop).toBe('0px')
     expect(getComputedStyle(host.querySelectorAll('li')[1]!).marginTop).toBe('16px')
   } finally { style.remove(); host.remove() }
+})
+
+it('labels a deletion without its trailing periods and space, in linear time on long runs', () => {
+  const markLabels = { deletion: 'Deletion', hint: 'Press to undo.' }
+  const label = (source: string) => {
+    const host = document.createElement('div')
+    host.innerHTML = renderToStaticMarkup(<MarkdownView analysis={analyzeMarkdown(source)} ctx={{ source, markLabels }} />)
+    return host.querySelector('[role="button"]')!.getAttribute('aria-label')
+  }
+  expect(label('Keep {--old text. . --}here.')).toBe('Deletion: old text. Press to undo.')
+  const long = ' .'.repeat(40_000) + 'x'
+  const started = performance.now()
+  expect(label(`{--${long}--}`)).toBe(`Deletion: ${long}. Press to undo.`)
+  expect(performance.now() - started).toBeLessThan(2000)
 })

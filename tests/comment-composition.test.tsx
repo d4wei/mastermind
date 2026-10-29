@@ -143,6 +143,24 @@ it('keeps the composed comment when its edit is refused', async () => {
   expect(host.querySelector('textarea')).toBeNull()
 })
 
+it('names a comment body line that opens block syntax and blocks submission', async () => {
+  const textarea = await compose()
+  act(() => inputValue(textarea, 'see:\n- one'))
+  expect(host.querySelector('[role="alert"]')!.textContent).toBe('A comment line cannot start with a list, heading, quote, or code fence marker.')
+  expect(host.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
+  act(() => inputValue(textarea, 'see:\n  \n  \none'))
+  expect(host.querySelector('[role="alert"]')).toBeNull()
+  expect(host.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(false)
+})
+
+it('refuses a comment that would join the discussion beside the selection', async () => {
+  const textarea = await compose('Comment', <Harness text="Friday" source="Friday{>>@agent: is Friday firm?<<}" />)
+  act(() => inputValue(textarea, 'prefer Monday'))
+  expect(host.querySelector('[role="alert"]')!.textContent).toBe('This passage cannot anchor a comment. Select text without review delimiters.')
+  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  expect(edit).not.toHaveBeenCalled()
+})
+
 it('prefills a replacement and submits a substitution, or a deletion when cleared', async () => {
   await compose('Suggest change')
   const textarea = host.querySelector('textarea')!

@@ -13,7 +13,7 @@ import { createDocStore, useDoc } from '../ui/documents/store'
 const getFile = vi.fn<(id: string) => Promise<FileResponse>>()
 const putFile = vi.fn()
 const saveCopy = vi.fn()
-const lossyFile = { content: 'a�b\n', version: 'v1', mtimeMs: 1, lossy: true }
+const lossyFile = { content: 'a�b\n', version: 'v1', lossy: true }
 let host: HTMLDivElement
 let root: Root
 const initialDoc = useDoc.getState()
@@ -62,7 +62,7 @@ it('opens a file that is not valid UTF-8 read-only and never schedules or lists 
 it('becomes editable when a later read finds the file rewritten as UTF-8', async () => {
   const store = createDocStore()
   await store.getState().load('A')
-  getFile.mockResolvedValue({ content: 'ab\n', version: 'v2', mtimeMs: 2, lossy: false })
+  getFile.mockResolvedValue({ content: 'ab\n', version: 'v2', lossy: false })
   store.getState().notifyDiskChange()
   await vi.advanceTimersByTimeAsync(0)
   expect(store.getState()).toMatchObject({ lossy: false, source: 'ab\n' })
@@ -72,7 +72,7 @@ it('becomes editable when a later read finds the file rewritten as UTF-8', async
 })
 
 it('marks a document lossy when the host refuses its write as not UTF-8, without offering Retry', async () => {
-  getFile.mockResolvedValue({ content: 'ab\n', version: 'v1', mtimeMs: 1 })
+  getFile.mockResolvedValue({ content: 'ab\n', version: 'v1' })
   putFile.mockRejectedValue(new HostError('notUtf8', 'not_utf8'))
   const store = createDocStore()
   await store.getState().load('A')
@@ -96,8 +96,8 @@ it('marks a document lossy when the host refuses its write as not UTF-8, without
 
 it('admits a successful Save As copy as an editable UTF-8 document', async () => {
   saveCopy.mockResolvedValue({ meta: { sessionId: 'B', displayName: 'B.md', path: 'B' },
-    file: { content: lossyFile.content, version: 'b1', mtimeMs: 2, lossy: false } })
-  getFile.mockImplementation(async (id) => id === 'B' ? { content: lossyFile.content, version: 'b1', mtimeMs: 2, lossy: false } : lossyFile)
+    file: { content: lossyFile.content, version: 'b1', lossy: false } })
+  getFile.mockImplementation(async (id) => id === 'B' ? { content: lossyFile.content, version: 'b1', lossy: false } : lossyFile)
   const store = createDocStore()
   await store.getState().load('A')
   expect(await store.getState().saveCopy()).toBe('B')
@@ -111,7 +111,7 @@ it('disables review actions and shows the read-only notice for a lossy document'
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
   Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true,
     value: () => ({ top: 100, left: 100, width: 40, height: 10, bottom: 110, right: 140 }) })
-  getFile.mockResolvedValue({ content: 'Passage {>>@Alex: note<<}\n', version: 'v1', mtimeMs: 1, lossy: true })
+  getFile.mockResolvedValue({ content: 'Passage {>>@Alex: note<<}\n', version: 'v1', lossy: true })
   await useDoc.getState().load('A')
   await act(async () => root.render(<Notifications><SessionView sessionId="A" /></Notifications>))
   expect(host.textContent).toContain('This file is not valid UTF-8, so it is read-only.')

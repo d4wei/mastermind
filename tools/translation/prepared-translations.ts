@@ -53,15 +53,19 @@ export async function savePreparedTranslation(realPath: string, source: string, 
     throw new Error('translation must match the current source, languages, and complete block structure')
   }
   const artifactPath = translationFile(realPath, targetLang)
-  if (!(await artifactDirectory(realPath))) {
-    throw new Error(`translation directory must not be a symbolic link and must be named exactly ${translationDirectory(realPath)}`)
-  }
+  const redirected = () =>
+    new Error(`translation directory must not be a symbolic link and must be named exactly ${translationDirectory(realPath)}`)
+  const checked = await artifactDirectory(realPath)
+  if (!checked) throw redirected()
   const temporary = `${artifactPath}.${crypto.randomUUID()}.tmp`
   try {
     await fs.writeFile(temporary, JSON.stringify(artifact), { flag: 'wx', mode: 0o600 })
     // Recheck freshness after preparation and before replacing the saved translation.
     const currentSource = await fs.readFile(realPath, 'utf8')
     if (!(await matchPreparedTranslation(currentSource, artifact))) throw new Error('source changed before saving translation')
+    // The write and rename resolve the path again; a segment swapped for a link since the check
+    // would redirect the artifact.
+    if (await fs.realpath(path.dirname(temporary)) !== checked) throw redirected()
     await fs.rename(temporary, artifactPath)
   } finally {
     await fs.rm(temporary, { force: true })

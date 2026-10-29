@@ -66,7 +66,7 @@ describe('native reviewer boundary', () => {
       if (command === 'document_meta') return {
         sessionId: '0', path: '/document.md', displayName: 'document.md',
       }
-      if (command === 'read_document') return { content: 'original\r\n', mtimeMs: 1, version: 'base' }
+      if (command === 'read_document') return { content: 'original\r\n', version: 'base' }
       if (command === 'write_document') throw failure
     }) as NativeBridge['invoke']
     installHost(createNativeHost({ invoke, listen: vi.fn() }, []))

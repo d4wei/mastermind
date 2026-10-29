@@ -106,6 +106,26 @@ it.runIf(process.platform !== 'win32')('refuses to save through a redirected tra
   expect(await fs.readdir(elsewhere)).toEqual([])
 })
 
+it.runIf(process.platform !== 'win32')('refuses to rename into a translations directory swapped for a link after the check', async () => {
+  const translations = path.dirname(translationFile(file, 'zh-CN'))
+  const elsewhere = path.join(dir, 'elsewhere')
+  await fs.mkdir(elsewhere)
+  const artifact = await artifactFor()
+  const readFile = fs.readFile.bind(fs)
+  vi.spyOn(fs, 'readFile').mockImplementation(async (...args: Parameters<typeof fs.readFile>) => {
+    // The freshness read runs between writing the temporary file and renaming it.
+    if (args[0] === file) {
+      await fs.rename(translations, path.join(dir, 'checked'))
+      await fs.symlink(elsewhere, translations)
+    }
+    return readFile(...args)
+  })
+  await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', artifact)).rejects.toThrow('must not be a symbolic link')
+  expect(await fs.readdir(elsewhere)).toEqual([])
+  // The temporary moved away with the checked directory, beyond reach of its path.
+  expect((await fs.readdir(path.join(dir, 'checked'))).filter((name) => !name.endsWith('.tmp'))).toEqual([])
+})
+
 it.runIf(process.platform !== 'win32')('creates nothing outside when .mastermind itself is a link', async () => {
   const outside = path.join(dir, 'outside')
   await fs.mkdir(outside)

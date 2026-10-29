@@ -50,6 +50,7 @@
   --md-h4-size: 1em;
   --md-h5-size: 0.875em;
   --md-h6-size: 0.85em;
+  --md-font-size-sm: calc(var(--font-size-body) * 0.875);
   --md-list-indent: 2em;
   --md-list-gap: 0.25em;
   --document-scrollbar-size: 6px;
