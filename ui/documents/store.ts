@@ -8,6 +8,12 @@ import { HostError, requireReviewerHost, type FileResponse, type SessionMeta } f
 export type ViewMode = 'reading' | 'source'
 
 const AUTOSAVE_MS = 600
+/** Review undo keeps at most this many prior buffers per document. */
+const HISTORY_LIMIT = 50
+
+function pushHistory(history: string[], previous: string): string[] {
+  return [...history.slice(1 - HISTORY_LIMIT), previous]
+}
 
 function setTabTitle(name: string): void {
   const g = globalThis as { document?: { title: string } }
@@ -251,7 +257,7 @@ export function createDocStore() {
       updateDocument(id, { source: incoming, savedSource: incoming, eol: detectEol(file.content),
         version: file.version, lossy: readLossy(doc, file), recovery: null,
         // Adoption stays reversible so review undo can recover the discarded buffer.
-        history: incoming === doc.source ? doc.history : [...doc.history.slice(-49), doc.source] })
+        history: incoming === doc.source ? doc.history : pushHistory(doc.history, doc.source) })
       if (activeId === id) store.setState((s) => ({ externalVersion: s.externalVersion + 1 }))
       return true
     } catch (err) {
@@ -363,7 +369,7 @@ export function createDocStore() {
         set((s) => ({
           source,
           externalVersion: s.externalVersion + 1,
-          history: [...s.history.slice(-49), s.source],
+          history: pushHistory(s.history, s.source),
         }))
         get().queueAutosave()
       },
@@ -384,12 +390,7 @@ export function createDocStore() {
 
       applyEdits(edits) {
         if (editingLocked(get())) return
-        set((s) => ({
-          source: applyTextEdits(s.source, edits),
-          externalVersion: s.externalVersion + 1,
-          history: [...s.history.slice(-49), s.source],
-        }))
-        get().queueAutosave()
+        get().setSource(applyTextEdits(get().source, edits))
       },
 
       setMode(mode) {

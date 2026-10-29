@@ -6,6 +6,7 @@ import { SlideOver } from '../app/SlideOver'
 import { useT, type MsgKey } from '../i18n'
 import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme, type CodeThemeId } from '../theme/codeThemes'
+import type { ThemeInfo } from '../../themes/types'
 
 const CODE_COLOR_LABEL: Record<CodeThemeId, MsgKey> = {
   none: 'codeColorNone', soft: 'codeColorSoft', vivid: 'codeColorVivid', warm: 'codeColorWarm',
@@ -57,8 +58,7 @@ function CodeSwatch({ theme, appearance }: { theme: CodeTheme; appearance: 'ligh
   )
 }
 
-function ThemeSwatch({ s }: { s: { bg: string; ink: string; accent: string } | null }) {
-  if (!s) return null
+function ThemeSwatch({ s }: { s: ThemeInfo['swatch'] }) {
   return (
     <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden focusable={false} style={{ flex: 'none' }}>
       <rect x={1} y={1} width={14} height={14} rx={2.5} fill={s.bg} stroke="var(--color-border-hover)" strokeWidth={1} />

@@ -1,8 +1,13 @@
 # Input-method composition
 
 `composition.ts` keeps the shortcuts of comment and reply composers, translated selection, Find,
-the close dialog, and initial setup out of input-method composition. It tracks the input's composition lifecycle and checks the native keyboard event's
-`isComposing` flag. Blur or input detachment clears a composition that did not emit an end event.
+the close dialog, and initial setup out of input-method composition. `useCompositionGuard` returns
+`inputProps` to spread onto the guarded input, which track its composition lifecycle; its
+`isComposing` combines that lifecycle with `isImeKey`. Blur or input detachment clears a composition
+that did not emit an end event.
+
+`isImeKey` checks only the keyboard event, for window-level Escape handlers that own no input: the
+session view, slide-over panels, and the expanded table viewport.
 
 The legacy `keyCode` check covers a final IME key after `compositionend`, when WebKit can report
 `isComposing` as false. WebKit's [event-order report][ordering] describes that ordering, and its

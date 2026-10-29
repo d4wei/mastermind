@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { create } from 'zustand'
 
 const DocumentId = createContext({ id: '', name: '' })
-export interface ReviewDraft { id: string; key: string; label: string; discard: () => void }
+interface ReviewDraft { id: string; key: string; label: string; discard: () => void }
 /** `order` keeps drafts listed in the order they became meaningful, across documents. */
 interface PendingDraft extends ReviewDraft { order: number }
 

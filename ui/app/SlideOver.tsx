@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useT } from '../i18n'
 import { CrossIcon } from '../icons'
+import { isImeKey } from '../util/composition'
 
 interface Props {
   title: string
@@ -30,7 +31,7 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOn
     })
     const onKey = (e: KeyboardEvent): void => {
       // A panel hidden under an inert ancestor leaves Escape to whatever hid it.
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !panelRef.current?.closest('[inert]')) {
+      if (e.key === 'Escape' && !isImeKey(e) && !panelRef.current?.closest('[inert]')) {
         // Sibling window listeners still run; defaultPrevented tells them this Escape is consumed.
         e.preventDefault()
         e.stopPropagation()

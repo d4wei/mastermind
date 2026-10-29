@@ -33,6 +33,7 @@ import { SlideOver } from './SlideOver'
 import { Navigator, useIsNarrow, type SourceOutline } from './Navigator'
 import { readingSpace } from './reading-space'
 import { useReadingSpace, useReadingMovement } from './useReadingSpace'
+import { isImeKey } from '../util/composition'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -71,6 +72,17 @@ function useThreadChoice(cards: ThreadCard[] | null, source: string) {
   return [located?.spanIndex ?? null, choose, rebase] as const
 }
 
+/** A callback ref that mirrors its element into a ref for handlers and into state for renders. */
+function useObservedElement() {
+  const ref = useRef<HTMLElement | null>(null)
+  const [element, setElement] = useState<HTMLElement | null>(null)
+  const attach = useCallback((next: HTMLElement | null) => {
+    ref.current = next
+    setElement(next)
+  }, [])
+  return { ref, element, attach }
+}
+
 function isTypingTarget(e: KeyboardEvent): boolean {
   const el = e.target as HTMLElement | null
   if (!el) return false
@@ -94,19 +106,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const { collapse: collapseTable, hidden: tableExpanded } = useTableExpansion()
 
   const t = useT()
-  const articleRef = useRef<HTMLElement | null>(null)
   // The outline locates headings in whichever article is mounted, so it observes both as state.
-  const [articleElement, setArticleElement] = useState<HTMLElement | null>(null)
-  const articleContainer = useCallback((element: HTMLElement | null) => {
-    articleRef.current = element
-    setArticleElement(element)
-  }, [])
-  const translatedRef = useRef<HTMLElement | null>(null)
-  const [translatedElement, setTranslatedElement] = useState<HTMLElement | null>(null)
-  const translatedContainer = useCallback((element: HTMLElement | null) => {
-    translatedRef.current = element
-    setTranslatedElement(element)
-  }, [])
+  const { ref: articleRef, element: articleElement, attach: articleContainer } = useObservedElement()
+  const { ref: translatedRef, element: translatedElement, attach: translatedContainer } = useObservedElement()
   const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
   const replyHandled = useCallback(() => setReplyRequest(null), [])
   const translation = useTranslation()
@@ -234,7 +236,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     const onKey = (e: KeyboardEvent) => {
       if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
       // An open panel consumes Escape; its listener may run after this one, so check the DOM too.
-      if (e.key === 'Escape' && !e.isComposing && e.keyCode !== 229 && !isTypingTarget(e) &&
+      if (e.key === 'Escape' && !isImeKey(e) && !isTypingTarget(e) &&
         !e.defaultPrevented && !escapeOwner()) chooseActive(null)
       // Autosave owns persistence; suppress the browser’s save-page dialog.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
@@ -360,7 +362,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       onActivate={chooseActive}
       drafts={replyDrafts}
       onDraftsChange={setReplyDrafts}
-      onEdit={(edits) => applyReviewEdits(edits, source)}
+      onEdit={applyEdits}
     />
   )
 
@@ -402,7 +404,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           <div className="doc-column">
             {showTranslated && (
               <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-                {translation.artifact && <TranslatedView sessionId={sessionId} source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
+                {translation.artifact && <TranslatedView source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
               </Suspense>
             )}
             {mode === 'reading' && !showTranslated && analysis && (

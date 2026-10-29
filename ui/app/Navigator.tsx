@@ -41,7 +41,6 @@ export function Navigator({ outline: items, docEl, source: sourceOutline }: Navi
   const container = useRef<HTMLElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => { setActiveOffset(items[0]?.offset ?? null) }, [items])
   useEffect(() => {
     const heads = items.flatMap((item) => {
       if (!docEl) return sourceOutline ? [{ offset: item.offset, top: () => sourceOutline.headingTop(item.offset) }] : []

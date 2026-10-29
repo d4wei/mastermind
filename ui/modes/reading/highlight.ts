@@ -103,7 +103,6 @@ export function highlight(code: string, lang?: string): HlToken[] {
 
   const n = code.length
   let i = 0
-  // shell: are we at a position where the next word is a command name?
   let cmdStart = true
 
   const startsWith = (at: number, s: string): boolean => code.startsWith(s, at)

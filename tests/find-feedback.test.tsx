@@ -11,7 +11,7 @@ let host: HTMLDivElement
 let root: Root
 let serial = 0
 const highlights = new Map<string, Set<Range>>()
-const open = vi.fn(), close = vi.fn(), reveal = vi.fn()
+const close = vi.fn(), reveal = vi.fn()
 
 function Harness({ text = 'Review the proposal. Review it again.', source = '', id = `find-${serial}` }: { text?: string; source?: string; id?: string }) {
   const docRef = useRef<HTMLElement>(null)
@@ -173,7 +173,7 @@ it('searches the asynchronously rendered translation and visible discussions, ex
   function TranslatedHarness() {
     const docRef = useRef<HTMLElement>(null)
     return <div className="app-content"><div className="document-scroll">
-      <TranslatedView sessionId={`translated-${serial}`} source={original} artifact={artifact} containerRef={docRef} />
+      <TranslatedView source={original} artifact={artifact} containerRef={docRef} />
       </div><FindPanel sessionId={`translated-${serial}`} source={original} mode="translated" docRef={docRef}
         analysis={analyzeMarkdown(original)} onClose={close} onRevealComment={reveal} /></div>
   }

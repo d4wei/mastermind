@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextEdits } from '../document/edits'
+import { applyTextEdits, shiftAt } from '../document/edits'
 import { detectEol, normalizeToLf, restoreEol } from '../document/eol'
 import { parseMarkdown } from '../document/markdown/processor'
 import { toggleTaskEdit } from '../document/markdown/tasklist'
@@ -39,6 +39,28 @@ describe('applyTextEdits', () => {
         { from: 2, to: 4, insert: 'y' },
       ]),
     ).toThrow()
+  })
+})
+
+describe('shiftAt', () => {
+  const edits = [
+    { from: 0, to: 2, insert: 'abcde' },
+    { from: 4, to: 4, insert: 'xy' },
+    { from: 6, to: 9, insert: '' },
+  ]
+  it('sums the length change of edits ending at or before the point', () => {
+    expect(shiftAt(0, edits)).toBe(0)
+    expect(shiftAt(2, edits)).toBe(3)
+    expect(shiftAt(4, edits)).toBe(5)
+    expect(shiftAt(9, edits)).toBe(2)
+  })
+  it('leaves an edit reaching past the point to the caller', () => {
+    expect(shiftAt(1, edits)).toBe(0)
+    expect(shiftAt(7, edits)).toBe(5)
+  })
+  it('places text at the point where applying the edits moves it', () => {
+    const text = 'ABCDEFGHIJ'
+    expect(applyTextEdits(text, edits).slice(9 + shiftAt(9, edits))).toBe(text.slice(9))
   })
 })
 

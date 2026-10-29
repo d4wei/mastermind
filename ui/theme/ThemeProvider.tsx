@@ -103,8 +103,7 @@ export function ThemeEffects() {
     root.setProperty('--ls-heading', set.displayTracking)
     root.setProperty('--font-mono', monoStack(monoById(config.monoFont)))
 
-    // code-color scheme → --code-* tokens, picked for the active theme's appearance.
-    // `none` clears them; the renderer also skips tokenizing, so it's a no-op there.
+    // `none` clears the --code-* tokens; the renderer also skips tokenizing for it.
     const vars = codeThemeVars(codeThemeById(config.codeTheme), theme?.appearance ?? 'light')
     for (const tok of COLOR_TOKS) {
       const name = `--code-${tok}`

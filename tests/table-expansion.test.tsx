@@ -127,6 +127,15 @@ it('returns focus on Escape while leaving composer Escape alone', async () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
   expect(document.activeElement).toBe(host.querySelector('.md-table-toggle'))
 })
+it('ignores an Escape the input method consumes after composition ends', async () => {
+  act(() => root.render(<Harness />)); toggle(); await finish()
+  const imeEscape = new KeyboardEvent('keydown', { key: 'Escape' })
+  Object.defineProperty(imeEscape, 'keyCode', { value: 229 })
+  act(() => window.dispatchEvent(imeEscape)); await finish()
+  expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+  expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
+})
 it('uses current geometry when reversed mid-transition and honors reduced motion', async () => {
   act(() => root.render(<Harness />)); toggle()
   await act(async () => { vi.advanceTimersByTime(80) })

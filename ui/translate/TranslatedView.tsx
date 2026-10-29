@@ -17,7 +17,6 @@ function sourceHeading(block: TranslationBlock): { depth: number; kind: CalloutK
 }
 
 interface Props {
-  sessionId: string
   source: string
   artifact: PreparedTranslation
   containerRef: Ref<HTMLElement>

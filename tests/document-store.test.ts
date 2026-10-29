@@ -56,6 +56,19 @@ it('saves the departing buffer and keeps undo isolated across documents', async 
   expect(store.getState().source).toBe('A')
 })
 
+it('caps review undo at fifty prior buffers across direct and edit-based changes', async () => {
+  const store = createDocStore()
+  await store.getState().load('A')
+  for (let i = 1; i <= 60; i++) {
+    const next = `v${i}`
+    if (i % 2) store.getState().setSource(next)
+    else store.getState().applyEdits([{ from: 0, to: store.getState().source.length, insert: next }])
+  }
+  expect(store.getState().history).toHaveLength(50)
+  for (let i = 0; i < 60; i++) store.getState().undo()
+  expect(store.getState().source).toBe('v10')
+})
+
 it('ignores reversed load completion', async () => {
   const tab = { title: '' }
   vi.stubGlobal('document', tab)

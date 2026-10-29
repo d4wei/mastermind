@@ -17,7 +17,7 @@ export interface FileResponse {
 
 const HOST_FAILURES = ['conflict', 'missing', 'notUtf8', 'failure'] as const
 /** `notUtf8` is a refused write to a file whose bytes are not valid UTF-8. */
-export type HostFailure = typeof HOST_FAILURES[number]
+type HostFailure = typeof HOST_FAILURES[number]
 type HostInvalidation = 'changed' | 'deleted' | 'translations'
 
 export class HostError extends Error {

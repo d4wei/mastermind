@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { matchPreparedTranslation, prepareTranslation } from '../../document/translation'
 
-export function validLanguageCode(code: string): boolean {
+function validLanguageCode(code: string): boolean {
   return code.length <= 64 && /^[A-Za-z][A-Za-z0-9_-]*$/.test(code)
 }
 

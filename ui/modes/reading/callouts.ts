@@ -11,7 +11,7 @@ export function calloutKind(text: string): CalloutKind | null {
 }
 
 /** A callout heading with the blocks it governs, or one block outside any callout; `start` indexes its first block. */
-export type CalloutSection<T> = { kind: CalloutKind; start: number; items: T[] } | { kind: null; start: number; items: [T] }
+type CalloutSection<T> = { kind: CalloutKind; start: number; items: T[] } | { kind: null; start: number; items: [T] }
 
 /**
  * Groups top-level blocks into callout sections. A callout runs from its heading until the next

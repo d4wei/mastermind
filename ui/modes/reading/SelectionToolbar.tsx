@@ -8,11 +8,13 @@ import { useT } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
 import { usePresence } from '../../util/presence'
 import { useCompositionGuard } from '../../util/composition'
+import { cssMs } from '../../util/css-tokens'
 import { rangeToSourceRanges, type SelRange } from './selection'
 import { documentViewport } from '../../util/scroll'
 import { commentEdits, changeEdits } from './marks'
 
-const EXIT_MS = 120
+/** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
+const FALLBACK_EXIT_MS = 120
 
 interface Props {
   readOnly?: boolean
@@ -135,8 +137,9 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     () => { requestAnimationFrame(() => toolbarRef.current?.querySelector('textarea')?.focus()) },
     dismiss)
 
+  const exitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? FALLBACK_EXIT_MS, [])
   // Preserve the last position while the toolbar exits.
-  const present = usePresence(!!active, EXIT_MS)
+  const present = usePresence(!!active, exitMs)
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current
     if (!toolbar) return
@@ -223,10 +226,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
           {(readOnly || source !== view.source) && <p role="status">{t(readOnly ? 'editingPaused' : 'draftSelectionChanged')}</p>}
           {composing === 'comment' ? <textarea readOnly={readOnly}
             autoFocus
-            ref={ime.ref}
-            onCompositionStart={ime.onCompositionStart}
-            onCompositionEnd={ime.onCompositionEnd}
-            onBlur={ime.onBlur}
+            {...ime.inputProps}
             rows={3}
             placeholder={t('commentPlaceholder')}
             title={t('commentHint')}
@@ -238,8 +238,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
             {replacements.map((replacement, index) => <label key={index}>
               {t('replacement')}{replacements.length > 1 ? ` ${index + 1}` : ''}
               <textarea autoFocus={index === 0} readOnly={readOnly} rows={3}
-                ref={ime.ref} onCompositionStart={ime.onCompositionStart}
-                onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
+                {...ime.inputProps}
                 value={replacement} onChange={(event) => setReplacements((current) =>
                   current.map((value, i) => i === index ? event.target.value : value))}
                 onKeyDown={composerKey} />

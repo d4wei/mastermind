@@ -9,7 +9,6 @@ interface ConfigState {
   config: ClientConfig | null
   themes: ThemeInfo[]
   saveFailed: boolean
-  clearFailure(): void
   load(): Promise<void>
   update(patch: ConfigPatch): Promise<void>
 }
@@ -20,7 +19,6 @@ export const useConfig = create<ConfigState>((set, get) => ({
   config: null,
   themes: [],
   saveFailed: false,
-  clearFailure() { set({ saveFailed: false }) },
 
   async load() {
     const [config, themes] = await Promise.all([

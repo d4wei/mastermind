@@ -4,7 +4,6 @@ import type {
   List,
   ListItem,
   PhrasingContent,
-  Root,
   RootContent,
 } from 'mdast'
 import { Fragment, type ReactNode, createElement, useMemo } from 'react'
@@ -80,7 +79,7 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
     case 'criticHighlight': {
       const n = node as CriticWrapNode
       // A highlight is only a visual when it anchors a comment thread; a standalone
-      // highlight renders as plain text (the Highlight verb was retired).
+      // highlight renders as plain text.
       if (!ctx.anchoredHighlights?.has(n.data.spanIndex)) {
         return <Fragment key={key}>{renderInline(n.children, ctx)}</Fragment>
       }

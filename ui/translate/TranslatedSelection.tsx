@@ -2,7 +2,7 @@ import { requireReviewerHost } from '../app/host'
 import { useDraftGuard, useDraftState } from '../review/drafts'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { matchPreparedTranslation, translatedCommentEdit, type PreparedTranslation } from '../../document/translation'
-import { editingLocked, useDoc } from '../documents/store'
+import { editingLocked, useDoc, type DocStore } from '../documents/store'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { documentViewport, readingLine } from '../util/scroll'
@@ -69,14 +69,16 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const submit = async () => {
     if (readOnly || !selection || !body.trim() || busy.current) return
     const capturedArtifact = selection.artifact
+    const stillCurrent = (doc: DocStore): boolean => {
+      const translation = useTranslation.getState()
+      return doc.sessionId === sessionId && translationActive(translation, doc) &&
+        translation.artifact === capturedArtifact && translation.targetLang === capturedArtifact.targetLang
+    }
     busy.current = true
     setSubmitting(true)
     try {
       const current = useDoc.getState()
-      const translated = useTranslation.getState()
-      if (current.sessionId !== sessionId || !translationActive(translated, current) || translated.artifact !== capturedArtifact ||
-        translated.targetLang !== capturedArtifact.targetLang ||
-        !(await matchPreparedTranslation(current.source, capturedArtifact))) {
+      if (!stillCurrent(current) || !(await matchPreparedTranslation(current.source, capturedArtifact))) {
         setError(true); return
       }
       const rereads = await requireReviewerHost().translations(sessionId)
@@ -88,9 +90,9 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const edit = await translatedCommentEdit(current.source, { blockId: selection.blockId,
         sourceHash: capturedArtifact.sourceHash, quote: selection.quote, language: capturedArtifact.targetLang, author: authorTag, body })
       const latest = useDoc.getState()
-      if (editingLocked(latest) || !edit || latest.sessionId !== sessionId || latest.source !== current.source ||
-        useTranslation.getState().artifact !== capturedArtifact || !translationActive(useTranslation.getState(), latest) ||
-        useTranslation.getState().targetLang !== capturedArtifact.targetLang) { setError(true); return }
+      if (editingLocked(latest) || !edit || latest.source !== current.source || !stillCurrent(latest)) {
+        setError(true); return
+      }
       latest.applyEdits([edit])
       window.getSelection()?.removeAllRanges()
       close()
@@ -106,8 +108,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
     {!composing ? <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>{t('comment')}</button> :
       <div className="sel-composer">
         {readOnly && <p role="status">{t('editingPaused')}</p>}
-        <textarea readOnly={readOnly} ref={ime.ref} autoFocus rows={3} onCompositionStart={ime.onCompositionStart}
-          onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur} value={body} placeholder={t('commentPlaceholder')}
+        <textarea readOnly={readOnly} autoFocus rows={3} {...ime.inputProps} value={body} placeholder={t('commentPlaceholder')}
           onChange={(event) => setBody(event.target.value)} onKeyDown={(event) => {
             if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
             if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') void submit()

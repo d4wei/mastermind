@@ -1,4 +1,4 @@
-import { applyTextEdits } from '../../document/edits'
+import { applyTextEdits, shiftAt } from '../../document/edits'
 import type { ThreadCard } from '../../document/critic/types'
 import type { TextEdit } from '../../document/types'
 
@@ -52,12 +52,8 @@ export function refreshReplies(drafts: ReplyDraft[], source: string, cards: read
 
 /** The offset after `edits`, or null when an edit replaces the character at `offset`. */
 function mapOffset(offset: number, edits: readonly TextEdit[]): number | null {
-  let shift = 0
-  for (const edit of edits) {
-    if (edit.from <= offset && offset < edit.to) return null
-    if (edit.to <= offset) shift += edit.insert.length - (edit.to - edit.from)
-  }
-  return offset + shift
+  if (edits.some((edit) => edit.from <= offset && offset < edit.to)) return null
+  return offset + shiftAt(offset, edits)
 }
 
 /**

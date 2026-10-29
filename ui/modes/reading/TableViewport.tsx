@@ -6,6 +6,8 @@ import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { ESCAPE_OWNER_SELECTOR, escapeOwner } from '../../app/constants'
 import { useTableExpansion } from './TableExpansion'
 import { prefersReducedMotion } from '../../util/presence'
+import { isImeKey } from '../../util/composition'
+import { cssMs, cssPx } from '../../util/css-tokens'
 
 interface Geometry { left: number; width: number }
 
@@ -59,10 +61,8 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
       const target = next ? bounds.current.wide : bounds.current.normal
       const from = { ...geometry.current, scroll: scroll.scrollLeft }
       const offset = Math.min(next ? from.scroll : savedScroll.current, Math.max(0, table.offsetWidth - target.width))
-      const css = getComputedStyle(host)
-      const duration = css.getPropertyValue('--dur-fade').trim()
-      const ms = parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000)
-      const time = immediate || prefersReducedMotion() || !Number.isFinite(ms) ? 0 : ms
+      const ms = cssMs(getComputedStyle(host), '--dur-fade')
+      const time = immediate || prefersReducedMotion() || ms === null ? 0 : ms
       const start = performance.now()
       const step = (now: number) => {
         const progress = time ? Math.min(1, (now - start) / time) : 1
@@ -83,7 +83,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
     const measure = () => {
       if (disposed || !host.isConnected || !host.clientWidth) return
       const css = getComputedStyle(host)
-      const edge = parseFloat(css.getPropertyValue('--reading-edge')) || 0
+      const edge = cssPx(css, '--reading-edge')
       const hostRect = host.getBoundingClientRect()
       const containerRect = container.getBoundingClientRect()
       const available = container.clientWidth - edge * 2
@@ -105,13 +105,13 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
         setExpandable(canExpand)
         if (!canExpand && isExpanded.current) change.current(false, true)
       }
-      const scrollbar = parseFloat(css.getPropertyValue('--document-scrollbar-size')) || 0
+      const scrollbar = cssPx(css, '--document-scrollbar-size')
       view.style.height = `${table.getBoundingClientRect().height + scrollbar}px`
       if (boundsChanged && animation.current) change.current(isExpanded.current, true)
       if (!animation.current) paint(isExpanded.current ? bounds.current.wide : bounds.current.normal)
     }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !isExpanded.current || event.defaultPrevented || event.isComposing) return
+      if (event.key !== 'Escape' || !isExpanded.current || event.defaultPrevented || isImeKey(event)) return
       if (escapeOwner(`.sel-toolbar, ${ESCAPE_OWNER_SELECTOR}`)) return
       if (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable=true], [role=dialog]')) return
       event.preventDefault()

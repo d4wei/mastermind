@@ -82,20 +82,20 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
       event.preventDefault()
       if (!compositionSubmit.current) void confirm()
     }} onCompositionStartCapture={(event) => {
-      composition.onCompositionStart()
+      composition.inputProps.onCompositionStart()
       composingInput.current = event.target as Node
       if (event.target instanceof HTMLInputElement && event.target.name === 'authorTag') protect('authorTag')
     }} onCompositionEndCapture={() => {
       composingInput.current = null
-      composition.onCompositionEnd()
+      composition.inputProps.onCompositionEnd()
     }} onBlurCapture={() => {
       composingInput.current = null
-      composition.onBlur()
+      composition.inputProps.onBlur()
     }} onPointerDown={() => { compositionSubmit.current = false }} onKeyDownCapture={(event) => {
       // Unmounting a composing input can skip both compositionend and blur.
       if (composingInput.current && !composingInput.current.isConnected) {
         composingInput.current = null
-        composition.onBlur()
+        composition.inputProps.onBlur()
       }
       clearTimeout(compositionReset.current)
       compositionSubmit.current = false

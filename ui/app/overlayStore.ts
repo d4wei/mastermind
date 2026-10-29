@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 /** Transient surfaces that exclude one another: opening one closes whichever else is open. */
-export type Overlay = 'find' | 'files' | 'language' | 'settings' | 'resolved'
+type Overlay = 'find' | 'files' | 'language' | 'settings' | 'resolved'
 
 interface OverlayState {
   open: Overlay | null

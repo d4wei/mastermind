@@ -6,7 +6,6 @@
   --bar-clear: calc(var(--bar-h) + var(--bar-gap) * 2);
 
   /* Document controls remain above the outline and comment rail. */
-  --z-sticky: 10;
   --z-rail: 15;
   --z-nav: 30;
   --z-topbar: 40;
@@ -243,9 +242,6 @@ button:disabled {
   padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2.5);
 }
 
-
-
-.seg-btn.active,
 .seg-btn[data-state='on'] {
   color: var(--color-text);
   background: var(--color-selection);
@@ -862,7 +858,7 @@ mark.critic-hl.critic-anchor:hover,
   background: var(--review-comment-active-bg);
 }
 
-/* ---------- misc ---------- */
+/* ---------- centered status notes ---------- */
 
 .center-note {
   max-width: var(--content-max-width);
@@ -1146,7 +1142,7 @@ input[type='checkbox'] {
   }
 }
 
-/* ---------- misc additions ---------- */
+/* ---------- loading note and comment marker icon ---------- */
 
 .loading-note {
   color: var(--color-text-muted);
@@ -1195,7 +1191,7 @@ input[type='checkbox'] {
   animation: mm-pop-out var(--dur-fast) var(--ease-standard) forwards;
   pointer-events: none;
 }
-/* the segmented active state eases between options (view-mode, Files/Outline, presets) */
+/* the segmented active state eases between settings presets */
 .seg-btn {
   transition:
     color var(--dur-fast) var(--ease-standard),
@@ -1434,9 +1430,8 @@ input[type='checkbox'] {
 }
 
 /* ---------- copy: sentence-case chrome ----------
-   Caps are reserved for the small mono eyebrow labels only (.settings-body h4). Every interactive control, toolbar verb, and panel title
-   reads in sentence case — calmer and more legible, fewer shouted words. The
-   prominent CTA / ghost / segmented controls drop their caps at their own rules. */
+   Caps are reserved for the mono eyebrow labels (.settings-body h4); controls, toolbar verbs, and
+   panel titles read in sentence case. CTA, ghost, and segmented controls set this in their own rules. */
 .rail-author,
 .rail-actions button,
 .sel-toolbar > button,

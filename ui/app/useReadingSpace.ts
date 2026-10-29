@@ -3,6 +3,7 @@ import { useConfig } from './configStore'
 import { DEFAULT_CONFIG } from '../settings/defaults'
 import { READING_LAYOUT_EVENT, readingSpace, type ReadingSpace } from './reading-space'
 import { prefersReducedMotion } from '../util/presence'
+import { cssMs, cssPx } from '../util/css-tokens'
 
 /** `outline` says whether the outline strip is shown and reserves its width. */
 export function useReadingSpace(outline: boolean) {
@@ -13,7 +14,7 @@ export function useReadingSpace(outline: boolean) {
     if (!element) return
     const measure = () => {
       const css = getComputedStyle(element)
-      const px = (name: string) => parseFloat(css.getPropertyValue(name)) || 0
+      const px = (name: string) => cssPx(css, name)
       const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
       const next = {
         viewport: element.parentElement!.clientWidth,
@@ -50,10 +51,9 @@ export function useReadingMovement(element: HTMLDivElement | null, left: number 
     if (!element?.isConnected || left === undefined || !old || old.rail === rail || old.left === left ||
       !element.animate || prefersReducedMotion()) return
     const css = getComputedStyle(element)
-    const duration = css.getPropertyValue('--dur-base').trim()
-    const durationMs = parseFloat(duration) * (duration.endsWith('ms') ? 1 : 1000)
+    const durationMs = cssMs(css, '--dur-base')
     const column = element.querySelector<HTMLElement>('.doc-column')
-    if (!column?.animate) return
+    if (durationMs === null || !column?.animate) return
     animation.current = column.animate([
       { transform: `translateX(${old.left - left}px)` }, { transform: 'translateX(0)' },
     ], { duration: durationMs, easing: css.getPropertyValue('--ease-out').trim() })

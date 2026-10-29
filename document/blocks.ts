@@ -1,7 +1,7 @@
 import type { ListItem, RootContent } from 'mdast'
 import { parseMarkdown } from './markdown/processor'
 
-export interface SourceBlock {
+interface SourceBlock {
   text: string
   start: number
   end: number

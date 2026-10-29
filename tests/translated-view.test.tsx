@@ -36,7 +36,7 @@ it('renders translated blocks without stripping positions from shared trees or r
   const artifact = { version: 1 as const, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id,
       text: block.kind === 'heading' ? '# 标题' : '正文。' })) }
-  const view = () => <TranslatedView sessionId="translated" source={source} artifact={artifact} containerRef={null} />
+  const view = () => <TranslatedView source={source} artifact={artifact} containerRef={null} />
   await act(async () => root.render(view()))
   await vi.waitFor(async () => {
     await act(async () => {})

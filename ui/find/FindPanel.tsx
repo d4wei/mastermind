@@ -29,6 +29,7 @@ interface Props {
 export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealComment, onClose }: Props) {
   const t = useT()
   const ime = useCompositionGuard()
+  const imeRef = ime.inputProps.ref
   const [state, setState] = useState<FindState>(() => retained.get(sessionId) ?? { open: false, query: '', caseSensitive: false })
   const { open, query, caseSensitive } = state
   const [index, setIndex] = useState(0)
@@ -40,8 +41,8 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   const returnFocus = useRef<HTMLElement | null>(null)
   const setInput = useCallback((element: HTMLInputElement | null) => {
     input.current = element
-    ime.ref(element)
-  }, [ime.ref])
+    imeRef(element)
+  }, [imeRef])
   const pendingReveal = useRef(false)
   const chooseFromPosition = useRef(false)
   const adapter = useSourceSearch((s) => s.adapter?.sessionId === sessionId ? s.adapter : null)
@@ -224,14 +225,13 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   const countSize = results.length ? t('findCount').replace('{current}', String(results.length)).replace('{total}', String(results.length)) : count
   return <div className="find-bar" role="search" aria-label={t('find')} ref={panel}>
     <SearchIcon />
-    <input ref={setInput}
+    <input {...ime.inputProps} ref={setInput}
       spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off"
       className="settings-input find-input" aria-label={t('findPlaceholder')} placeholder={t('findPlaceholder')}
       value={query} onChange={(event) => {
         pendingReveal.current = true; chooseFromPosition.current = true; setWrapped(false)
         setState((current) => ({ ...current, query: event.target.value }))
-      }} onCompositionStart={ime.onCompositionStart} onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
-      onKeyDown={(event) => {
+      }} onKeyDown={(event) => {
         if (ime.isComposing(event.nativeEvent)) return
         if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); step(event.shiftKey ? -1 : 1) }
       }} />

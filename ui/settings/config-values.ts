@@ -16,17 +16,6 @@ function acceptsConfigValue(key: keyof MastermindConfig, value: unknown): boolea
   return true
 }
 
-/** Admits known keys with acceptable values and ignores unknown keys; null rejects the whole patch. */
-export function configPatch(patch: object): Partial<MastermindConfig> | null {
-  const accepted: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(patch)) {
-    if (!knownKey(key)) continue
-    if (!acceptsConfigValue(key, value)) return null
-    accepted[key] = value
-  }
-  return accepted
-}
-
 /**
  * Stored preferences may be hand-edited, so each unacceptable field falls back to its default alone.
  * An author name is read normalized, as the native host normalizes it.

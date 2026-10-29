@@ -1,4 +1,4 @@
-import { applyTextEdits } from '../../../document/edits'
+import { applyTextEdits, shiftAt } from '../../../document/edits'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import type { CriticSpan } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
@@ -21,11 +21,8 @@ const OFFSETS = ['start', 'end', 'innerStart', 'innerEnd', 'oldStart', 'oldEnd',
 
 /** `span` moved by edits that end at or before its start; null when an edit reaches inside it. */
 function mappedSpan(span: CriticSpan, edits: readonly TextEdit[]): CriticSpan | null {
-  let shift = 0
-  for (const edit of edits) {
-    if (edit.to <= span.start) shift += edit.insert.length - (edit.to - edit.from)
-    else if (edit.from < span.end) return null
-  }
+  if (edits.some((edit) => edit.to > span.start && edit.from < span.end)) return null
+  const shift = shiftAt(span.start, edits)
   const moved = { ...span }
   for (const key of OFFSETS) if (moved[key] !== undefined) moved[key] = moved[key] + shift
   return moved

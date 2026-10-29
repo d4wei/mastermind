@@ -193,6 +193,33 @@ it.each(['Comment', 'Suggest change'])('keeps %s open when an earlier selection 
   expect(edit).not.toHaveBeenCalled()
 })
 
+it('keeps the exiting toolbar for the themed --dur-fast duration', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  const deselect = async (exitWait: number) => {
+    act(() => {
+      window.getSelection()!.removeAllRanges()
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(120))
+    await act(async () => vi.advanceTimersByTimeAsync(exitWait))
+  }
+  await select()
+  await deselect(500)
+  expect(host.querySelector('.sel-toolbar')).toBeNull()
+  document.documentElement.style.setProperty('--dur-fast', '1s')
+  try {
+    act(() => root.unmount())
+    ;({ host, root } = createReactHost())
+    await select()
+    await deselect(500)
+    expect(host.querySelector('.sel-toolbar.closing')).not.toBeNull()
+    await act(async () => vi.advanceTimersByTimeAsync(600))
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+  } finally {
+    document.documentElement.style.removeProperty('--dur-fast')
+  }
+})
+
 it('does not enter a hidden composer from an exiting toolbar', async () => {
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
   await compose()

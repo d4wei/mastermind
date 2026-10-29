@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 
-// Hand-rolled routing (no router dep). Parsing stays DOM-free; navigation and the hook touch
-// `window` only when called.
+// Parsing stays DOM-free; navigation and the hook touch `window` only when called.
 
-export type Route = { kind: 'home' } | { kind: 'doc'; sessionId: string }
+type Route = { kind: 'home' } | { kind: 'doc'; sessionId: string }
 
 const DOC_RE = /^\/d\/([0-9a-f-]+)\/?$/i
 

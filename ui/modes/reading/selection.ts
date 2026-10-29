@@ -3,7 +3,6 @@ import { visit } from 'unist-util-visit'
 import type { CriticSpan, Range as SourceRange } from '../../../document/critic/types'
 import type { Analysis } from '../../../document/markdown/analyze'
 import { excludedRanges } from '../../../document/markdown/exclusions'
-import type { TextEdit } from '../../../document/types'
 
 export interface SelRange {
   from: number
@@ -42,6 +41,13 @@ function normalizePoint(node: Node, offset: number): { node: Node; offset: numbe
   return { node: current, offset: off }
 }
 
+/** The source extent a rendered element records in `data-ps`/`data-pe`; null when either is missing. */
+function positionedExtent(el: HTMLElement): { from: number; to: number } | null {
+  const from = Number(el.dataset.ps)
+  const to = Number(el.dataset.pe)
+  return Number.isFinite(from) && Number.isFinite(to) ? { from, to } : null
+}
+
 /** Escapes and entities can make rendered offsets differ from source offsets. */
 function pointToOffset(rawNode: Node, rawOffset: number): number | null {
   const { node, offset } = normalizePoint(rawNode, rawOffset)
@@ -49,12 +55,10 @@ function pointToOffset(rawNode: Node, rawOffset: number): number | null {
   const el = node.parentElement
   if (!el) return null
   const span = el.closest('[data-ps]') as HTMLElement | null
-  if (!span) return null
-  const ps = Number(span.dataset.ps)
-  const pe = Number(span.dataset.pe)
-  if (!Number.isFinite(ps) || !Number.isFinite(pe)) return null
+  const extent = span && positionedExtent(span)
+  if (!span || !extent) return null
   const value = span.textContent ?? ''
-  if (pe - ps !== value.length) return null
+  if (extent.to - extent.from !== value.length) return null
   let prefix = 0
   let walker: Node | null = span.firstChild
   while (walker && walker !== node) {
@@ -62,7 +66,7 @@ function pointToOffset(rawNode: Node, rawOffset: number): number | null {
     walker = walker.nextSibling
   }
   if (!walker) return null
-  return ps + prefix + offset
+  return extent.from + prefix + offset
 }
 
 /** Code is atomic for review: put delimiters outside its backticks, never inside them. */
@@ -76,11 +80,8 @@ function selectedInlineCode(range: Range, block: HTMLElement, source: string): S
     if (range.toString() !== code.textContent ||
         range.compareBoundaryPoints(Range.START_TO_START, content) > 0 ||
         range.compareBoundaryPoints(Range.END_TO_END, content) < 0) continue
-    const from = Number(code.dataset.ps)
-    const to = Number(code.dataset.pe)
-    if (Number.isFinite(from) && Number.isFinite(to) && to > from) {
-      return { from, to, text: source.slice(from, to) }
-    }
+    const extent = positionedExtent(code)
+    if (extent && extent.to > extent.from) return { ...extent, text: source.slice(extent.from, extent.to) }
   }
   return null
 }
@@ -134,9 +135,9 @@ function mapTextSelection(
   if (start.node !== end.node || start.node.nodeType !== Node.TEXT_NODE) return null
   const element = start.node.parentElement
   if (!element || element.childNodes.length !== 1) return null
-  const from = Number(element.dataset.ps)
-  const to = Number(element.dataset.pe)
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  const extent = positionedExtent(element)
+  if (!extent) return null
+  const { from, to } = extent
   const parsed = positionedNodes().get(`text:${from}:${to}`)
   const value = start.node.textContent ?? ''
   if (!parsed || inlineText(parsed)?.replace(/\r\n?/g, '\n') !== value.replace(/\r\n?/g, '\n')) return null
@@ -190,11 +191,10 @@ function mapFormattedSelection(
       const complete = comparePoints(range, false, content, false) <= 0 &&
         comparePoints(range, true, content, true) >= 0
       if (complete) {
-        const from = Number(node.dataset.ps)
-        const to = Number(node.dataset.pe)
-        const markdown = positioned.get(`${INLINE_FORMAT_TYPES[node.tagName]}:${from}:${to}`)
-        if (!markdown || inlineText(markdown) !== node.textContent) return false
-        pieces.push({ from, to, rendered: node.textContent ?? '' })
+        const extent = positionedExtent(node)
+        const markdown = extent && positioned.get(`${INLINE_FORMAT_TYPES[node.tagName]}:${extent.from}:${extent.to}`)
+        if (!extent || !markdown || inlineText(markdown) !== node.textContent) return false
+        pieces.push({ ...extent, rendered: node.textContent ?? '' })
         return true
       }
       // Crossing a partial wrapper would strand its opening or closing syntax outside the mark.
@@ -243,16 +243,16 @@ function uniqueOccurrence(
   const holder = (common.nodeType === Node.ELEMENT_NODE ? common as Element : common.parentElement)
     ?.closest<HTMLElement>('[data-ps]')
   const scope = holder && block.contains(holder) ? holder : block
-  let from = Number(scope.dataset.ps)
-  let to = Number(scope.dataset.pe)
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return null
+  const scopeExtent = positionedExtent(scope)
+  if (!scopeExtent) return null
+  let { from, to } = scopeExtent
   const rendered = scope.ownerDocument.createRange()
   rendered.selectNodeContents(scope)
   for (const neighbor of scope.querySelectorAll<HTMLElement>(`[data-ps], ${MARK_SELECTOR}`)) {
     const span = neighbor.matches(MARK_SELECTOR) ? spans[Number(neighbor.dataset.spanIndex)] : undefined
-    const start = span ? span.start : Number(neighbor.dataset.ps)
-    const end = span ? span.end : Number(neighbor.dataset.pe)
-    if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+    const bound = span ? { from: span.start, to: span.end } : positionedExtent(neighbor)
+    if (!bound) return null
+    const { from: start, to: end } = bound
     const extent = scope.ownerDocument.createRange()
     extent.selectNode(neighbor)
     // Elements holding or crossing the selection bound nothing; nested neighbors never widen a bound.
@@ -395,11 +395,4 @@ export function rangeToSourceRanges(range: Range, source: string,
   if (ranges.length === 0) return { error: 'unmapped' }
   ranges.sort((a, b) => a.from - b.from)
   return { ranges }
-}
-
-export function markEdits(
-  ranges: readonly SelRange[],
-  wrap: (text: string, index: number, isLast: boolean) => string,
-): TextEdit[] {
-  return ranges.map((r, i) => ({ from: r.from, to: r.to, insert: wrap(r.text, i, i === ranges.length - 1) }))
 }

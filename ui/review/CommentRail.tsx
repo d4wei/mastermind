@@ -257,8 +257,7 @@ export function CommentRail({ analysis: { spans, threads: cards }, source, docRe
           </div>)}
         {selected && replyFor === card.key ? <div className="rail-reply">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
-          <textarea autoFocus readOnly={readOnly} ref={ime.ref} rows={2}
-            onCompositionStart={ime.onCompositionStart} onCompositionEnd={ime.onCompositionEnd} onBlur={ime.onBlur}
+          <textarea autoFocus readOnly={readOnly} rows={2} {...ime.inputProps}
             value={draftText(card)} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
             onChange={(event) => setDraftText(card, event.target.value)}
             onKeyDown={(event) => {

@@ -13,11 +13,9 @@ interface CriticWrapData {
 interface CriticSubData extends CriticWrapData {
   old: string
   new: string
-  raw: string
 }
 interface CriticCommentData extends CriticWrapData {
   content: string
-  raw: string
 }
 
 export interface CriticWrapNode extends Parent {
@@ -146,7 +144,6 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
         spanIndex: -1, // patched by caller
         old: stripLinePrefixes(original.slice(span.oldStart!, span.oldEnd!)),
         new: stripLinePrefixes(original.slice(span.newStart!, span.newEnd!)),
-        raw: original.slice(span.start, span.end),
       },
       position: synthPosition(span),
     } as CriticSubNode
@@ -157,7 +154,6 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
     data: {
       spanIndex: -1,
       content: stripLinePrefixes(original.slice(span.innerStart, span.innerEnd)),
-      raw: original.slice(span.start, span.end),
     },
     position: synthPosition(span),
   } as CriticCommentNode

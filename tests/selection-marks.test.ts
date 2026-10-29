@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { markEdits, type SelRange } from '../ui/modes/reading/selection'
+import type { SelRange } from '../ui/modes/reading/selection'
 import { commentEdits, changeEdits, replyEdits } from '../ui/modes/reading/marks'
 import { applyTextEdits } from '../document/edits'
 import { scan, group } from '../document/critic/scanner'
@@ -13,17 +13,17 @@ const CROSS: SelRange[] = [
   { from: 18, to: 34, text: 'Second paragraph' },
 ]
 
-describe('markEdits — cross-block marks round-trip', () => {
-  it('highlights each block independently', () => {
-    const out = applyTextEdits(SOURCE, markEdits(CROSS, (s) => `{==${s}==}`))
-    expect(out).toBe('First {==paragraph.==}\n\n{==Second paragraph==}.')
-    const highlights = scan(out).filter((s) => s.kind === 'highlight')
-    expect(highlights).toHaveLength(2)
-    expect(highlights.map((h) => out.slice(h.innerStart, h.innerEnd))).toEqual(['paragraph.', 'Second paragraph'])
+describe('cross-block marks round-trip', () => {
+  it('substitutes within each block independently', () => {
+    const out = applyTextEdits(SOURCE, changeEdits(SOURCE, CROSS, ['section.', 'Third section'])!)
+    expect(out).toBe('First {~~paragraph.~>section.~~}\n\n{~~Second paragraph~>Third section~~}.')
+    const subs = scan(out).filter((s) => s.kind === 'sub')
+    expect(subs).toHaveLength(2)
+    expect(subs.map((s) => out.slice(s.oldStart, s.oldEnd))).toEqual(['paragraph.', 'Second paragraph'])
   })
 
   it('suggests deletion on each block', () => {
-    const out = applyTextEdits(SOURCE, markEdits(CROSS, (s) => `{--${s}--}`))
+    const out = applyTextEdits(SOURCE, changeEdits(SOURCE, CROSS, ['', ''])!)
     expect(out).toBe('First {--paragraph.--}\n\n{--Second paragraph--}.')
     expect(scan(out).filter((s) => s.kind === 'del')).toHaveLength(2)
   })
@@ -48,7 +48,9 @@ describe('markEdits — cross-block marks round-trip', () => {
 
   it('preserves text outside a single range', () => {
     const one: SelRange[] = [{ from: 6, to: 15, text: 'paragraph' }]
-    expect(applyTextEdits(SOURCE, markEdits(one, (s) => `{==${s}==}`))).toBe('First {==paragraph==}.\n\nSecond paragraph.')
+    expect(applyTextEdits(SOURCE, commentEdits(SOURCE, one, 'Alex', 'why')!))
+      .toBe('First {==paragraph==}{>>@Alex: why<<}.\n\nSecond paragraph.')
+    expect(applyTextEdits(SOURCE, changeEdits(SOURCE, one, [''])!)).toBe('First {--paragraph--}.\n\nSecond paragraph.')
   })
 })
 
