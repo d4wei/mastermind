@@ -239,13 +239,13 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     >
       {!composing ? view.ranges.length ? (
         <>
-          <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('comment')}>
-            <ChatIcon width={13} height={13} />
-            {t('comment')}
-          </button>
           <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('change')}>
             <PencilIcon width={13} height={13} />
             {t('suggestChange')}
+          </button>
+          <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('comment')}>
+            <ChatIcon width={13} height={13} />
+            {t('comment')}
           </button>
           {scope && <p className="sel-note">{scope}</p>}
         </>

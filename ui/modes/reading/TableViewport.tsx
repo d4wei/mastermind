@@ -106,7 +106,8 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
         if (!canExpand && isExpanded.current) change.current(false, true)
       }
       const scrollbar = cssPx(css, '--document-scrollbar-size')
-      view.style.height = `${table.getBoundingClientRect().height + scrollbar}px`
+      const gap = parseFloat(getComputedStyle(scroll).paddingBottom) || 0
+      view.style.height = `${table.getBoundingClientRect().height + gap + scrollbar}px`
       if (boundsChanged && animation.current) change.current(isExpanded.current, true)
       if (!animation.current) paint(isExpanded.current ? bounds.current.wide : bounds.current.normal)
     }

@@ -678,6 +678,8 @@ button:disabled {
   width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  /* Overlay scrollbars draw inside the scrollport; the gap keeps them clear of the last row. */
+  padding-bottom: var(--table-scrollbar-gap);
   scrollbar-width: thin;
   scrollbar-color: var(--color-text-faint) transparent;
 }
@@ -698,7 +700,7 @@ button:disabled {
 .md-table-edge {
   position: absolute;
   top: 0;
-  bottom: var(--document-scrollbar-size);
+  bottom: calc(var(--document-scrollbar-size) + var(--table-scrollbar-gap));
   width: var(--reading-gap);
   opacity: 0;
   pointer-events: none;

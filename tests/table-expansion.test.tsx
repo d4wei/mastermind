@@ -174,3 +174,8 @@ it('collapses on Escape while the panel it hid stays open', async () => {
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
   expect(closePanel).not.toHaveBeenCalled()
 })
+it('reserves the scroll gap below the table so an overlay scrollbar clears the last row', () => {
+  const style = document.createElement('style'); style.textContent = '.md-table-scroll { padding-bottom: 12px }'; document.head.append(style)
+  act(() => root.render(<Harness />))
+  expect(host.querySelector<HTMLElement>('.md-table-viewport')!.style.height).toBe('218px')
+})

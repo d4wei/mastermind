@@ -365,7 +365,7 @@ describe('the selection toolbar', () => {
 
   it('keeps both actions for a partial mapping and states what is left out', async () => {
     await show('Try `open` now.', 'Try op')
-    expect(buttons()).toEqual(['Comment', 'Suggest change'])
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
     expect(note()).toBe('Only part of this selection can be marked. Inline code is reviewed as a whole. Select all of it.')
     press('Suggest change')
     expect(host.querySelector('textarea')!.value).toBe('Try ')
@@ -406,7 +406,7 @@ describe('the selection toolbar', () => {
     await show('Alpha bravo.', 'bravo')
     act(() => root.render(<Review source={'Alpha bravo charlie.'} rendered={'Alpha bravo.'} />))
     await act(async () => vi.advanceTimersByTimeAsync(120))
-    expect(buttons()).toEqual(['Comment', 'Suggest change'])
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
     expect(note()).toBeUndefined()
   })
 

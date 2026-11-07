@@ -191,7 +191,7 @@ it('keeps change drafts during IME and blocks unchanged, invalid, or paused subm
 })
 
 
-it.each(['Comment', 'Suggest change'])('keeps %s open when an earlier selection check fires after entry', async (action) => {
+it.each(['Suggest change', 'Comment'])('keeps %s open when an earlier selection check fires after entry', async (action) => {
   await compose()
   act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
   act(() => document.dispatchEvent(new Event('selectionchange')))
@@ -324,4 +324,8 @@ it('keeps a composed comment when Escape closes an open menu', async () => {
   expect(document.querySelector('[role="menuitem"]')).toBeNull()
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')
+})
+it('offers Suggest change before Comment', async () => {
+  await select()
+  expect(Array.from(host.querySelectorAll('.sel-toolbar > button'), (button) => button.textContent)).toEqual(['Suggest change', 'Comment'])
 })

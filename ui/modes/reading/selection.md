@@ -87,7 +87,7 @@ dismisses pending work as well as the visible controls. A shown toolbar re-reads
 selection when the source changes, since no selection event follows, and keeps its state through an
 outdated read.
 
-A selection with segments offers Comment and Suggest change; with exclusions it also says, beside
+A selection with segments offers Suggest change and Comment; with exclusions it also says, beside
 the actions and in the composer, that only part of the selection can be marked and why. A selection
 with no segments shows only the reasons. A comment composer for several segments says the comment
 attaches to the first. Draft text remains intact across focus changes, scrolling, and source
