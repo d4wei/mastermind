@@ -59,8 +59,8 @@ Complete shadow tokens supply panel and popover elevation.
 
 ## Typography and layout
 
-Font presets override reading and code fonts, heading weight and letter spacing, and code weight
-(`--weight-code`). Markdown headings use
+Font presets override reading and code fonts, heading weight and letter spacing, code weight
+(`--weight-code`), and document body weight (`--weight-body`), which dark themes lower per preset. Markdown headings use
 body-relative sizes; shared block, heading, and list gaps establish the reading rhythm. All
 document-body text sizes from `--font-size-body` (`--md-font-size-sm` or `em`) so the font size
 setting scales it, while application chrome keeps the fixed `--font-size-sm/xs/micro` rem tokens.

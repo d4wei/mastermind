@@ -485,6 +485,8 @@ button:disabled {
 
 /* ---------- markdown elements ---------- */
 
+.md-root { font-weight: var(--weight-body); }
+
 /* Body-relative sizes keep the hierarchy stable when text size changes. */
 .md-root :is(h1, h2, h3, h4, h5, h6) {
   font-family: var(--font-display);

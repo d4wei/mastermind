@@ -95,6 +95,7 @@ export function ThemeEffects() {
     const preset = fontPresetById(config.fontPreset)
     root.setProperty('--font-display', displayStack(preset))
     root.setProperty('--font-body', bodyStack(preset))
+    root.setProperty('--weight-body', String(theme?.appearance === 'dark' ? preset.darkBodyWeight : 400))
     root.setProperty('--weight-bold', String(preset.displayWeight))
     root.setProperty('--ls-heading', preset.displayTracking)
     root.setProperty('--font-mono', monoStack(preset))

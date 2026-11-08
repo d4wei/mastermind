@@ -17,6 +17,8 @@ export interface FontPreset {
   displayWeight: number
   displayTracking: string
   bodyFamily: string
+  /** Body weight on dark themes, where light text on a dark ground reads heavier; light themes use 400. */
+  darkBodyWeight: number
   /** Serif or sans: picks the CJK faces and the generic family that follow the Latin face. */
   style: CjkStyle
   codeFamily: string
@@ -28,17 +30,17 @@ export const FONT_PRESETS: FontPreset[] = [
   {
     id: 'serif', label: 'fontPresetSerif', style: 'serif',
     displayFamily: 'Source Serif 4', displayWeight: 650, displayTracking: '-0.01em',
-    bodyFamily: 'Source Serif 4', codeFamily: 'Source Code Pro', codeWeight: 500,
+    bodyFamily: 'Source Serif 4', darkBodyWeight: 350, codeFamily: 'Source Code Pro', codeWeight: 500,
   },
   {
     id: 'sans', label: 'fontPresetSans', style: 'sans',
     displayFamily: 'Source Sans 3', displayWeight: 700, displayTracking: '-0.01em',
-    bodyFamily: 'Source Sans 3', codeFamily: 'Source Code Pro', codeWeight: 500,
+    bodyFamily: 'Source Sans 3', darkBodyWeight: 370, codeFamily: 'Source Code Pro', codeWeight: 500,
   },
   {
     id: 'hyperlegible', label: 'fontPresetHyperlegible', style: 'sans',
     displayFamily: 'Atkinson Hyperlegible Next', displayWeight: 700, displayTracking: '0',
-    bodyFamily: 'Atkinson Hyperlegible Next', codeFamily: 'Atkinson Hyperlegible Mono', codeWeight: 400,
+    bodyFamily: 'Atkinson Hyperlegible Next', darkBodyWeight: 330, codeFamily: 'Atkinson Hyperlegible Mono', codeWeight: 400,
   },
 ]
 

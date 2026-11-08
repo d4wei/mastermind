@@ -26,15 +26,6 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-07 — Body weight on dark themes
-
-**Open question.** Light text on a dark ground reads heavier, and the bundled variable faces could
-take a slightly lower body weight on dark themes; whether the offset helps, and by how much, is
-unmeasured.
-
-**Exit:** a side-by-side reading of each preset on a dark and a light theme rules on a per-theme
-weight adjustment or rejects it.
-
 ## 2026-11-07 — Recursive for the Markdown source mode
 
 **Bet.** Recursive's continuous axis between proportional and monospace could suit the Markdown

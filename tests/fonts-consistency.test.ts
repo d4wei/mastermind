@@ -53,6 +53,7 @@ describe('font presets', () => {
     expect(tokens['--weight-bold']).toBe(String(DEFAULT_FONT_PRESET.displayWeight))
     expect(tokens['--ls-heading']).toBe(DEFAULT_FONT_PRESET.displayTracking)
     expect(tokens['--weight-code']).toBe(String(DEFAULT_FONT_PRESET.codeWeight))
+    expect(tokens['--weight-body']).toBe('400')
   })
 
   it('reads a removed or unknown preset as the default and drops the retired code font', () => {

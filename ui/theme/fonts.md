@@ -30,10 +30,17 @@ holds the lists. Code takes the sans CJK faces in every preset. Noto SC ships as
 `unicode-range` slices, so a document loads only the slices its characters need; the
 [bundled fonts](../../themes/fonts/README.md) describe the files and their provenance.
 
+## Body weight on dark themes
+
+Light text on a dark ground reads heavier than the same text on paper, so each preset names a lower
+document body weight for themes whose appearance is dark; light themes keep 400. The values came
+from matching each preset's dark rendering to its light one by eye on a desktop display. Headings,
+bold text, code, and the interface keep their weights.
+
 ## Defaults and preferences
 
 The first preset is the default, and the base tokens in `themes/common.css` (`--font-display`,
-`--font-body`, `--font-mono`, `--weight-bold`, `--ls-heading`, `--weight-code`) match it, so the
+`--font-body`, `--font-mono`, `--weight-body`, `--weight-bold`, `--ls-heading`, `--weight-code`) match it, so the
 document renders identically before preferences load. [ThemeProvider.tsx](ThemeProvider.tsx) links
 the bundled `@font-face` sheet once and overrides those tokens from the chosen preset.
 

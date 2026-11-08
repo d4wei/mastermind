@@ -34,7 +34,9 @@ Use this entry shape:
 **Ruled.** Settings offer exactly Serif (Source Serif 4, default), Sans (Source Sans 3), and
 Hyperlegible (Atkinson Hyperlegible Next); each names its code face and a CJK stack, and Noto Serif
 SC and Noto Sans SC ship in the bundle so Chinese renders identically on every platform. Comfort
-over long on-screen reading outranks taste when choosing body faces.
+over long on-screen reading outranks taste when choosing body faces. On dark themes each preset
+lowers the document body weight (Serif 350, Sans 370, Hyperlegible 330), set by matching dark to
+light rendering by eye.
 
 **Beat:** seven display-led presets with a separate code font and system-only CJK fallback;
 Charis SIL and Literata as the serif body.

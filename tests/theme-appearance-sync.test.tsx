@@ -7,6 +7,7 @@ import { useConfig } from '../ui/app/configStore'
 import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
+import { FONT_PRESETS } from '../ui/theme/fontRegistry'
 
 let root: Root
 let host: HTMLDivElement
@@ -103,4 +104,19 @@ it('applies the loaded theme over the startup default without a veil, then cross
   expect(document.querySelector('.theme-veil')).toBeNull()
   act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'grid' } }))
   expect(document.querySelector('.theme-veil')).not.toBeNull()
+})
+
+it('lowers the document body weight to the preset value on dark themes only', () => {
+  const info = (id: string, appearance: 'light' | 'dark') => ({ id, name: id, appearance,
+    swatch: { bg: '', ink: '', accent: '' } })
+  useConfig.setState({ themes: [info('grid', 'light'), info('carbon', 'dark')] })
+  const weight = () => document.documentElement.style.getPropertyValue('--weight-body')
+  act(() => root.render(<ThemeEffects />))
+  expect(weight()).toBe('400')
+  for (const preset of FONT_PRESETS) {
+    act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'carbon', fontPreset: preset.id } }))
+    expect(weight()).toBe(String(preset.darkBodyWeight))
+    act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'grid', fontPreset: preset.id } }))
+    expect(weight()).toBe('400')
+  }
 })
