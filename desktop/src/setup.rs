@@ -833,13 +833,18 @@ mod tests {
     fn global_git_default_ignores_repository_name() {
         use std::process::{Command, Stdio};
         let fixture = Fixture::new();
-        let global = fixture.0.join("global.gitconfig");
+        // Git cannot open Windows verbatim paths, which the canonical fixture directory uses.
+        let plain = |path: &std::path::Path| {
+            std::path::PathBuf::from(path.to_string_lossy().trim_start_matches(r"\\?\"))
+        };
+        let directory = plain(fixture.0.path());
+        let global = directory.join("global.gitconfig");
         std::fs::write(&global, "[user]\n name = Global Reader\n").unwrap();
         let git = |args: &[&str]| {
             let mut command = Command::new("git");
             command
                 .args(args)
-                .current_dir(fixture.0.path())
+                .current_dir(&directory)
                 .env("GIT_CONFIG_GLOBAL", &global)
                 .env("GIT_CONFIG_NOSYSTEM", "1")
                 .stdin(Stdio::null())

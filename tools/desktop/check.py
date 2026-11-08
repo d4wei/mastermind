@@ -97,13 +97,17 @@ try:
         check('cold bundled executable / cwd / Unicode / spaces / leading hyphen',
               code == 0 and [r['status'] for r in response['results']] == ['opened'] * 3)
         pid = response['pid']
-        code, response, warm = invoke(root, [files / 'alias.md', files / 'missing', files])
+        # Admission checks the Markdown extension before touching the filesystem, so the missing
+        # file and the directory carry one to reach their own failures.
+        folder = base / 'folder.md'
+        folder.mkdir()
+        code, response, warm = invoke(root, [files / 'alias.md', files / 'missing.md', folder, files])
         check('warm reuse / alias deduplication / partial failure / directory rejection',
               code == 1 and response['pid'] == pid and
-              [r['status'] for r in response['results']] == ['already_open', 'error', 'error'])
+              [r['status'] for r in response['results']] == ['already_open', 'error', 'error', 'error'])
         check('file failures carry stable codes and readable messages',
-              response['results'][1]['error'] == 'file_not_found' and
-              response['results'][2]['error'] == 'not_supported_file' and
+              [r['error'] for r in response['results'][1:]] ==
+              ['file_not_found', 'not_supported_file', 'not_markdown'] and
               all(isinstance(result.get('message'), str) and result['message']
                   for result in response['results'][1:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])

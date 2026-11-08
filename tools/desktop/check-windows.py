@@ -233,13 +233,16 @@ try:
         check('release executable / Unicode / spaces / leading hyphen',
               code == 0 and [r['status'] for r in response['results']] == ['opened'] * 3)
         pid = response['pid']
-        code, response, warm = invoke(identifier, ['.\\a.md', 'A.MD', 'missing', '.'], files)
+        # Admission checks the Markdown extension before touching the filesystem, so the missing
+        # file and the directory carry one to reach their own failures.
+        (files / 'folder.md').mkdir()
+        code, response, warm = invoke(identifier, ['.\\a.md', 'A.MD', 'missing.md', 'folder.md', '.'], files)
         check('cwd / case alias / warm reuse / partial failure / directory rejection',
               code == 1 and response['pid'] == pid and
-              [r['status'] for r in response['results']] == ['already_open', 'already_open', 'error', 'error'])
+              [r['status'] for r in response['results']] == ['already_open', 'already_open', 'error', 'error', 'error'])
         check('file failures carry stable codes and readable messages',
-              response['results'][2]['error'] == 'file_not_found' and
-              response['results'][3]['error'] == 'not_supported_file' and
+              [r['error'] for r in response['results'][2:]] ==
+              ['file_not_found', 'not_supported_file', 'not_markdown'] and
               all(isinstance(result.get('message'), str) and result['message']
                   for result in response['results'][2:]))
         check('incomplete onboarding accompanies admission', response['onboarding_needed'])
