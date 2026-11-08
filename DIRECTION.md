@@ -26,6 +26,17 @@ entry that has already resolved.
 
 * * *
 
+## 2026-11-07 — Remembered files on volumes that are not mounted at launch
+
+**Open question.** A remembered document that cannot be reopened at launch is dropped from the
+inventory after one persistent notice, as `desktop/src/restoration.md` states. A file on an external
+drive, a network share, or an evicted cloud-sync folder is often missing only at login and present
+minutes later, so the drop is a real loss for those readers, while keeping unreachable paths forever
+would reopen stale files and confuse the open-files list.
+
+**Exit:** a ruling on whether a missing file stays remembered (for how many launches, or until the
+reader dismisses it) or is forgotten at once, then the inventory rule and notice copy that follow.
+
 ## 2026-11-07 — Several agents on one file
 
 **Gap.** Opening and closing assume one agent hands a file to the person and takes it back. A close
