@@ -25,6 +25,12 @@ room for every preceding card above the anchor, the selected card moves down onl
 retain order and separation. Measurements include actual card heights, including a resized reply
 composer. Narrow comment panels use ordinary vertical flow instead of positioned cards.
 
+Each card is a memoized `RailCard` that receives only its own selection, emphasis, placement,
+composer, and draft state, with the rail's actions in one object that lives as long as the rail,
+so hover, focus, selection, or typing renders only the cards whose state changed. The document view
+keeps its analysis and rendering context stable across those changes, so it does not render at all;
+`tests/session-render-scope.test.tsx` checks both.
+
 Hover and keyboard focus emphasize the matching passage and card without selecting, expanding,
 or repositioning either. They are separate sources, and either one emphasizes: the pointer leaving
 a card or passage ends only hover, and focus leaving a card ends only focus, so a focused card stays
@@ -87,7 +93,9 @@ posting the reply clears it, once the edit applies, leaving the emptied field op
 still-selected card; a refused edit keeps the draft.
 
 The reply textarea posts on Enter or Cmd/Ctrl+Enter, and Shift+Enter adds a line; an Enter that
-cannot post inserts nothing. Composition keys, including an IME's Enter, remain with the IME. Conflict state prevents submission, deletion, and resolution while
+cannot post inserts nothing. Reply follows the [block-scope verdict](../modes/reading/selection.md#verifying-marks)
+of the deferred draft; posting verifies the whole document, and its refusal disables Reply until the
+text or source changes. Composition keys, including an IME's Enter, remain with the IME. Conflict state prevents submission, deletion, and resolution while
 retaining the draft; a selected card shows its reply field then only if it holds a draft or was
 already open. Actions stop stale activation after a source splice.
 

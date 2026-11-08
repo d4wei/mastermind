@@ -1,10 +1,11 @@
+import type { Root } from 'mdast'
 import type { Node, Parent } from 'unist'
 import { group, parseAuthor, scan, stripLinePrefixes } from './critic/scanner'
 import type { Range, ReviewItem } from './critic/types'
 import { detectEol } from './eol'
 import { applyTextEdits } from './edits'
 import { stringifyEscaped } from './escaped-json'
-import { scanMarkdown, textBlockRanges } from './markdown/scan'
+import { scanMarkdownTree, textBlockRanges } from './markdown/scan'
 import { parseMarkdown } from './markdown/processor'
 import type { TextEdit } from './types'
 
@@ -22,7 +23,18 @@ interface ArchiveDiagnostic {
 
 const MARKER = 'mastermind:resolved-thread'
 
-export function parseResolvedThreads(source: string): { entries: ResolvedThread[]; diagnostics: ArchiveDiagnostic[] } {
+/**
+ * Functions here that take `plain` accept the plain Markdown parse of exactly `source` (an
+ * analysis's `plain`, never its reading tree) and parse the source themselves without it.
+ */
+type PlainParse = Root | undefined
+
+/** How many resolved-discussion records `source` holds; a source without the marker has none. */
+export function countResolvedThreads(source: string, plain?: PlainParse): number {
+  return source.includes(MARKER) ? parseResolvedThreads(source, plain).entries.length : 0
+}
+
+export function parseResolvedThreads(source: string, plain?: PlainParse): { entries: ResolvedThread[]; diagnostics: ArchiveDiagnostic[] } {
   const entries: ResolvedThread[] = []
   const diagnostics: ArchiveDiagnostic[] = []
   const visit = (node: Node): void => {
@@ -60,7 +72,7 @@ export function parseResolvedThreads(source: string): { entries: ResolvedThread[
     }
     for (const child of (node as Parent).children ?? []) visit(child)
   }
-  visit(parseMarkdown(source))
+  visit(plain ?? parseMarkdown(source))
   return { entries, diagnostics }
 }
 
@@ -78,8 +90,9 @@ const blankLineAt = (source: string, at: number) => /^[ \t]*(?:\r?\n|$)/.test(so
  * joins blocks the record held apart. At the file tail, deletion inverts the separator resolution
  * chose for a source that did not end in the dominant line ending.
  */
-export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedThread, 'range' | 'context' | 'thread'>): TextEdit[] {
-  const current = parseResolvedThreads(source).entries.find(({ range }) =>
+export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedThread, 'range' | 'context' | 'thread'>,
+  plain?: PlainParse): TextEdit[] {
+  const current = parseResolvedThreads(source, plain).entries.find(({ range }) =>
     range.start === entry.range.start && range.end === entry.range.end)
   if (!current || current.context !== entry.context || current.thread !== entry.thread) return []
   let { start: from, end: to } = current.range
@@ -109,8 +122,8 @@ export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedTh
   return [{ from, to, insert: '' }]
 }
 
-function currentThread(source: string, thread: ReviewThread): ReviewThread | null {
-  const current = group(scanMarkdown(source), source)
+function currentThread(source: string, plain: Root, thread: ReviewThread): ReviewThread | null {
+  const current = group(scanMarkdownTree(source, plain), source)
     .find((item): item is ReviewThread => item.type === 'thread' && item.start === thread.start && item.end === thread.end)
   // Revalidate offsets and parsed comment text before splicing a captured UI thread.
   return current && JSON.stringify(current) === JSON.stringify(thread) ? current : null
@@ -122,8 +135,9 @@ function unwrapAnchor(thread: ReviewThread): TextEdit[] {
     { from: anchor.innerEnd, to: anchor.end, insert: '' }] : []
 }
 
-export function deleteCommentEdits(source: string, thread: ReviewThread, commentIndex: number): TextEdit[] {
-  const current = currentThread(source, thread)
+export function deleteCommentEdits(source: string, thread: ReviewThread, commentIndex: number,
+  plain?: PlainParse): TextEdit[] {
+  const current = currentThread(source, plain ?? parseMarkdown(source), thread)
   if (!current || !Number.isInteger(commentIndex)) return []
   const comment = current.comments[commentIndex]
   if (!comment) return []
@@ -131,9 +145,9 @@ export function deleteCommentEdits(source: string, thread: ReviewThread, comment
     ...(current.comments.length === 1 ? unwrapAnchor(current) : [])]
 }
 
-function quotedContext(source: string, thread: ReviewThread): string {
+function quotedContext(source: string, plain: Root, thread: ReviewThread): string {
   if (thread.anchor) return source.slice(thread.anchor.innerStart, thread.anchor.innerEnd)
-  const block = textBlockRanges(parseMarkdown(source))
+  const block = textBlockRanges(plain)
     .find(({ start, end }) => start <= thread.start && thread.start < end)
   // A validated thread came from scanMarkdown, so a block contains it; never quote unrelated text.
   if (!block) return ''
@@ -145,16 +159,50 @@ function encodeRecord(record: Pick<ResolvedThread, 'context' | 'thread'>): strin
   return stringifyEscaped(record, /[{}<>-]/g, 2)
 }
 
-export function resolveThreadEdits(source: string, thread: ReviewThread): TextEdit[] {
-  const current = currentThread(source, thread)
+/**
+ * Offsets of the top-level blocks that start a line at column 0, with a non-blank character, after a
+ * blank line. No paragraph, list, quote, table, or indented code continues onto such a line, so the
+ * text from there parses as it would on its own unless a fenced code or HTML block is still open.
+ */
+function freshStarts(source: string, plain: Root): number[] {
+  const starts: number[] = []
+  for (const node of plain.children) {
+    const at = node.position?.start.offset
+    if (at === undefined || at === 0 || source[at - 1] !== '\n' || /\s/.test(source[at] ?? ' ')) continue
+    let before = at - 2
+    if (source[before] === '\r') before--
+    while (before >= 0 && (source[before] === ' ' || source[before] === '\t')) before--
+    if (before < 0 || source[before] === '\n') starts.push(at)
+  }
+  return starts
+}
+
+/**
+ * Whether `block` is a top-level HTML block of its own at `start`, parsing `text` only from `from`,
+ * where it must parse as it would on its own. A leading line break keeps that slice from opening
+ * with frontmatter.
+ */
+function ownHtmlBlock(text: string, from: number, start: number, block: string): boolean {
+  const base = from === 0 ? 0 : from - 1
+  return parseMarkdown(text.slice(base)).children.some(({ type, position }) => type === 'html' &&
+    position?.start.offset !== undefined && position.end.offset !== undefined &&
+    position.start.offset + base === start && text.slice(start, position.end.offset + base) === block)
+}
+
+/** A complete HTML comment that closes no block it lands in except a code or HTML block left open. */
+const PROBE = '<!-- -->'
+
+export function resolveThreadEdits(source: string, thread: ReviewThread, plain?: PlainParse): TextEdit[] {
+  const tree = plain ?? parseMarkdown(source)
+  const current = currentThread(source, tree, thread)
   if (!current) return []
-  const parsed = parseResolvedThreads(source)
+  const parsed = parseResolvedThreads(source, tree)
   // Appending inside an unterminated archive would hide the new record and change its meaning.
   if (parsed.diagnostics.some(({ range }) => !source.slice(range.start, range.end).endsWith('-->'))) {
     throw new Error('Cannot resolve discussion while the document contains an unterminated archive')
   }
   const eol = detectEol(source) === 'crlf' ? '\r\n' : '\n'
-  const record = encodeRecord({ context: quotedContext(source, current), thread: source.slice(current.start, current.end) }).replace(/\n/g, eol)
+  const record = encodeRecord({ context: quotedContext(source, tree, current), thread: source.slice(current.start, current.end) }).replace(/\n/g, eol)
   const separator = source.endsWith(eol + eol) ? '' : source.endsWith(eol) ? eol : eol + eol
   const archive = `<!-- ${MARKER} v1${eol}${record}${eol}-->`
   const edits: TextEdit[] = [
@@ -164,8 +212,18 @@ export function resolveThreadEdits(source: string, thread: ReviewThread): TextEd
   ]
   const updated = applyTextEdits(source, edits)
   const archiveStart = updated.lastIndexOf(archive)
-  const ownHtmlBlock = parseMarkdown(updated).children.some((node) => node.type === 'html' &&
-    node.position?.start.offset === archiveStart && updated.slice(archiveStart, node.position.end.offset) === archive)
-  if (!ownHtmlBlock) throw new Error('Cannot resolve discussion while the document ends in an unterminated code or HTML block')
+  // Text before the discussion's fresh start is unchanged, so parsing can begin there. Past the next
+  // fresh start, the text parses as before once a probe shows the edited stretch leaves no code or
+  // HTML block open, and only the tail from the last fresh start needs parsing.
+  const fresh = freshStarts(source, tree)
+  const from = fresh.findLast((at) => at < current.start) ?? 0
+  const next = fresh.find((at) => at > current.end)
+  const removed = source.length + edits.at(-1)!.insert.length - updated.length
+  const settled = next !== undefined &&
+    ownHtmlBlock(updated.slice(0, next - removed) + PROBE, from, next - removed, PROBE)
+  const start = settled ? fresh.at(-1)! - removed : from
+  if (!ownHtmlBlock(updated, start, archiveStart, archive)) {
+    throw new Error('Cannot resolve discussion while the document ends in an unterminated code or HTML block')
+  }
   return edits
 }

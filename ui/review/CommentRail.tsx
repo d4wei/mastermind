@@ -1,7 +1,7 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
-import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
@@ -22,7 +22,7 @@ import type { TextEdit } from '../../document/types'
 
 interface Props {
   readOnly?: boolean
-  analysis: Pick<Analysis, 'spans' | 'threads' | 'tree' | 'provenance'>
+  analysis: Pick<Analysis, 'plain' | 'spans' | 'threads' | 'tree' | 'provenance'>
   /** The source `analysis` describes. */
   source: string
   docRef: RefObject<HTMLElement | null>
@@ -48,12 +48,26 @@ interface Props {
 
 const CARD_GAP = 8
 
+/** What a card asks of its rail; one object for the rail's lifetime, so cards need not re-render for it. */
+interface CardActions {
+  activate: (spanIndex: number) => void
+  /** Deselects the discussion; `keepFocus` leaves focus on a control that stays rendered. */
+  collapse: (keepFocus?: boolean) => void
+  resolve: (card: ThreadCard) => void
+  deleteMessage: (card: ThreadCard, messageIndex: number) => void
+  setDraft: (card: ThreadCard, text: string) => void
+  submit: (card: ThreadCard) => void
+  /** Discards the card's draft and collapses it. */
+  cancel: (card: ThreadCard) => void
+  hover: (spanIndex: number | null) => void
+  focusSpan: (spanIndex: number | null) => void
+}
+
 export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, focusedSpan, onHover,
   onFocusSpan, onActivate, onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false, leaving = false }: Props) {
   const cards = analysis.threads
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
-  const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement | null>(null)
   const [placed, setPlaced] = useState<ReadonlySet<string>>(() => new Set())
   const [placement] = useState(() => new RailPlacement(CARD_GAP, (keys) => setPlaced(new Set(keys))))
@@ -176,7 +190,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const resolveThread = (card: ThreadCard) => {
     if (readOnly) return
     let edits: TextEdit[]
-    try { edits = resolveThreadEdits(source, card.thread) }
+    try { edits = resolveThreadEdits(source, card.thread, analysis.plain) }
     catch (error) { setResolveError(error instanceof Error ? error.message : String(error)); return }
     if (!edits.length) return
     onHover?.(null)
@@ -184,26 +198,59 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     setResolveError(null)
     collapse()
   }
-  // Null marks a reply whose insert would not reparse as one comment in place; it stays editable
-  // but cannot submit, and a body whose own lines break the mark says so.
-  const pendingReply = (card: ThreadCard, text: string): TextEdit[] | null =>
-    readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text, analysis)
+  const deleteMessage = (card: ThreadCard, messageIndex: number) => {
+    onHover?.(null)
+    // Deleting the opening message ends the discussion's identity.
+    const ended = messageIndex === 0 ? card : undefined
+    if (edit(deleteCommentEdits(source, card.thread, messageIndex, analysis.plain), ended)) collapse()
+  }
   // A paused document opens no new composer but keeps one that holds a draft or was already open.
   const composes = (card: ThreadCard) => card.spanIndex === activeSpan &&
     (!readOnly || replyFor === card.key || draftText(card) !== '')
-  // Verifying reparses the document, so the open composer's verdict follows its deferred text and
-  // is kept across renders that change neither; submission verifies the final text.
+  // The open composer's verdict checks only the edited blocks, follows its deferred text, and is
+  // kept across renders that change neither. Submission verifies the final text in the whole
+  // document; its refusal stands until the text or source changes. Null marks a reply whose insert
+  // would not reparse as one comment in place: it stays editable but cannot submit.
   const composerCard = cards.find(composes)
   const composerText = useDeferredValue(composerCard ? draftText(composerCard) : '')
   const composerEnd = composerCard?.thread.end
   const composerVerified = useMemo(() => composerEnd === undefined || readOnly || !composerText.trim() ? null
-    : replyEdits(source, composerEnd, authorTag, composerText, analysis),
+    : replyEdits(source, composerEnd, authorTag, composerText, analysis, 'block'),
   [composerEnd, composerText, readOnly, source, authorTag, analysis])
+  const [refusedReply, setRefusedReply] = useState<{ key: string; text: string; source: string } | null>(null)
+  const canReply = !!composerVerified && !(refusedReply?.key === composerCard?.key &&
+    refusedReply?.text === composerText && refusedReply?.source === source)
+  // A body whose own lines break the mark says so.
+  const bodyInvalid = !readOnly && !!composerText.trim() && !canReply && !commentBodyFits(authorTag, composerText)
   const submitReply = (card: ThreadCard) => {
-    const edits = pendingReply(card, draftText(card))
-    if (!edits || !edit(edits, card)) return
+    const text = draftText(card)
+    if (readOnly || !text.trim()) return
+    const edits = replyEdits(source, card.thread.end, authorTag, text, analysis)
+    if (!edits) { setRefusedReply({ key: card.key, text, source }); return }
+    if (!edit(edits, card)) return
     setReplyFor(null)
   }
+  const cancel = (card: ThreadCard) => {
+    removeDraft(placedDrafts.byCard.get(card.key)?.id)
+    collapse()
+  }
+
+  const latest: CardActions = { activate, collapse, resolve: resolveThread, deleteMessage, setDraft: setDraftText,
+    submit: submitReply, cancel, hover: (spanIndex) => onHover?.(spanIndex),
+    focusSpan: (spanIndex) => onFocusSpan?.(spanIndex) }
+  const handlers = useRef(latest)
+  useLayoutEffect(() => { handlers.current = latest })
+  const [actions] = useState<CardActions>(() => ({
+    activate: (spanIndex) => handlers.current.activate(spanIndex),
+    collapse: (keepFocus) => handlers.current.collapse(keepFocus),
+    resolve: (card) => handlers.current.resolve(card),
+    deleteMessage: (card, messageIndex) => handlers.current.deleteMessage(card, messageIndex),
+    setDraft: (card, text) => handlers.current.setDraft(card, text),
+    submit: (card) => handlers.current.submit(card),
+    cancel: (card) => handlers.current.cancel(card),
+    hover: (spanIndex) => handlers.current.hover(spanIndex),
+    focusSpan: (spanIndex) => handlers.current.focusSpan(spanIndex),
+  }))
 
   useDraftGuard('replies', t('reply'), drafts.some((draft) => !!draft.text.trim()), () => {
     const card = cards.find((item) => draftText(item).trim())
@@ -228,75 +275,12 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.map((card) => {
-      const selected = activeSpan === card.spanIndex
-      const replies = card.thread.comments.length - 1
-      // A message reads author, then (opening message only) the quoted passage, then the comment, as
-      // a resolved discussion does; the reply count follows the opening message.
-      const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
-        <ThreadMessage key={messageIndex} data-find-comment={card.messages[messageIndex]} reply={messageIndex > 0} body={comment.body}
-          author={messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
-            aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
-            onClick={() => activate(card.spanIndex)}>
-            <span className="rail-author">{comment.author ?? t('comment')}</span>
-          </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-          quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} expandable={selected} /> : undefined}
-          actions={<>
-            {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
-              title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
-            <DiscussionMenu label={t('deleteComment')} disabled={readOnly} onSelect={() => {
-              onHover?.(null)
-              // Deleting the opening message ends the discussion's identity.
-              const ended = messageIndex === 0 ? card : undefined
-              if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
-            }} />
-          </>} />
-      return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
-        ref={cardRef(card.key)} data-keeps-discussion=""
-        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex || focusedSpan === card.spanIndex
-          ? ' paired' : ''}${placed.has(card.key) ? '' : ' unplaced'}`}
-        onPointerEnter={() => onHover?.(card.spanIndex)} onPointerLeave={() => onHover?.(null)}
-        onFocus={() => onFocusSpan?.(card.spanIndex)}
-        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onFocusSpan?.(null) }}
-        onClick={(event) => {
-          if ((event.target as HTMLElement).closest('button, a, input, select, textarea, [role="menuitem"]')) return
-          if (window.getSelection()?.isCollapsed !== false) activate(card.spanIndex)
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape' && !ime.isComposing(event.nativeEvent) && !(event.target as HTMLElement).closest('[role="menu"]')) {
-            event.stopPropagation()
-            collapse()
-          }
-        }}>
-        {message(card.thread.comments[0]!, 0)}
-        {replies > 0 && <RepliesDisclosure count={replies} expanded={selected}
-          onToggle={() => selected ? collapse(true) : activate(card.spanIndex)}>
-          {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
-        </RepliesDisclosure>}
-        <Collapsible open={composes(card)}><div className="rail-reply">
-          {readOnly && <p role="status">{t('editingPaused')}</p>}
-          <textarea autoFocus={replyFor === card.key} readOnly={readOnly} rows={2} {...ime.inputProps}
-            value={draftText(card)} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
-            onChange={(event) => setDraftText(card, event.target.value)}
-            onKeyDown={(event) => {
-              if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
-              // Enter posts and Shift+Enter adds a line; an Enter that cannot post inserts nothing.
-              if (event.key === 'Enter' && !event.shiftKey && !event.altKey) { event.preventDefault(); submitReply(card) }
-              if (event.key === 'Escape') { event.stopPropagation(); collapse() }
-            }} />
-          {/* The open composer's verdict is this card's: a collapsing composer keeps its last open render. */}
-          <Collapsible open={!readOnly && !!composerText.trim() && !composerVerified &&
-            !commentBodyFits(authorTag, composerText)}><p role="alert">{t('commentBodyInvalid')}</p></Collapsible>
-          <div className="rail-actions">
-            {/* Cancel discards the draft; Escape and clicking away keep it for the next selection. */}
-            <button type="button" className="btn-ghost btn-compact" onClick={() => {
-              removeDraft(placedDrafts.byCard.get(card.key)?.id)
-              collapse()
-            }}>{t('cancel')}</button>
-            <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
-              onClick={() => submitReply(card)}>{t('reply')}</button>
-          </div>
-        </div></Collapsible>
-      </div>
+      const composer = card === composerCard
+      return <RailCard key={card.key} card={card} attach={cardRef(card.key)} actions={actions} readOnly={readOnly}
+        selected={activeSpan === card.spanIndex} placed={placed.has(card.key)}
+        paired={hoveredSpan === card.spanIndex || focusedSpan === card.spanIndex}
+        composes={composes(card)} requested={replyFor === card.key} draft={draftText(card)}
+        canReply={composer && canReply} bodyInvalid={composer && bodyInvalid} />
     })}
     {orphaned.length > 0 && <div ref={attachDrafts} className="rail-orphan">
       <p>{t('draftTargetChanged')}</p>
@@ -309,3 +293,91 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     </div>}
   </div>
 }
+
+interface CardProps {
+  card: ThreadCard
+  /** Registers the card with placement; stable per card key. */
+  attach: (element: HTMLDivElement | null) => (() => void) | undefined
+  actions: CardActions
+  readOnly: boolean
+  selected: boolean
+  /** Hovered or focused: emphasized with its passage, without selecting. */
+  paired: boolean
+  /** Placement has positioned the card; until then it stays unseen. */
+  placed: boolean
+  /** The reply composer shows. */
+  composes: boolean
+  /** The composer was explicitly requested and takes focus as it opens. */
+  requested: boolean
+  draft: string
+  /** The open composer's verdict; a collapsing composer keeps its last open render. */
+  canReply: boolean
+  bodyInvalid: boolean
+}
+
+/**
+ * One discussion card. It renders only when its own props change, so hover, focus, or a draft on
+ * another card leaves it untouched; its labels follow the interface language through `useT`.
+ */
+const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selected, paired, placed, composes,
+  requested, draft, canReply, bodyInvalid }: CardProps) {
+  const t = useT()
+  const ime = useCompositionGuard()
+  const replies = card.thread.comments.length - 1
+  // A message reads author, then (opening message only) the quoted passage, then the comment, as
+  // a resolved discussion does; the reply count follows the opening message.
+  const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
+    <ThreadMessage key={messageIndex} data-find-comment={card.messages[messageIndex]} reply={messageIndex > 0} body={comment.body}
+      author={messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
+        aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
+        onClick={() => actions.activate(card.spanIndex)}>
+        <span className="rail-author">{comment.author ?? t('comment')}</span>
+      </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
+      quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} expandable={selected} /> : undefined}
+      actions={<>
+        {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
+          title={t('resolve')} disabled={readOnly} onClick={() => actions.resolve(card)}><CheckIcon /></button>}
+        <DiscussionMenu label={t('deleteComment')} disabled={readOnly}
+          onSelect={() => actions.deleteMessage(card, messageIndex)} />
+      </>} />
+  return <div role="group" aria-label={t('resolvedOriginal')} ref={attach} data-keeps-discussion=""
+    className={`rail-card${selected ? ' active' : ''}${paired ? ' paired' : ''}${placed ? '' : ' unplaced'}`}
+    onPointerEnter={() => actions.hover(card.spanIndex)} onPointerLeave={() => actions.hover(null)}
+    onFocus={() => actions.focusSpan(card.spanIndex)}
+    onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) actions.focusSpan(null) }}
+    onClick={(event) => {
+      if ((event.target as HTMLElement).closest('button, a, input, select, textarea, [role="menuitem"]')) return
+      if (window.getSelection()?.isCollapsed !== false) actions.activate(card.spanIndex)
+    }}
+    onKeyDown={(event) => {
+      if (event.key === 'Escape' && !ime.isComposing(event.nativeEvent) && !(event.target as HTMLElement).closest('[role="menu"]')) {
+        event.stopPropagation()
+        actions.collapse()
+      }
+    }}>
+    {message(card.thread.comments[0]!, 0)}
+    {replies > 0 && <RepliesDisclosure count={replies} expanded={selected}
+      onToggle={() => selected ? actions.collapse(true) : actions.activate(card.spanIndex)}>
+      {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
+    </RepliesDisclosure>}
+    <Collapsible open={composes}><div className="rail-reply">
+      {readOnly && <p role="status">{t('editingPaused')}</p>}
+      <textarea autoFocus={requested} readOnly={readOnly} rows={2} {...ime.inputProps}
+        value={draft} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
+        onChange={(event) => actions.setDraft(card, event.target.value)}
+        onKeyDown={(event) => {
+          if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
+          // Enter posts and Shift+Enter adds a line; an Enter that cannot post inserts nothing.
+          if (event.key === 'Enter' && !event.shiftKey && !event.altKey) { event.preventDefault(); actions.submit(card) }
+          if (event.key === 'Escape') { event.stopPropagation(); actions.collapse() }
+        }} />
+      <Collapsible open={bodyInvalid}><p role="alert">{t('commentBodyInvalid')}</p></Collapsible>
+      <div className="rail-actions">
+        {/* Cancel discards the draft; Escape and clicking away keep it for the next selection. */}
+        <button type="button" className="btn-ghost btn-compact" onClick={() => actions.cancel(card)}>{t('cancel')}</button>
+        <button type="button" className="btn-primary btn-compact" disabled={!canReply}
+          onClick={() => actions.submit(card)}>{t('reply')}</button>
+      </div>
+    </div></Collapsible>
+  </div>
+})

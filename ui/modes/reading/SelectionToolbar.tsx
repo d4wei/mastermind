@@ -14,7 +14,8 @@ import { useCompositionGuard } from '../../util/composition'
 import { rootMs } from '../../util/css-tokens'
 import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
-import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from './marks'
+import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict, type VerifyScope } from './marks'
+import { analyzeMarkdown } from '../../../document/markdown/analyze'
 
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
@@ -111,6 +112,9 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
    * with the next pointer event that reports no button held.
    */
   const held = useRef({ pointer: false, shift: false, awaiting: false })
+  /** A submission's refusal, shown in place of the draft verdict while its inputs stand. */
+  const [submitted, setSubmitted] = useState<{ verdict: MarkVerdict; source: string; ranges: SelRange[];
+    composing: 'comment' | 'change' | null; comment: string; replacements: string[] } | null>(null)
   /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
   const reread = useRef(false)
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -309,21 +313,28 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   useLayoutEffect(relayout, [findOpen])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
-  const verify = (text: string, changes: readonly string[]): MarkVerdict => {
+  // The analysis describes only the current source; an open composer on a stale view analyzes its
+  // own once.
+  const viewSource = view?.source
+  const viewAnalysis = useMemo(() => !composing || viewSource === undefined ? undefined
+    : viewSource === source ? analysis : analyzeMarkdown(viewSource), [composing, viewSource, source, analysis])
+  const verify = (text: string, changes: readonly string[], scope: VerifyScope): MarkVerdict => {
     if (!view) return { edits: [] }
-    // The analysis describes only the current source; a stale view analyzes its own.
-    const known = source === view.source ? analysis : undefined
-    return composing === 'change' ? changeVerdict(view.source, view.ranges, changes, known)
-      : composing === 'comment' && text.trim() ? commentVerdict(view.source, view.ranges, authorTag, text, known)
+    return composing === 'change' ? changeVerdict(view.source, view.ranges, changes, viewAnalysis, scope)
+      : composing === 'comment' && text.trim()
+        ? commentVerdict(view.source, view.ranges, authorTag, text, viewAnalysis, scope)
         : { edits: [] }
   }
-  // Verifying reparses the document, so the composer's verdict follows its deferred text and is
-  // kept across renders, such as scroll frames, that change none of its inputs; submission verifies
-  // the final text.
+  // The composer's verdict checks only the edited blocks, follows the deferred text, and is kept
+  // across renders, such as scroll frames, that change none of its inputs; submission verifies the
+  // final text in the whole document, and its refusal stands until the draft or selection changes.
   const deferredComment = useDeferredValue(comment)
   const deferredReplacements = useDeferredValue(replacements)
-  const verdict = useMemo(() => verify(deferredComment, deferredReplacements),
-    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, source, analysis, authorTag])
+  const draftVerdict = useMemo(() => verify(deferredComment, deferredReplacements, 'block'),
+    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, viewAnalysis, authorTag])
+  const verdict = submitted && submitted.source === source && submitted.ranges === view?.ranges &&
+    submitted.composing === composing && submitted.comment === deferredComment &&
+    submitted.replacements === deferredReplacements ? submitted.verdict : draftVerdict
   if (!present.mounted || !view) return null
 
   const begin = (kind: 'comment' | 'change'): void => {
@@ -349,8 +360,9 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const current = source === view.source && !readOnly
   const canSubmit = current && 'edits' in verdict && verdict.edits.length > 0
   const submit = (): void => {
-    const final = current ? verify(comment, replacements) : null
+    const final = current ? verify(comment, replacements, 'document') : null
     if (final && 'edits' in final && final.edits.length) finish(final.edits)
+    else if (final && 'refused' in final) setSubmitted({ verdict: final, source, ranges: view.ranges, composing, comment, replacements })
   }
   const refusal = 'refused' in verdict ? verdict.refused === 'formatting' ? 'markChangesFormatting'
     : composing === 'change' ? 'changeInvalid'

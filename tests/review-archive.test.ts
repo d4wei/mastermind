@@ -3,8 +3,9 @@ import { segmentBlocks } from '../document/blocks'
 import { group, scan } from '../document/critic/scanner'
 import { applyTextEdits } from '../document/edits'
 import { scanMarkdown } from '../document/markdown/scan'
-import { deleteCommentEdits, deleteResolvedThreadEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread }
-  from '../document/review-archive'
+import { parseMarkdown } from '../document/markdown/processor'
+import { countResolvedThreads, deleteCommentEdits, deleteResolvedThreadEdits, parseResolvedThreads, resolveThreadEdits,
+  type ReviewThread } from '../document/review-archive'
 
 function threads(source: string): ReviewThread[] {
   return group(scanMarkdown(source), source).filter((item): item is ReviewThread => item.type === 'thread')
@@ -229,6 +230,45 @@ describe('resolved discussion archive', () => {
   it('ignores archive examples inside fenced code', () => {
     const source = '```html\n<!-- mastermind:resolved-thread v9\n{}\n-->\n```'
     expect(parseResolvedThreads(source)).toEqual({ entries: [], diagnostics: [] })
+    expect(countResolvedThreads(source)).toBe(0)
+  })
+
+  it('counts records without parsing a source that has no marker, and with a supplied parse', () => {
+    const resolved = resolve('Text {>>@A: note<<}\n\nMore {>>@B: other<<}\n')
+    const twice = applyTextEdits(resolved, resolveThreadEdits(resolved, threads(resolved)[0]!))
+    expect(countResolvedThreads(twice)).toBe(2)
+    expect(countResolvedThreads(twice, parseMarkdown(twice))).toBe(2)
+    expect(countResolvedThreads('mastermind resolved thread, in prose')).toBe(0)
+  })
+
+  it('splices the same edits from a supplied plain parse', () => {
+    const source = 'Intro.\n\nStart {==quoted==}{>>@A: one<<}{>>@B: two<<} end.\n\nTail.\n'
+    const plain = parseMarkdown(source)
+    const thread = threads(source)[0]!
+    expect(resolveThreadEdits(source, thread, plain)).toEqual(resolveThreadEdits(source, thread))
+    expect(deleteCommentEdits(source, thread, 1, plain)).toEqual(deleteCommentEdits(source, thread, 1))
+    const archived = resolve(source)
+    const entry = parseResolvedThreads(archived, parseMarkdown(archived)).entries[0]!
+    expect(deleteResolvedThreadEdits(archived, entry, parseMarkdown(archived))).toEqual(deleteResolvedThreadEdits(archived, entry))
+  })
+
+  // Removing a comment can turn the rest of its line into a fence opener; whether that fence
+  // swallows the archive depends on every fence after it, as a parse of the whole result shows.
+  it.each([
+    ['an opened fence that nothing closes', 'Intro.\n\npara\n{>>@a: c<<}```\n\ntext\n\nmore\n', false],
+    ['an opened fence that a later fence line closes', 'Intro.\n\npara\n{>>@a: c<<}```\n\ntext\n\n```\n', true],
+    ['an opened fence that turns a later closing line into an opener', 'Intro.\n\npara\n{>>@a: c<<}```\n\ntext\n\n```\ncode\n```\n', false],
+    ['a closed fence after the discussion', 'Intro.\n\npara {>>@a: c<<}\n\n```\ncode\n```\n\nEnd.\n', true],
+  ])('decides the archive block as a whole parse does: %s', (_, source, archived) => {
+    const thread = threads(source)[0]!
+    if (!archived) {
+      expect(() => resolveThreadEdits(source, thread)).toThrow('unterminated code or HTML block')
+      return
+    }
+    const result = applyTextEdits(source, resolveThreadEdits(source, thread))
+    const last = parseMarkdown(result).children.at(-1)!
+    expect(last.type).toBe('html')
+    expect(result.slice(last.position!.start.offset)).toMatch(/^<!-- mastermind:resolved-thread v1[\s\S]*-->\n$/)
   })
 
   it('keeps archived threads out of raw mark discovery and translation', async () => {

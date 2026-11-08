@@ -1,11 +1,12 @@
 import type { TextEdit } from '../../document/types'
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { DraftScope, useDraftPending, useDraftState, useDraftValue, useDrafts } from '../review/drafts'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, startTransition, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import type { Root } from 'mdast'
 import { DocumentScroll } from './DocumentScroll'
 import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
-import { analyzeMarkdown } from '../../document/markdown/analyze'
+import { analyzeMarkdown, type Analysis } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
@@ -14,7 +15,7 @@ import { locateThread, rebaseReplies, rebaseThread, refreshReplies, refreshThrea
   type ReplyDraft, type ThreadRef } from '../review/thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { PreparedTranslation } from '../../document/translation'
-import { closeOverlay, openOverlay, publishCommentRail, useOverlay } from './overlayStore'
+import { closeOverlay, openOverlay, publishCommentRail, requestFind, useOverlay } from './overlayStore'
 import { MarkGutter } from '../review/MarkGutter'
 import { extractOutline } from '../modes/reading/outline'
 import { parseAuthor } from '../../document/critic/scanner'
@@ -24,7 +25,7 @@ import { TranslatedSelection } from '../translate/TranslatedSelection'
 import { requireReviewerHost } from './host'
 import { useConfig } from './configStore'
 import { editingLocked, useDoc, type ViewMode } from '../documents/store'
-import { parseResolvedThreads } from '../../document/review-archive'
+import { countResolvedThreads } from '../../document/review-archive'
 import { ResolvedThreads } from '../review/ResolvedThreads'
 import { Notice } from './Notifications'
 import { ConflictPanel } from './ConflictPanel'
@@ -44,6 +45,53 @@ const FindPanel = lazy(() => import('../find/FindPanel').then((m) => ({ default:
 const TranslatedView = lazy(() => import('../translate/TranslatedView').then((m) => ({ default: m.TranslatedView })))
 
 const MODE_CYCLE: Record<ViewMode, ViewMode> = { reading: 'source', source: 'reading' }
+
+/** How long edits must pause before Markdown mode parses again for its outline and resolved count. */
+const PARSE_PAUSE_MS = 300
+/** Whether a view has mounted Find already; later views mount it at once, from the loaded chunk. */
+let findLoaded = false
+
+/** Runs `run` once the browser is idle, or after a short delay where it cannot say; returns a cancel. */
+function whenIdle(run: () => void): () => void {
+  if (typeof requestIdleCallback === 'function') {
+    const id = requestIdleCallback(run, { timeout: 2000 })
+    return () => cancelIdleCallback(id)
+  }
+  const id = setTimeout(run, 500)
+  return () => clearTimeout(id)
+}
+
+/** Runs `run` once mounted, after the effects of the siblings before it. */
+function AfterMount({ run }: { run: () => void }) {
+  useEffect(run, [run])
+  return null
+}
+
+/** A plain parse with the session and source it describes. */
+interface PlainParse { sessionId: string; source: string; tree: Root }
+
+/**
+ * The plain parse that stands in for a reading analysis while there is none (Markdown mode, the
+ * translated view): `cached` when it describes `source`, otherwise the session's first parse at
+ * once and later ones only after edits pause, so the result may describe an earlier source.
+ */
+function usePlainParse(sessionId: string, source: string, enabled: boolean, cached: Root | null): PlainParse | null {
+  const [parsed, setParsed] = useState<PlainParse | null>(null)
+  const current = parsed?.sessionId === sessionId ? parsed : null
+  useLayoutEffect(() => {
+    if (!enabled) return
+    if (cached) {
+      if (current?.tree !== cached) setParsed({ sessionId, source, tree: cached })
+      return
+    }
+    if (current?.source === source) return
+    const parse = () => setParsed({ sessionId, source, tree: parseMarkdown(source) })
+    if (!current) { parse(); return }
+    const timer = setTimeout(parse, PARSE_PAUSE_MS)
+    return () => clearTimeout(timer)
+  }, [enabled, cached, current, sessionId, source])
+  return !enabled ? null : cached ? { sessionId, source, tree: cached } : current
+}
 
 /**
  * Holds a discussion choice by thread identity, so edits elsewhere cannot move it to another
@@ -132,14 +180,20 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [sessionId, source, status, loadedSessionId])
 
   const showTranslated = mode === 'reading' && transActive
-  const analysis = useMemo(
-    () => (status === 'ready' && mode === 'reading' && !showTranslated ? analyzeMarkdown(source) : null),
-    [status, source, mode, showTranslated],
-  )
-  // Reuse the critic-aware reading tree; Markdown mode needs its own parse.
+  // The last analysis, kept by its source, so leaving and returning to reading with the source
+  // unchanged analyzes it once.
+  const analyzed = useRef<{ source: string; analysis: Analysis } | null>(null)
+  const analysis = useMemo(() => {
+    if (status !== 'ready' || mode !== 'reading' || showTranslated) return null
+    if (analyzed.current?.source !== source) analyzed.current = { source, analysis: analyzeMarkdown(source) }
+    return analyzed.current.analysis
+  }, [status, source, mode, showTranslated])
+  const cachedPlain = analyzed.current?.source === source ? analyzed.current.analysis.plain : null
+  const plainParse = usePlainParse(sessionId, source, status === 'ready' && !analysis, cachedPlain)
+  // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
   const outline = useMemo(
-    () => (analysis ? extractOutline(analysis.tree) : status === 'ready' ? extractOutline(parseMarkdown(source)) : []),
-    [analysis, status, source],
+    () => (analysis ? extractOutline(analysis.tree) : plainParse ? extractOutline(plainParse.tree) : []),
+    [analysis, plainParse?.tree],
   )
   const [sourceOutline, setSourceOutline] = useState<SourceOutline | null>(null)
   const smallWindow = useIsNarrow()
@@ -153,7 +207,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     if (findOpenedRail.current) { setRailOpen(false); findOpenedRail.current = false }
   }, [])
   const panel = useOverlay((s) => s.owner === sessionId && (s.open === 'settings' || s.open === 'resolved') ? s.open : null)
-  const resolvedCount = useMemo(() => parseResolvedThreads(source).entries.length, [source])
+  const resolvedCount = useMemo(() => analysis ? countResolvedThreads(source, analysis.plain)
+    : plainParse ? countResolvedThreads(plainParse.source, plainParse.tree) : 0, [analysis, source, plainParse?.tree])
   const togglePanel = useCallback((next: 'settings' | 'resolved') => {
     if (narrow) setRailOpen(false)
     const { open, owner } = useOverlay.getState()
@@ -264,6 +319,61 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       .filter((s) => s.kind === 'comment')
       .map((s) => parseAuthor(source.slice(s.innerStart, s.innerEnd)))
   }, [analysis, source])
+  // The document renders again only for a new analysis or context: hover, focus, and selection
+  // leave both alone. Task checkboxes edit through the latest `applyEdits`, which reads the source.
+  const latestApplyEdits = useRef(applyEdits)
+  useLayoutEffect(() => { latestApplyEdits.current = applyEdits })
+  const editTask = useCallback((edit: TextEdit) => latestApplyEdits.current([edit]), [])
+  const deletionLabel = t('markDeletion')
+  const undoDeletionLabel = t('undoDeletion')
+  const renderCtx = useMemo(() => ({ source, onEdit: editTask, highlightCode,
+    markLabels: { deletion: deletionLabel, hint: undoDeletionLabel } }),
+  [source, editTask, highlightCode, deletionLabel, undoDeletionLabel])
+  const commentsLabel = t('comments')
+  const printFootnotes = useMemo(() => commentFootnotes.length > 0 && (
+    <section className="print-footnotes">
+      <h2>{commentsLabel}</h2>
+      <ol>
+        {commentFootnotes.map((c, i) => (
+          <li key={i}>
+            {c.author && <span className="pf-author">@{c.author}: </span>}
+            {c.body}
+          </li>
+        ))}
+      </ol>
+    </section>
+  ), [commentFootnotes, commentsLabel])
+
+  // The rail mounts in a transition after the document first renders; it fades in at its anchors
+  // either way, and its geometry is reserved from the start.
+  const [railMountable, setRailMountable] = useState(false)
+  useEffect(() => {
+    if (status === 'ready' && !railMountable) startTransition(() => setRailMountable(true))
+  }, [status, railMountable])
+
+  // Find mounts on its first request, or once the view is idle, so its chunk stays out of the first
+  // render. A request made before it mounted is replayed once it can observe one.
+  const [findMounted, setFindMounted] = useState(findLoaded)
+  const findRequest = useOverlay((s) => s.findRequest)
+  const mountedFindRequest = useRef(findRequest)
+  const replayFind = useRef(false)
+  useEffect(() => {
+    if (findMounted) { findLoaded = true; return }
+    const mount = (replay: boolean) => { replayFind.current ||= replay; setFindMounted(true) }
+    if (findRequest !== mountedFindRequest.current) { mount(true); return }
+    const key = (event: KeyboardEvent) => {
+      if (document.getElementById('root')?.inert || isImeKey(event)) return
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); mount(true) }
+    }
+    window.addEventListener('keydown', key, true)
+    const cancelIdle = whenIdle(() => mount(false))
+    return () => { window.removeEventListener('keydown', key, true); cancelIdle() }
+  }, [findMounted, findRequest])
+  const findReady = useCallback(() => {
+    if (!replayFind.current) return
+    replayFind.current = false
+    requestFind()
+  }, [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
@@ -463,11 +573,12 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           <SettingsPanel onClose={closePanel} />
         </Suspense>
       )}
-      <Suspense fallback={null}>
+      {findMounted && <Suspense fallback={null}>
         <FindPanel sessionId={sessionId} source={source} mode={showTranslated ? 'translated' : mode}
           docRef={showTranslated ? translatedRef : articleRef} analysis={analysis}
           onRevealComment={revealFindComment} onClose={restoreFindRail} />
-      </Suspense>
+        <AfterMount run={findReady} />
+      </Suspense>}
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} readOnly={readOnly} onEdit={applyEdits} />}
       <ConflictPanel />
       {translation.error && <Notice key={translation.error} tier="transient">
@@ -490,31 +601,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
                   chooseHovered(target ? Number(target.dataset.spanIndex) : null)
                 }}
                 onPointerLeave={() => chooseHovered(null)}>
-                <MarkdownView
-                  analysis={analysis}
-                  ctx={{
-                    source,
-                    onEdit: (edit) => applyEdits([edit]),
-                    highlightCode,
-                    markLabels: {
-                      deletion: t('markDeletion'),
-                      hint: t('undoDeletion'),
-                    },
-                  }}
-                />
-                {commentFootnotes.length > 0 && (
-                  <section className="print-footnotes">
-                    <h2>{t('comments')}</h2>
-                    <ol>
-                      {commentFootnotes.map((c, i) => (
-                        <li key={i}>
-                          {c.author && <span className="pf-author">@{c.author}: </span>}
-                          {c.body}
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                )}
+                <MarkdownView analysis={analysis} ctx={renderCtx} />
+                {printFootnotes}
               </article>
             )}
             {mode === 'source' && (
@@ -523,7 +611,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
               </Suspense>
             )}
           </div>
-          {railPlaced && commentRail}
+          {railPlaced && railMountable && commentRail}
         </div>
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (

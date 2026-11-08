@@ -131,6 +131,28 @@ describe('Markdown structure around new marks', () => {
     expect(scanMarkdown(applyTextEdits(SHORTCUT, [{ from: 1, to: 3, insert: '{--fo--}' }]))).toHaveLength(1)
   })
 
+  it('checks only the edited blocks under block scope, so a definition elsewhere is left to the full check', () => {
+    const analysis = analyzeMarkdown(SHORTCUT)
+    expect(commentVerdict(SHORTCUT, LABEL, 'me', 'x', analysis, 'block'))
+      .toEqual({ edits: [{ from: 1, to: 3, insert: '{==fo==}{>>@me: x<<}' }] })
+    expect(changeVerdict(SHORTCUT, LABEL, ['ba'], analysis, 'block')).toEqual({ edits: [{ from: 1, to: 3, insert: '{~~fo~>ba~~}' }] })
+    expect(commentVerdict(SHORTCUT, LABEL, 'me', 'x', analysis)).toEqual({ refused: 'formatting' })
+    expect(changeVerdict(SHORTCUT, LABEL, ['ba'], analysis, 'document')).toEqual({ refused: 'formatting' })
+  })
+
+  it('agrees with the full check on marks inside one block, wherever the block sits', () => {
+    const source = 'Intro.\n\n- one {==two==}{>>@a: hi<<}\n\n- three `x`\n\nEnd _em_ here.\n'
+    const analysis = analyzeMarkdown(source)
+    const at = analysis.threads[0]!.thread.end
+    expect(replyEdits(source, at, 'b', 'ok', analysis, 'block')).toEqual(replyEdits(source, at, 'b', 'ok', analysis))
+    const three: SelRange[] = [{ from: source.indexOf('three'), to: source.indexOf('three') + 5, text: 'three' }]
+    expect(commentVerdict(source, three, 'me', 'x', analysis, 'block')).toEqual(commentVerdict(source, three, 'me', 'x', analysis))
+    const tick: SelRange[] = [{ from: source.indexOf('`x'), to: source.indexOf('`x') + 1, text: '`' }]
+    expect(changeVerdict(source, tick, [''], analysis, 'block')).toEqual({ refused: 'markup' })
+    const emphasis: SelRange[] = [{ from: source.indexOf('End'), to: source.indexOf('_em_') + 2, text: 'End _e' }]
+    expect(commentVerdict(source, emphasis, 'me', 'x', analysis, 'block')).toEqual(commentVerdict(source, emphasis, 'me', 'x', analysis))
+  })
+
   it('accepts the same marks around the whole reference', () => {
     const whole: SelRange[] = [{ from: 0, to: 5, text: '[foo]' }]
     expect(commentVerdict(SHORTCUT, whole, 'me', 'x')).toEqual({ edits: [{ from: 0, to: 5, insert: '{==[foo]==}{>>@me: x<<}' }] })

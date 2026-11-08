@@ -37,6 +37,10 @@ Reading mode measures rendered headings; Markdown mode uses CodeMirror line geom
 off-screen headings. Its scroll effect remeasures virtualized lines before positioning the target.
 The document view derives the headings and renders `Navigator` with them, the mounted reading
 article, and the mounted editor's measurement callbacks; expansion is transient component state.
+Reading mode takes the headings from its analysis. The view keeps its last analysis by source, so
+switching modes with the source unchanged analyzes nothing; Markdown mode reads that analysis's
+plain parse while it matches, and otherwise parses on opening and again only once edits pause, so
+its outline and resolved count may briefly describe the previous source.
 `Navigator` renders inside `.app-content`, before the controls; its fixed position keeps it out of the
 document flow, and Find ignores its updates when watching for content changes.
 
@@ -55,7 +59,8 @@ tables temporarily hide this rail and the outline without changing their layout 
 comments share the overlay area.
 
 Changing inline comment visibility animates only horizontal displacement of the document column.
-The comment rail fades in independently at its measured anchors. Hiding it keeps the two-column
+The comment rail fades in independently at its measured anchors; the inline rail first mounts in a
+transition after the document renders, with its column already reserved. Hiding it keeps the two-column
 layout while the rail fades out, then moves the document; leaving reading mode or the wide layout
 removes the rail at once.
 Text widths settle immediately. Resizing cancels the running movement rather than queuing another;
@@ -67,7 +72,9 @@ The top-right region holds one floating surface at a time. Find, the file list, 
 the document overflow menu, settings, and resolved history exclude one another through the one open
 value in `overlayStore.ts`; opening any closes the others, so Find never stays open beneath a menu
 or panel. Settings, resolved history, the overflow menu, and the language menu belong to the
-document view that opened them and close with it; Find keeps its per-document open state. Surfaces
+document view that opened them and close with it; Find keeps its per-document open state. Find
+mounts on its first request (the shortcut, the toolbar button, or a native command, replayed once
+it mounts) or once the view is idle, so its editor-search chunk stays out of the first render. Surfaces
 that hold a draft are not overlays and never close for one: menus stack above the selection and
 reply composers. The selection toolbar stays below the document controls and clear of Find,
 opening below its selection when there is no room above. Find floats above an expanded table, and

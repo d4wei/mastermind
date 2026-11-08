@@ -1,14 +1,29 @@
+import type { Root } from 'mdast'
 import { applyTextEdits, shiftAt } from '../../../document/edits'
 import { analyzeMarkdown, type Analysis } from '../../../document/markdown/analyze'
 import { scanMarkdown } from '../../../document/markdown/scan'
 import { readingShape } from '../../../document/markdown/structure'
 import { group } from '../../../document/critic/scanner'
 import type { CriticSpan } from '../../../document/critic/types'
+import type { Range } from '../../../document/critic/types'
 import type { TextEdit } from '../../../document/types'
 import type { SelRange } from './selection'
 
-/** The analysis of the source an edit applies to; verification analyzes the source when it is absent. */
-export type SourceAnalysis = Pick<Analysis, 'spans' | 'tree' | 'provenance'>
+/**
+ * The analysis of the source an edit applies to; verification analyzes the source when it is absent.
+ * `block` scope needs its plain parse to find the edited blocks.
+ */
+export type SourceAnalysis = Pick<Analysis, 'spans' | 'tree' | 'provenance'> & Partial<Pick<Analysis, 'plain'>>
+
+/**
+ * How much of the edited source a verdict checks. `document` checks all of it and alone decides
+ * submission. `block` checks only the top-level blocks that hold the edits, parsed on their own, so
+ * its cost follows those blocks rather than the document; it cannot see reference definitions,
+ * list items, or setext underlines outside them, so it may accept marks that `document` refuses.
+ * Without the plain parse of the source, or for an edit outside every block, `block` checks the
+ * whole document.
+ */
+export type VerifyScope = 'document' | 'block'
 
 /**
  * Whether proposed review marks may enter the document. `markup` means the edited source would not
@@ -58,18 +73,27 @@ function sameSpan(a: CriticSpan | undefined, b: CriticSpan): boolean {
 
 /**
  * Surrounding Markdown can reinterpret delimiters once spliced (an unpaired backtick in the selection
- * can pair with a later one), so each edit is checked in the full edited source: every span of
- * `source` must reappear at its shifted offsets with the same extents, and the spans starting inside
- * each insert must be exactly its intended marks, so no other span appears or disappears. The edited
+ * can pair with a later one), so each edit is checked in the edited source, or under `block` scope in
+ * its edited blocks: every span of `source` must reappear at its shifted offsets with the same
+ * extents, and the spans starting inside each insert must be exactly its intended marks, so no other
+ * span appears or disappears. The edited
  * reading tree must then match the original's structure with the new marks unwrapped, and with each
  * substitution and the source it replaces left out, so a mark cannot unlink a reference, end an
  * emphasis, or otherwise change how the Markdown it touches renders.
  */
 function verifiedInPlace(
   source: string, analysis: SourceAnalysis | undefined, marks: readonly MarkEdit[], newThreads?: number,
+  scope: VerifyScope = 'document',
 ): MarkVerdict {
   if (!marks.length) return { edits: [] }
   const edits = marks.map(({ edit }) => edit)
+  const blocks = scope === 'block' && analysis?.plain ? blockWindow(source, analysis.plain, edits) : null
+  if (blocks) {
+    const local = marks.map(({ edit, spans }) =>
+      ({ edit: { ...edit, from: edit.from - blocks.start, to: edit.to - blocks.start }, spans }))
+    const verdict = verifiedInPlace(source.slice(blocks.start, blocks.end), undefined, local, newThreads)
+    return 'edits' in verdict ? { edits } : verdict
+  }
   const original = analysis ?? analyzeMarkdown(source)
   const before = original.spans
   const updated = applyTextEdits(source, edits)
@@ -108,6 +132,26 @@ function verifiedInPlace(
   return { edits }
 }
 
+/**
+ * The source of the top-level blocks from the first that holds an edit to the last, or null when
+ * an edit lies outside every block. It starts at the line break before the first block, so the
+ * slice parses from a line start and cannot open with frontmatter.
+ */
+function blockWindow(source: string, plain: Root, edits: readonly TextEdit[]): Range | null {
+  let start = Infinity
+  let end = -Infinity
+  for (const edit of edits) {
+    const block = plain.children.find(({ position }) =>
+      position?.start.offset !== undefined && position.end.offset !== undefined &&
+      position.start.offset <= edit.from && edit.to <= position.end.offset)
+    if (!block) return null
+    start = Math.min(start, block.position!.start.offset!)
+    end = Math.max(end, block.position!.end.offset!)
+  }
+  const lineStart = source.lastIndexOf('\n', start - 1) + 1
+  return { start: Math.max(0, lineStart - 1), end }
+}
+
 function threadCount(spans: readonly CriticSpan[], text: string): number {
   return group(spans, text).filter((item) => item.type === 'thread').length
 }
@@ -121,6 +165,7 @@ const editsOf = (verdict: MarkVerdict): TextEdit[] | null => 'edits' in verdict 
  */
 export function commentVerdict(
   source: string, ranges: readonly SelRange[], authorTag: string, body: string, analysis?: SourceAnalysis,
+  scope?: VerifyScope,
 ): MarkVerdict {
   const anchor = ranges[0]
   if (!anchor) return { edits: [] }
@@ -132,7 +177,7 @@ export function commentVerdict(
       { kind: 'highlight', start: 0, end: highlight.length, innerStart: 3, innerEnd: 3 + anchor.text.length },
       { kind: 'comment', start: highlight.length, end: insert.length },
     ],
-  }], 1)
+  }], 1, scope)
 }
 
 /** `commentVerdict`'s edits; null when it refuses them. */
@@ -144,17 +189,18 @@ export function commentEdits(
 
 /** Returns null when the edited source would not parse as exactly that reply comment in unchanged Markdown. */
 export function replyEdits(
-  source: string, at: number, authorTag: string, body: string, analysis?: SourceAnalysis,
+  source: string, at: number, authorTag: string, body: string, analysis?: SourceAnalysis, scope?: VerifyScope,
 ): TextEdit[] | null {
   const insert = commentMark(authorTag, body)
   return editsOf(verifiedInPlace(source, analysis, [{
     edit: { from: at, to: at, insert }, spans: [{ kind: 'comment', start: 0, end: insert.length }],
-  }]))
+  }], undefined, scope))
 }
 
 /** Refuses markup unless every edited fragment parses as exactly its deletion or substitution. */
 export function changeVerdict(
   source: string, ranges: readonly SelRange[], replacements: readonly string[], analysis?: SourceAnalysis,
+  scope?: VerifyScope,
 ): MarkVerdict {
   if (ranges.length !== replacements.length) return { refused: 'markup' }
   const marks: MarkEdit[] = []
@@ -176,7 +222,7 @@ export function changeVerdict(
       }] })
     }
   }
-  return verifiedInPlace(source, analysis, marks)
+  return verifiedInPlace(source, analysis, marks, undefined, scope)
 }
 
 /** `changeVerdict`'s edits; null when it refuses them. */

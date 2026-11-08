@@ -70,7 +70,10 @@ segment.
 ## Verifying marks
 
 `marks.ts` checks every comment, reply, and suggestion in the full edited source before it can be
-submitted. The edited source must reparse with exactly the intended marks starting inside each
+submitted. Drafts are checked in `block` scope instead: only the top-level blocks holding the edits,
+parsed on their own, so the check costs what those blocks cost. That scope cannot see reference
+definitions, list items, or setext underlines outside the blocks, so it may accept what the full
+check refuses; only the full check admits a mark. The edited source must reparse with exactly the intended marks starting inside each
 insert and every existing mark at its shifted offsets with unchanged extents; a new comment must add
 exactly one discussion. The edited reading tree must also match the original's structure
 (`document/markdown/structure.ts`) with the new marks unwrapped, and with each substitution and the
@@ -105,10 +108,12 @@ inside one fragment yields, says the comment attaches to the first. A comment po
 line; suggested text keeps Enter for line breaks, since it edits the document, and both submit on
 Cmd/Ctrl+Enter. Composition keys stay with the IME. Draft text remains intact across focus changes,
 scrolling, and source
-updates; submission still requires the captured source. Composers show the verdict for their
-deferred text, reusing it until the source, selection, or text changes, and name a body line that
-opens block syntax, markup that would not reparse, or a mark that would change the surrounding
-formatting; submission verifies the final text. Stale drafts and paused editing keep their own
+updates; submission still requires the captured source. Composers show the block-scope verdict for
+their deferred text, reusing it until the source, selection, or text changes, and name a body line
+that opens block syntax, markup that would not reparse, or a mark that would change the surrounding
+formatting. Submission verifies the final text in the whole document; its refusal replaces the
+draft verdict until the text, selection, or source changes. A stale draft is checked against an
+analysis of its own captured source, made once. Stale drafts and paused editing keep their own
 messages.
 
 Focus entering a composer stops the browser painting the document selection, so while a composer
@@ -126,4 +131,5 @@ reselection, and trimming: one range replacing the document selection, the first
 notification per trim, a trim deferred while dragging and resumed after a swallowed release, and no actions for an unmarkable selection. `tests/selection-ranges.test.ts`,
 `formatted-selection.test.tsx`, `inline-code-selection.test.tsx`, and `wrapped-selection.test.tsx`
 check marks, decoded text, wrappers, code, and container continuations in detail;
-`tests/selection-marks.test.ts` checks edit verification.
+`tests/selection-marks.test.ts` checks edit verification in both scopes, and
+`tests/composer-verdict-scope.test.tsx` checks that composers submit only past the full check.

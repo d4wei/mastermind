@@ -31,10 +31,19 @@ bytes; an unterminated archive blocks appending because a new record would becom
 Code examples are not archive records. Adjacent comments are parsed as independent records even when
 a manually edited archive omits blank separation.
 
+`countResolvedThreads` answers zero without parsing a source that lacks the record marker. Every
+function that reads the Markdown structure takes an optional plain parse of exactly its source, such
+as an analysis's `plain`, and parses the source itself without one.
+
 `resolveThreadEdits` and `deleteCommentEdits` validate a captured thread against freshly scanned
 source before returning exact splices. Resolution checks the proposed result with the Markdown
 parser and throws a descriptive error if the archive would fall inside an unterminated code or HTML
-block; callers surface that failure before applying any edits. Stale or already-removed threads
+block; callers surface that failure before applying any edits. The check parses only from fresh
+starts: top-level blocks at column 0 after a blank line, where only an open fenced code or HTML
+block could carry state in. It parses from the fresh start before the discussion; when a probe
+comment shows that the edited stretch up to the next fresh start leaves no such block open, it
+parses only the tail from the last fresh start. Each slice parses after a line break, so it cannot
+open with frontmatter. Stale or already-removed threads
 return no edits. Resolve removes comment spans and only the highlight anchor's delimiters;
 suggestion marks remain untouched. Delete removes one selected comment and unwraps the highlight
 only when its last comment disappears. Deletion creates no historical record. Undo belongs to the

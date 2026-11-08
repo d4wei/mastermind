@@ -6,7 +6,7 @@ import type {
   PhrasingContent,
   RootContent,
 } from 'mdast'
-import { Fragment, type ReactNode, createElement, useMemo } from 'react'
+import { Fragment, type ReactNode, createElement, memo, useMemo } from 'react'
 import type { CriticCommentNode, CriticSubNode, CriticWrapNode } from '../../../document/markdown/critic-mdast'
 import { highlight } from './highlight'
 import { toggleTaskEdit } from '../../../document/markdown/tasklist'
@@ -314,7 +314,8 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
         return a ? { textAlign: a } : undefined
       }
       return (
-        <TableViewport key={key} contentKey={ctx.source}><table {...posAttrs(node)}>
+        <TableViewport key={key} contentKey={ctx.source.slice(node.position?.start.offset, node.position?.end.offset)}
+          source={ctx.source}><table {...posAttrs(node)}>
           {head && (
             <thead>
               <tr>
@@ -366,7 +367,13 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
   }
 }
 
-export function MarkdownView({ analysis, ctx }: { analysis: Pick<Analysis, 'tree' | 'threads'>; ctx: RenderCtx }) {
+/**
+ * Renders again only for a new analysis or context, so a caller that keeps both stable while
+ * selection or hover changes leaves the document untouched.
+ */
+export const MarkdownView = memo(function MarkdownView({ analysis, ctx }: {
+  analysis: Pick<Analysis, 'tree' | 'threads'>; ctx: RenderCtx
+}) {
   const presentation = useMemo(() => {
     const anchoredHighlights = new Set<number>()
     const commentMarkers = new Set<number>()
@@ -382,4 +389,4 @@ export function MarkdownView({ analysis, ctx }: { analysis: Pick<Analysis, 'tree
       {section.items.map((b, bi) => renderBlock(b, bi, presented))}
     </section>
     : renderBlock(section.items[0], section.start, presented))}</>
-}
+})
