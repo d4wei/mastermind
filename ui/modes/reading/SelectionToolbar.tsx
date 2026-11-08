@@ -1,7 +1,8 @@
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { escapeOwner } from '../../app/constants'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type RefObject } from 'react'
+import { useOverlay } from '../../app/overlayStore'
 import type { Analysis } from '../../../document/markdown/analyze'
 import type { TextEdit } from '../../../document/types'
 import { useT, type MsgKey } from '../../i18n'
@@ -16,6 +17,8 @@ import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from
 
 /** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
 const FALLBACK_EXIT_MS = 120
+/** The toolbar's size before it is measured, and where layout reports none. */
+const FALLBACK_SIZE = { width: 260, height: 44 }
 /** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
 export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
 
@@ -62,7 +65,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const [replacements, setReplacements] = useDraftState<string[]>('selection:replacements', [])
   const [comment, setComment] = useDraftState('selection:comment', '')
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const [toolbarSize, setToolbarSize] = useState({ width: 260, height: 44 })
+  const [toolbarSize, setToolbarSize] = useState(FALLBACK_SIZE)
   const composingRef = useRef(false)
   composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
@@ -170,7 +173,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     const measure = () => {
       const { width, height } = toolbar.getBoundingClientRect()
       setToolbarSize((current) => width === current.width && height === current.height ? current
-        : { width: width || 260, height: height || 44 })
+        : { width: width || FALLBACK_SIZE.width, height: height || FALLBACK_SIZE.height })
     }
     measure()
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
@@ -184,7 +187,12 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     if (!composing || !active || !range || range.collapsed || !range.commonAncestorContainer.isConnected) return
     paintHighlight(SELECTION_TARGET_HIGHLIGHT, [range])
     return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
-  }, [composing, active])
+    // A new capture replaces `ranges`; scrolling only moves `rect`, which needs no repaint.
+  }, [composing, active?.ranges])
+  // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
+  const findOpen = useOverlay((s) => s.open === 'find')
+  const [, relayout] = useReducer((n: number) => n + 1, 0)
+  useLayoutEffect(relayout, [findOpen])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
   const verify = (text: string, changes: readonly string[]): MarkVerdict => {
@@ -240,7 +248,8 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     e.stopPropagation()
   }
 
-  const left = Math.min(Math.max(8, view.rect.left + view.rect.width / 2 - 130), window.innerWidth - 280)
+  const left = Math.max(8, Math.min(view.rect.left + view.rect.width / 2 - toolbarSize.width / 2,
+    window.innerWidth - toolbarSize.width - 8))
   // The toolbar never covers the document controls or Find; without room above its selection it opens below.
   const find = document.querySelector('.find-bar')?.getBoundingClientRect()
   const besideFind = !!find && left < find.right && left + toolbarSize.width > find.left

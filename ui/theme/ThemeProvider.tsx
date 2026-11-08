@@ -74,7 +74,7 @@ export function ThemeEffects() {
   }, [theme?.id, theme?.appearance, themeId])
   useEffect(() => { if (config) configuredThemeShown.current = true }, [config])
 
-  // Declare local font faces independently of the selected theme.
+  // The desktop page links the face sheet before scripts run; this covers pages that do not.
   useEffect(() => {
     if (document.getElementById(FONTS_LINK_ID)) return
     const link = document.createElement('link')
@@ -95,7 +95,9 @@ export function ThemeEffects() {
     const preset = fontPresetById(config.fontPreset)
     root.setProperty('--font-display', displayStack(preset))
     root.setProperty('--font-body', bodyStack(preset))
-    root.setProperty('--weight-body', String(theme?.appearance === 'dark' ? preset.darkBodyWeight : 400))
+    // Light themes keep the base weight from `themes/common.css`.
+    if (theme?.appearance === 'dark') root.setProperty('--weight-body', String(preset.darkBodyWeight))
+    else root.removeProperty('--weight-body')
     root.setProperty('--weight-bold', String(preset.displayWeight))
     root.setProperty('--ls-heading', preset.displayTracking)
     root.setProperty('--font-mono', monoStack(preset))

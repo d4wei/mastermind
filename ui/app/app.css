@@ -302,7 +302,6 @@ button:disabled {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 3);
-  font-family: var(--font-ui);
   font-size: var(--font-size-sm);
   transition: border-color var(--dur-fast) ease;
 }
@@ -352,7 +351,6 @@ button:disabled {
   border-top: 1px solid var(--color-border);
 }
 .rail-author {
-  font-family: var(--font-ui);
   font-size: var(--font-size-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text);
@@ -369,8 +367,8 @@ button:disabled {
   gap: var(--space-unit);
   margin-top: calc(var(--space-unit) * 2);
 }
-/* Footer links are quiet text; composer actions use the shared compact buttons. */
-.rail-actions button:not(.btn-compact) {
+/* Quiet text buttons in a card: the reply count and the orphaned-draft discard. */
+.rail-link {
   background: transparent;
   border: none;
   border-radius: var(--radius-xs);
@@ -761,7 +759,6 @@ button:disabled {
 }
 
 .md-root th {
-  font-family: var(--font-body);
   font-weight: var(--weight-medium);
   font-size: var(--md-font-size-sm);
   text-align: left;
@@ -1564,13 +1561,13 @@ input[type='checkbox'] {
 
 /* Ordinary controls share hover feedback; selection remains a separate state. */
 :is(.btn-ghost, .seg-btn, .theme-chip, .topbar-language, .find-nav,
-  .rail-actions button:not(.btn-compact), .nav-outline button, .native-open:not(.native-open-home), .native-file-close,
+  .rail-link, .nav-outline button, .native-open:not(.native-open-home), .native-file-close,
   .native-file-pill, .outline-progress):hover:not(:disabled):not([aria-disabled='true']):not(.active):not([data-state='on']):not([aria-current]):not([aria-pressed='true']) {
   background: var(--color-control-hover);
   color: var(--color-text);
 }
 :is(.btn-ghost, .seg-btn, .theme-chip, .topbar-language, .find-nav,
-  .rail-actions button:not(.btn-compact), .nav-outline button, .native-open:not(.native-open-home), .native-file-close):active:not(:disabled) {
+  .rail-link, .nav-outline button, .native-open:not(.native-open-home), .native-file-close):active:not(:disabled) {
   background: var(--color-control-pressed);
 }
 .sel-toolbar button:not(.btn-primary):hover:not(:disabled) {

@@ -37,6 +37,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
     const container = documentScroll ?? document.documentElement
     let lastSizing = ''
     let tableWidth = 0
+    let gap = 0
     let disposed = false
     const edges = () => {
       const overflow = scroll.scrollWidth - scroll.clientWidth > 1
@@ -97,6 +98,11 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
         tableWidth = table.getBoundingClientRect().width
         table.style.width = `${tableWidth}px`
         table.style.maxWidth = 'none'
+        // The scroll gap is a calc() token, so read it resolved from the scroller's padding.
+        gap = parseFloat(getComputedStyle(scroll).paddingBottom) || 0
+        const canExpand = tableWidth > host.clientWidth + 1 && available > host.clientWidth + 1
+        setExpandable(canExpand)
+        if (!canExpand && isExpanded.current) change.current(false, true)
       }
       // An expanded table narrower than the window centers on the reading column, kept within
       // the window's edges.
@@ -107,11 +113,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
       bounds.current = { normal: { left: 0, width: host.clientWidth }, wide: { left: wideLeft, width: wideWidth } }
       const boundsChanged = previous.normal.width !== host.clientWidth ||
         previous.wide.width !== wideWidth || previous.wide.left !== wideLeft
-      const canExpand = tableWidth > host.clientWidth + 1 && available > host.clientWidth + 1
-      setExpandable(canExpand)
-      if (!canExpand && isExpanded.current) change.current(false, true)
       const scrollbar = cssPx(css, '--document-scrollbar-size')
-      const gap = parseFloat(getComputedStyle(scroll).paddingBottom) || 0
       view.style.height = `${table.getBoundingClientRect().height + gap + scrollbar}px`
       if (boundsChanged && animation.current) change.current(isExpanded.current, true)
       if (!animation.current) paint(isExpanded.current ? bounds.current.wide : bounds.current.normal)

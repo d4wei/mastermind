@@ -1,10 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Popover } from 'radix-ui'
 import { AlertIcon, ChevronDownIcon, CrossIcon } from '../icons'
 import { fileLabels } from './file-labels'
 import { fileWindow } from './file-window'
 import { useClosePrompt } from './CloseDialog'
-import { closeOverlay, openOverlay, useOverlay, useOverlayOpen } from '../app/overlayStore'
+import { useOverlay, useOverlayControl } from '../app/overlayStore'
 import { useT } from '../i18n'
 
 export interface OpenDocument { language?: string; id: string; path: string }
@@ -25,8 +25,8 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
   const list = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [geometry, setGeometry] = useState({ width: Infinity, widths: [] as number[], overflowWidths: [] as number[], gap: 0 })
-  const open = useOverlayOpen('files')
-  const setOpen = (next: boolean) => { if (next) openOverlay('files'); else closeOverlay('files') }
+  // The list closes with the file row, so a remounted row never reopens it.
+  const [open, setOpen] = useOverlayControl('files')
   const pendingFocus = useRef<{ id: string; index: number; menu: boolean } | null>(null)
   const closing = useRef(false)
   const selecting = useRef(false)
@@ -63,8 +63,6 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
     return () => observer.disconnect()
   }, [measurementKey])
 
-  // The list closes with the file row, so a remounted row never reopens it.
-  useEffect(() => () => closeOverlay('files'), [])
   useLayoutEffect(() => {
     if (closePrompt) { selecting.current = true; setOpen(false) }
   }, [closePrompt])

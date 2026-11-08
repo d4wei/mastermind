@@ -1,11 +1,11 @@
 import { LanguageMenu } from '../translate/LanguageMenu'
-import { useContext, useEffect, useLayoutEffect, useRef } from 'react'
+import { useContext, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ToolbarTarget } from './ToolbarTarget'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { ChatIcon, SearchIcon, CodeIcon, EyeIcon, GearIcon, HistoryIcon, MoreIcon } from '../icons'
-import { closeOverlay, openOverlay, requestFind, useOverlayOpen } from './overlayStore'
+import { requestFind, useOverlayControl } from './overlayStore'
 import { useDoc } from '../documents/store'
 
 interface TopBarProps {
@@ -24,9 +24,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
   const mode = useDoc((s) => s.mode)
   const setMode = useDoc((s) => s.setMode)
   const sessionId = useDoc((s) => s.sessionId)
-  const menuOpen = useOverlayOpen('menu', sessionId)
-  // The menu lives no longer than its control.
-  useEffect(() => () => closeOverlay('menu'), [])
+  const [menuOpen, setMenuOpen] = useOverlayControl('menu', sessionId)
   const destination = mode === 'reading' ? 'source' : 'reading'
   const ModeIcon = mode === 'reading' ? CodeIcon : EyeIcon
 
@@ -55,10 +53,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
           onClick={onToggleRail} aria-label={railOpen ? t('hideComments') : t('showComments')}
           aria-pressed={railOpen} title={t('toggleRail')}><ChatIcon /></button>
       )}
-      <DropdownMenu.Root modal={false} open={menuOpen} onOpenChange={(next) => {
-        if (next) openOverlay('menu', sessionId)
-        else closeOverlay('menu')
-      }}>
+      <DropdownMenu.Root modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenu.Trigger asChild>
           <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-overflow${settings.open || resolved.open ? ' active' : ''}`}
             aria-label={t('moreActions')}

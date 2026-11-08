@@ -1,11 +1,11 @@
-import { useId, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { parseResolvedThreads } from '../../document/review-archive'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { SlideOver } from '../app/SlideOver'
 import { useT } from '../i18n'
 import { AlertIcon, HistoryIcon } from '../icons'
-import { CommentBody } from './CommentBody'
-import { RepliesToggle } from './RepliesToggle'
+import { RepliesDisclosure } from './RepliesDisclosure'
+import { ThreadMessage } from './ThreadMessage'
 import './ResolvedThreads.css'
 
 export function ResolvedThreads({ source, onClose }: { source: string; onClose: () => void }) {
@@ -36,16 +36,12 @@ export function ResolvedThreads({ source, onClose }: { source: string; onClose: 
 function ResolvedDiscussion({ context, thread }: { context: string; thread: string }) {
   const t = useT()
   const [repliesOpen, setRepliesOpen] = useState(false)
-  const repliesId = useId()
-  const comments = analyzeMarkdown(thread).items.flatMap((item) => item.type === 'thread' ? item.comments : [])
+  const comments = useMemo(() => analyzeMarkdown(thread).items.flatMap((item) => item.type === 'thread' ? item.comments : []), [thread])
   const [first, ...replies] = comments
   const quote = context && <blockquote className="rail-card-anchor" aria-label={t('resolvedContext')} title={context}>{context}</blockquote>
   const message = (comment: typeof comments[number], index: number) =>
-    <div className={`rail-comment${index ? ' rail-comment-reply' : ''}`} key={index}>
-      <div className="rail-message-header"><span className="rail-author">{comment.author ?? t('comment')}</span></div>
-      {index === 0 && quote}
-      <CommentBody body={comment.body} />
-    </div>
+    <ThreadMessage key={index} reply={index > 0} body={comment.body} quote={index === 0 ? quote : undefined}
+      author={<span className="rail-author">{comment.author ?? t('comment')}</span>} />
   return (
     <article className="resolved-card" aria-label={t('resolvedOriginal')}>
       {first ? message(first, 0) : <>
@@ -53,9 +49,10 @@ function ResolvedDiscussion({ context, thread }: { context: string; thread: stri
         {/* A record whose thread no longer parses as comments still shows its stored text. */}
         <pre className="resolved-source">{thread}</pre>
       </>}
-      {replies.length > 0 && <RepliesToggle count={replies.length} expanded={repliesOpen} controls={repliesId}
-        onToggle={() => setRepliesOpen((open) => !open)} />}
-      {repliesOpen && <div id={repliesId}>{replies.map((reply, index) => message(reply, index + 1))}</div>}
+      {replies.length > 0 && <RepliesDisclosure count={replies.length} expanded={repliesOpen}
+        onToggle={() => setRepliesOpen((open) => !open)}>
+        {replies.map((reply, index) => message(reply, index + 1))}
+      </RepliesDisclosure>}
     </article>
   )
 }

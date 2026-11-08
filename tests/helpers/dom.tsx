@@ -1,5 +1,6 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { vi } from 'vitest'
 export function createReactHost(): { host: HTMLDivElement; root: Root } {
   const host = document.createElement('div')
   document.body.append(host)
@@ -22,4 +23,11 @@ export function rangeBetween(start: Node, from: number, end: Node, to: number): 
   range.setStart(start, from)
   range.setEnd(end, to)
   return range
+}
+
+/** jsdom lacks the CSS Custom Highlight API; stubs `CSS.highlights` with `registry` and returns it. */
+export function stubHighlights(registry = new Map<string, Set<Range>>()): Map<string, Set<Range>> {
+  vi.stubGlobal('CSS', { highlights: registry })
+  vi.stubGlobal('Highlight', class extends Set<Range> { constructor(...ranges: Range[]) { super(ranges) } })
+  return registry
 }

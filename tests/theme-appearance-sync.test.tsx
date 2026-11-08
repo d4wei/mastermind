@@ -106,17 +106,17 @@ it('applies the loaded theme over the startup default without a veil, then cross
   expect(document.querySelector('.theme-veil')).not.toBeNull()
 })
 
-it('lowers the document body weight to the preset value on dark themes only', () => {
+it('lowers the document body weight to the preset value on dark themes, leaving light themes the base weight', () => {
   const info = (id: string, appearance: 'light' | 'dark') => ({ id, name: id, appearance,
     swatch: { bg: '', ink: '', accent: '' } })
   useConfig.setState({ themes: [info('grid', 'light'), info('carbon', 'dark')] })
   const weight = () => document.documentElement.style.getPropertyValue('--weight-body')
   act(() => root.render(<ThemeEffects />))
-  expect(weight()).toBe('400')
+  expect(weight()).toBe('')
   for (const preset of FONT_PRESETS) {
     act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'carbon', fontPreset: preset.id } }))
     expect(weight()).toBe(String(preset.darkBodyWeight))
     act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, theme: 'grid', fontPreset: preset.id } }))
-    expect(weight()).toBe('400')
+    expect(weight()).toBe('')
   }
 })

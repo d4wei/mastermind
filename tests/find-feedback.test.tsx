@@ -3,6 +3,7 @@ import { act, useRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { FindPanel } from '../ui/find/FindPanel'
+import { stubHighlights } from './helpers/dom'
 import { openOverlay, requestFind, useOverlay } from '../ui/app/overlayStore'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { useConfig } from '../ui/app/configStore'
@@ -37,8 +38,7 @@ beforeEach(() => {
   serial++
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  vi.stubGlobal('CSS', { highlights })
-  vi.stubGlobal('Highlight', class extends Set<Range> { constructor(...ranges: Range[]) { super(ranges) } })
+  stubHighlights(highlights)
   Range.prototype.getBoundingClientRect = () => ({ top: 100, bottom: 120 } as DOMRect)
   useConfig.setState({ config: { ...useConfig.getState().config!, uiLang: 'en' } })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)

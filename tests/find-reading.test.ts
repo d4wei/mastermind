@@ -3,6 +3,7 @@ import { expect, it } from 'vitest'
 import { readingMatches, commentRange, revealMatch } from '../ui/find/reading'
 import { textMatches } from '../ui/find/matches'
 import { commentSearchText } from '../ui/review/CommentBody'
+import { stubHighlights } from './helpers/dom'
 
 it('matches across inline formatting while respecting blocks, cells, chrome, and hidden archives', () => {
   const root = document.createElement('article')
@@ -63,9 +64,7 @@ it('keeps a result clear of an overlapping floating panel without moving already
 it('updates registered highlight membership and removes every old range on close', async () => {
   const { vi } = await import('vitest')
   const { paintMatches, clearMatches } = await import('../ui/find/reading')
-  const registry = new Map<string, Set<Range>>()
-  vi.stubGlobal('CSS', { highlights: registry })
-  vi.stubGlobal('Highlight', class extends Set<Range> { constructor(...ranges: Range[]) { super(ranges) } })
+  const registry = stubHighlights()
   try {
     const root = document.createElement('p'); root.textContent = 'review another review'
     const first = readingMatches(root, 'review', false)

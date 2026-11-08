@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { create } from 'zustand'
 
 /**
@@ -37,6 +38,16 @@ export function closeOverlay(...overlays: Overlay[]): void {
 /** Whether `overlay` is open for the document `owner`. */
 export function useOverlayOpen(overlay: Overlay, owner: string | null = null): boolean {
   return useOverlay((s) => s.open === overlay && s.owner === owner)
+}
+
+/**
+ * Binds a menu's open state to `overlay` for `owner`. The overlay closes when the menu unmounts,
+ * since a menu lives no longer than its control.
+ */
+export function useOverlayControl(overlay: Overlay, owner: string | null = null): [boolean, (next: boolean) => void] {
+  const open = useOverlayOpen(overlay, owner)
+  useEffect(() => () => closeOverlay(overlay), [overlay])
+  return [open, (next) => { if (next) openOverlay(overlay, owner); else closeOverlay(overlay) }]
 }
 
 /** Opens or refocuses Find for the active document. */

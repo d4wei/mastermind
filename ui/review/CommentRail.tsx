@@ -1,12 +1,12 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
-import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject,
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
-import { CommentBody } from './CommentBody'
-import { RepliesToggle } from './RepliesToggle'
+import { RepliesDisclosure } from './RepliesDisclosure'
+import { ThreadMessage } from './ThreadMessage'
 import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
@@ -53,7 +53,6 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   // The card whose reply composer was explicitly requested and takes focus; the selected card shows
   // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
-  const repliesId = useId()
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   const selectedKey = useRef<string | null>(null)
@@ -216,13 +215,14 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       // A message reads author, then (opening message only) the quoted passage, then the comment, as
       // a resolved discussion does; the reply count follows the opening message.
       const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
-        <div key={messageIndex} data-find-comment={card.messages[messageIndex]} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
-          <div className="rail-message-header">
-            {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
-              aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
-              onClick={() => activate(card.spanIndex)}>
-              <span className="rail-author">{comment.author ?? t('comment')}</span>
-            </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
+        <ThreadMessage key={messageIndex} data-find-comment={card.messages[messageIndex]} reply={messageIndex > 0} body={comment.body}
+          author={messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
+            aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
+            onClick={() => activate(card.spanIndex)}>
+            <span className="rail-author">{comment.author ?? t('comment')}</span>
+          </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
+          quote={messageIndex === 0 && card.anchorText ? <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div> : undefined}
+          actions={<>
             {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
               title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
             <DropdownMenu.Root modal={false}>
@@ -240,10 +240,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
-          </div>
-          {messageIndex === 0 && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
-          <CommentBody body={comment.body} />
-        </div>
+          </>} />
       return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
         ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
         className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}`}
@@ -262,11 +259,10 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           }
         }}>
         {message(card.thread.comments[0]!, 0)}
-        {replies > 0 && <RepliesToggle count={replies} expanded={selected} controls={`${repliesId}-${index}`}
-          onToggle={() => selected ? collapse(true) : activate(card.spanIndex)} />}
-        {selected && replies > 0 && <div id={`${repliesId}-${index}`}>
+        {replies > 0 && <RepliesDisclosure count={replies} expanded={selected}
+          onToggle={() => selected ? collapse(true) : activate(card.spanIndex)}>
           {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
-        </div>}
+        </RepliesDisclosure>}
         {composes(card) && <div className="rail-reply">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
           <textarea autoFocus={replyFor === card.key} readOnly={readOnly} rows={2} {...ime.inputProps}
@@ -280,7 +276,11 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&
             <p role="alert">{t('commentBodyInvalid')}</p>}
           <div className="rail-actions">
-            <button type="button" className="btn-ghost btn-compact" onClick={() => collapse()}>{t('cancel')}</button>
+            {/* Cancel discards the draft; Escape and clicking away keep it for the next selection. */}
+            <button type="button" className="btn-ghost btn-compact" onClick={() => {
+              removeDraft(placedDrafts.byCard.get(card.key)?.id)
+              collapse()
+            }}>{t('cancel')}</button>
             <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
@@ -292,7 +292,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       {orphaned.map((draft) => <div key={draft.id}>
         <label>{t('reply')}<textarea readOnly value={draft.text} /></label>
         <div className="rail-actions">
-          <button type="button" onClick={() => removeDraft(draft.id)}>{t('discardDraft')}</button>
+          <button type="button" className="rail-link" onClick={() => removeDraft(draft.id)}>{t('discardDraft')}</button>
         </div>
       </div>)}
     </div>}

@@ -505,3 +505,22 @@ it('keeps a sent reply draft when its edit does not apply', () => {
   expect(store.getState().source).toBe(source)
   expect(host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!.value).toBe('not lost')
 })
+
+it('discards a reply draft on Cancel but keeps it through Escape', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  const type = (text: string) => {
+    const textarea = host.querySelector<HTMLTextAreaElement>('textarea')!
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, text)
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  openCard()
+  type('kept')
+  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  openCard()
+  expect(host.querySelector('textarea')!.value).toBe('kept')
+  click('Cancel')
+  openCard()
+  expect(host.querySelector('textarea')!.value).toBe('')
+})

@@ -7,7 +7,7 @@
 import { act, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { inputValue } from './helpers/dom'
+import { inputValue, stubHighlights as stubHighlightRegistry } from './helpers/dom'
 import { renderMarkdown } from './helpers/markdown'
 import { DRIVES, selectRendered } from './helpers/selection'
 import { applyTextEdits } from '../document/edits'
@@ -20,6 +20,7 @@ import { changeVerdict, commentVerdict } from '../ui/modes/reading/marks'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { SELECTION_TARGET_HIGHLIGHT, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { useConfig } from '../ui/app/configStore'
+import { useOverlay } from '../ui/app/overlayStore'
 
 /** A source slice by its text and, when it recurs, the occurrence meant. */
 type Slice = string | [text: string, occurrence: number]
@@ -427,6 +428,31 @@ describe('the selection toolbar', () => {
     expect(host.querySelector<HTMLElement>('.sel-toolbar')!.style.top).toBe('248px')
   })
 
+  it('moves below its selection when Find opens while it is shown', async () => {
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true, value: () => ({ top: 120, bottom: 140, left: 100, width: 40 }),
+    })
+    await show('Alpha bravo.', 'bravo')
+    const toolbar = host.querySelector<HTMLElement>('.sel-toolbar')!
+    expect(toolbar.style.top).toBe('68px')
+    const find = document.createElement('div')
+    find.className = 'find-bar'
+    find.getBoundingClientRect = () => ({ top: 0, bottom: 100, left: 0, right: 2000 } as DOMRect)
+    document.body.append(find)
+    cleanups.push(() => { find.remove(); useOverlay.setState({ open: null, owner: null }) })
+    act(() => useOverlay.setState({ open: 'find', owner: null }))
+    expect(toolbar.style.top).toBe('148px')
+  })
+
+  it('keeps its measured width inside the window near the right edge', async () => {
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true, value: () => ({ top: 300, bottom: 320, left: window.innerWidth - 20, width: 10 }),
+    })
+    await show('Alpha bravo.', 'bravo')
+    // jsdom measures no width, so the toolbar falls back to its 260px estimate.
+    expect(host.querySelector<HTMLElement>('.sel-toolbar')!.style.left).toBe(`${window.innerWidth - 260 - 8}px`)
+  })
+
   it('names a mark that would change the surrounding formatting', async () => {
     await show('x _a_ y', 'x a')
     press('Suggest change')
@@ -455,13 +481,9 @@ describe('the selection toolbar', () => {
     expect(note()).toBeUndefined()
   })
 
-  /** jsdom lacks the CSS Custom Highlight API; this registry stands in for `CSS.highlights`. */
   function stubHighlights(): Map<string, Set<Range>> {
-    const registry = new Map<string, Set<Range>>()
-    vi.stubGlobal('Highlight', class extends Set<Range> {})
-    vi.stubGlobal('CSS', { highlights: registry })
     cleanups.push(() => vi.unstubAllGlobals())
-    return registry
+    return stubHighlightRegistry()
   }
   const painted = (registry: Map<string, Set<Range>>) =>
     Array.from(registry.get(SELECTION_TARGET_HIGHLIGHT) ?? [], (range) => range.toString())

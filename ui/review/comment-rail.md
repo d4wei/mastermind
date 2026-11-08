@@ -1,7 +1,7 @@
 # Comment rail interaction
 
 A card reads author, quoted passage, then the opening comment, followed by a reply count only when
-replies exist; `RepliesToggle` draws that count with the chevron it shares with resolved
+replies exist; `RepliesDisclosure` draws that count with the chevron it shares with resolved
 discussions, turned while the replies show. A card without replies has no footer and no Reply
 button. Clicking its passage, opening message, or count expands the discussion and focuses the reply
 composer; the expanded count collapses it again and keeps focus. Enter and Space on the passage or
