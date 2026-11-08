@@ -36,7 +36,7 @@ The tests check these; a change that needs one relaxed is a `DECISIONS.md` rulin
 - `document/` is imported by translation tooling and the desktop interface; keep it isomorphic.
 - Components reference `var(--*)` only; colors and spacing live in `themes/common.css` and
   `themes/*/tokens.css`, whose roles `themes/README.md` fixes. Review marks are the only color in
-  the document body.
+  the document body, apart from transient Find highlights.
 
 ## Working the code
 

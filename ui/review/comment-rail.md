@@ -22,10 +22,12 @@ provisional positions. Narrow
 panels use the same fade. Motion honors reduced-motion preferences.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
-message has a native button that opens the discussion and reply composer; Resolve, Collapse
-discussion, More, and Reply remain separate keyboard controls. More uses the shared Radix menu
-behavior. Delete comment belongs to one message; Resolve archives the complete discussion through
-the existing source-splice helpers.
+message has a native button that opens the discussion and reply composer; Resolve, More, and Reply
+remain separate keyboard controls. The card has no collapse control: Escape and clicks elsewhere
+collapse it. More uses the shared Radix menu behavior; its Delete comment item carries the delete
+icon, as other menu items carry theirs. Reply's Cancel and Reply buttons share one compact face,
+size, and height, and the reply field resizes vertically down to two lines. Delete comment belongs
+to one message; Resolve archives the complete discussion through the existing source-splice helpers.
 
 Escape and clicks elsewhere in the article collapse selection; Escape that closes a panel, popover,
 or menu does not. Reply drafts stay with their discussions, including when switching or collapsing
@@ -42,3 +44,11 @@ posting the reply clears it, once the edit applies; a refused edit keeps the dra
 The reply textarea retains normal text-input semantics and its submission shortcut. Composition
 keys remain with the IME. Conflict state prevents submission, deletion, and resolution while
 retaining the draft. Actions stop stale activation after a source splice.
+
+## Resolved discussions
+
+The history panel lists each archived discussion as a card in the rail's typography: the quoted
+passage as a quotation in the reading face, clamped to three lines; the opening comment; a
+reply-count disclosure with the shared chevron; and a Markdown source toggle in the message header
+that shows the stored thread text. Unrecognized records show their diagnostic and raw text. Cards
+offer no jump to the passage, since resolution removes its anchor.

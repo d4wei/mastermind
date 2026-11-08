@@ -26,7 +26,7 @@ A family with italics ships them, and Source Serif 4 keeps its optical-size axis
 
 Each display and body stack is the Latin face, then the bundled Noto SC face matching the preset's
 style, then system faces in case a bundled slice cannot load, then the generic family; `CJK_STACKS`
-holds the lists. Code takes the sans CJK faces in every preset. Noto SC ships as the packages'
+holds the lists. Code takes system monospace faces after its bundled face, so Latin code stays monospace if that face cannot load, then the sans CJK faces in every preset. Noto SC ships as the packages'
 `unicode-range` slices, so a document loads only the slices its characters need; the
 [bundled fonts](../../themes/fonts/README.md) describe the files and their provenance.
 

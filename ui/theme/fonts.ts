@@ -5,7 +5,9 @@ export * from './fontRegistry'
 /** The generated `@font-face` sheet for every bundled face, served beside the themes. */
 export const FONT_FACES_HREF = '/themes/fonts/faces.css'
 
-const MONO_FALLBACK = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+/** System monospace faces carry Latin code if the bundled face cannot load; they hold no CJK, so
+ * CJK characters fall through them to the sans CJK faces. */
+const SYSTEM_MONO = ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas']
 
 /** Quoted named families, then an unquoted fallback list ending in a generic family. */
 function stack(families: readonly string[], fallback: string): string {
@@ -24,5 +26,5 @@ export function bodyStack(preset: FontPreset): string {
 }
 /** Code takes the sans CJK faces in every preset; CJK text in code keeps one even stroke. */
 export function monoStack(preset: FontPreset): string {
-  return stack([preset.codeFamily, ...CJK_STACKS.sans], MONO_FALLBACK)
+  return [`'${preset.codeFamily}'`, ...SYSTEM_MONO, ...CJK_STACKS.sans.map((family) => `'${family}'`), 'monospace'].join(', ')
 }

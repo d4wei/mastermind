@@ -221,24 +221,26 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   useEffect(() => () => { adapter?.close() }, [adapter])
 
   if (!open) return null
-  const count = results.length ? t('findCount').replace('{current}', String(currentIndex + 1)).replace('{total}', String(results.length)) : query ? t('findNone') : ''
-  const countSize = results.length ? t('findCount').replace('{current}', String(results.length)).replace('{total}', String(results.length)) : count
+  // The field shows a compact counter; the live region announces the full phrase.
+  const announcement = results.length ? t('findCount').replace('{current}', String(currentIndex + 1))
+    .replace('{total}', String(results.length)) : query ? t('findNone') : ''
+  const counter = results.length ? `${currentIndex + 1}/${results.length}` : '0/0'
   return <div className="find-bar" role="search" aria-label={t('find')} ref={panel}>
-    <SearchIcon />
-    <input {...ime.inputProps} ref={setInput}
-      spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off"
-      className="settings-input find-input" aria-label={t('findPlaceholder')} placeholder={t('findPlaceholder')}
-      value={query} onChange={(event) => {
-        pendingReveal.current = true; chooseFromPosition.current = true; setWrapped(false)
-        setState((current) => ({ ...current, query: event.target.value }))
-      }} onKeyDown={(event) => {
-        if (ime.isComposing(event.nativeEvent)) return
-        if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); step(event.shiftKey ? -1 : 1) }
-      }} />
-    <span className="find-count">
-      <span className="find-count-size" aria-hidden="true">{countSize}</span>
-      <span role="status" aria-live="polite">{count}<span className="find-announcement">{wrapped ? ` · ${t('findWrapped')}` : ''}</span></span>
-    </span>
+    <div className="find-field">
+      <SearchIcon />
+      <input {...ime.inputProps} ref={setInput}
+        spellCheck={false} autoCorrect="off" autoCapitalize="off" autoComplete="off"
+        className="settings-input find-input" aria-label={t('findPlaceholder')} placeholder={t('findPlaceholder')}
+        value={query} onChange={(event) => {
+          pendingReveal.current = true; chooseFromPosition.current = true; setWrapped(false)
+          setState((current) => ({ ...current, query: event.target.value }))
+        }} onKeyDown={(event) => {
+          if (ime.isComposing(event.nativeEvent)) return
+          if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); step(event.shiftKey ? -1 : 1) }
+        }} />
+      {query && <span className="find-count" aria-hidden="true">{counter}</span>}
+    </div>
+    <span className="find-announcement" role="status" aria-live="polite">{announcement}{wrapped ? ` · ${t('findWrapped')}` : ''}</span>
     <div className="find-actions">
       <button className="btn-ghost btn-icon find-nav" type="button" aria-label={t('findCase')} title={t('findCase')}
         aria-pressed={caseSensitive} onClick={() => {

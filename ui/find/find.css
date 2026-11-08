@@ -13,40 +13,65 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
-  padding: calc(var(--space-unit) * 2);
-  font-family: var(--font-ui);
+  padding: calc(var(--space-unit) * 1.5);
+  font-size: var(--font-size-sm);
 }
-.find-input {
+/* The search glyph and result counter sit inside the field; its padding reserves both, so typing
+   never runs under the counter and the panel keeps its width whatever the count. */
+.find-field {
+  position: relative;
+  display: flex;
+  align-items: center;
   width: var(--find-input-width);
   min-width: 0;
   flex: 1 1 var(--find-input-width);
 }
+.find-field > svg {
+  position: absolute;
+  left: calc(var(--space-unit) * 2);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.find-input.settings-input {
+  height: calc(var(--space-unit) * 7);
+  padding-block: 0;
+  padding-left: calc(var(--space-unit) * 7);
+  padding-right: calc(var(--space-unit) * 15);
+}
 .find-count {
-  display: grid;
+  position: absolute;
+  right: calc(var(--space-unit) * 2);
+  max-width: calc(var(--space-unit) * 12);
+  overflow: hidden;
   font-variant-numeric: tabular-nums;
   font-size: var(--font-size-micro);
+  line-height: 1;
   color: var(--color-text-muted);
   white-space: nowrap;
-  text-align: center;
-  padding-inline: var(--space-unit);
+  pointer-events: none;
 }
-.find-count > span { grid-area: 1 / 1; }
-.find-count-size { visibility: hidden; }
-.find-actions { display: flex; gap: 0; }
+.find-actions { display: flex; align-items: center; gap: 0; }
 .find-nav {
   border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
 }
 .find-nav[aria-pressed='true'] { background: var(--color-selection); }
 .find-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-::highlight(find-results) { background-color: var(--color-selection); }
+/* Matches take the customary find colors: every match one saturated fill, the current one another. */
+::highlight(find-results) {
+  background-color: var(--find-match-bg);
+  color: var(--find-match-text);
+}
 ::highlight(find-current) {
-  background-color: var(--color-control-pressed);
+  background-color: var(--find-current-bg);
+  color: var(--find-match-text);
 }
 .cm-panels:has(> .cm-find-placeholder:only-child) { display: none; }
-.cm-editor .cm-searchMatch { background-color: var(--color-selection); }
-.cm-editor .cm-searchMatch.cm-searchMatch-selected {
-  background-color: var(--color-control-pressed);
+.cm-editor .cm-searchMatch {
+  background-color: var(--find-match-bg);
+  color: var(--find-match-text);
 }
+.cm-editor .cm-searchMatch.cm-searchMatch-selected { background-color: var(--find-current-bg); }
 @media print { .find-bar { display: none; } }
 
 .app-content:has(.find-bar) .comments-panel .slide-over {

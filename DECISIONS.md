@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Transient find highlights may color the document body
+
+**Ruled.** Find paints every match in a saturated yellow and the current match in orange, theme
+tokens for light and dark palettes, because a neutral fill left the current match hard to tell
+apart; the colors last only while Find is open and stay distinct from the translucent review
+highlight. Review marks remain the only persistent color in the document body.
+
+**Beat:** neutral grey find fills that keep review marks the body's only color.
+
 ## 2026-11-07 — Three complete font presets, Source Serif 4 by default, Noto SC bundled
 
 **Ruled.** Settings offer exactly Serif (Source Serif 4, default), Sans (Source Sans 3), and

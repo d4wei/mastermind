@@ -12,9 +12,13 @@ blocks do. Repeated quote previews, hidden syntax, resolved archives, and toolba
 excluded. Translated reading searches its displayed content and appended discussions once, without
 opening the original document's comment rail. Markdown searches the complete source.
 
-The current match uses a darker neutral fill without an additional underline or outline. The count
-uses tabular digits and reserves the width of the largest result number, keeping navigation still.
-Its four compact square controls stay grouped when the panel wraps.
+Every match takes the saturated `--find-match-bg` fill and the current match `--find-current-bg`,
+both with `--find-match-text` ink and without an underline or outline; the fills stay distinct from
+the translucent review highlight. A compact `current/total` counter (`0/0` without matches) sits
+right-aligned inside the field, whose padding reserves its space, so typing never runs under it and
+the panel keeps one width; a visually hidden live region announces the full phrase. Its four
+compact square controls stay grouped when the panel wraps. Opening another top-right surface closes
+Find; see the [layout contract](../app/layout.md).
 
 `matches.ts` uses the pinned CodeMirror search package for literal matching and Unicode offsets.
 `reading.ts` maps displayed text to DOM ranges without rewriting the renderer's nodes. Comment

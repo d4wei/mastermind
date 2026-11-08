@@ -6,7 +6,7 @@ import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, use
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { CommentBody } from './CommentBody'
-import { CheckIcon, ChevronUpIcon, MoreIcon } from '../icons'
+import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
@@ -231,12 +231,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
                 onClick={() => activate(card.spanIndex)}>
                 <span className="rail-author">{comment.author ?? t('comment')}</span>
               </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-              {messageIndex === 0 && <>
-                <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')} title={t('resolve')}
-                  disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>
-                {selected && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('collapseDiscussion')}
-                  title={t('collapseDiscussion')} onClick={collapse}><ChevronUpIcon /></button>}
-              </>}
+              {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
+                title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
               <DropdownMenu.Root modal={false}>
                 <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
                   aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
@@ -248,7 +244,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
                       // Deleting the opening message ends the discussion's identity.
                       const ended = messageIndex === 0 ? card : undefined
                       if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
-                    }}>{t('deleteComment')}</DropdownMenu.Item>
+                    }}><TrashIcon />{t('deleteComment')}</DropdownMenu.Item>
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
@@ -269,7 +265,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&
             <p role="alert">{t('commentBodyInvalid')}</p>}
           <div className="rail-actions">
-            <button type="button" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
+            <button type="button" className="btn-ghost btn-compact" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
             <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>

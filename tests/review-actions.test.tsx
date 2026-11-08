@@ -63,6 +63,10 @@ function render(source: string) {
   store.setState({ source, savedSource: source, status: 'ready' })
   act(() => root.render(<Harness />))
 }
+/** Escape on the selected card collapses it; the card has no separate collapse control. */
+function collapse() {
+  act(() => host.querySelector('.rail-card.active .rail-select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+}
 function click(label: string, index = 0) {
   if (label === 'Delete comment') {
     const trigger = host.querySelectorAll<HTMLButtonElement>('[aria-label="More"]')[index]!
@@ -136,9 +140,33 @@ it('keeps opening comments readable and hides replies until their count is selec
   expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['one', 'two'])
   click('1 reply')
   expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['one', 'answer', 'two'])
-  click('Collapse discussion')
+  collapse()
   expect(host.querySelectorAll('.rail-comment-reply')).toHaveLength(0)
   expect(edit).not.toHaveBeenCalled()
+})
+
+it('collapses a selected discussion with Escape rather than a header control', () => {
+  render('{==first==}{>>@Alex: one<<}{>>@Sam: answer<<}')
+  click('1 reply')
+  const header = host.querySelector('.rail-card.active .rail-message-header')!
+  expect(Array.from(header.querySelectorAll('button'), (button) => button.getAttribute('aria-label') ?? button.textContent))
+    .toEqual(['Discussion: Alex', 'Resolve', 'More'])
+  collapse()
+  expect(activate).toHaveBeenLastCalledWith(null)
+  expect(host.querySelector('.rail-card.active')).toBeNull()
+})
+
+it('pairs Cancel and Reply as matching compact buttons and marks Delete comment with an icon', () => {
+  render('{==first==}{>>@Alex: one<<}')
+  click('Reply')
+  const actions = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-reply .rail-actions button'))
+  expect(actions.map((button) => button.textContent)).toEqual(['Cancel', 'Reply'])
+  expect(actions.map((button) => button.className)).toEqual(['btn-ghost btn-compact', 'btn-primary btn-compact'])
+  const trigger = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!
+  act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+  const item = document.querySelector('[role="menuitem"]')!
+  expect(item.textContent).toBe('Delete comment')
+  expect(item.firstElementChild?.tagName.toLowerCase()).toBe('svg')
 })
 
 it('reply textarea focus preserves activation and keyboard submission still edits the file', () => {
@@ -288,7 +316,7 @@ it('keeps the quoted passage visible before, during and after replying', () => {
   expect(quote()).toBe('context')
   click('Reply')
   expect(quote()).toBe('context')
-  click('Collapse discussion')
+  collapse()
   expect(quote()).toBe('context')
 })
 
@@ -367,7 +395,7 @@ it('keeps a reply draft on its discussion when an identical earlier one is resol
   render('{==a==}{>>@bo: same<<} x {==a==}{>>@bo: same<<} y {==a==}{>>@bo: same<<}')
   click('Reply', 2)
   typeReply('meant for the third')
-  click('Collapse discussion')
+  collapse()
   click('Resolve', 0)
   expect(host.querySelector('.rail-orphan')).toBeNull()
   click('Reply', 0)

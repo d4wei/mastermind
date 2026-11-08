@@ -9,6 +9,7 @@ import {
   DotsHorizontalIcon,
   ChevronUpIcon as RChevronUpIcon,
   ChevronDownIcon as RChevronDownIcon,
+  ChevronRightIcon as RChevronRightIcon,
   FileIcon as RFileIcon,
   Cross2Icon,
   Pencil1Icon,
@@ -17,6 +18,7 @@ import {
   MagnifyingGlassIcon,
   CodeIcon as RCodeIcon,
   GlobeIcon as RGlobeIcon,
+  TrashIcon as RTrashIcon,
 } from '@radix-ui/react-icons'
 
 type IconProps = SVGProps<SVGSVGElement>
@@ -54,6 +56,7 @@ export const CheckIcon = radix(RCheckIcon, 14)
 export const MoreIcon = radix(DotsHorizontalIcon, 15)
 export const ChevronUpIcon = radix(RChevronUpIcon, 13)
 export const ChevronDownIcon = radix(RChevronDownIcon, 13)
+export const ChevronRightIcon = radix(RChevronRightIcon, 13)
 export const FileIcon = radix(RFileIcon, 14)
 
 /* ---- review/chrome verbs ---- */
@@ -64,6 +67,7 @@ export const HistoryIcon = radix(CounterClockwiseClockIcon, 14)
 export const SearchIcon = radix(MagnifyingGlassIcon, 14)
 export const CodeIcon = radix(RCodeIcon, 14)
 export const LanguageIcon = radix(RGlobeIcon, 14)
+export const TrashIcon = radix(RTrashIcon, 14)
 
 /* ---- hand-drawn glyphs Radix lacks ---- */
 

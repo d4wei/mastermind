@@ -125,6 +125,10 @@ and Chinese interface labels, a prepared translation, and light and dark themes.
 - Open settings, resolved history, comments, and Find. Panels fit the viewport and scroll inside;
   Find wraps. In a disposable conflict test, the bottom-left recovery notice coexists with Find
   and clears the toolbar.
+- With Find open, open the More menu, the language menu, settings, and resolved history: each closes
+  Find. Matches show yellow and the current match orange in light and dark themes, distinct from a
+  highlighted comment passage; the `1/2` counter stays inside the field and the panel width does
+  not change while typing. Select text just below Find; the selection toolbar opens below it.
 - Overscroll the top and bottom in light and dark themes, then change themes and repeat. The
   revealed surface matches the current page background in both reading modes. File controls,
   outline, and open overlay panels stay fixed throughout scrolling and overscroll.

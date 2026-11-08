@@ -187,6 +187,9 @@ Use **Suggested edits / 修改建议** for unaccepted edits.
 Keep **Accept / 接受**, **Reject / 拒绝**, and **Suggest change / 建议修改** as actions.
 
 Example: “This document has two suggested edits.” / “此文档有两处修改建议。”
+A Suggest change field needs no label; when a selection spans several fragments, number them as
+**Part 1 of 2 / 第 1 处，共 2 处**. Put the deletion hint in an empty field's placeholder: **Leave
+empty to suggest deletion / 留空即建议删除**.
 Technical `suggestion` and `CriticKind` need no rename. A UI-only edit proposal and a CriticMarkup
 mark already stored in the file have different persistence states; the term suggestion does not
 establish whether either has been accepted.

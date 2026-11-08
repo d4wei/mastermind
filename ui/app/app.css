@@ -68,9 +68,10 @@ body {
   scroll-padding-top: calc(var(--space-unit) * 6);
 }
 
+/* Interface chrome uses the system face; only rendered document content takes the reading preset. */
 body {
   color: var(--color-text);
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--font-size-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
@@ -159,6 +160,8 @@ body {
   outline: none;
   background: var(--color-control-hover);
 }
+.reader-menu-item > svg { flex: none; color: var(--color-text-muted); }
+.reader-menu-item[data-disabled] { opacity: 0.45; cursor: default; }
 
 .topbar-icon-btn.btn-icon {
   width: var(--control-size);
@@ -183,9 +186,9 @@ body {
 /* ---------- buttons ---------- */
 
 button {
-  font-family: var(--font-body);
   cursor: pointer;
 }
+:is(button, input, textarea, select) { font-family: var(--font-ui); }
 
 button:disabled {
   cursor: default;
@@ -365,7 +368,8 @@ button:disabled {
   gap: var(--space-unit);
   margin-top: calc(var(--space-unit) * 2);
 }
-.rail-actions button:not(.btn-primary) {
+/* Footer links are quiet text; composer actions use the shared compact buttons. */
+.rail-actions button:not(.btn-compact) {
   background: transparent;
   border: none;
   border-radius: var(--radius-xs);
@@ -377,11 +381,14 @@ button:disabled {
 }
 .rail-footer { justify-content: flex-start; }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
+/* Resizing stops at two full lines, so the placeholder and caret stay readable. */
 .rail-reply textarea {
+  display: block;
   width: 100%;
   resize: vertical;
-  font-family: var(--font-ui);
+  min-height: calc(var(--font-size-sm) * var(--lh-snug) * 2 + var(--space-unit) * 4 + 2px);
   font-size: var(--font-size-sm);
+  line-height: var(--lh-snug);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -412,8 +419,6 @@ button:disabled {
   border-radius: var(--radius-xs);
   color: var(--color-invert-text);
   font-size: var(--font-size-sm);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2.5);
   white-space: nowrap;
 }
@@ -433,22 +438,26 @@ button:disabled {
 .sel-composer {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--space-unit) * 1.5);
+  gap: calc(var(--space-unit) * 2);
   padding: calc(var(--space-unit) * 1.5);
   width: 280px;
+  font-size: var(--font-size-xs);
+  line-height: var(--lh-snug);
 }
 
 .sel-composer textarea {
+  display: block;
   width: 100%;
   resize: none;
-  font-family: var(--font-body);
   font-size: var(--font-size-sm);
+  line-height: var(--lh-snug);
   background: var(--color-invert-bg-elevated);
   border: 1px solid var(--color-invert-border);
   border-radius: var(--radius-md);
   color: var(--color-invert-text);
-  padding: calc(var(--space-unit) * 1.5);
+  padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
+.sel-composer textarea::placeholder { color: var(--color-invert-text-muted); }
 
 .sel-composer textarea::selection {
   background: var(--color-invert-text);
@@ -461,22 +470,23 @@ button:disabled {
   gap: calc(var(--space-unit) * 1);
 }
 
+/* The secondary action stays on the inverted band rather than taking the page's ghost surfaces. */
 .sel-composer-actions button:not(.btn-primary) {
   background: transparent;
   border: none;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-md);
   color: var(--color-invert-text-muted);
-  font-size: var(--font-size-micro);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
-  padding: calc(var(--space-unit) * 1) calc(var(--space-unit) * 2);
 }
 
+/* Composer actions: secondary and primary share one face, size, and height. */
 .btn-compact {
-  font-family: var(--font-ui);
-  font-size: var(--font-size-sm);
-  min-height: calc(var(--space-unit) * 7);
-  padding: var(--space-unit) calc(var(--space-unit) * 2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--space-unit) * 7);
+  padding: 0 calc(var(--space-unit) * 3);
+  font-size: var(--font-size-xs);
+  line-height: 1;
 }
 
 .sel-composer-actions button:disabled {
@@ -485,7 +495,10 @@ button:disabled {
 
 /* ---------- markdown elements ---------- */
 
-.md-root { font-weight: var(--weight-body); }
+.md-root {
+  font-family: var(--font-body);
+  font-weight: var(--weight-body);
+}
 
 /* Body-relative sizes keep the hierarchy stable when text size changes. */
 .md-root :is(h1, h2, h3, h4, h5, h6) {
@@ -911,7 +924,6 @@ mark.critic-hl.critic-anchor:hover,
 }
 
 .center-note h1 {
-  font-family: var(--font-display);
   font-weight: var(--weight-bold);
   letter-spacing: var(--ls-heading);
   color: var(--color-text);
@@ -958,11 +970,8 @@ mark.critic-hl.critic-anchor:hover,
   border-bottom: 1px solid var(--color-border);
 }
 .slide-over-title {
-  font-family: var(--font-display);
   font-weight: var(--weight-medium);
   font-size: var(--font-size-sm);
-  letter-spacing: var(--ls-caps);
-  text-transform: uppercase;
   color: var(--color-text);
 }
 .slide-over-body {
@@ -1072,7 +1081,6 @@ mark.critic-hl.critic-anchor:hover,
 }
 
 .settings-input {
-  font-family: var(--font-body);
   font-size: var(--font-size-sm);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -1484,7 +1492,9 @@ input[type='checkbox'] {
   letter-spacing: var(--ls-normal);
 }
 
+/* The quote is document text, so it keeps the reading face inside the comment. */
 .translated-comment-quote {
+  font-family: var(--font-body);
   margin: 0 0 calc(var(--space-unit) * 2);
   padding-left: calc(var(--space-unit) * 2);
   border-left: 1px solid var(--color-border);
@@ -1529,13 +1539,13 @@ input[type='checkbox'] {
 
 /* Ordinary controls share hover feedback; selection remains a separate state. */
 :is(.btn-ghost, .seg-btn, .theme-chip, .topbar-language, .find-nav,
-  .rail-actions button:not(.btn-primary), .nav-outline button, .native-open:not(.native-open-home), .native-file-close,
-  .native-file-pill, .outline-progress, .resolved-threads summary):hover:not(:disabled):not([aria-disabled='true']):not(.active):not([data-state='on']):not([aria-current]):not([aria-pressed='true']) {
+  .rail-actions button:not(.btn-compact), .nav-outline button, .native-open:not(.native-open-home), .native-file-close,
+  .native-file-pill, .outline-progress):hover:not(:disabled):not([aria-disabled='true']):not(.active):not([data-state='on']):not([aria-current]):not([aria-pressed='true']) {
   background: var(--color-control-hover);
   color: var(--color-text);
 }
 :is(.btn-ghost, .seg-btn, .theme-chip, .topbar-language, .find-nav,
-  .rail-actions button:not(.btn-primary), .nav-outline button, .native-open:not(.native-open-home), .native-file-close):active:not(:disabled) {
+  .rail-actions button:not(.btn-compact), .nav-outline button, .native-open:not(.native-open-home), .native-file-close):active:not(:disabled) {
   background: var(--color-control-pressed);
 }
 .sel-toolbar button:not(.btn-primary):hover:not(:disabled) {
@@ -1560,5 +1570,11 @@ input[type='checkbox'] {
   }
 }
 .sel-composer { max-height: min(60vh, calc(var(--space-unit) * 100)); overflow-y: auto; }
-.sel-composer label, .sel-composer p { font-size: var(--font-size-xs); margin: 0; }
+.sel-composer p { margin: 0; color: var(--color-invert-text-muted); }
+.sel-composer p[role='alert'] { color: var(--color-invert-text); }
 .sel-composer label { display: grid; gap: var(--space-unit); }
+.sel-part {
+  color: var(--color-invert-text-muted);
+  font-size: var(--font-size-micro);
+  font-weight: var(--weight-medium);
+}

@@ -93,6 +93,12 @@ it('closes when another overlay opens, but not for one already open when it moun
   expect(host.querySelector('[role="search"]')).toBeNull()
 })
 
+it('closes when the document overflow menu opens in the same region', () => {
+  key('f', { metaKey: true }); expect(host.querySelector('[role="search"]')).not.toBeNull()
+  act(() => openOverlay('menu', 'doc'))
+  expect(host.querySelector('[role="search"]')).toBeNull()
+})
+
 it('does not navigate or close while confirming IME composition', () => {
   key('f', { metaKey: true }); fill('Review')
   act(() => input().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
@@ -106,19 +112,26 @@ it('does not navigate or close while confirming IME composition', () => {
   key('Enter'); expect(host.querySelector('[role="status"]')?.textContent).toBe('2 of 2')
 })
 
-it.each(['en', 'zh-CN'] as const)('reserves the largest result counter while navigating in %s', (uiLang) => {
+it.each([
+  ['en', '10 of 12', 'No results'], ['zh-CN', '第 10 项，共 12 项', '无结果'],
+] as const)('shows a compact counter inside the field and announces the full phrase in %s', (uiLang, announced, none) => {
   act(() => {
     useConfig.setState({ config: { ...useConfig.getState().config!, uiLang } })
     root.render(<Harness text={'Review '.repeat(12)} />)
   })
-  key('f', { metaKey: true }); fill('Review')
-  const reserved = () => host.querySelector('.find-count-size')!
-  const expected = uiLang === 'en' ? '12 of 12' : '第 12 项，共 12 项'
-  expect(reserved().textContent).toBe(expected)
-  expect(reserved().getAttribute('aria-hidden')).toBe('true')
+  key('f', { metaKey: true })
+  const counter = () => host.querySelector('.find-count')
+  expect(counter()).toBeNull()
+  fill('Review')
+  expect(counter()!.parentElement).toBe(input().parentElement)
+  expect(counter()!.getAttribute('aria-hidden')).toBe('true')
+  expect(counter()!.textContent).toBe('1/12')
   for (let i = 0; i < 9; i++) key('Enter')
-  expect(host.querySelector('[role="status"]')?.textContent).toBe(uiLang === 'en' ? '10 of 12' : '第 10 项，共 12 项')
-  expect(reserved().textContent).toBe(expected)
+  expect(counter()!.textContent).toBe('10/12')
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(announced)
+  fill('absent')
+  expect(counter()!.textContent).toBe('0/0')
+  expect(host.querySelector('[role="status"]')?.textContent).toBe(none)
 })
 
 it('recomputes after external content replacement without stealing field focus or retaining detached ranges', () => {

@@ -1,7 +1,7 @@
 :where([data-theme]) {
   --font-display: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
   --font-body: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-mono: 'Source Code Pro', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
   --font-size-body: 1rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.8125rem;
@@ -11,7 +11,6 @@
   --lh-body: 1.6;
   --ls-heading: -0.01em;
   --ls-normal: 0;
-  --ls-caps: 0.06em;
   --ls-label: 0.08em;
   --weight-medium: 600;
   --weight-body: 400;
@@ -28,7 +27,7 @@
   --dur-fade: 260ms;
   --dur-slow: 300ms;
 
-  --find-input-width: 12rem;
+  --find-input-width: 16rem;
   --file-tab-max-width: 10rem;
   --language-trigger-max-width: 10rem;
   --file-menu-width: 15rem;
@@ -72,6 +71,7 @@
   --review-insert-border: var(--review-insert-text);
   --review-delete-bg: color-mix(in srgb, var(--review-delete-text) 10%, transparent);
   --review-delete-border: var(--review-delete-text);
+  --find-match-text: #1a1a1a;
   --shadow-popover: 0 4px 16px var(--color-shadow);
   --shadow-panel: 0 8px 28px var(--color-shadow);
 }

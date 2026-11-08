@@ -59,10 +59,15 @@ reduced motion changes position immediately. The animation uses the shared durat
 The Web Animations duration converts CSS seconds or milliseconds explicitly; production CSS may
 shorten the token to seconds.
 
-Find, the file list, the language menu, settings, and resolved history exclude one another through
-the one open value in `overlayStore.ts`; opening any closes the others. Settings, resolved history,
-and the language menu belong to the document view that opened them and close with it; Find keeps
-its per-document open state. On narrow layouts, opening settings or resolved history closes
+The top-right region holds one floating surface at a time. Find, the file list, the language menu,
+the document overflow menu, settings, and resolved history exclude one another through the one open
+value in `overlayStore.ts`; opening any closes the others, so Find never stays open beneath a menu
+or panel. Settings, resolved history, the overflow menu, and the language menu belong to the
+document view that opened them and close with it; Find keeps its per-document open state. Surfaces
+that hold a draft are not overlays and never close for one: menus stack above the selection and
+reply composers. The selection toolbar stays below the document controls and clear of Find,
+opening below its selection when there is no room above. Find floats above an expanded table, and
+the narrow comments panel moves below Find rather than closing it. On narrow layouts, opening settings or resolved history closes
 comments. Settings-save feedback belongs to application
 preferences and can appear without an active document.
 
@@ -95,8 +100,9 @@ footnote
 numbering. Standalone highlights render as plain text; insertions, deletions, and replacements
 retain edit styling.
 
-Suggest change opens one Markdown replacement field per editable selected fragment. An empty field
-suggests deletion; an unchanged field emits no edit. Fragment boundaries preserve intervening marks,
+Suggest change opens one Markdown replacement field per editable selected fragment. A single field
+has no label; several are numbered as parts in source order. An empty field suggests deletion, as
+its placeholder says; an unchanged field emits no edit. Fragment boundaries preserve intervening marks,
 code, and block structure. Unrepresentable replacement text is rejected without sanitizing it.
 The composer retains IME handling and pauses submission while the file has a conflict.
 
@@ -110,5 +116,5 @@ not add a ring to buttons. Text fields strengthen their existing boundary while 
 editor uses its caret rather than a page-sized outline. Inverted composers use a local light ring.
 Panels move keyboard focus inside on open and return it to the invoking control on dismissal;
 clicking elsewhere keeps focus at the clicked destination. Radix menu items use the highlighted row
-surface. Search matches use a neutral fill, darker on the current match, independent of focus, and
-clear when no match remains or Find closes.
+surface. Search matches use the find fills described in the [Find notes](../find/README.md), independent
+of focus, and clear when no match remains or Find closes.

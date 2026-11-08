@@ -87,6 +87,22 @@ describe('theme token contract', () => {
     }
   })
 
+  it.each(themeIds)('%s paints find matches in opaque fills that stay apart from review highlights', (id) => {
+    const tokens = themeTokens(id)
+    const paper = rgb('--color-bg', tokens)
+    const match = rgb('--find-match-bg', tokens)
+    const current = rgb('--find-current-bg', tokens)
+    const distance = (a: number[], b: number[]) => Math.hypot(...a.slice(0, 3).map((channel, i) => channel - b[i]!))
+    for (const fill of [match, current]) {
+      expect(fill[3] ?? 1, id).toBe(1)
+      expect(contrast(rgb('--find-match-text', tokens), fill), id).toBeGreaterThanOrEqual(7)
+    }
+    // Every match must read as a find result rather than a translucent review highlight.
+    expect(distance(match, composite(rgb('--review-highlight-bg', tokens), paper)), `${id}: match vs highlight`)
+      .toBeGreaterThanOrEqual(80)
+    expect(distance(current, match), `${id}: current vs match`).toBeGreaterThanOrEqual(70)
+  })
+
   it.each(themeIds)('%s keeps optional code palettes readable on code blocks', (id) => {
     const tokens = themeTokens(id)
     const background = rgb('--color-bg-elevated', tokens)

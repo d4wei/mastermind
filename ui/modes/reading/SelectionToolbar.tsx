@@ -10,7 +10,7 @@ import { usePresence } from '../../util/presence'
 import { useCompositionGuard } from '../../util/composition'
 import { cssMs } from '../../util/css-tokens'
 import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelRange } from './selection'
-import { documentViewport } from '../../util/scroll'
+import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from './marks'
 
 /** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
@@ -33,7 +33,7 @@ interface Active {
   ranges: SelRange[]
   /** Selected text no fragment covers; the toolbar explains why instead of dropping it silently. */
   excluded: ExcludedSegment[]
-  rect: { top: number; left: number; width: number }
+  rect: { top: number; left: number; width: number; bottom: number }
 }
 
 const REASON_MESSAGES: Record<ExclusionReason, MsgKey> = {
@@ -59,7 +59,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const [replacements, setReplacements] = useDraftState<string[]>('selection:replacements', [])
   const [comment, setComment] = useDraftState('selection:comment', '')
   const toolbarRef = useRef<HTMLDivElement>(null)
-  const [toolbarHeight, setToolbarHeight] = useState(44)
+  const [toolbarSize, setToolbarSize] = useState({ width: 260, height: 44 })
   const composingRef = useRef(false)
   composingRef.current = composing !== null
   const lastActive = useRef<Active | null>(null)
@@ -90,7 +90,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     selectedRange.current = range.cloneRange()
     const rect = range.getBoundingClientRect()
     return { source: mapped.revision, ranges: mapped.segments, excluded: mapped.excluded,
-      rect: { top: rect.top, left: rect.left, width: rect.width } }
+      rect: { top: rect.top, left: rect.left, width: rect.width, bottom: rect.bottom } }
   }
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
           ? selectedRange.current : sel?.rangeCount ? sel.getRangeAt(0) : null
         if (!range) return
         const rect = range.getBoundingClientRect()
-        setActive((prev) => (prev ? { ...prev, rect: { top: rect.top, left: rect.left, width: rect.width } } : prev))
+        setActive((prev) => (prev ? { ...prev, rect: { top: rect.top, left: rect.left, width: rect.width, bottom: rect.bottom } } : prev))
       })
     }
     const scrollTarget = documentViewport().target
@@ -164,7 +164,11 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current
     if (!toolbar) return
-    const measure = () => setToolbarHeight(toolbar.getBoundingClientRect().height || 44)
+    const measure = () => {
+      const { width, height } = toolbar.getBoundingClientRect()
+      setToolbarSize((current) => width === current.width && height === current.height ? current
+        : { width: width || 260, height: height || 44 })
+    }
     measure()
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
     observer?.observe(toolbar)
@@ -225,8 +229,14 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     e.stopPropagation()
   }
 
-  const top = Math.max(8, Math.min(view.rect.top - toolbarHeight - 8, window.innerHeight - toolbarHeight - 8))
   const left = Math.min(Math.max(8, view.rect.left + view.rect.width / 2 - 130), window.innerWidth - 280)
+  // The toolbar never covers the document controls or Find; without room above its selection it opens below.
+  const find = document.querySelector('.find-bar')?.getBoundingClientRect()
+  const besideFind = !!find && left < find.right && left + toolbarSize.width > find.left
+  const ceiling = Math.max(readingLine(), besideFind ? find.bottom : 0) + 8
+  const above = view.rect.top - toolbarSize.height - 8
+  const top = above >= ceiling ? above
+    : Math.max(ceiling, Math.min(view.rect.bottom + 8, window.innerHeight - toolbarSize.height - 8))
 
   return (
     <div ref={toolbarRef}
@@ -263,20 +273,24 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={composerKey}
-          /> : <>
-            <p>{t('changeHint')}</p>
-            {replacements.map((replacement, index) => <label key={index}>
-              {t('replacement')}{replacements.length > 1 ? ` ${index + 1}` : ''}
+          /> : replacements.map((replacement, index) => {
+            // One field needs no label; fields for a selection spanning blocks are numbered in order.
+            const part = replacements.length > 1 ? t('changePart').replace('{index}', String(index + 1))
+              .replace('{total}', String(replacements.length)) : null
+            return <label key={index}>
+              {part && <span className="sel-part">{part}</span>}
               <textarea autoFocus={index === 0} readOnly={readOnly} rows={3}
                 {...ime.inputProps}
+                aria-label={part ? undefined : t('suggestChange')}
+                placeholder={t('changeDeletePlaceholder')}
                 value={replacement} onChange={(event) => setReplacements((current) =>
                   current.map((value, i) => i === index ? event.target.value : value))}
                 onKeyDown={composerKey} />
-            </label>)}
-          </>}
+            </label>
+          })}
           {refusal && <p role="alert">{t(refusal)}</p>}
           <div className="sel-composer-actions">
-            <button type="button" onClick={() => {
+            <button type="button" className="btn-compact" onClick={() => {
               cancelSelectionCheck()
               composingRef.current = false
               setComposing(null)

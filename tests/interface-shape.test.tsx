@@ -71,15 +71,38 @@ it('keeps segmented choices wide', () => {
   expect(preset.padding).toBe('0px')
 })
 
-it('reserves counter space and groups compact Find controls without gaps', () => {
+it('keeps the Find counter inside a fixed-width field and groups compact controls without gaps', () => {
   installStyles()
-  document.body.innerHTML = '<span class="find-count"><span class="find-count-size" aria-hidden="true">12 of 12</span><span>1 of 12</span></span><div class="find-actions"></div>'
-  const count = document.querySelector('.find-count')!
-  expect(getComputedStyle(count).fontVariantNumeric).toBe('tabular-nums')
-  expect(getComputedStyle(count).display).toBe('grid')
-  for (const child of count.children) expect(getComputedStyle(child).gridArea).toBe('1 / 1')
-  expect(getComputedStyle(count.firstElementChild!).visibility).toBe('hidden')
+  document.body.innerHTML = '<div class="find-bar"><div class="find-field"><svg></svg><input class="settings-input find-input"><span class="find-count">1/12</span></div><div class="find-actions"></div></div>'
+  const field = getComputedStyle(document.querySelector('.find-field')!)
+  const input = getComputedStyle(document.querySelector('.find-input')!)
+  const count = getComputedStyle(document.querySelector('.find-count')!)
+  expect(field.position).toBe('relative')
+  expect(field.width).toBe('var(--find-input-width)')
+  expect(count.position).toBe('absolute')
+  expect(count.fontVariantNumeric).toBe('tabular-nums')
+  // The input's right padding covers the counter's offset and widest box, so typing never reaches it.
+  expect(input.paddingRight).toBe('calc(60px)')
+  expect(count.right).toBe('calc(8px)')
+  expect(count.maxWidth).toBe('calc(48px)')
   expect(getComputedStyle(document.querySelector('.find-actions')!).gap).toBe('0px')
+})
+
+it('gives composer actions one face, size, and height and keeps every chrome control sentence case', () => {
+  installStyles()
+  document.body.innerHTML = '<div class="rail-reply"><textarea></textarea><div class="rail-actions"><button class="btn-ghost btn-compact">Cancel</button><button class="btn-primary btn-compact">Reply</button></div></div>' +
+    '<div class="sel-toolbar"><div class="sel-composer"><div class="sel-composer-actions"><button class="btn-compact">Cancel</button><button class="btn-primary btn-compact">Suggest change</button></div></div></div>'
+  for (const group of document.querySelectorAll('.rail-actions, .sel-composer-actions')) {
+    const [secondary, primary] = Array.from(group.querySelectorAll('button'), (button) => getComputedStyle(button))
+    for (const property of ['fontFamily', 'fontSize', 'height', 'lineHeight', 'paddingLeft'] as const) {
+      expect(secondary![property], `${group.className} ${property}`).toBe(primary![property])
+    }
+    expect(secondary!.textTransform).not.toBe('uppercase')
+  }
+  const reply = getComputedStyle(document.querySelector('.rail-reply textarea')!)
+  expect(reply.resize).toBe('vertical')
+  // Two full lines of reply text plus the field's vertical padding and border.
+  expect(reply.minHeight).toBe('calc(var(--font-size-sm) * var(--lh-snug) * 2 + 4px * 4 + 2px)')
 })
 
 it('adds no frontmatter top inset and leaves space between properties and below the divider', () => {

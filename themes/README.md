@@ -36,9 +36,12 @@ same CSS variables as the theme defaults.
   semantic roles. Dotted underlines, strikethrough, labels, and card linkage distinguish meaning
   even when a theme accent resembles a review color.
 - **Navigation:** Open, Markdown, Comments, More, file tabs, and secondary actions use neutral ink
-  and surfaces. The current outline tick uses the text-safe accent. Find matches and its Match case
-  control use neutral emphasis, independent of review colors. The current match uses a darker fill
-  without an additional underline or outline.
+  and surfaces. The current outline tick uses the text-safe accent. The Match case control uses
+  neutral emphasis.
+- **Find matches:** transient, so the one color allowed in the document body besides review marks.
+  Every match uses the opaque, saturated `--find-match-bg`; the current match `--find-current-bg`;
+  both carry `--find-match-text`. Palettes set the two fills for their appearance; they stay
+  distinguishable from the translucent `--review-highlight-bg`.
 - **Selection and focus:** neutral selection fill and a neutral keyboard focus ring remain separate
   from review colors. Focus never substitutes for a selected state.
 - **Document content:** ordinary links retain underlines and neutral ink; task checkboxes are
@@ -64,7 +67,9 @@ Font presets override reading and code fonts, heading weight and letter spacing,
 body-relative sizes; shared block, heading, and list gaps establish the reading rhythm. All
 document-body text sizes from `--font-size-body` (`--md-font-size-sm` or `em`) so the font size
 setting scales it, while application chrome keeps the fixed `--font-size-sm/xs/micro` rem tokens.
-Comment cards use the system UI font independently of reading preferences. The home wordmark uses a
+Interface chrome (controls, menus, panels, inputs, comment cards, and their text) uses
+`--font-ui` independently of reading preferences; only rendered document text and quotations of it
+take the preset faces. The home wordmark uses a
 fixed monospace stack and line height that preserve its horizontal slit.
 
 Controls and panel labels use sentence case. Letter-spaced uppercase is reserved for small section

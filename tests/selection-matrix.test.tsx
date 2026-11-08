@@ -19,6 +19,7 @@ import { mapSelection, type ExclusionReason, type SelRange } from '../ui/modes/r
 import { changeVerdict, commentVerdict } from '../ui/modes/reading/marks'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { useConfig } from '../ui/app/configStore'
 
 /** A source slice by its text and, when it recurs, the occurrence meant. */
 type Slice = string | [text: string, occurrence: number]
@@ -380,6 +381,50 @@ describe('the selection toolbar', () => {
     act(() => inputValue(host.querySelector('textarea')!, 'Why?'))
     press('Comment')
     expect(edit).toHaveBeenCalledWith([{ from: 4, to: 7, insert: '{==re ==}{>>@Alex: Why?<<}' }])
+  })
+
+  it('offers one unlabeled field whose placeholder explains deletion, with sentence-case matching actions', async () => {
+    await show('Alpha bravo.', 'bravo')
+    press('Suggest change')
+    const field = host.querySelector('textarea')!
+    expect(host.querySelector('.sel-part')).toBeNull()
+    expect(field.getAttribute('aria-label')).toBe('Suggest change')
+    expect(field.placeholder).toBe('Leave empty to suggest deletion')
+    expect(host.querySelector('.sel-composer')!.textContent).not.toContain('Edit the selected Markdown')
+    const actions = Array.from(host.querySelectorAll('.sel-composer-actions button'))
+    expect(actions.map((button) => button.textContent)).toEqual(['Cancel', 'Suggest change'])
+    expect(actions.map((button) => button.className)).toEqual(['btn-compact', 'btn-primary btn-compact'])
+  })
+
+  it.each([
+    ['en', ['Part 1 of 2', 'Part 2 of 2']], ['zh-CN', ['第 1 处，共 2 处', '第 2 处，共 2 处']],
+  ] as const)('numbers the fields of a selection spanning marks in %s', async (uiLang, parts) => {
+    const previous = useConfig.getState()
+    useConfig.setState({ config: { ...previous.config!, uiLang } })
+    cleanups.push(() => useConfig.setState(previous))
+    await show('Before **bold** after.', 're bo')
+    press(uiLang === 'en' ? 'Suggest change' : '建议修改')
+    expect(Array.from(host.querySelectorAll('.sel-composer label'), (label) => label.querySelector('.sel-part')?.textContent))
+      .toEqual(parts)
+    expect(Array.from(host.querySelectorAll('textarea'), (field) => field.value)).toEqual(['re ', 'bo'])
+  })
+
+  it('opens below its selection rather than cover Find', async () => {
+    const find = document.createElement('div')
+    find.className = 'find-bar'
+    find.getBoundingClientRect = () => ({ top: 0, bottom: 100, left: 0, right: 2000 } as DOMRect)
+    document.body.append(find)
+    cleanups.push(() => find.remove())
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true, value: () => ({ top: 120, bottom: 140, left: 100, width: 40 }),
+    })
+    await show('Alpha bravo.', 'bravo')
+    expect(host.querySelector<HTMLElement>('.sel-toolbar')!.style.top).toBe('148px')
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true, value: () => ({ top: 300, bottom: 320, left: 100, width: 40 }),
+    })
+    await show('Alpha bravo charlie.', 'charlie')
+    expect(host.querySelector<HTMLElement>('.sel-toolbar')!.style.top).toBe('248px')
   })
 
   it('names a mark that would change the surrounding formatting', async () => {

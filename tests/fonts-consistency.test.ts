@@ -41,7 +41,8 @@ describe('font presets', () => {
       const cjk = CJK_STACKS[preset.style].map((family) => `'${family}'`).join(', ')
       expect(bodyStack(preset)).toBe(`'${preset.bodyFamily}', ${cjk}, ${preset.style === 'serif' ? 'serif' : 'sans-serif'}`)
       expect(displayStack(preset)).toContain(`'${preset.displayFamily}', ${cjk}, `)
-      expect(monoStack(preset)).toMatch(new RegExp(`^'${preset.codeFamily}', 'Noto Sans SC', .*monospace$`))
+      // System monospace precedes the CJK faces so Latin code stays monospace if the bundled face fails.
+      expect(monoStack(preset)).toMatch(new RegExp(`^'${preset.codeFamily}', ui-monospace, .*'Noto Sans SC', .*monospace$`))
     }
   })
 

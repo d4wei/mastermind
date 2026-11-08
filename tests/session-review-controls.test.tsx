@@ -6,6 +6,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { useDoc } from '../ui/documents/store'
+import { requestFind, useOverlay } from '../ui/app/overlayStore'
 import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
@@ -90,6 +91,17 @@ it.each(['resolve', 'delete'])('ignores stale double %s and callbacks captured b
   act(() => useDoc.setState({ sessionId: 'B', source, savedSource: source }))
   act(() => callback(edits))
   expect(useDoc.getState().source).toBe(source)
+})
+
+it('holds the overflow menu in the shared top-right overlay, closing Find and yielding to its panels', () => {
+  render('body')
+  act(() => requestFind())
+  openReaderMenu(host)
+  expect(useOverlay.getState()).toMatchObject({ open: 'menu', owner: 'A' })
+  act(() => readerMenuItem('Resolved (0)').click())
+  expect(useOverlay.getState()).toMatchObject({ open: 'resolved', owner: 'A' })
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+  expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Resolved discussions (0)')
 })
 
 it('keeps resolved discussions available while a conflict pauses edits', () => {

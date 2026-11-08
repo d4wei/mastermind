@@ -18,6 +18,8 @@
   --review-insert-text: #4fc76e;
   --review-delete-text: #f0664a;
   --review-highlight-bg: rgba(232, 190, 58, 0.2);
+  --find-match-bg: #ecd64a;
+  --find-current-bg: #f58a3a;
   --color-accent-text: oklch(0.631 0.107 182.719);
   --color-accent-hover: #4bddc9;
   --color-accent-pressed: #6ae7d5;
