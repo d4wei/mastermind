@@ -26,6 +26,28 @@ entry that has already resolved.
 
 * * *
 
+## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse
+
+**Bet.** Even with the micromark truncation patched (`document/markdown/processor.md`), a whole
+document parse costs about 0.5 µs per byte and runs on the renderer's main thread, so a 4 MB file
+blocks for seconds and a 15 MiB one for far longer, during which the window cannot paint. The
+likely remedies are parsing in a Web Worker (the core is isomorphic, so it can run there) and
+re-analyzing only the top-level block an edit touched with offsets shifted after it; both are
+larger than the per-interaction fixes landed so far.
+
+**Exit:** a measured prototype of either on the perf fixtures, then a ruling on which one, or a
+size threshold above which the app offers the source view instead of the reading view.
+
+## 2026-11-07 — Restoring remembered files reads every one before the first reply
+
+**Open question.** Restoration reads each remembered document's content before the triggering
+launcher request is answered (`desktop/src/restoration.md`), which keeps "admission reads and
+retains a snapshot before reporting success" but costs about 350 ms with six 15 MiB files
+remembered. Deferring the content read of inactive restored documents to their first
+`read_document` would relax that contract for the restore path alone.
+
+**Exit:** a ruling on whether a restored, inactive document may be admitted from metadata alone.
+
 ## 2026-11-07 — Remembered files on volumes that are not mounted at launch
 
 **Open question.** A remembered document that cannot be reopened at launch is dropped from the
