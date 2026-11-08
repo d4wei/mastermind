@@ -5,5 +5,5 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["ui", "document"]
+  "include": ["ui", "document", "tools/perf/session/entry.tsx"]
 }

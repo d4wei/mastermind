@@ -17,6 +17,7 @@
     "vite.config.ts",
     "vitest.config.ts",
     "tools/translation",
+    "tools/perf/document.bench.mts",
     "themes/discovery.ts"
   ]
 }

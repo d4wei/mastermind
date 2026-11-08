@@ -20,3 +20,9 @@ node_modules/
 /dummy-demo.md
 /mastermind-demo.md
 /roadmap-demo.md
+
+# Performance fixtures, builds, run state and results (tools/perf/README.md)
+/tools/perf/fixtures/
+/tools/perf/.build/
+/tools/perf/.runs/
+/tools/perf/results/

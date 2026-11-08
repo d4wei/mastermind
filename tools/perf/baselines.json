@@ -1,0 +1,28 @@
+{
+  "fixtures": {
+    "mid.md": "44be177c3f38cbc24250e5a21c4fdbfa874ddc96a5db641dd6e8bd5a036f44d9",
+    "large.md": "1fee6d11ab6c028ee206d66493aa3e6f7ede21588933fc3fdd088842a226aba9",
+    "small.md": "a7adb9c59fa2dc50a4ec6565fa05ffbc810248400c976c6192699970180e7ed6",
+    "k600.md": "d16a82705c960be6aa611e200db575f0ea4eb50c86c0ea551fce54b8d4626611",
+    "m15.md": "03fd4393a245283bc7ae8d3f83dba366f535de2560d12df6933da575ba0338a5",
+    "p600.md": "098707de229aee2fd81bdfacb32f6b05def0dcaa81687de784c3edec83eb4f92",
+    "p15.md": "8892cb0c728d4f79121f1aca76ee8f2e119d42464160d892b6b58198edc8bc11"
+  },
+  "audits": [
+    {
+      "date": "2026-11-07",
+      "bench": "perf:session",
+      "fixture": "large.md",
+      "machine": "Apple M1 Pro, macOS 26.6, headless Google Chrome",
+      "statistic": "median of 3 page runs, ms",
+      "before": { "commit": "863468a" },
+      "after": { "commit": "fbf1730" },
+      "metrics": {
+        "hover anchor: dispatch..next task ms (median of 6)": { "before": 56.1, "after": 5.1 },
+        "click anchor (select thread): sync ms": { "before": 110.8, "after": 9.0 },
+        "reply keystroke \"O\": until deferred verdict done ms": { "before": 708.2, "after": 20.8 },
+        "Markdown-mode keystroke (dispatch + store + React + next task) ms median of 3": { "before": 858.8, "after": 7.0 }
+      }
+    }
+  ]
+}

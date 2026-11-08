@@ -38,6 +38,13 @@
     "desktop:build": "npm run desktop:assets && node tools/desktop/tauri.mjs build --bundles app -- --locked",
     "postinstall": "patch-package",
     "fonts:vendor": "node --import tsx tools/fonts/vendor-fonts.mts",
+    "perf:fixtures": "node tools/perf/fixtures.mjs",
+    "perf:document": "node --import tsx tools/perf/document.bench.mts",
+    "perf:session": "node tools/perf/session/run.mjs",
+    "perf:app": "python3 tools/perf/app/opens.py",
+    "perf:app:idle": "python3 tools/perf/app/idle.py",
+    "perf:app:timeline": "python3 tools/perf/app/timeline.py",
+    "perf:app:save": "python3 tools/perf/app/save_io.py",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
