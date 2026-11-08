@@ -334,16 +334,30 @@ button:disabled {
   border-radius: var(--radius-xs);
   color: var(--color-text-muted);
 }
+/* QuotedPassage sets --quote-lines: two on an unselected card, more on a selected or resolved one. */
 .rail-card-anchor {
+  --quote-lines: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--quote-lines);
+  line-clamp: var(--quote-lines);
   color: var(--color-text-muted);
   font-size: var(--font-size-micro);
+  line-height: var(--lh-snug);
   margin: calc(var(--space-unit) * 2) 0;
   padding-left: calc(var(--space-unit) * 2);
   border-left: 2px solid var(--color-border);
   overflow-wrap: anywhere;
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+.rail-card-anchor.expanded { display: block; -webkit-line-clamp: none; line-clamp: none; }
+.rail-card-anchor:has(+ .rail-quote-toggle) { margin-bottom: var(--space-unit); }
+/* The toggle's label lines up with the quoted text beside the rule; its hover surface overhangs. */
+.rail-quote-toggle {
+  display: block;
+  min-height: 0;
+  margin: 0 0 var(--space-unit) calc(2px + var(--space-unit) * 0.5);
+  padding: calc(var(--space-unit) * 0.5) calc(var(--space-unit) * 1.5);
 }
 .rail-comment-reply {
   margin-top: calc(var(--space-unit) * 3);
@@ -431,16 +445,6 @@ button:disabled {
 }
 
 
-/* A short explanation of what the selection leaves out; it wraps below the actions. */
-.sel-toolbar { flex-wrap: wrap; }
-.sel-toolbar > .sel-note {
-  flex: 1 1 100%;
-  max-width: calc(var(--space-unit) * 70);
-  margin: 0;
-  padding: var(--space-unit) calc(var(--space-unit) * 2.5);
-  color: var(--color-invert-text-muted);
-  font-size: var(--font-size-xs);
-}
 
 .sel-composer {
   display: flex;
@@ -465,7 +469,8 @@ button:disabled {
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
 .sel-composer textarea::placeholder { color: var(--color-invert-text-muted); }
-/* A composer's target keeps the document selection's color while focus is in the composer. */
+/* What will be marked keeps the document selection's color while a composer holds focus or a
+   trimmed selection's fragments stand in for it. */
 ::highlight(selection-target) { background-color: var(--color-selection); }
 
 .sel-composer textarea::selection {

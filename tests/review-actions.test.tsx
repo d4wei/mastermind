@@ -236,6 +236,31 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   expect(edit).toHaveBeenCalledTimes(1)
 })
 
+it('posts a reply on Enter, adds a line on Shift+Enter, and leaves Enter to the IME while composing', () => {
+  const source = '{==context==}{>>@Da Wei: question<<}'
+  render(source)
+  openCard()
+  const textarea = host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!
+  const press = (init: KeyboardEventInit): boolean => {
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init })
+    act(() => { textarea.dispatchEvent(event) })
+    return event.defaultPrevented
+  }
+  // An empty reply cannot post, and its Enter inserts nothing either.
+  expect(press({})).toBe(true)
+  expect(edit).not.toHaveBeenCalled()
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Answer')
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(press({ shiftKey: true })).toBe(false)
+  expect(press({ isComposing: true })).toBe(false)
+  expect(press({ keyCode: 229 })).toBe(false)
+  expect(edit).not.toHaveBeenCalled()
+  expect(press({})).toBe(true)
+  expect(store.getState().source).toBe(source + '{>>@reviewer: Answer<<}')
+})
+
 it('disables a reply whose backtick would pair with code after the thread or whose line opens a list', () => {
   const source = '{==context==}{>>@Da Wei: question<<} then `code` here.'
   render(source)

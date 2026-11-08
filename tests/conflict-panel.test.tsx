@@ -92,7 +92,7 @@ it('presents the newer version when an invalidation rejects Use incoming', async
   try {
     await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
     expect(host.textContent).toContain('conflictNotice')
-    expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent))
+    expect([...host.querySelectorAll('.notification-actions button')].map((button) => button.textContent))
       .toEqual(['conflictSaveCopy', 'conflictUseDisk'])
   } finally { act(() => root.unmount()); host.remove() }
   expect(await store.getState().useConflictDisk()).toBe(true)
@@ -238,7 +238,7 @@ it('keeps Retry available when saving a copy fails after a read failure', async 
   const root = createRoot(host)
   try {
     await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
-    const choices = [...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent)
+    const choices = [...host.querySelectorAll('.notification-actions button')].map((button) => button.textContent)
     expect(choices).toEqual(['conflictSaveCopy', 'retry'])
     expect(host.textContent).toContain('conflictCopyFailed')
     expect(store.getState().recovery).toBe('readFailed')
@@ -259,7 +259,7 @@ it.each([
   try {
     await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
     expect(host.textContent).toContain(message)
-    expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent))
+    expect([...host.querySelectorAll('.notification-actions button')].map((button) => button.textContent))
       .toEqual(['conflictSaveCopy', choice])
   } finally { act(() => root.unmount()); host.remove() }
 })

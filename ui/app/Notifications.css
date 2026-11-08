@@ -1,34 +1,97 @@
+/* The stack pads its scroll box so notification shadows are not clipped; the offsets keep cards on
+   the shared bar gap. */
 .notification-stack {
+  --notice-shadow-room: calc(var(--space-unit) * 4);
   position: fixed;
-  bottom: var(--bar-gap);
-  left: var(--bar-gap);
+  bottom: calc(var(--bar-gap) - var(--notice-shadow-room));
+  left: calc(var(--bar-gap) - var(--notice-shadow-room));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: calc(var(--space-unit) * 2);
-  width: min(calc(var(--space-unit) * 100), calc(100vw - var(--bar-gap) * 2));
-  max-height: calc(100dvh - var(--bar-clear) - var(--bar-gap));
+  box-sizing: border-box;
+  width: min(calc(var(--space-unit) * 100 + var(--notice-shadow-room) * 2), calc(100vw - var(--bar-gap) * 2 + var(--notice-shadow-room) * 2));
+  max-height: calc(100dvh - var(--bar-clear) - var(--bar-gap) + var(--notice-shadow-room));
+  padding: var(--notice-shadow-room);
   overflow: auto;
   pointer-events: none;
 }
+.notification-stack:empty { display: none; }
+
 .notification {
+  /* The height of one line of notice text, which icons and the close control center on. */
+  --notice-line: calc(var(--font-size-sm) * var(--lh-snug));
   display: flex;
+  flex: none;
   align-items: start;
-  gap: calc(var(--space-unit) * 2);
-  padding: calc(var(--space-unit) * 3);
+  gap: calc(var(--space-unit) * 2.5);
   border: thin solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg-elevated);
   color: var(--color-text);
   font-size: var(--font-size-sm);
+  line-height: var(--lh-snug);
   overflow-wrap: anywhere;
   pointer-events: auto;
+  animation: mm-notice-in var(--dur-base) var(--ease-out);
 }
-.notification-content { flex: 1; min-width: 0; }
-.notification-content p { margin: calc(var(--space-unit) * 2) 0; }
-.conflict-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); }
-.conflict-actions button { text-align: left; }
+.notification-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 2);
+  min-width: 0;
+}
+.notification-content :is(p, ul) { margin: 0; }
+.notification-content ul { padding-left: calc(var(--space-unit) * 4); }
+/* A single item needs no bullet. */
+.notification-content ul:has(> li:only-child) { padding-left: 0; list-style: none; }
+.notification-content strong { font-weight: var(--weight-medium); }
+.notification-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); }
+.notification-actions button { text-align: left; }
 
-.notification-compact { align-self: flex-start; padding: var(--space-unit); }
+/* Persistent notices need the reader: a warning symbol, elevation, and an explicit close. */
+.notification-persistent {
+  padding: calc(var(--space-unit) * 3);
+  box-shadow: var(--shadow-popover);
+}
+.notification-icon {
+  flex: none;
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+  margin-top: calc((var(--notice-line) - var(--control-icon-size)) / 2);
+  color: var(--color-text);
+}
+.notification-dismiss {
+  margin-block: calc((var(--notice-line) - var(--control-size-compact)) / 2);
+  margin-right: calc(var(--space-unit) * -1);
+}
+
+/* Transient notices inform and leave: quieter ink, no symbol or close control, and no elevation. */
+.notification-transient {
+  padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
+  color: var(--color-text-muted);
+}
+.notification-transient.leaving {
+  animation: mm-notice-out var(--dur-base) var(--ease-standard) forwards;
+  pointer-events: none;
+}
+
+/* A dismissed persistent notice keeps only the control that reopens it. */
+.notification-recall {
+  align-self: flex-start;
+  padding: var(--space-unit);
+  box-shadow: var(--shadow-popover);
+}
 .recovery-warning { color: var(--color-text-muted); }
+
+@keyframes mm-notice-in {
+  from { opacity: 0; transform: translateY(calc(var(--space-unit) * 2)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes mm-notice-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(var(--space-unit)); }
+}
+
 #root[inert] .notification-stack { visibility: hidden; }

@@ -26,6 +26,8 @@
   --dur-base: 180ms;
   --dur-fade: 260ms;
   --dur-slow: 300ms;
+  /* How long a transient notification stays before leaving; time to read two short sentences. */
+  --notice-dismiss: 6s;
 
   --panel-width: 340px;
   --file-tab-max-width: 10rem;

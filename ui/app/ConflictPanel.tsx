@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useT, type MsgKey } from '../i18n'
-import { Notification } from './Notifications'
-import { AlertIcon } from '../icons'
+import { Notification, NotificationRecall } from './Notifications'
 import { useDoc, type createDocStore, type Recovery } from '../documents/store'
 import { navigate } from './route'
 import { transferDrafts } from '../review/drafts'
@@ -22,39 +21,35 @@ export function ConflictPanel({ store = useDoc }: Props) {
     if (copyId && state.sessionId) transferDrafts(state.sessionId, copyId)
     if (copyId && store.getState().sessionId === copyId) navigate(`/d/${copyId}`)
   }
-  const saveCopyButton = <button type="button" className="btn-primary"
+  const saveCopyButton = <button type="button" className="btn-primary btn-compact"
     onClick={() => void saveCopy()}>{t('conflictSaveCopy')}</button>
   // Lossiness persists until the file is read back as UTF-8, so its notice has no dismissal.
-  if (!state.recovery) return <Notification>
+  if (!state.recovery) return <Notification tier="persistent">
     <strong>{state.meta?.displayName}</strong>
     <p>{t('lossyNotice')}</p>
     {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
-    <div className="conflict-actions">{saveCopyButton}</div>
+    <div className="notification-actions">{saveCopyButton}</div>
   </Notification>
-  if (state.conflictDismissed) return <Notification compact>
-    <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={`${state.meta?.displayName} · ${t('needsAttention')}`}
-      title={t('needsAttention')} onClick={() => state.openConflict()}>
-      <AlertIcon />
-    </button>
-  </Notification>
+  if (state.conflictDismissed) return <NotificationRecall label={`${state.meta?.displayName} · ${t('needsAttention')}`}
+    title={t('needsAttention')} onOpen={() => state.openConflict()} />
   // Only an external change can be adopted; failures and a missing path offer Retry instead.
   const ioFailure = state.recovery !== 'changed'
-  return <Notification onDismiss={() => { setConfirmIncoming(false); state.closeConflict() }}>
+  return <Notification tier="persistent" onDismiss={() => { setConfirmIncoming(false); state.closeConflict() }}>
     <strong>{state.meta?.displayName}</strong>
     <p>{t(RECOVERY_MESSAGE[state.recovery])}</p>
     {state.copyError && <p role="alert">{t('conflictCopyFailed')}</p>}
     {confirmIncoming && !ioFailure ? <>
       <p>{t('conflictDiscard')}</p>
-      <div className="conflict-actions">
-        <button type="button" className="btn-primary" disabled={state.saving}
+      <div className="notification-actions">
+        <button type="button" className="btn-primary btn-compact" disabled={state.saving}
           onClick={() => { setConfirmIncoming(false); void state.useConflictDisk() }}>{t('conflictUseDisk')}</button>
-        <button type="button" className="btn-ghost" onClick={() => setConfirmIncoming(false)}>{t('cancel')}</button>
+        <button type="button" className="btn-ghost btn-compact" onClick={() => setConfirmIncoming(false)}>{t('cancel')}</button>
       </div>
-    </> : <div className="conflict-actions">
+    </> : <div className="notification-actions">
       {saveCopyButton}
-      {ioFailure ? <button type="button" className="btn-ghost"
+      {ioFailure ? <button type="button" className="btn-ghost btn-compact"
         onClick={() => void state.retryRecovery()}>{t('retry')}</button> :
-        <button type="button" className="btn-ghost"
+        <button type="button" className="btn-ghost btn-compact"
           onClick={() => setConfirmIncoming(true)}>{t('conflictUseDisk')}</button>}
     </div>}
   </Notification>

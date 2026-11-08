@@ -91,6 +91,16 @@ function isTypingTarget(e: KeyboardEvent): boolean {
   return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable
 }
 
+/**
+ * Where a click leaves the selected discussion selected; see the deselection effect. The narrow
+ * comments panel is a slide-over dialog but holds the rail itself, so its empty space deselects.
+ */
+const KEEPS_DISCUSSION = ['.rail-card', '.critic-anchor', '.critic-comment-marker', '.critic-del',
+  '[data-radix-popper-content-wrapper]', '[role="menu"]', 'dialog', '.tooltip',
+  ':is([role="dialog"], .slide-over):not(.comments-panel > *)', '.find-bar', '.sel-toolbar', '.notification-stack'].join(', ')
+/** Pointer travel, in pixels, beyond which a press and release is a drag rather than a click. */
+const DRAG_DISTANCE = 4
+
 export function SessionView({ sessionId }: { sessionId: string }) {
   const name = useDoc((s) => s.sessionId === sessionId ? s.meta?.displayName : undefined)
   return <DraftScope id={sessionId} name={name}><DocumentView sessionId={sessionId} /></DraftScope>
@@ -313,10 +323,36 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (window.getSelection()?.isCollapsed === false) return
       const del = (e.target as HTMLElement).closest('.critic-del') as HTMLElement | null
       if (del && undoDeletion(del)) return
-      if (!activateThread(e.target)) chooseActive(null)
+      activateThread(e.target)
     },
-    [undoDeletion, activateThread, chooseActive],
+    [undoDeletion, activateThread],
   )
+  // A click anywhere but the selected discussion's card or a discussion's passage deselects it,
+  // keeping its reply draft as Escape does. Cards and passages select through their own handlers;
+  // menus, tooltips, dialogs, panels, Find, notifications, and the selection toolbar leave it.
+  useEffect(() => {
+    if (activeSpan === null) return
+    let pressed: { x: number; y: number } | null = null
+    const press = (event: PointerEvent): void => { pressed = { x: event.clientX, y: event.clientY } }
+    const click = (event: MouseEvent): void => {
+      const from = pressed
+      pressed = null
+      if (event.button !== 0) return
+      // A drag, such as selecting text, is not a click elsewhere.
+      if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > DRAG_DISTANCE) return
+      const target = event.composedPath()[0]
+      // A control the click removed, such as a menu item, was inside what it belonged to.
+      if (!(target instanceof Element) || !target.isConnected || target.closest(KEEPS_DISCUSSION)) return
+      if (target.closest('.md-root') && window.getSelection()?.isCollapsed === false) return
+      chooseActive(null)
+    }
+    document.addEventListener('pointerdown', press, true)
+    document.addEventListener('click', click)
+    return () => {
+      document.removeEventListener('pointerdown', press, true)
+      document.removeEventListener('click', click)
+    }
+  }, [activeSpan, chooseActive])
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return
@@ -421,7 +457,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       </Suspense>
       {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} readOnly={readOnly} onEdit={applyEdits} />}
       <ConflictPanel />
-      {translation.error && <Notice key={translation.error}>
+      {translation.error && <Notice key={translation.error} tier="transient">
         {t(translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </Notice>}
       <DocumentScroll>

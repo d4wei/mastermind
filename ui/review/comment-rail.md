@@ -11,6 +11,17 @@ request (by Find revealing a reply, for example) offers it without taking focus.
 chronologically beneath the count. Neighboring opening messages remain fully readable. Cards use
 interface typography independently of the reading font preset.
 
+`QuotedPassage` clamps the quoted passage to two lines on an unselected card and six on the
+selected card or a resolved one, ending in an ellipsis. Only a passage that overflows its clamp
+offers Show more, measured again whenever the card resizes; it reveals the passage whole inside the
+card, and a new clamp starts collapsed. The full passage stays in the title.
+
+Cards ease their height when their structure changes (the reply field, replies, the full passage,
+an alert, or the paused-editing notice) through `util/height-transition.ts`, attached once per card
+element. The rail's measurement observes the intermediate heights, so neighbors slide with the card
+frame by frame and the selected card stays on its passage; positions themselves do not animate.
+Reduced motion keeps changes immediate, and a text field resized by hand is not eased.
+
 `rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
 space above crowded anchors; earlier cards stay within the document surface. When there is not
 room for every preceding card above the anchor, the selected card moves down only far enough to
@@ -33,8 +44,12 @@ face, size, and height; Cancel collapses the card like Escape. The reply field r
 down to two lines. Delete comment belongs
 to one message; Resolve archives the complete discussion through the existing source-splice helpers.
 
-Escape and clicks elsewhere in the article collapse selection; Escape that closes a panel, popover,
-or menu does not. Reply drafts stay with their discussions, including when switching or collapsing
+Escape collapses selection, as does a click anywhere but the selected card and the discussion
+passages: the empty rail, margins, top bar, outline, or another card's controls. Another card's
+background selects that card instead. Clicks inside menus, tooltips, dialogs, slide-over panels other
+than the narrow comments panel, Find, notifications, and the selection toolbar keep it, as do a drag
+and a click that ends a text selection in the document. Escape that closes a panel, popover, or menu
+does not collapse it. Reply drafts stay with their discussions, including when switching or collapsing
 cards. Each analysis builds its thread cards once (`threadCards` beside `group`), carrying every
 member's span index; `thread-identity.ts` identifies a discussion by its anchor text and opening
 message plus its start offset, which edits elsewhere shift; identical discussions are told apart by
@@ -46,15 +61,15 @@ hover on the old one. Resolve and deleting the opening message discard that disc
 posting the reply clears it, once the edit applies, leaving the emptied field open on the
 still-selected card; a refused edit keeps the draft.
 
-The reply textarea retains normal text-input semantics and its submission shortcut. Composition
-keys remain with the IME. Conflict state prevents submission, deletion, and resolution while
+The reply textarea posts on Enter or Cmd/Ctrl+Enter, and Shift+Enter adds a line; an Enter that
+cannot post inserts nothing. Composition keys, including an IME's Enter, remain with the IME. Conflict state prevents submission, deletion, and resolution while
 retaining the draft; a selected card shows its reply field then only if it holds a draft or was
 already open. Actions stop stale activation after a source splice.
 
 ## Resolved discussions
 
 The history panel lists each archived discussion as a card laid out like a live one, reusing the
-rail's message classes: author, the quoted passage with its left rule and one-line truncation, the
+rail's message classes: author, the quoted passage with its left rule and six-line clamp, the
 opening comment, then the shared reply-count disclosure. A record whose thread no longer parses as
 comments shows its stored text instead; unrecognized records show their diagnostic and raw text. Cards
 offer no jump to the passage, since resolution removes its anchor. The opening message carries the

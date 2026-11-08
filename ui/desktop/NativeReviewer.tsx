@@ -270,14 +270,16 @@ export function NativeReviewer() {
         onAttention={(fileId) => { if (id === fileId) void documentState.openConflict() }} onClose={closeFile} />
       <div className="native-document-controls" ref={setToolbarTarget} />
     </div>
-      {openingErrors.length > 0 && <Notification error onDismiss={dismissOpeningErrors}>
+      {openingErrors.length > 0 && <Notification tier="persistent" error onDismiss={dismissOpeningErrors}>
         <ul>{openingErrors.map((message, index) => <li key={index}>{message}</li>)}</ul>
       </Notification>}
-      {error && <Notice key={error} error>{error}</Notice>}
-      {setupError && <Notice key={setupError} error>{setupError}
-        <button type="button" onClick={() => { void refreshSetup.current() }}>
-          {t('retryLoadingSetup')}
-        </button>
+      {error && <Notice key={error} tier="persistent">{error}</Notice>}
+      {setupError && <Notice key={setupError} tier="persistent"><p>{setupError}</p>
+        <div className="notification-actions">
+          <button type="button" className="btn-ghost btn-compact" onClick={() => { void refreshSetup.current() }}>
+            {t('retryLoadingSetup')}
+          </button>
+        </div>
       </Notice>}
     <CloseDialog />
     <ToolbarTarget.Provider value={toolbarTarget}><App onboarding={setupRequired === false ? undefined : setup

@@ -7,6 +7,7 @@ import type { Analysis } from '../../../document/markdown/analyze'
 import type { TextEdit } from '../../../document/types'
 import { useT, type MsgKey } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
+import { announce } from '../../app/Notifications'
 import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
 import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
@@ -15,11 +16,12 @@ import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelRange
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from './marks'
 
-/** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
-/** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
+/** The CSS highlight that shows what will be marked; see `::highlight(selection-target)`. */
 export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
+/** One notice explains the latest trimmed selection; a later trim replaces it. */
+export const SELECTION_TRIM_NOTICE = 'selection-trim'
 
 interface Props {
   readOnly?: boolean
@@ -36,10 +38,18 @@ interface Active {
   source: string
   /** Editable fragments in source order; existing marks and unmappable text stay outside them. */
   ranges: SelRange[]
-  /** Selected text no fragment covers; the toolbar explains why instead of dropping it silently. */
-  excluded: ExcludedSegment[]
+  /** The rendered text `ranges` cover, in document order. */
+  fragments: Range[]
+  /**
+   * The fragments are painted because the document selection, which holds one range, was cleared
+   * rather than show the excluded text between them.
+   */
+  painted: boolean
   rect: { top: number; left: number; width: number; bottom: number }
 }
+
+/** A mapped selection and the selected text it leaves out. */
+interface Reading { active: Active; excluded: ExcludedSegment[] }
 
 const REASON_MESSAGES: Record<ExclusionReason, MsgKey> = {
   'existing-mark': 'selectionExistingMark',
@@ -51,9 +61,27 @@ const REASON_MESSAGES: Record<ExclusionReason, MsgKey> = {
   'no-provenance': 'selectionUnmatched',
 }
 
-/** One sentence per distinct reason, in the order the selection meets them. */
-function exclusionMessage(t: (key: MsgKey) => string, excluded: readonly ExcludedSegment[]): string {
-  return [...new Set(excluded.map((segment) => segment.reason))].map((reason) => t(REASON_MESSAGES[reason])).join(' ')
+/** Joins sentences, spacing them unless one ends in a full-width stop. */
+function sentences(parts: readonly string[]): string {
+  return parts.reduce((text, part) => !text ? part : /[。！？]$/.test(text) ? text + part : `${text} ${part}`, '')
+}
+
+/**
+ * Why a selection was trimmed, or why none of it can be marked: one sentence per distinct reason,
+ * in the order the selection meets them.
+ */
+function exclusionNotice(t: (key: MsgKey) => string, excluded: readonly ExcludedSegment[], trimmed: boolean): string {
+  const reasons = [...new Set(excluded.map((segment) => segment.reason))].map((reason) => t(REASON_MESSAGES[reason]))
+  return sentences(trimmed ? [t('selectionTrimmed'), ...reasons] : reasons)
+}
+
+const rectOf = (range: Range): Active['rect'] => {
+  const rect = range.getBoundingClientRect()
+  return { top: rect.top, left: rect.left, width: rect.width, bottom: rect.bottom }
+}
+
+function sameRange(a: Range, b: Range): boolean {
+  return a.compareBoundaryPoints(Range.START_TO_START, b) === 0 && a.compareBoundaryPoints(Range.END_TO_END, b) === 0
 }
 
 export function SelectionToolbar({ containerRef, source, analysis, authorTag, onEdit, readOnly = false }: Props) {
@@ -71,6 +99,17 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const activeRef = useRef(active)
   activeRef.current = active
   const selectedRange = useRef<Range | null>(null)
+  /**
+   * The document selection this toolbar last set while trimming: the markable range, or `cleared`
+   * when several fragments are painted instead. The selection changes that echo it are not new
+   * selections, so they neither map again nor notify again.
+   */
+  const applied = useRef<Range | 'cleared' | null>(null)
+  /** Whether a pointer button or Shift is extending the selection; a partial one waits for release. */
+  const held = useRef({ pointer: false, shift: false, awaiting: false })
+  /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
+  const reread = useRef(false)
+  const checkSelection = useRef<() => void>(() => {})
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelSelectionCheck = (): void => {
     if (selectionTimer.current !== null) clearTimeout(selectionTimer.current)
@@ -79,13 +118,14 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const dismiss = (): void => {
     cancelSelectionCheck()
     composingRef.current = false
+    applied.current = null
     setComposing(null)
     setComment('')
     setReplacements([])
     setActive(null)
   }
   /** The current selection's coverage; null when nothing is selected, undefined while its DOM is outdated. */
-  const readSelection = (): Active | null | undefined => {
+  const readSelection = (): Reading | null | undefined => {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !containerRef.current) return null
     const range = sel.getRangeAt(0)
@@ -93,32 +133,108 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     if (mapped.status === 'inactive') return null
     if (mapped.status === 'outdated') return undefined
     selectedRange.current = range.cloneRange()
-    const rect = range.getBoundingClientRect()
-    return { source: mapped.revision, ranges: mapped.segments, excluded: mapped.excluded,
-      rect: { top: rect.top, left: rect.left, width: rect.width, bottom: rect.bottom } }
+    return { excluded: mapped.excluded, active: { source: mapped.revision, ranges: mapped.segments,
+      fragments: mapped.fragments, painted: false, rect: rectOf(range) } }
+  }
+  /** Whether the document selection is still the one this toolbar set. */
+  const echoesTrim = (): boolean => {
+    const own = applied.current
+    const sel = window.getSelection()
+    if (!own || !sel) return false
+    return own === 'cleared' ? sel.rangeCount === 0 : sel.rangeCount === 1 && sameRange(sel.getRangeAt(0), own)
+  }
+  /**
+   * Narrows a partial selection to what will be marked and explains the trim once. One markable
+   * range becomes the document selection; several are painted, since the selection holds one range.
+   * Returns the toolbar's state, or null when nothing can be marked.
+   */
+  const trim = ({ active: next, excluded }: Reading): Active | null => {
+    if (!excluded.length) return next
+    announce(SELECTION_TRIM_NOTICE, exclusionNotice(t, excluded, next.ranges.length > 0))
+    if (!next.ranges.length) return null
+    const sel = window.getSelection()
+    const first = next.fragments[0]!
+    const last = next.fragments.at(-1)!
+    const painted = next.fragments.length > 1
+    sel?.removeAllRanges()
+    if (painted) applied.current = 'cleared'
+    else {
+      sel?.addRange(first.cloneRange())
+      applied.current = first.cloneRange()
+    }
+    const covering = first.cloneRange()
+    covering.setEnd(last.endContainer, last.endOffset)
+    selectedRange.current = covering
+    return { ...next, painted, rect: rectOf(covering) }
   }
 
   useEffect(() => {
+    const check = (): void => {
+      selectionTimer.current = null
+      // Focus entering a composer may collapse the browser selection after this check was queued.
+      if (composingRef.current) return
+      if (reread.current) {
+        reread.current = false
+        // Painted fragments have no selection to re-read; their source offsets are stale.
+        if (applied.current === 'cleared') { applied.current = null; setActive(null); return }
+      } else if (echoesTrim()) return
+      applied.current = null
+      // An outdated read waits for the render that follows its source change, which reads again.
+      const next = readSelection()
+      if (next === undefined) return
+      // Trimming under a drag or Shift-extension would fight it; the trim waits for release.
+      if (next?.excluded.length && (held.current.pointer || held.current.shift)) {
+        held.current.awaiting = true
+        setActive(null)
+        return
+      }
+      setActive(next ? trim(next) : null)
+    }
     const onSelectionChange = (): void => {
       cancelSelectionCheck()
       if (composingRef.current) return
-      selectionTimer.current = setTimeout(() => {
-        selectionTimer.current = null
-        // Focus entering a composer may collapse the browser selection after this check was queued.
-        if (composingRef.current) return
-        // An outdated read waits for the render that follows its source change, which reads again.
-        const next = readSelection()
-        if (next !== undefined) setActive(next)
-      }, 120)
+      selectionTimer.current = setTimeout(check, 120)
     }
+    checkSelection.current = onSelectionChange
     document.addEventListener('selectionchange', onSelectionChange)
     // A shown toolbar's selection can survive a source change without a new event; re-read it.
-    if (activeRef.current) onSelectionChange()
+    if (activeRef.current) { reread.current = true; onSelectionChange() }
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange)
       cancelSelectionCheck()
     }
   }, [containerRef, source, analysis])
+
+  useEffect(() => {
+    const state = held.current
+    const settle = (): void => {
+      if (state.pointer || state.shift || !state.awaiting) return
+      state.awaiting = false
+      checkSelection.current()
+    }
+    const press = (event: PointerEvent): void => { if (event.button === 0) state.pointer = true }
+    const lift = (): void => { state.pointer = false; settle() }
+    const key = (event: KeyboardEvent): void => {
+      if (event.key !== 'Shift') return
+      state.shift = event.type === 'keydown'
+      settle()
+    }
+    const blur = (): void => { state.pointer = false; state.shift = false; settle() }
+    document.addEventListener('pointerdown', press, true)
+    window.addEventListener('pointerup', lift, true)
+    window.addEventListener('pointercancel', lift, true)
+    window.addEventListener('keydown', key, true)
+    window.addEventListener('keyup', key, true)
+    window.addEventListener('blur', blur)
+    return () => {
+      document.removeEventListener('pointerdown', press, true)
+      window.removeEventListener('pointerup', lift, true)
+      window.removeEventListener('pointercancel', lift, true)
+      window.removeEventListener('keydown', key, true)
+      window.removeEventListener('keyup', key, true)
+      window.removeEventListener('blur', blur)
+    }
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -179,15 +295,17 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     observer?.observe(toolbar)
     return () => observer?.disconnect()
   }, [present.mounted, composing])
-  // Focus moving into a composer stops the browser painting the document selection, so its range
-  // keeps a selection-colored highlight until the composer closes; the reading DOM stays untouched.
+  // Focus moving into a composer stops the browser painting the document selection, and a trimmed
+  // selection of several fragments has none; either way the fragments keep a selection-colored
+  // highlight until the toolbar closes. The reading DOM stays untouched.
   useLayoutEffect(() => {
-    const range = selectedRange.current
-    if (!composing || !active || !range || range.collapsed || !range.commonAncestorContainer.isConnected) return
-    paintHighlight(SELECTION_TARGET_HIGHLIGHT, [range])
+    if (!active || !(composing || active.painted)) return
+    const ranges = active.fragments.filter((range) => !range.collapsed && range.commonAncestorContainer.isConnected)
+    if (!ranges.length) return
+    paintHighlight(SELECTION_TARGET_HIGHLIGHT, ranges)
     return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
-    // A new capture replaces `ranges`; scrolling only moves `rect`, which needs no repaint.
-  }, [composing, active?.ranges])
+    // A new capture replaces `fragments`; scrolling only moves `rect`, which needs no repaint.
+  }, [composing, active?.fragments, active?.painted])
   // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
   const findOpen = useOverlay((s) => s.open === 'find')
   const [, relayout] = useReducer((n: number) => n + 1, 0)
@@ -213,9 +331,12 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
 
   const begin = (kind: 'comment' | 'change'): void => {
     if (!active || present.exiting || readOnly) return
-    const target = selectionTimer.current !== null ? readSelection() ?? active : active
-    if (!target.ranges.length) return
+    // A pending selection change is read now, unless it only echoes the toolbar's own trim.
+    const pending = selectionTimer.current !== null && !echoesTrim() ? readSelection() : null
+    if (pending) applied.current = null
+    const target = pending ? trim(pending) : active
     cancelSelectionCheck()
+    if (!target?.ranges.length) { setActive(target); return }
     setActive(target)
     composingRef.current = true
     if (kind === 'change') setReplacements(target.ranges.map((range) => range.text))
@@ -237,11 +358,15 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const refusal = 'refused' in verdict ? verdict.refused === 'formatting' ? 'markChangesFormatting'
     : composing === 'change' ? 'changeInvalid'
       : commentBodyFits(authorTag, deferredComment) ? 'commentInvalid' : 'commentBodyInvalid' : null
-  const scope = view.excluded.length ? `${t('selectionPartial')} ${exclusionMessage(t, view.excluded)}` : null
   const composerKey = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (ime.isComposing(e.nativeEvent) || e.defaultPrevented) { e.stopPropagation(); return }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit()
-    else if (e.key === 'Escape') {
+    // A comment posts on Enter, with Shift+Enter for a new line; suggested text keeps Enter for
+    // line breaks, since it edits the document. Cmd/Ctrl+Enter submits either. An Enter that cannot
+    // submit still inserts nothing in a comment.
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey || (composing === 'comment' && !e.shiftKey && !e.altKey))) {
+      e.preventDefault()
+      submit()
+    } else if (e.key === 'Escape') {
       dismiss()
     }
     e.stopPropagation()
@@ -266,7 +391,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
         if ((e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault()
       }}
     >
-      {!composing ? view.ranges.length ? (
+      {!composing ? (
         <>
           <button type="button" disabled={readOnly || !active || present.exiting} onClick={() => begin('change')}>
             <PencilIcon width={13} height={13} />
@@ -276,12 +401,10 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
             <ChatIcon width={13} height={13} />
             {t('comment')}
           </button>
-          {scope && <p className="sel-note">{scope}</p>}
         </>
-      ) : <p className="sel-note">{exclusionMessage(t, view.excluded)}</p> : (
+      ) : (
         <div className="sel-composer">
           {(readOnly || source !== view.source) && <p role="status">{t(readOnly ? 'editingPaused' : 'draftSelectionChanged')}</p>}
-          {scope && <p className="sel-note">{scope}</p>}
           {composing === 'comment' && view.ranges.length > 1 && <p className="sel-note">{t('commentFirstPart')}</p>}
           {composing === 'comment' ? <textarea readOnly={readOnly}
             autoFocus

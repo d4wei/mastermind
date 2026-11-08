@@ -21,6 +21,7 @@ import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { SELECTION_TARGET_HIGHLIGHT, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { useConfig } from '../ui/app/configStore'
 import { useOverlay } from '../ui/app/overlayStore'
+import { Notifications, useAnnouncements } from '../ui/app/Notifications'
 
 /** A source slice by its text and, when it recurs, the occurrence meant. */
 type Slice = string | [text: string, occurrence: number]
@@ -325,8 +326,8 @@ describe('the selection toolbar', () => {
     const ref = useRef<HTMLElement>(null)
     const shown = useMemo(() => analyzeMarkdown(rendered), [rendered])
     const analysis = useMemo(() => analyzeMarkdown(source), [source])
-    return <><article ref={ref}><MarkdownView analysis={shown} ctx={{ source: rendered }} /></article>
-      <SelectionToolbar containerRef={ref} source={source} analysis={analysis} authorTag="Alex" onEdit={edit} /></>
+    return <Notifications><article ref={ref}><MarkdownView analysis={shown} ctx={{ source: rendered }} /></article>
+      <SelectionToolbar containerRef={ref} source={source} analysis={analysis} authorTag="Alex" onEdit={edit} /></Notifications>
   }
 
   beforeEach(() => {
@@ -342,6 +343,7 @@ describe('the selection toolbar', () => {
     cleanups.push(() => {
       act(() => root.unmount())
       host.remove()
+      useAnnouncements.setState({ items: [] })
       Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
       vi.useRealTimers()
     })
@@ -359,19 +361,103 @@ describe('the selection toolbar', () => {
   const press = (label: string): void => act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button'))
     .find((button) => button.textContent === label)!.click())
 
-  it('explains a selection that maps nothing instead of hiding', async () => {
+  const notices = (): string[] => Array.from(host.querySelectorAll('.notification-stack .notification'), (notice) => notice.textContent!)
+  /** Counts announcements, including ones that replace a shown notice with the same text. */
+  function countAnnouncements(): () => number {
+    let count = 0
+    const stop = useAnnouncements.subscribe(() => { count++ })
+    cleanups.push(stop)
+    return () => count
+  }
+  /** Lets jsdom's queued selection events and the toolbar's debounced check run. */
+  const settle = async (): Promise<void> => {
+    act(() => document.dispatchEvent(new Event('selectionchange')))
+    // jsdom queues its own selection events, each restarting the debounce once more.
+    await act(async () => vi.advanceTimersByTimeAsync(250))
+  }
+
+  it('offers no actions for a selection that maps nothing and explains why in a notification', async () => {
     await show('```sh\ncommand\n```', 'command')
-    expect(buttons()).toEqual([])
-    expect(note()).toBe('Code blocks, HTML, and metadata cannot take inline suggestions.')
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+    expect(notices()).toEqual(['Code blocks, HTML, and metadata cannot take inline suggestions.'])
   })
 
-  it('keeps both actions for a partial mapping and states what is left out', async () => {
+  it('trims a partial selection to its one markable range and explains the trim once', async () => {
+    const announced = countAnnouncements()
     await show('Try `open` now.', 'Try op')
+    expect(window.getSelection()!.toString()).toBe('Try ')
     expect(buttons()).toEqual(['Suggest change', 'Comment'])
-    expect(note()).toBe('Only part of this selection can be marked. Inline code is reviewed as a whole. Select all of it.')
+    expect(note()).toBeUndefined()
+    expect(notices()).toEqual(['Selection trimmed. Inline code is reviewed as a whole. Select all of it.'])
+    // The selection change the trim causes is not a new selection.
+    await settle()
+    await settle()
+    expect(announced()).toBe(1)
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
     press('Suggest change')
     expect(host.querySelector('textarea')!.value).toBe('Try ')
-    expect(note()).toBe('Only part of this selection can be marked. Inline code is reviewed as a whole. Select all of it.')
+    expect(note()).toBeUndefined()
+  })
+
+  it('paints the markable fragments of a selection split by an existing mark and clears the document selection', async () => {
+    const registry = stubHighlights()
+    await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
+    expect(window.getSelection()!.rangeCount).toBe(0)
+    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
+    expect(notices()).toEqual(['Selection trimmed. Text that already has a suggestion or discussion cannot be marked again.'])
+    // The cleared selection echoes back as a selection change; the toolbar and its fragments stay.
+    await settle()
+    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
+    press('Suggest change')
+    expect(Array.from(host.querySelectorAll('textarea'), (field) => field.value)).toEqual(['Alpha ', ' gamma'])
+    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
+    act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+  })
+
+  it('dismisses painted fragments when the reader selects elsewhere', async () => {
+    const registry = stubHighlights()
+    await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
+    const text = host.querySelector('article p')!.firstChild!.firstChild!
+    act(() => { window.getSelection()!.collapse(text, 1) })
+    await settle()
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+    await act(async () => vi.advanceTimersByTimeAsync(200))
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+  })
+
+  it('replaces the trim notice on each new trim instead of stacking copies', async () => {
+    const announced = countAnnouncements()
+    await show('Alpha {++beta++} gamma and `code` here.', 'Alpha beta gamma')
+    selectRendered(host.querySelector('article')!, 'and co')
+    await settle()
+    expect(announced()).toBe(2)
+    expect(notices()).toEqual(['Selection trimmed. Inline code is reviewed as a whole. Select all of it.'])
+    expect(window.getSelection()!.toString()).toBe('and ')
+  })
+
+  it('waits for the pointer to lift before trimming a selection still being dragged', async () => {
+    act(() => root.render(<Review source="Try `open` now." />))
+    act(() => { document.dispatchEvent(new PointerEvent('pointerdown', { button: 0 })) })
+    selectRendered(host.querySelector('article')!, 'Try op')
+    await settle()
+    expect(window.getSelection()!.toString()).toBe('Try op')
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+    expect(notices()).toEqual([])
+    act(() => { window.dispatchEvent(new PointerEvent('pointerup', { button: 0 })) })
+    await act(async () => vi.advanceTimersByTimeAsync(120))
+    expect(window.getSelection()!.toString()).toBe('Try ')
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
+    expect(notices()).toHaveLength(1)
+  })
+
+  it('explains the trim in Chinese without spacing between full-width sentences', async () => {
+    const previous = useConfig.getState()
+    useConfig.setState({ config: { ...previous.config!, uiLang: 'zh-CN' } })
+    cleanups.push(() => useConfig.setState(previous))
+    await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
+    expect(notices()).toEqual(['已缩小选区。已有修改建议或讨论的文本不能再次标记。'])
   })
 
   it('says a comment attaches to the first part of a split selection', async () => {
@@ -382,6 +468,34 @@ describe('the selection toolbar', () => {
     act(() => inputValue(host.querySelector('textarea')!, 'Why?'))
     press('Comment')
     expect(edit).toHaveBeenCalledWith([{ from: 4, to: 7, insert: '{==re ==}{>>@Alex: Why?<<}' }])
+  })
+
+  it('posts a comment on Enter and keeps Enter for line breaks in suggested text', async () => {
+    await show('Alpha bravo charlie.', 'bravo')
+    press('Comment')
+    const enter = (init: KeyboardEventInit = {}): boolean => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, ...init })
+      act(() => { host.querySelector('textarea')!.dispatchEvent(event) })
+      return event.defaultPrevented
+    }
+    // An empty comment cannot post, and its Enter inserts nothing either.
+    expect(enter()).toBe(true)
+    expect(edit).not.toHaveBeenCalled()
+    act(() => inputValue(host.querySelector('textarea')!, 'Why?'))
+    expect(enter({ shiftKey: true })).toBe(false)
+    expect(enter({ isComposing: true })).toBe(false)
+    expect(enter({ keyCode: 229 })).toBe(false)
+    expect(edit).not.toHaveBeenCalled()
+    expect(enter()).toBe(true)
+    expect(edit).toHaveBeenCalledWith([{ from: 6, to: 11, insert: '{==bravo==}{>>@Alex: Why?<<}' }])
+    edit.mockClear()
+    await show('Alpha bravo charlie.', 'charlie')
+    press('Suggest change')
+    act(() => inputValue(host.querySelector('textarea')!, 'delta'))
+    expect(enter()).toBe(false)
+    expect(edit).not.toHaveBeenCalled()
+    expect(enter({ metaKey: true })).toBe(true)
+    expect(edit).toHaveBeenCalledWith([{ from: 12, to: 19, insert: '{~~charlie~>delta~~}' }])
   })
 
   it('offers one unlabeled field whose placeholder explains deletion, with sentence-case matching actions', async () => {

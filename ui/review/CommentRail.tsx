@@ -7,12 +7,14 @@ import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
 import { ThreadMessage } from './ThreadMessage'
+import { QuotedPassage } from './QuotedPassage'
 import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
 import { placeCommentCards } from './rail-layout'
+import { easeHeightChanges } from '../util/height-transition'
 import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { Analysis } from '../../document/markdown/analyze'
@@ -107,6 +109,16 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     window.addEventListener('resize', measure)
     return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
   }, [cards, activeSpan, replyFor, docRef])
+
+  // Cards ease their own height changes; the measurement above follows them frame by frame, so
+  // neighbors slide along. Each card element keeps one attachment for as long as it is mounted.
+  const easing = useRef(new Map<HTMLDivElement, () => void>())
+  useLayoutEffect(() => {
+    const live = new Set(cardRefs.current.values())
+    for (const [element, detach] of easing.current) if (!live.has(element)) { detach(); easing.current.delete(element) }
+    for (const element of live) if (!easing.current.has(element)) easing.current.set(element, easeHeightChanges(element))
+  })
+  useEffect(() => () => { easing.current.forEach((detach) => detach()); easing.current.clear() }, [])
 
   useEffect(() => {
     if (activeSpan === null) {
@@ -224,7 +236,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
             onClick={() => activate(card.spanIndex)}>
             <span className="rail-author">{comment.author ?? t('comment')}</span>
           </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-          quote={messageIndex === 0 && card.anchorText ? <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div> : undefined}
+          quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} /> : undefined}
           actions={<>
             {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
               title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
@@ -273,7 +285,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
             onChange={(event) => setDraftText(card, event.target.value)}
             onKeyDown={(event) => {
               if (ime.isComposing(event.nativeEvent)) { event.stopPropagation(); return }
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); submitReply(card) }
+              // Enter posts and Shift+Enter adds a line; an Enter that cannot post inserts nothing.
+              if (event.key === 'Enter' && !event.shiftKey && !event.altKey) { event.preventDefault(); submitReply(card) }
               if (event.key === 'Escape') { event.stopPropagation(); collapse() }
             }} />
           {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&

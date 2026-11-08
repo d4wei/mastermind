@@ -45,6 +45,11 @@ export interface SelectionCoverage {
   segments: SelRange[]
   /** Selected text left out of every segment, in document order. */
   excluded: ExcludedSegment[]
+  /**
+   * The rendered text the segments cover, in document order: segments with no excluded text
+   * between them share one fragment, so a single fragment means the markable part is contiguous.
+   */
+  fragments: Range[]
 }
 
 export type SelectionMapping =
@@ -166,12 +171,18 @@ const MARK_SELECTOR = '.critic[data-span-index]'
 /** Rendered blocks whose source is opaque to review marks. */
 const OPAQUE_SELECTOR = 'pre, .md-frontmatter'
 
+/** A rendered boundary point. */
+type Point = readonly [Node, number]
+
 interface Piece {
   from: number
   to: number
   /** The selected rendered text the piece maps. */
   rendered: string
   block: TextBlock
+  /** Where the piece's rendered text starts and ends. */
+  start: Point
+  end: Point
 }
 
 type Item = { piece: Piece } | ExcludedSegment
@@ -232,7 +243,12 @@ function readItems(range: Range, index: SelectableIndex, spans: readonly CriticS
       // An image shows no text, so its alternative text stands for it.
       if (texts.length) exclude(selected, 'existing-mark')
       else items.push({ text: element.getAttribute('alt') ?? '', reason: 'existing-mark' })
-    } else if (complete) items.push({ piece: { from: entry.start, to: entry.end, rendered: selected, block: entry.block } })
+    } else if (complete) {
+      const parent = element.parentNode!
+      const at = Array.prototype.indexOf.call(parent.childNodes, element)
+      items.push({ piece: { from: entry.start, to: entry.end, rendered: selected, block: entry.block,
+        start: [parent, at], end: [parent, at + 1] } })
+    }
     else exclude(selected, (element as HTMLElement).dataset.atom === 'label' ? 'generated-text' : 'partial-code')
   }
   const walker = root.ownerDocument!.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
@@ -293,15 +309,13 @@ function leafItem(
   if (start == null || end == null || end <= start) return { text: selected, reason: 'no-provenance' }
   // A recognized mark the transform left literal still owns its source; marks must not nest in it.
   if (overlapsSpan(start, end, spans)) return { text: selected, reason: 'existing-mark' }
-  return { piece: { from: start, to: end, rendered: selected, block: leaf.block } }
+  return { piece: { from: start, to: end, rendered: selected, block: leaf.block, start: [text, from], end: [text, to] } }
 }
 
 /* ---- planning segments ---------------------------------------------------- */
 
-interface Plan {
-  segments: { range: SelRange; rendered: string }[]
-  excluded: ExcludedSegment[]
-}
+/** Planned segments and exclusions, in document order. */
+type Plan = ({ range: SelRange; rendered: string; start: Point; end: Point } | ExcludedSegment)[]
 
 /**
  * Splits consecutive pieces of one text block into the fewest segments whose delimiters keep every
@@ -335,12 +349,13 @@ function plan(pieces: Piece[], spans: readonly CriticSpan[], source: string, out
     if ((from <= wrapper.start && to >= wrapper.end) || to <= wrapper.start || from >= wrapper.end) continue
     if (from >= wrapper.contentStart && to <= wrapper.contentEnd) {
       if (!wrapper.locked) continue
-      out.excluded.push({ text: pieces.map((piece) => piece.rendered).join(''), reason: 'partial-link' })
+      out.push({ text: pieces.map((piece) => piece.rendered).join(''), reason: 'partial-link' })
       return
     }
     return splitAt((piece) => (from < wrapper.start ? piece.to <= wrapper.start : piece.to <= wrapper.contentEnd))
   }
-  out.segments.push({ range: { from, to, text: source.slice(from, to) }, rendered: pieces.map((piece) => piece.rendered).join('') })
+  out.push({ range: { from, to, text: source.slice(from, to) }, rendered: pieces.map((piece) => piece.rendered).join(''),
+    start: pieces[0]!.start, end: pieces.at(-1)!.end })
 }
 
 /** A guard for a reading tree that diverges from the plain parse: no delimiter lands in opaque source. */
@@ -367,19 +382,30 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
   }
   const segments: SelRange[] = []
   const excluded: ExcludedSegment[] = []
+  const fragments: Range[] = []
+  // Excluded text closes the open fragment; the next segment starts a new one.
+  let fragmentOpen = false
+  const exclude = (segment: ExcludedSegment): void => { excluded.push(segment); fragmentOpen = false }
   const opaque = excludedRanges(analysis.plain)
   // Pieces join only within one text block and never across excluded text.
   let run: Piece[] = []
   const flush = (): void => {
-    const planned: Plan = { segments: [], excluded: [] }
+    const planned: Plan = []
     plan(run, analysis.spans, source, planned)
     run = []
-    for (const { range: segment, rendered } of planned.segments) {
-      if (!rendered.trim()) continue
-      if (splitsOpaqueSyntax(segment.from, segment.to, opaque)) excluded.push({ text: rendered, reason: 'no-provenance' })
-      else segments.push(segment)
+    for (const entry of planned) {
+      if ('reason' in entry) { exclude(entry); continue }
+      if (!entry.rendered.trim()) continue
+      if (splitsOpaqueSyntax(entry.range.from, entry.range.to, opaque)) { exclude({ text: entry.rendered, reason: 'no-provenance' }); continue }
+      segments.push(entry.range)
+      if (!fragmentOpen) {
+        const fragment = range.startContainer.ownerDocument!.createRange()
+        fragment.setStart(...entry.start)
+        fragments.push(fragment)
+        fragmentOpen = true
+      }
+      fragments.at(-1)!.setEnd(...entry.end)
     }
-    excluded.push(...planned.excluded)
   }
   for (const item of items) {
     if ('piece' in item) {
@@ -387,11 +413,11 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
       run.push(item.piece)
     } else {
       flush()
-      excluded.push(item)
+      exclude(item)
     }
   }
   flush()
   if (!segments.length && !excluded.length) return { status: 'inactive' }
   segments.sort((a, b) => a.from - b.from)
-  return { status: 'covered', revision: source, quote, segments, excluded }
+  return { status: 'covered', revision: source, quote, segments, excluded, fragments }
 }

@@ -7,6 +7,8 @@ import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { documentViewport, readingLine } from '../util/scroll'
 import { translationActive, useTranslation } from './translationStore'
+import { announce } from '../app/Notifications'
+import { SELECTION_TRIM_NOTICE } from '../modes/reading/SelectionToolbar'
 
 interface Props {
   containerRef: RefObject<HTMLElement | null>
@@ -26,8 +28,10 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const [composing, setComposing] = useDraftState('translated:composing', false)
   const [body, setBody] = useDraftState('translated:body', '')
   const [placement, setPlacement] = useState<Placement | null>(null)
-  /** Where a selection across translated blocks is explained; a translated comment quotes one block. */
-  const [spanning, setSpanning] = useState<Placement | null>(null)
+  /** Whether the selection crosses translated blocks; a translated comment quotes one block. */
+  const spanning = useRef(false)
+  const translate = useRef(t)
+  translate.current = t
   const [error, setError] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const busy = useRef(false)
@@ -36,7 +40,8 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   useEffect(() => {
     const change = () => {
       if (composingRef.current) return
-      setSpanning(null)
+      const wasSpanning = spanning.current
+      spanning.current = false
       const selected = window.getSelection()
       if (!selected || selected.isCollapsed || selected.rangeCount !== 1) { setSelection(null); return }
       const range = selected.getRangeAt(0)
@@ -51,7 +56,9 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       const rect = range.getBoundingClientRect()
       if (first !== last) {
         setSelection(null)
-        setSpanning({ top: rect.top, left: rect.left })
+        spanning.current = true
+        // Explained once as the selection starts to span blocks, not on every extension.
+        if (!wasSpanning) announce(SELECTION_TRIM_NOTICE, translate.current('selectionTranslatedBlocks'))
         return
       }
       setSelection({ artifact, blockId: first.dataset.transBlockId!, quote })
@@ -110,12 +117,6 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   const composer = useRef<HTMLDivElement>(null)
   useDraftGuard('translated', t('comment'), composing && !!body.trim(),
     () => { requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus()) }, close)
-  if (!selection && spanning) {
-    return <div className="sel-toolbar" style={{ top: Math.max(8, spanning.top - 44),
-      left: Math.max(8, Math.min(spanning.left, window.innerWidth - 280)) }}>
-      <p className="sel-note">{t('selectionTranslatedBlocks')}</p>
-    </div>
-  }
   if (!selection || !placement) return null
   return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, placement.top - (composing ? 150 : 44)),
     left: Math.max(8, Math.min(placement.left, window.innerWidth - 280)) }}

@@ -15,7 +15,8 @@ the DOM was rendered from another revision; the caller keeps its state and maps 
 render that follows the source change. Neither is a mapping failure.
 
 **Covered** carries the source revision the offsets index, the selected quote, the mapped segments
-in source order, and the excluded segments in document order, each with a reason:
+in source order, their rendered `fragments`, and the excluded segments in document order, each with
+a reason:
 
 | Reason | Selected text |
 | --- | --- |
@@ -87,19 +88,30 @@ dismisses pending work as well as the visible controls. A shown toolbar re-reads
 selection when the source changes, since no selection event follows, and keeps its state through an
 outdated read.
 
-A selection with segments offers Suggest change and Comment; with exclusions it also says, beside
-the actions and in the composer, that only part of the selection can be marked and why. A selection
-with no segments shows only the reasons. A comment composer for several segments says the comment
-attaches to the first. Draft text remains intact across focus changes, scrolling, and source
+A selection with segments offers Suggest change and Comment and nothing else. A partial selection
+is trimmed first, so what looks selected is exactly what will be marked: `fragments` in the
+coverage are the rendered extents of the segments, joined wherever no excluded text separates them.
+One fragment replaces the document selection; several are painted with the `selection-target` CSS
+highlight and the document selection is cleared, since WebKit holds one range. The selection change
+a trim causes is recognized as its own echo, so it neither maps again nor notifies again; a source
+change under painted fragments dismisses them, since no selection remains to re-read. A trim waits
+while a pointer button or Shift is still extending the selection. Each trim raises one transient
+notification naming the distinct exclusion reasons, which replaces the previous selection notice
+rather than stacking. A selection with no segments shows no toolbar, only that notification. A
+comment composer for several segments says the comment attaches to the first, since the painted
+fragments do not show which one anchors it. A comment posts on Enter, with Shift+Enter for a new
+line; suggested text keeps Enter for line breaks, since it edits the document, and both submit on
+Cmd/Ctrl+Enter. Composition keys stay with the IME. Draft text remains intact across focus changes,
+scrolling, and source
 updates; submission still requires the captured source. Composers show the verdict for their
 deferred text, reusing it until the source, selection, or text changes, and name a body line that
 opens block syntax, markup that would not reparse, or a mark that would change the surrounding
 formatting; submission verifies the final text. Stale drafts and paused editing keep their own
-messages. Selection limits never raise global notifications.
+messages.
 
 Focus entering a composer stops the browser painting the document selection, so while a composer
-is open its captured range carries the `selection-target` CSS Custom Highlight in the selection
-color; closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM
+is open its fragments carry the `selection-target` CSS Custom Highlight in the selection color;
+closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM
 untouched and is skipped where the Highlight API is absent.
 
 ## Tests
@@ -108,7 +120,8 @@ untouched and is skipped where the Highlight API is absent.
 and backward with text and element endpoints, asserts its segments and exclusion reasons, and
 round-trips a comment, a deletion, and a substitution: rejection restores the original bytes and
 acceptance performs exactly the proposed change. It also covers inactivity, outdated renders, rapid
-reselection, and the toolbar's explanations. `tests/selection-ranges.test.ts`,
+reselection, and trimming: one range replacing the document selection, painted fragments, one
+notification per trim, a trim deferred while dragging, and no actions for an unmarkable selection. `tests/selection-ranges.test.ts`,
 `formatted-selection.test.tsx`, `inline-code-selection.test.tsx`, and `wrapped-selection.test.tsx`
 check marks, decoded text, wrappers, code, and container continuations in detail;
 `tests/selection-marks.test.ts` checks edit verification.

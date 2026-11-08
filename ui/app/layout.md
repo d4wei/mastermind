@@ -78,12 +78,10 @@ preferences and can appear without an active document.
 Settings, history, and Find share `--panel-width` and fit within the viewport width; panels scroll
 their bodies when needed. A panel's compact close control lines its glyph up with the body's content
 inset while keeping a full hit target.
-`Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling.
-Conflict recovery, save failures, and translation feedback share it; Find floats below the top-right
-document controls. Dismissed failures remain reachable from a compact control. Conflict state also
-appears on file tabs. Informational notices dismiss completely. Error notices retain an icon-only
-warning control that reopens their content. Successful transient messages expire; unresolved
-failures do not disappear on a timer.
+`Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling;
+Find floats below the top-right document controls. Conflict state also appears on file tabs. The
+[notification contract](notifications.md) owns the persistent and transient tiers and classifies
+every notice.
 Find controls wrap to fit narrow widths. Long source/code lines can still scroll within their own
 content areas.
 

@@ -90,7 +90,7 @@ it('marks a document lossy when the host refuses its write as not UTF-8, without
   expect(putFile).toHaveBeenCalledOnce()
   await act(async () => root.render(<Notifications><ConflictPanel store={store} /></Notifications>))
   expect(host.textContent).toContain('not valid UTF-8')
-  expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent)).toEqual(['Save As…'])
+  expect([...host.querySelectorAll('.notification-actions button')].map((button) => button.textContent)).toEqual(['Save As…'])
   expect(host.querySelector('.notification-dismiss')).toBeNull()
 })
 
@@ -115,7 +115,7 @@ it('disables review actions and shows the read-only notice for a lossy document'
   await useDoc.getState().load('A')
   await act(async () => root.render(<Notifications><SessionView sessionId="A" /></Notifications>))
   expect(host.textContent).toContain('This file is not valid UTF-8, so it is read-only.')
-  expect([...host.querySelectorAll('.conflict-actions button')].map((button) => button.textContent)).toEqual(['Save As…'])
+  expect([...host.querySelectorAll('.notification-actions button')].map((button) => button.textContent)).toEqual(['Save As…'])
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('article p')!.firstChild!)
   window.getSelection()!.removeAllRanges()

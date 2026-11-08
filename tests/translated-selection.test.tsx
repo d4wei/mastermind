@@ -9,6 +9,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { TranslatedSelection } from '../ui/translate/TranslatedSelection'
 import { useTranslation } from '../ui/translate/translationStore'
 import { useConfig } from '../ui/app/configStore'
+import { useAnnouncements } from '../ui/app/Notifications'
 import { useDoc } from '../ui/documents/store'
 import { prepareTranslation, parseTranslatedComment, type PreparedTranslation } from '../document/translation'
 import { analyzeMarkdown } from '../document/markdown/analyze'
@@ -72,13 +73,20 @@ async function submitComment(button: HTMLButtonElement) {
   })
   await act(async () => { button.click(); button.click(); await changed })
 }
-it('explains instead of offering a comment for a selection spanning translated blocks', () => {
-  select(true)
-  expect(host.querySelector('.sel-toolbar')!.textContent).toBe('Select text within one translated block to comment.')
-  expect(host.querySelector('.sel-toolbar button')).toBeNull()
-  select()
-  expect(host.querySelector('.sel-toolbar .sel-note')).toBeNull()
-  expect(host.querySelector('.sel-toolbar button')!.textContent).toBe('Comment')
+it('offers no toolbar for a selection spanning translated blocks and explains why once in a notification', () => {
+  let announced = 0
+  const stop = useAnnouncements.subscribe(() => { announced++ })
+  try {
+    select(true)
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+    expect(useAnnouncements.getState().items.map((item) => item.text))
+      .toEqual(['Select text within one translated block to comment.'])
+    // Extending a selection that already spans blocks does not explain it again.
+    select(true)
+    expect(announced).toBe(1)
+    select()
+    expect(host.querySelector('.sel-toolbar button')!.textContent).toBe('Comment')
+  } finally { stop(); useAnnouncements.setState({ items: [] }) }
 })
 it('comments on one translated block with exact quote/language and one undoable source edit', async () => {
   const submit = compose()

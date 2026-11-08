@@ -32,7 +32,7 @@ describe('mapSelection', () => {
   it('maps a single-block selection to one segment', () => {
     const { t0 } = build()
     expect(mapSelection(rangeBetween(t0, 6, t0, 15), SOURCE, analyzeMarkdown(SOURCE))).toEqual({
-      status: 'covered', revision: SOURCE, quote: 'paragraph', segments: [{ from: 6, to: 15, text: 'paragraph' }], excluded: [],
+      status: 'covered', revision: SOURCE, quote: 'paragraph', segments: [{ from: 6, to: 15, text: 'paragraph' }], excluded: [], fragments: [expect.any(Range)],
     })
   })
 

@@ -29,6 +29,33 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Enter posts comments and replies; suggested text keeps Enter for line breaks
+
+**Ruled.** Comment and reply fields post on Enter and add a line on Shift+Enter, as chat-style
+feedback does; Suggest change fields edit document text, where line breaks matter, so Enter stays a
+newline there. Cmd/Ctrl+Enter submits both, and an IME's Enter never submits.
+
+**Beat:** Cmd/Ctrl+Enter as the only way to post a one-line comment.
+
+## 2026-11-07 — Notifications are persistent or transient by what they ask of the reader
+
+**Ruled.** A notice that needs action or attention (data at risk, conflicts, failed saves, refused
+admissions) is persistent: it carries a warning symbol and stays until dismissed or resolved. A
+notice that only informs is transient: no close control, it leaves after `--notice-dismiss`, pauses
+while hovered or focused, and never takes focus. Every notification names its tier in code.
+
+**Beat:** one notification style whose informational notices linger until dismissed, and inline
+toolbar notes that repeat the same explanation in the composer.
+
+## 2026-11-07 — A partial selection is trimmed to what will be marked
+
+**Ruled.** The app narrows the visible selection to its markable text, painting fragments when
+there are several, and explains the trim once in a transient notification; an unmarkable selection
+shows no toolbar.
+
+**Beat:** keeping the reader's full selection with an inline note that only part of it can be
+marked.
+
 ## 2026-11-07 — Reviewers can delete a resolved discussion from the file
 
 **Ruled.** Each Resolved discussions card offers Delete discussion / 删除讨论, which splices its

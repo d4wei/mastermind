@@ -31,7 +31,7 @@ export function App({ onboarding }: { onboarding?: ReactNode }) {
           </SessionErrorBoundary>
         </AppFrame>
       ))}
-      {saveFailed && <Notice error>{t('configSaveFailed')}</Notice>}
+      {saveFailed && <Notice tier="persistent">{t('configSaveFailed')}</Notice>}
     </Tooltip.Provider>
   )
 }

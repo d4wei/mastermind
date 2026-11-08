@@ -251,6 +251,53 @@ it('selects from the passage and clears selection on ordinary document clicks or
   expect(rail.active).toBeNull()
 })
 
+it('deselects on a click anywhere but the selected card, a passage, or UI the card opened', () => {
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  const passage = host.querySelector<HTMLElement>('.critic-anchor')!
+  const select = () => { act(() => passage.click()); expect(rail.active).toBe(0) }
+  const clickOn = (element: Element, init: MouseEventInit = {}) =>
+    act(() => { element.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0, ...init })) })
+  const add = (html: string): HTMLElement => {
+    const holder = document.createElement('div')
+    holder.innerHTML = html
+    host.append(holder)
+    return holder.querySelector<HTMLElement>('[data-target]')!
+  }
+  const card = add('<div class="rail-card active"><div class="rail-reply"><textarea data-target></textarea></div></div>')
+  const menu = add('<div data-radix-popper-content-wrapper><div role="menu"><div role="menuitem" data-target>Delete</div></div></div>')
+  const dialog = add('<div class="slide-over" role="dialog"><p data-target>Settings</p></div>')
+  const narrowRail = add('<div class="comments-panel"><div class="slide-over" role="dialog"><div class="rail" data-target></div></div></div>')
+  select()
+  for (const kept of [card, menu, dialog, passage]) {
+    clickOn(kept)
+    expect(rail.active).toBe(0)
+  }
+  for (const elsewhere of [host.querySelector('.topbar')!, host.querySelector('[data-testid="rail"]')!,
+    host.querySelector('.doc-shell')!, narrowRail]) {
+    select()
+    clickOn(elsewhere)
+    expect(rail.active).toBeNull()
+  }
+})
+
+it('keeps the selected discussion through a drag or a text selection that ends in a click', () => {
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  act(() => host.querySelector<HTMLElement>('.critic-anchor')!.click())
+  const paragraph = host.querySelector('article p')!
+  act(() => {
+    paragraph.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 10 }))
+    paragraph.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 80, clientY: 10 }))
+  })
+  expect(rail.active).toBe(0)
+  const text = paragraph.firstChild!.firstChild!
+  window.getSelection()!.setBaseAndExtent(text, 0, text, 3)
+  act(() => { paragraph.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  expect(rail.active).toBe(0)
+  window.getSelection()!.removeAllRanges()
+  act(() => { paragraph.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  expect(rail.active).toBeNull()
+})
+
 it('keeps the selected discussion when an edit inserts an earlier one, and forgets it once resolved', () => {
   render('a {==X==}{>>x<<} b {==Y==}{>>y<<}')
   act(() => host.querySelector<HTMLElement>('.critic-anchor[data-span-index="2"]')!.click())
