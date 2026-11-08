@@ -835,21 +835,43 @@ mod tests {
         let fixture = Fixture::new();
         let global = fixture.0.join("global.gitconfig");
         std::fs::write(&global, "[user]\n name = Global Reader\n").unwrap();
-        std::fs::create_dir(fixture.0.join(".git")).unwrap();
-        std::fs::write(
-            fixture.0.join(".git/config"),
-            "[user]\n name = Repository Reader\n",
-        )
-        .unwrap();
-        let mut command = Command::new("git");
-        command
-            .args(["config", "--global", "--get", "user.name"])
-            .current_dir(fixture.0.path())
-            .env("GIT_CONFIG_GLOBAL", global)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null());
-        assert_eq!(git_name_from(command), "Global Reader");
+        let git = |args: &[&str]| {
+            let mut command = Command::new("git");
+            command
+                .args(args)
+                .current_dir(fixture.0.path())
+                .env("GIT_CONFIG_GLOBAL", &global)
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped());
+            command
+        };
+        let init = git(&["init", "--quiet"]).output().unwrap();
+        assert!(
+            init.status.success(),
+            "git init: {}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+        let local = git(&["config", "user.name", "Repository Reader"])
+            .output()
+            .unwrap();
+        assert!(
+            local.status.success(),
+            "git config: {}",
+            String::from_utf8_lossy(&local.stderr)
+        );
+        let args = ["config", "--global", "--get", "user.name"];
+        let mut quiet = git(&args);
+        quiet.stderr(Stdio::null());
+        let name = git_name_from(quiet);
+        if name != "Global Reader" {
+            let output = git(&args).output().unwrap();
+            panic!(
+                "read {name:?}; git exited {} with {:?}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         assert_eq!(normalize_name(" @中文 Reader "), "中文 Reader");
     }
 

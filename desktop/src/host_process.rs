@@ -27,7 +27,7 @@ pub fn startup_failed(child: &mut Child) -> std::io::Result<bool> {
 }
 
 #[cfg(windows)]
-pub use windows::{Child, spawn, startup_failed};
+pub use windows::{spawn, startup_failed};
 
 #[cfg(windows)]
 mod windows {

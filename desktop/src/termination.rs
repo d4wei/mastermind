@@ -38,12 +38,15 @@ pub fn renderer_lost(app: &tauri::AppHandle) {
     let _ = app;
 }
 
-/// How many lost renderers one host reloads before leaving the window blank.
+/// How many lost renderers one host reloads before leaving the window blank. Only macOS reports
+/// a lost web content process.
+#[cfg(any(target_os = "macos", test))]
 pub const RENDERER_RELOAD_LIMIT: u32 = 3;
 
 /// Whether to reload after a lost renderer. A document that crashes the web content process on
 /// every load would otherwise reload forever; past the limit the window stays blank and quitting
 /// still works, since an unsubscribed renderer never defers termination.
+#[cfg(any(target_os = "macos", test))]
 pub fn should_reload_renderer(reloads: &std::sync::atomic::AtomicU32) -> bool {
     reloads.fetch_add(1, std::sync::atomic::Ordering::SeqCst) < RENDERER_RELOAD_LIMIT
 }
