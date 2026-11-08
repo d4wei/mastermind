@@ -26,12 +26,18 @@ afterEach(() => {
 const section = () => host.querySelector<HTMLElement>('.collapsible')
 const field = () => host.querySelector('textarea')
 const show = (open: boolean) => act(() => root.render(<Collapsible open={open} id="reply"><textarea /></Collapsible>))
-/** The row's own transition ending, as the browser reports it. */
-function endTransition(propertyName = 'grid-template-rows') {
-  const event = new Event('transitionend')
+/** The row's own transition ending or cancelled, as the browser reports it. */
+function endTransition(propertyName = 'grid-template-rows', type = 'transitionend') {
+  const event = new Event(type)
   Object.defineProperty(event, 'propertyName', { value: propertyName })
   act(() => section()!.dispatchEvent(event))
 }
+/** Lists the row's running transitions, which jsdom cannot. */
+function stubAnimations(running: () => boolean) {
+  HTMLElement.prototype.getAnimations = () => running()
+    ? [{ transitionProperty: 'grid-template-rows', playState: 'running' } as unknown as Animation] : []
+}
+afterEach(() => { Reflect.deleteProperty(HTMLElement.prototype, 'getAnimations') })
 
 it('renders content opened with it at once, and nothing while closed', () => {
   show(true)
@@ -57,7 +63,26 @@ it('opens through its row transition and stops clipping only when that transitio
   expect(section()!.className).toBe('collapsible open settled')
 })
 
-it('keeps closing content mounted, inert and hidden, until the collapse finishes', () => {
+it('settles an opening row whose transition is cancelled', () => {
+  show(false)
+  show(true)
+  endTransition('grid-template-rows', 'transitioncancel')
+  expect(section()!.className).toBe('collapsible open settled')
+})
+
+it('keeps clipping through a cancel that reverses the row mid-way', () => {
+  let moving = true
+  stubAnimations(() => moving)
+  show(false)
+  show(true)
+  endTransition('grid-template-rows', 'transitioncancel')
+  expect(section()!.className).toBe('collapsible open')
+  moving = false
+  endTransition()
+  expect(section()!.className).toBe('collapsible open settled')
+})
+
+it('keeps closing content mounted, inert and hidden, until the row\'s transition ends', () => {
   show(true)
   const input = field()!
   show(false)
@@ -66,23 +91,60 @@ it('keeps closing content mounted, inert and hidden, until the collapse finishes
   expect(section()!.hasAttribute('inert')).toBe(true)
   expect(section()!.getAttribute('aria-hidden')).toBe('true')
   expect(section()!.getAttribute('data-settles-to')).toBe('0')
-  act(() => vi.advanceTimersByTime(179))
+  act(() => vi.advanceTimersByTime(1000))
   expect(field()).toBe(input)
-  act(() => vi.advanceTimersByTime(1))
+  endTransition('margin-top')
+  expect(field()).toBe(input)
+  endTransition()
   expect(section()).toBeNull()
+})
+
+it('unmounts closing content whose transition is cancelled', () => {
+  show(true)
+  show(false)
+  endTransition('grid-template-rows', 'transitioncancel')
+  expect(section()).toBeNull()
+})
+
+it('unmounts closing content at once when the row does not transition', () => {
+  stubAnimations(() => false)
+  show(true)
+  show(false)
+  expect(section()).toBeNull()
+})
+
+it('draws closing content from its last open render and refuses its input', () => {
+  const post = vi.fn()
+  const draw = (open: boolean, label: string) => act(() => root.render(<Collapsible open={open}>
+    <button type="button" onClick={post} onKeyDown={post}>{label}</button>
+  </Collapsible>))
+  draw(true, 'Reply')
+  draw(false, 'Changed')
+  const button = host.querySelector('button')!
+  expect(button.textContent).toBe('Reply')
+  act(() => {
+    button.click()
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+  expect(post).not.toHaveBeenCalled()
+  draw(true, 'Again')
+  expect(host.querySelector('button')).toBe(button)
+  expect(button.textContent).toBe('Again')
+  act(() => button.click())
+  expect(post).toHaveBeenCalledTimes(1)
 })
 
 it('reopens the same content when opened again mid-collapse', () => {
   show(true)
   const input = field()!
   show(false)
-  act(() => vi.advanceTimersByTime(90))
   show(true)
   expect(field()).toBe(input)
   expect(section()!.className).toBe('collapsible open')
   expect(section()!.hasAttribute('inert')).toBe(false)
-  act(() => vi.advanceTimersByTime(500))
+  endTransition()
   expect(field()).toBe(input)
+  expect(section()!.className).toBe('collapsible open settled')
 })
 
 it('changes at once under reduced motion', () => {

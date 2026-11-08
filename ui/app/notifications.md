@@ -12,10 +12,16 @@ Every notification names its tier (`NotificationTier`):
   dismissed or resolved, and, when dismissible, have an explicit close control. A dismissed failure
   keeps an icon-only recall control (`NotificationRecall`) that reopens it, so it is never lost on
   a timer. Errors use `role="alert"`; others use `role="status"`.
-- **Transient** notices only inform. They have no symbol, close control, or elevation, use muted
-  ink, and leave after `--notice-dismiss` (a theme duration token), with a `--dur-base` fade. The
-  timer pauses while the notice is hovered or holds focus and resumes with the time remaining.
-  Reduced motion removes them without the fade. They use `role="status"` and never move focus.
+- **Transient** notices only inform. They have no symbol or close control, use muted ink, and
+  share the persistent tier's popover elevation. They leave after `--notice-dismiss` (a theme
+  duration token), with a `--dur-base` fade. The lifetime pauses while the notice is hovered or
+  holds focus and resumes with the time remaining; once the fade begins, it runs to the end.
+  Reduced motion removes them without the fade. They never move focus.
+
+The stack keeps one polite live region (`role="status"`) mounted before any notice, and transient
+notices render inside it, so screen readers announce text added to an existing region. A restarted
+notice re-adds its text, so a repeat with identical text is announced again. Persistent notices sit
+outside that region and keep their own roles.
 
 `Notice` manages its own dismissal for either tier. `announce(id, text)` raises a transient notice
 from an event rather than from state; a later announcement with the same id replaces it in place
@@ -28,7 +34,7 @@ and restarts its lifetime, so repeated events never stack copies.
 | File changed on disk, missing, unreadable, or unsaved (recovery actions) | `ConflictPanel` | Persistent, dismissible to a recall and file attention |
 | File is not valid UTF-8, so read-only | `ConflictPanel` | Persistent, no close control until resolved by Save As |
 | Files refused at opening | `NativeReviewer` | Persistent, dismissible |
-| Files from the last session that could not be reopened | `NativeReviewer` | Transient |
+| Files from the last session that could not be reopened | `NativeReviewer` | Persistent, dismissible to a recall |
 | Native command failures, including a close refused because the file changed again | `NativeReviewer` | Persistent, dismissible to a recall |
 | Setup could not load, with Retry | `NativeReviewer` | Persistent, dismissible to a recall |
 | Settings could not be saved | `App` | Persistent, dismissible to a recall |

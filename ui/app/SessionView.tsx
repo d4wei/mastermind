@@ -35,7 +35,7 @@ import { readingSpace } from './reading-space'
 import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 import { isImeKey } from '../util/composition'
 import { EXIT_MS_FALLBACK, prefersReducedMotion, usePresence } from '../util/presence'
-import { cssMs } from '../util/css-tokens'
+import { rootMs } from '../util/css-tokens'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -332,8 +332,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   // menus, tooltips, dialogs, panels, Find, notifications, and the selection toolbar leave it.
   useEffect(() => {
     if (activeSpan === null) return
+    // The press that began the coming click. A press that ends without one (a context menu, a touch
+    // turned into a scroll) or a key that can click is forgotten, so it cannot measure a later click.
     let pressed: { x: number; y: number } | null = null
     const press = (event: PointerEvent): void => { pressed = { x: event.clientX, y: event.clientY } }
+    const forget = (): void => { pressed = null }
     const click = (event: MouseEvent): void => {
       const from = pressed
       pressed = null
@@ -346,10 +349,13 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       if (target.closest('.md-root') && window.getSelection()?.isCollapsed === false) return
       chooseActive(null)
     }
+    const forgetting = ['pointercancel', 'contextmenu', 'keydown'] as const
     document.addEventListener('pointerdown', press, true)
+    for (const type of forgetting) document.addEventListener(type, forget, true)
     document.addEventListener('click', click)
     return () => {
       document.removeEventListener('pointerdown', press, true)
+      for (const type of forgetting) document.removeEventListener(type, forget, true)
       document.removeEventListener('click', click)
     }
   }, [activeSpan, chooseActive])
@@ -390,7 +396,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const inlineRail = showRail && inlineSpace
   // Hiding inline comments fades the rail out at its anchors before the document recenters; leaving
   // reading or the wide layout removes it at once, since its anchors are gone.
-  const railExitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? EXIT_MS_FALLBACK, [])
+  const railExitMs = useMemo(() => rootMs('--dur-fast', EXIT_MS_FALLBACK), [])
   const railPresence = usePresence(inlineRail, railExitMs)
   const railLeaving = !inlineRail && railPresence.mounted && inlineSpace && hasThreads && !prefersReducedMotion()
   const railPlaced = inlineRail || railLeaving

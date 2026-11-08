@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TopBar } from '../ui/app/TopBar'
 import { ToolbarTarget } from '../ui/app/ToolbarTarget'
 import { useDoc } from '../ui/documents/store'
 import { useTranslation } from '../ui/translate/translationStore'
+import { createReactHost, removeReactHost } from './helpers/dom'
 
 let host: HTMLDivElement
 let root: Root
@@ -14,11 +15,11 @@ const translation = useTranslation.getState()
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  host = document.createElement('div'); document.body.append(host); root = createRoot(host)
+  ;({ host, root } = createReactHost())
   useDoc.setState({ sessionId: 'A' })
 })
 afterEach(() => {
-  act(() => root.unmount()); host.remove()
+  removeReactHost(root, host)
   useDoc.setState(doc); useTranslation.setState(translation); vi.unstubAllGlobals()
 })
 

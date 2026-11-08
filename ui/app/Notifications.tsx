@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { AlertIcon, CrossIcon } from '../icons'
 import { useT } from '../i18n'
-import { cssMs } from '../util/css-tokens'
-import { EXIT_MS_FALLBACK, prefersReducedMotion } from '../util/presence'
+import { rootMs } from '../util/css-tokens'
+import { usePresence } from '../util/presence'
 import './Notifications.css'
 
 /**
@@ -17,7 +17,14 @@ export type NotificationTier = 'persistent' | 'transient'
 /** A transient notice's lifetime when the theme's `--notice-dismiss` token cannot be read. */
 export const NOTICE_DISMISS_FALLBACK_MS = 6000
 
-const NotificationTarget = createContext<HTMLElement | null>(null)
+/** A transient notice's exit fade when the theme's `--dur-base` token cannot be read. */
+export const NOTICE_EXIT_FALLBACK_MS = 180
+
+/**
+ * Where notices portal: persistent ones into the stack, transient ones into the stack's polite live
+ * region, which exists before any notice so that screen readers announce the text added to it.
+ */
+const NotificationTarget = createContext<{ stack: HTMLElement; transients: HTMLElement } | null>(null)
 
 interface Announcement { id: string; text: string; serial: number }
 
@@ -43,14 +50,24 @@ function withdraw(id: string, serial: number): void {
 }
 
 export function Notifications({ children }: { children: ReactNode }) {
-  const [target, setTarget] = useState<HTMLDivElement | null>(null)
+  const [stack, setStack] = useState<HTMLDivElement | null>(null)
+  const [transients, setTransients] = useState<HTMLDivElement | null>(null)
+  const target = useMemo(() => stack && transients ? { stack, transients } : null, [stack, transients])
   const announcements = useAnnouncements((state) => state.items)
   return <NotificationTarget.Provider value={target}>
     {children}
     {announcements.map(({ id, text, serial }) => <Notification key={id} tier="transient" restart={serial}
       onExpire={() => withdraw(id, serial)}>{text}</Notification>)}
-    <div ref={setTarget} className="notification-stack" />
+    <div ref={setStack} className="notification-stack">
+      <div ref={setTransients} className="notification-transients" role="status" aria-live="polite" />
+    </div>
   </NotificationTarget.Provider>
+}
+
+/** Places a notice in its tier's part of the stack, or in place outside a `Notifications` provider. */
+function InStack({ tier, children }: { tier: NotificationTier; children: ReactNode }) {
+  const target = useContext(NotificationTarget)
+  return target ? createPortal(children, tier === 'transient' ? target.transients : target.stack) : children
 }
 
 type NotificationProps = { children: ReactNode } & (
@@ -60,9 +77,9 @@ type NotificationProps = { children: ReactNode } & (
   | { tier: 'transient'; onExpire: () => void; restart?: unknown })
 
 export function Notification(props: NotificationProps) {
-  const target = useContext(NotificationTarget)
-  const content = props.tier === 'transient' ? <TransientNotification {...props} /> : <PersistentNotification {...props} />
-  return target ? createPortal(content, target) : content
+  return <InStack tier={props.tier}>
+    {props.tier === 'transient' ? <TransientNotification {...props} /> : <PersistentNotification {...props} />}
+  </InStack>
 }
 
 function PersistentNotification({ children, onDismiss, error = false }: Extract<NotificationProps, { tier: 'persistent' }>) {
@@ -75,19 +92,21 @@ function PersistentNotification({ children, onDismiss, error = false }: Extract<
   </section>
 }
 
+/**
+ * The notice's lifetime pauses while it is hovered or holds focus; once the lifetime ends, its exit
+ * fade runs to completion regardless, so a notice that is fading out always leaves.
+ */
 function TransientNotification({ children, onExpire, restart }: Extract<NotificationProps, { tier: 'transient' }>) {
-  const [leaving, setLeaving] = useState(false)
+  const [open, setOpen] = useState(true)
+  // Each restart remounts the text so the live region announces it again, even when unchanged.
+  const [shown, setShown] = useState({ restart, generation: 0 })
+  if (!Object.is(shown.restart, restart)) setShown({ restart, generation: shown.generation + 1 })
+  const [exitMs] = useState(() => rootMs('--dur-base', NOTICE_EXIT_FALLBACK_MS))
+  const { mounted, exiting } = usePresence(open, exitMs)
   const expire = useRef(onExpire)
   expire.current = onExpire
   const clock = useRef<{ timer: ReturnType<typeof setTimeout> | null; remaining: number; startedAt: number;
     hovered: boolean; focused: boolean }>({ timer: null, remaining: 0, startedAt: 0, hovered: false, focused: false })
-  const leave = (): void => {
-    const style = getComputedStyle(document.documentElement)
-    const exitMs = cssMs(style, '--dur-base') ?? EXIT_MS_FALLBACK
-    if (exitMs <= 0 || prefersReducedMotion()) { expire.current(); return }
-    setLeaving(true)
-    clock.current.timer = setTimeout(() => { clock.current.timer = null; expire.current() }, exitMs)
-  }
   const pause = (): void => {
     const state = clock.current
     if (state.timer === null) return
@@ -97,42 +116,44 @@ function TransientNotification({ children, onExpire, restart }: Extract<Notifica
   }
   const resume = (): void => {
     const state = clock.current
-    if (state.timer !== null || state.hovered || state.focused) return
+    if (state.timer !== null || state.hovered || state.focused || state.remaining <= 0) return
     state.startedAt = Date.now()
-    state.timer = setTimeout(() => { state.timer = null; leave() }, state.remaining)
+    state.timer = setTimeout(() => { state.timer = null; state.remaining = 0; setOpen(false) }, state.remaining)
   }
   // Each restart grants the full lifetime again, still paused while the reader holds the notice.
   useEffect(() => {
     const state = clock.current
-    setLeaving(false)
+    setOpen(true)
     if (state.timer !== null) clearTimeout(state.timer)
     state.timer = null
-    state.remaining = cssMs(getComputedStyle(document.documentElement), '--notice-dismiss') ?? NOTICE_DISMISS_FALLBACK_MS
+    state.remaining = rootMs('--notice-dismiss', NOTICE_DISMISS_FALLBACK_MS)
     resume()
     return () => { if (state.timer !== null) clearTimeout(state.timer); state.timer = null }
   }, [restart])
-  return <section className={`notification notification-transient${leaving ? ' leaving' : ''}`} role="status"
+  useEffect(() => { if (!mounted) expire.current() }, [mounted])
+  if (!mounted) return null
+  return <section className={`notification notification-transient${exiting ? ' leaving' : ''}`}
     onPointerEnter={() => { clock.current.hovered = true; pause() }}
-    onPointerLeave={() => { clock.current.hovered = false; if (!leaving) resume() }}
+    onPointerLeave={() => { clock.current.hovered = false; resume() }}
     onFocus={() => { clock.current.focused = true; pause() }}
     onBlur={(event) => {
       if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
       clock.current.focused = false
-      if (!leaving) resume()
+      resume()
     }}>
-    <div className="notification-content">{children}</div>
+    <div key={shown.generation} className="notification-content">{children}</div>
   </section>
 }
 
 /** A dismissed persistent notice's icon-only control, which reopens it. */
 export function NotificationRecall({ label, title, onOpen }: { label: string; title: string; onOpen: () => void }) {
-  const target = useContext(NotificationTarget)
-  const content = <section className="notification notification-recall">
-    <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={label} title={title} onClick={onOpen}>
-      <AlertIcon />
-    </button>
-  </section>
-  return target ? createPortal(content, target) : content
+  return <InStack tier="persistent">
+    <section className="notification notification-recall">
+      <button type="button" className="btn-ghost btn-icon recovery-warning" aria-label={label} title={title} onClick={onOpen}>
+        <AlertIcon />
+      </button>
+    </section>
+  </InStack>
 }
 
 /**

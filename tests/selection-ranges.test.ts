@@ -32,7 +32,7 @@ describe('mapSelection', () => {
   it('maps a single-block selection to one segment', () => {
     const { t0 } = build()
     expect(mapSelection(rangeBetween(t0, 6, t0, 15), SOURCE, analyzeMarkdown(SOURCE))).toEqual({
-      status: 'covered', revision: SOURCE, quote: 'paragraph', segments: [{ from: 6, to: 15, text: 'paragraph' }], excluded: [], fragments: [expect.any(Range)],
+      status: 'covered', revision: SOURCE, quote: 'paragraph', segments: [{ from: 6, to: 15, text: 'paragraph' }], excluded: [], fragments: [{ range: expect.any(Range), segments: [{ from: 6, to: 15, text: 'paragraph' }] }],
     })
   })
 
@@ -96,6 +96,16 @@ describe('selections across rendered review marks', () => {
       { from: 16, to: 22, text: ' gamma' },
       { from: 24, to: 30, text: 'Second' },
     ])
+  })
+
+  it('gives each rendered fragment the segments it covers, split only by excluded text', () => {
+    const source = 'Alpha {++beta++} gamma\n\nSecond paragraph.'
+    const rendered = renderMarkdown(source)
+    const range = rangeBetween(textOf(rendered.host, 'p > span'), 0, textOf(rendered.host, 'p > span', 2), 6)
+    const mapped = mapSelection(range, source, rendered)
+    if (mapped.status !== 'covered') throw new Error(`expected coverage, got ${mapped.status}`)
+    expect(mapped.fragments.map((fragment) => [fragment.range.toString(), fragment.segments.map((segment) => segment.text)]))
+      .toEqual([['Alpha ', ['Alpha ']], [' gammaSecond', [' gamma', 'Second']]])
   })
 
   it('drops whitespace-only segments between adjacent marks', () => {

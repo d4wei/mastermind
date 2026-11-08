@@ -287,7 +287,7 @@ export function NativeReviewer() {
       {openingErrors.length > 0 && <Notification tier="persistent" error onDismiss={dismissOpeningErrors}>
         <ul>{openingErrors.map((message, index) => <li key={index}>{message}</li>)}</ul>
       </Notification>}
-      {restoreFailures.length > 0 && <Notice key={restoreFailures.join('\n')} tier="transient">
+      {restoreFailures.length > 0 && <Notice key={restoreFailures.join('\n')} tier="persistent">
         <p>{restoreFailures.length === 1 ? t('restoreFailedOne')
           : t('restoreFailedMany').replace('{count}', String(restoreFailures.length))}</p>
         <ul>{fileLabels(restoreFailures).map((label, index) => <li key={index}>{label}</li>)}</ul>

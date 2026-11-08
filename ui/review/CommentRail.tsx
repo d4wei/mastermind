@@ -4,13 +4,13 @@ import { useDraftGuard } from './drafts'
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { flushSync } from 'react-dom'
-import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
 import { ThreadMessage } from './ThreadMessage'
 import { QuotedPassage } from './QuotedPassage'
 import { Collapsible } from './Collapsible'
-import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
+import { CheckIcon } from '../icons'
+import { DiscussionMenu } from './DiscussionMenu'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
@@ -252,21 +252,12 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           actions={<>
             {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
               title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
-            <DropdownMenu.Root modal={false}>
-              <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
-                aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
-                  <DropdownMenu.Item className="reader-menu-item" disabled={readOnly} onSelect={() => {
-                    if (readOnly) return
-                    onHover?.(null)
-                    // Deleting the opening message ends the discussion's identity.
-                    const ended = messageIndex === 0 ? card : undefined
-                    if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
-                  }}><TrashIcon />{t('deleteComment')}</DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Root>
+            <DiscussionMenu label={t('deleteComment')} disabled={readOnly} onSelect={() => {
+              onHover?.(null)
+              // Deleting the opening message ends the discussion's identity.
+              const ended = messageIndex === 0 ? card : undefined
+              if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
+            }} />
           </>} />
       return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
         ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
@@ -305,8 +296,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
               if (event.key === 'Enter' && !event.shiftKey && !event.altKey) { event.preventDefault(); submitReply(card) }
               if (event.key === 'Escape') { event.stopPropagation(); collapse() }
             }} />
-          {/* A collapsing composer is not the open one, so the open composer's verdict is not its own. */}
-          <Collapsible open={composes(card) && !readOnly && !!composerText.trim() && !composerVerified &&
+          {/* The open composer's verdict is this card's: a collapsing composer keeps its last open render. */}
+          <Collapsible open={!readOnly && !!composerText.trim() && !composerVerified &&
             !commentBodyFits(authorTag, composerText)}><p role="alert">{t('commentBodyInvalid')}</p></Collapsible>
           <div className="rail-actions">
             {/* Cancel discards the draft; Escape and clicking away keep it for the next selection. */}
@@ -314,7 +305,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
               removeDraft(placedDrafts.byCard.get(card.key)?.id)
               collapse()
             }}>{t('cancel')}</button>
-            <button type="button" className="btn-primary btn-compact" disabled={!composes(card) || !composerVerified}
+            <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
         </div></Collapsible>

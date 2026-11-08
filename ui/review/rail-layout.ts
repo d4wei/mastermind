@@ -20,7 +20,7 @@ export function placeCommentCards(cards: readonly RailMeasurement[], selected: n
   })
   if (selected < 0 || selected >= cards.length) return tops
 
-  // A growing card reserves only what it has reached, as before; a collapsing one what it keeps.
+  // A growing card reserves only the height it has reached; a collapsing one only what it keeps.
   const reserved = cards.map((card) => Math.min(card.height, card.settledHeight ?? card.height))
   const minimumTops: number[] = []
   let minimum = 0

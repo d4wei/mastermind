@@ -5,25 +5,28 @@
  */
 export const SETTLES_TO = 'data-settles-to'
 
-function marginBox(element: HTMLElement): number {
+function margins(element: HTMLElement): number {
   const style = getComputedStyle(element)
-  return element.getBoundingClientRect().height + (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
+  return (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
 }
 
-/** The margin-box height `element` will have once its shrink ends, for marking it with `SETTLES_TO`. */
+/** The margin-box height `element` will have once its shrink to `height` ends, for `SETTLES_TO`. */
 export function settledMarginBox(element: HTMLElement, height: number): number {
-  return marginBox(element) - element.getBoundingClientRect().height + height
+  return height + margins(element)
 }
 
 /**
  * `height` of `container` less what its shrinking descendants are still to lose. Only outermost
- * marks count, since a shrinking section's own content leaves with it.
+ * marks count, since a shrinking section's own content leaves with it. A mark's margins count in
+ * full, which holds while a margin collapses only with a neighbor's of the opposite sign, as the
+ * passage's Show more row pulls up against the quote: margins of opposite signs add.
  */
 export function settledHeight(container: HTMLElement, height: number): number {
   let losing = 0
   for (const element of container.querySelectorAll<HTMLElement>(`[${SETTLES_TO}]`)) {
     if (element.parentElement?.closest(`[${SETTLES_TO}]`)) continue
-    losing += Math.max(0, marginBox(element) - (Number(element.getAttribute(SETTLES_TO)) || 0))
+    const marginBox = element.getBoundingClientRect().height + margins(element)
+    losing += Math.max(0, marginBox - (Number(element.getAttribute(SETTLES_TO)) || 0))
   }
   return height - losing
 }

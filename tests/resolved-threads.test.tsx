@@ -1,22 +1,21 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import { ResolvedThreads } from '../ui/review/ResolvedThreads'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits } from '../document/review-archive'
 import type { TextEdit } from '../document/types'
 import { applyTextEdits } from '../document/edits'
+import { createReactHost, removeReactHost } from './helpers/dom'
 
 let host: HTMLDivElement
 let root: Root
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-  host = document.createElement('div')
-  document.body.append(host)
-  root = createRoot(host)
+  ;({ host, root } = createReactHost())
 })
-afterEach(() => { act(() => root.unmount()); host.remove(); vi.unstubAllGlobals() })
+afterEach(() => { removeReactHost(root, host); vi.unstubAllGlobals() })
 
 function archive(source: string): string {
   const thread = analyzeMarkdown(source).items.find((item) => item.type === 'thread')!
@@ -116,6 +115,23 @@ it('deletes only the chosen discussion through one exact splice', () => {
   expect(onEdit).toHaveBeenCalledTimes(1)
   const after = applyTextEdits(source, onEdit.mock.calls[0]![0])
   expect(after).toBe(first.replace('{>>@B: second<<}', ''))
+})
+
+it('keeps a deleted record\'s expanded replies from passing to the record after it', () => {
+  const first = archive('One {>>@A: first<<}{>>@C: reply A<<}.\n\nTwo {>>@B: second<<}{>>@D: reply B<<}.\n')
+  const source = archive(first)
+  const onEdit = vi.fn((_edits: TextEdit[]) => true)
+  act(() => root.render(<ResolvedThreads source={source} onClose={() => {}} onEdit={onEdit} />))
+  const toggles = () => Array.from(host.querySelectorAll<HTMLButtonElement>('.resolved-card .rail-disclosure'))
+  act(() => toggles()[0]!.click())
+  expect(toggles().map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual(['true', 'false'])
+  const item = openMenu(0)
+  act(() => item.click())
+  act(() => root.render(<ResolvedThreads source={applyTextEdits(source, onEdit.mock.calls[0]![0])} onClose={() => {}} onEdit={onEdit} />))
+  expect(host.querySelectorAll('.resolved-card')).toHaveLength(1)
+  expect(host.querySelector('.resolved-card .rail-body')!.textContent).toBe('second')
+  expect(toggles().map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual(['false'])
+  expect(host.textContent).not.toContain('reply B')
 })
 
 it.each([

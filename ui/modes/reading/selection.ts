@@ -49,7 +49,13 @@ export interface SelectionCoverage {
    * The rendered text the segments cover, in document order: segments with no excluded text
    * between them share one fragment, so a single fragment means the markable part is contiguous.
    */
-  fragments: Range[]
+  fragments: SelectedFragment[]
+}
+
+/** One contiguous markable part of a selection and the segments it covers, in source order. */
+export interface SelectedFragment {
+  range: Range
+  segments: SelRange[]
 }
 
 export type SelectionMapping =
@@ -128,6 +134,14 @@ function wrapperOf(node: Parent, source: string): Wrapper | null {
 }
 
 const indexes = new WeakMap<Root, SelectableIndex>()
+const opaqueRanges = new WeakMap<MappingAnalysis['plain'], readonly SourceRange[]>()
+
+/** Source the plain parse treats as opaque, found once per analysis. */
+function opaqueSource(plain: MappingAnalysis['plain']): readonly SourceRange[] {
+  let ranges = opaqueRanges.get(plain)
+  if (!ranges) opaqueRanges.set(plain, ranges = excludedRanges(plain))
+  return ranges
+}
 
 /** Indexes each text block's leaves, atoms, and wrappers once per reading tree. */
 function selectableIndex(tree: Root, source: string, provenance: MappingAnalysis['provenance']): SelectableIndex {
@@ -382,11 +396,11 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
   }
   const segments: SelRange[] = []
   const excluded: ExcludedSegment[] = []
-  const fragments: Range[] = []
+  const fragments: SelectedFragment[] = []
   // Excluded text closes the open fragment; the next segment starts a new one.
   let fragmentOpen = false
   const exclude = (segment: ExcludedSegment): void => { excluded.push(segment); fragmentOpen = false }
-  const opaque = excludedRanges(analysis.plain)
+  const opaque = opaqueSource(analysis.plain)
   // Pieces join only within one text block and never across excluded text.
   let run: Piece[] = []
   const flush = (): void => {
@@ -401,10 +415,11 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
       if (!fragmentOpen) {
         const fragment = range.startContainer.ownerDocument!.createRange()
         fragment.setStart(...entry.start)
-        fragments.push(fragment)
+        fragments.push({ range: fragment, segments: [] })
         fragmentOpen = true
       }
-      fragments.at(-1)!.setEnd(...entry.end)
+      fragments.at(-1)!.range.setEnd(...entry.end)
+      fragments.at(-1)!.segments.push(entry.range)
     }
   }
   for (const item of items) {
@@ -419,5 +434,6 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
   flush()
   if (!segments.length && !excluded.length) return { status: 'inactive' }
   segments.sort((a, b) => a.from - b.from)
+  for (const fragment of fragments) fragment.segments.sort((a, b) => a.from - b.from)
   return { status: 'covered', revision: source, quote, segments, excluded, fragments }
 }

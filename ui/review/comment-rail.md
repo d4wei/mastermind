@@ -14,7 +14,7 @@ interface typography independently of the reading font preset.
 `QuotedPassage` clamps the quoted passage to two lines on an unselected card and six on the
 selected card or a resolved one, ending in an ellipsis. An unselected card only clamps. On a
 selected or resolved card, a passage that overflows its clamp, measured again whenever the card
-resizes, offers Show more, which reveals it whole inside the card and then reads Show less; a new
+resizes and once a clamp change finishes easing, offers Show more, which reveals it whole inside the card and then reads Show less; a new
 clamp starts collapsed. The full passage stays in the title. That disclosure and the reply count
 share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
 below, and the passage's turns from down to up as it grows in place.
@@ -36,10 +36,13 @@ recenters. Narrow panels use the same fade-in. Motion honors reduced-motion pref
 Sections that appear inside a card, live or resolved, ease open and closed through `Collapsible`:
 the reply composer and its alert, the replies, and the passage's Show more row. Its grid row moves
 between `0fr` and `1fr`, so the card's height follows its content and is never set. Closing content
-stays mounted, inert and hidden from assistive technology, until the collapse ends; reopening it
-mid-collapse keeps the same field and focuses it. A moving section clips with `overflow: clip`,
-because focusing a field inside an `overflow: hidden` clip scrolls the clip and throws its content
-toward the top; clipping ends with the row's transition. The quoted passage eases between clamps
+keeps its last open render and stays mounted, inert, hidden from assistive technology and refusing
+input, until the row's transition ends or is cancelled; a collapsing composer neither posts nor
+shows another card's verdict, and reopening it mid-collapse renders the same field live and focuses
+it. A moving section clips with `overflow: clip`, because focusing a field inside an
+`overflow: hidden` clip scrolls the clip and throws its content toward the top; clipping ends when
+the row's transition ends or is cancelled, but not when a reversal cancels it while the row still
+moves. The quoted passage eases between clamps
 by animating `max-height` from the height on screen to the next clamp's measured height, and a
 shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
 re-places cards synchronously from its size observer, so neighbors follow an easing card in the
@@ -86,7 +89,9 @@ The history panel lists each archived discussion as a card laid out like a live 
 rail's message classes: author, the quoted passage with its left rule and six-line clamp, the
 opening comment, then the shared reply-count disclosure. A record whose thread no longer parses as
 comments shows its stored text instead; unrecognized records show their diagnostic and raw text. Cards
-offer no jump to the passage, since resolution removes its anchor. The opening message carries the
-live card's More menu, whose Delete discussion removes the record through `deleteResolvedThreadEdits`
+offer no jump to the passage, since resolution removes its anchor. A card is keyed by its quoted
+passage and discussion, with its offset only beside an identical record, so deleting a record
+never hands its state, such as expanded replies, to the record after it. The opening message carries the
+live card's More menu (`DiscussionMenu`), whose Delete discussion removes the record through `deleteResolvedThreadEdits`
 and the document's review-edit path, so undo, saving, and paused editing behave as for live cards;
 paused editing disables the item. Unrecognized records offer no deletion.

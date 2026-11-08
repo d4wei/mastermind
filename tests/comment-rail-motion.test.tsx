@@ -23,6 +23,7 @@ beforeEach(() => {
   heights = [100, 50]
   resize = null
   commits = []
+  edit.mockClear()
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const index = [...document.querySelectorAll('.rail-card')].indexOf(this)
     return { top: 0, bottom: 0, left: 0, right: 0, width: 0, x: 0, y: 0, height: heights[index] ?? 0, toJSON: () => ({}) }
@@ -43,6 +44,7 @@ afterEach(() => {
 })
 
 const ANALYSIS = analyzeMarkdown(SOURCE)
+const edit = vi.fn(() => true)
 /** Each commit's selected and hovered discussion, as the document lights their passages. */
 let commits: { active: number | null; hovered: number | null }[]
 
@@ -55,11 +57,17 @@ function Harness({ detached = false }: { detached?: boolean }) {
   useLayoutEffect(() => { commits.push({ active, hovered }) })
   return <><article ref={detached ? undefined : docRef} />
     <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
-      activeSpan={active} onActivate={setActive} hoveredSpan={hovered} onHover={setHovered} onEdit={() => true}
+      activeSpan={active} onActivate={setActive} hoveredSpan={hovered} onHover={setHovered} onEdit={edit}
       drafts={drafts} onDraftsChange={setDrafts} /></>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
 const open = (index: number) => act(() => cards()[index]!.querySelector<HTMLButtonElement>('.rail-select')!.click())
+/** The row's own transition ending, as the browser reports it. */
+function endTransition(section: Element) {
+  const event = new Event('transitionend')
+  Object.defineProperty(event, 'propertyName', { value: 'grid-template-rows' })
+  act(() => section.dispatchEvent(event))
+}
 const escape = () => act(() => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
 
 it('keeps an unplaced card unseen rather than at the top of the rail', () => {
@@ -96,18 +104,28 @@ it('keeps a collapsing reply field mounted but inert, and focuses it when reopen
   expect(cards()[0]!.querySelector('textarea')).toBe(input)
 })
 
-it('leaves with the collapse when selection moves to another card, without the open composer\'s state', () => {
+it('leaves with the collapse when selection moves to another card, drawn as it was last open', () => {
   act(() => root.render(<Harness />))
   open(0)
-  act(() => inputValue(cards()[0]!.querySelector('textarea')!, 'A reply'))
+  const input = cards()[0]!.querySelector('textarea')!
+  act(() => inputValue(input, 'A reply'))
   act(() => vi.advanceTimersByTime(0))
   expect(cards()[0]!.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(false)
   open(1)
   const leaving = cards()[0]!.querySelector('.rail-reply')!
   expect(leaving.closest('[inert]')).not.toBeNull()
-  expect(leaving.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
+  expect(leaving.querySelector('textarea')).toBe(input)
+  expect(input.value).toBe('A reply')
   expect(document.activeElement).toBe(cards()[1]!.querySelector('textarea'))
-  act(() => vi.advanceTimersByTime(180))
+  // Enter or Reply in the collapsing composer posts nothing.
+  act(() => {
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    leaving.querySelector<HTMLButtonElement>('.btn-primary')!.click()
+  })
+  expect(edit).not.toHaveBeenCalled()
+  act(() => vi.advanceTimersByTime(1000))
+  expect(cards()[0]!.querySelector('.rail-reply')).toBe(leaving)
+  endTransition(leaving.closest('.collapsible')!)
   expect(cards()[0]!.querySelector('.rail-reply')).toBeNull()
 })
 

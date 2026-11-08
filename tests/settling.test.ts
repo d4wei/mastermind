@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { settledHeight } from '../ui/review/settling'
+import { settledHeight, settledMarginBox } from '../ui/review/settling'
 
 afterEach(() => { vi.restoreAllMocks(); document.body.replaceChildren() })
 
@@ -16,4 +16,9 @@ it('subtracts what outermost shrinking sections are still to lose, margins inclu
   })
   // The quote loses 76 - 46, the composer (with its alert) 80, the reveal 28 - 4.
   expect(settledHeight(document.getElementById('card')!, 400)).toBe(400 - 30 - 80 - 24)
+})
+
+it('marks a shrink by its target height plus the element\'s margins', () => {
+  document.body.innerHTML = '<div id="quote" style="margin: 8px 0 6px"></div>'
+  expect(settledMarginBox(document.getElementById('quote')!, 46)).toBe(60)
 })

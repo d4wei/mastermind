@@ -74,3 +74,28 @@ it('ignores a command raised before the view mounted', () => {
   expect(dialog()).toBeUndefined()
   expect(useOverlay.getState().open).toBeNull()
 })
+
+it.each([
+  ['a right-click', (at: Element) => {
+    at.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 2, clientX: 300, clientY: 200 }))
+    at.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, button: 2, clientX: 300, clientY: 200 }))
+  }],
+  ['a cancelled touch', (at: Element) => {
+    at.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 300, clientY: 200 }))
+    at.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, clientX: 300, clientY: 200 }))
+  }],
+  ['a press released without a click', (at: Element) => {
+    at.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 300, clientY: 200 }))
+  }],
+] as const)('lets a keyboard click on a top-bar button deselect the discussion after %s', (_, press) => {
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  act(() => host.querySelector<HTMLElement>('.critic-anchor')!.click())
+  expect(host.querySelector('.critic-anchor.active')).not.toBeNull()
+  act(() => press(host.querySelector('article p')!))
+  const button = host.querySelector<HTMLButtonElement>('.topbar button')!
+  act(() => {
+    button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ' }))
+    button.click()
+  })
+  expect(host.querySelector('.critic-anchor.active')).toBeNull()
+})

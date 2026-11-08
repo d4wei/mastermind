@@ -16,7 +16,15 @@
   overflow: auto;
   pointer-events: none;
 }
-.notification-stack:empty { display: none; }
+/* Transient notices sit nearest the corner, in a live region that stays rendered while empty so
+   screen readers track it; out of flow while empty, it adds no gap. */
+.notification-transients {
+  order: 1;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-unit) * 2);
+}
+.notification-transients:empty { position: absolute; }
 
 .notification {
   /* The height of one line of notice text, which icons and the close control center on. */
@@ -67,7 +75,8 @@
   margin-right: calc(var(--space-unit) * -1);
 }
 
-/* Transient notices inform and leave: quieter ink, no symbol or close control, and no elevation. */
+/* Transient notices inform and leave: quieter ink and no symbol or close control; like persistent
+   notices, they float with popover elevation. */
 .notification-transient {
   padding: calc(var(--space-unit) * 2) calc(var(--space-unit) * 3);
   color: var(--color-text-muted);

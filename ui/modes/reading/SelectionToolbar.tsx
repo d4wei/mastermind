@@ -11,8 +11,8 @@ import { announce } from '../../app/Notifications'
 import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
 import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
-import { cssMs } from '../../util/css-tokens'
-import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelRange } from './selection'
+import { rootMs } from '../../util/css-tokens'
+import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from './marks'
 
@@ -43,8 +43,8 @@ interface Active {
   rect: { top: number; left: number; width: number; bottom: number }
 }
 
-/** A mapped selection and the selected text it leaves out. */
-interface Reading { active: Active; excluded: ExcludedSegment[] }
+/** A mapped selection, its markable parts, and the selected text it leaves out. */
+interface Reading { active: Active; parts: SelectedFragment[]; excluded: ExcludedSegment[] }
 
 const REASON_MESSAGES: Record<ExclusionReason, MsgKey> = {
   'existing-mark': 'selectionExistingMark',
@@ -84,6 +84,9 @@ function sameRange(a: Range, b: Range): boolean {
 
 export function SelectionToolbar({ containerRef, source, analysis, authorTag, onEdit, readOnly = false }: Props) {
   const t = useT()
+  /** The current interface language, for checks queued by an effect that outlives a switch. */
+  const translate = useRef(t)
+  translate.current = t
   const ime = useCompositionGuard()
   const [active, setActive] = useDraftState<Active | null>('selection:active', null)
   const [composing, setComposing] = useDraftState<'comment' | 'change' | null>('selection:kind', null)
@@ -102,11 +105,14 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
    * it are not new selections, so they neither map again nor notify again.
    */
   const applied = useRef<Range | null>(null)
-  /** Whether a pointer button or Shift is extending the selection; a partial one waits for release. */
+  /**
+   * Whether a pointer button or Shift is extending the selection; a partial one waits for release.
+   * A press whose release never arrives, as when a context menu takes it, ends with that menu or
+   * with the next pointer event that reports no button held.
+   */
   const held = useRef({ pointer: false, shift: false, awaiting: false })
   /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
   const reread = useRef(false)
-  const checkSelection = useRef<() => void>(() => {})
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelSelectionCheck = (): void => {
     if (selectionTimer.current !== null) clearTimeout(selectionTimer.current)
@@ -130,8 +136,8 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     if (mapped.status === 'inactive') return null
     if (mapped.status === 'outdated') return undefined
     selectedRange.current = range.cloneRange()
-    return { excluded: mapped.excluded, active: { source: mapped.revision, ranges: mapped.segments,
-      fragments: mapped.fragments, rect: rectOf(range) } }
+    return { excluded: mapped.excluded, parts: mapped.fragments, active: { source: mapped.revision,
+      ranges: mapped.segments, fragments: mapped.fragments.map((part) => part.range), rect: rectOf(range) } }
   }
   /** Whether the document selection is still the one this toolbar set. */
   const echoesTrim = (): boolean => {
@@ -143,17 +149,17 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   /**
    * Narrows a partial selection to what will be marked and explains the trim once. The first
    * markable fragment becomes the document selection, which holds one range, and later fragments
-   * are dropped, so both actions act on exactly what is visibly selected. Returns the toolbar's
-   * state, or null when nothing can be marked.
+   * are dropped with their segments, so both actions act on exactly what is visibly selected.
+   * Returns the toolbar's state, or null when nothing can be marked.
    */
-  const trim = ({ active: next, excluded }: Reading): Active | null => {
+  const trim = ({ active: next, parts, excluded }: Reading): Active | null => {
     if (!excluded.length) return next
-    const fragment = next.fragments[0]
-    const remapped = fragment && next.fragments.length > 1 && containerRef.current
-      ? mapSelection(fragment, source, analysis, containerRef.current) : null
-    const ranges = remapped ? remapped.status === 'covered' ? remapped.segments : [] : next.ranges
-    announce(SELECTION_TRIM_NOTICE, exclusionNotice(t, excluded, !ranges.length ? 'none' : remapped ? 'first' : 'trimmed'))
-    if (!fragment || !ranges.length) return null
+    const [first] = parts
+    const ranges = first?.segments ?? []
+    const outcome = !first ? 'none' : parts.length > 1 ? 'first' : 'trimmed'
+    announce(SELECTION_TRIM_NOTICE, exclusionNotice(translate.current, excluded, outcome))
+    if (!first) return null
+    const fragment = first.range
     const sel = window.getSelection()
     sel?.removeAllRanges()
     sel?.addRange(fragment.cloneRange())
@@ -186,46 +192,46 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       if (composingRef.current) return
       selectionTimer.current = setTimeout(check, 120)
     }
-    checkSelection.current = onSelectionChange
-    document.addEventListener('selectionchange', onSelectionChange)
-    // A shown toolbar's selection can survive a source change without a new event; re-read it.
-    if (activeRef.current) { reread.current = true; onSelectionChange() }
-    return () => {
-      document.removeEventListener('selectionchange', onSelectionChange)
-      cancelSelectionCheck()
-    }
-  }, [containerRef, source, analysis])
-
-  useEffect(() => {
+    // Releasing the pointer or Shift checks a partial selection that waited for it.
     const state = held.current
     const settle = (): void => {
       if (state.pointer || state.shift || !state.awaiting) return
       state.awaiting = false
-      checkSelection.current()
+      onSelectionChange()
     }
     const press = (event: PointerEvent): void => { if (event.button === 0) state.pointer = true }
     const lift = (): void => { state.pointer = false; settle() }
+    const move = (event: PointerEvent): void => { if (state.pointer && event.buttons === 0) lift() }
     const key = (event: KeyboardEvent): void => {
       if (event.key !== 'Shift') return
       state.shift = event.type === 'keydown'
       settle()
     }
     const blur = (): void => { state.pointer = false; state.shift = false; settle() }
+    document.addEventListener('selectionchange', onSelectionChange)
     document.addEventListener('pointerdown', press, true)
     window.addEventListener('pointerup', lift, true)
     window.addEventListener('pointercancel', lift, true)
+    window.addEventListener('pointermove', move, true)
+    window.addEventListener('contextmenu', lift, true)
     window.addEventListener('keydown', key, true)
     window.addEventListener('keyup', key, true)
     window.addEventListener('blur', blur)
+    // A shown toolbar's selection can survive a source change without a new event; re-read it.
+    if (activeRef.current) { reread.current = true; onSelectionChange() }
     return () => {
+      document.removeEventListener('selectionchange', onSelectionChange)
       document.removeEventListener('pointerdown', press, true)
       window.removeEventListener('pointerup', lift, true)
       window.removeEventListener('pointercancel', lift, true)
+      window.removeEventListener('pointermove', move, true)
+      window.removeEventListener('contextmenu', lift, true)
       window.removeEventListener('keydown', key, true)
       window.removeEventListener('keyup', key, true)
       window.removeEventListener('blur', blur)
+      cancelSelectionCheck()
     }
-  }, [])
+  }, [containerRef, source, analysis])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -270,7 +276,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     () => { requestAnimationFrame(() => toolbarRef.current?.querySelector('textarea')?.focus()) },
     dismiss)
 
-  const exitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? EXIT_MS_FALLBACK, [])
+  const exitMs = useMemo(() => rootMs('--dur-fast', EXIT_MS_FALLBACK), [])
   // Preserve the last position while the toolbar exits.
   const present = usePresence(!!active, exitMs)
   useLayoutEffect(() => {

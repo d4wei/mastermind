@@ -1,9 +1,8 @@
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useT } from '../i18n'
-import { cssMs } from '../util/css-tokens'
 import { prefersReducedMotion } from '../util/presence'
-import { Collapsible } from './Collapsible'
+import { Collapsible, revealMs } from './Collapsible'
 import { DisclosureToggle } from './DisclosureToggle'
 import { SETTLES_TO, settledMarginBox } from './settling'
 
@@ -29,13 +28,20 @@ function drawClamp(element: HTMLElement, clamp: Clamp): () => void {
   return () => { element.style.setProperty('--quote-lines', lines); element.classList.toggle('expanded', expanded) }
 }
 
+/** Whether the passage's text runs past the clamp drawn on it. */
+function overflowsClamp(element: HTMLElement): boolean {
+  return element.scrollHeight > element.clientHeight + 1
+}
+
 /**
  * Eases the passage's height between clamps. Line clamping cannot transition, so a new clamp is
  * measured once, in place before paint, and the element's `max-height` animates from the height
  * on screen to the measured one. A growing clamp is drawn at once and revealed; a shrinking one
  * keeps the previous clamp drawn while it closes and takes over when the animation ends, so the
- * ellipsis appears only at the final height, and marks the passage as settling to it. Also reports whether the passage overflows `target`,
- * measured unanimated. Reduced motion, a new text, or a missing token change the clamp at once.
+ * ellipsis appears only at the final height, and marks the passage as settling to it. Also reports
+ * whether the passage overflows `target`, measured unanimated: with each new clamp, whenever the
+ * passage resizes outside an animation, and once an animation ends. Reduced motion, a new text, or
+ * a missing token change the clamp at once.
  */
 function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, target: Clamp, measure: boolean) {
   const [drawn, setDrawn] = useState(target)
@@ -60,27 +66,28 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
     element.removeAttribute(SETTLES_TO)
     const restore = drawClamp(element, next)
     const to = element.getBoundingClientRect().height
-    if (measure && !expanded) setOverflows(element.scrollHeight > element.clientHeight + 1)
+    if (measure && !expanded) setOverflows(overflowsClamp(element))
     restore()
-    const root = getComputedStyle(document.documentElement)
-    const duration = cssMs(root, '--dur-base') ?? 0
+    const duration = revealMs()
     if (textChanged || from === to || duration <= 0 || prefersReducedMotion() || !element.animate) {
       setDrawn(next)
       return
     }
     if (to > from) setDrawn(next)
     else element.setAttribute(SETTLES_TO, String(settledMarginBox(element, to)))
-    const easing = root.getPropertyValue('--ease-standard').trim() || 'ease'
+    const easing = getComputedStyle(document.documentElement).getPropertyValue('--ease-standard').trim() || 'ease'
     const running = element.animate([{ maxHeight: `${from}px` }, { maxHeight: `${to}px` }], { duration, easing, fill: 'forwards' })
     animation.current = running
     // The final clamp is committed before the held max-height is released, so no frame shows the
     // previous clamp unheld. A cancelled animation rejects; whatever cancelled it draws the next clamp.
+    // Resizes during the animation went unmeasured, so overflow is measured again at its end.
     running.finished.then(() => {
       if (animation.current !== running) return
       animation.current = null
       element.removeAttribute(SETTLES_TO)
       flushSync(() => setDrawn(next))
       running.cancel()
+      if (measure && !expanded) setOverflows(overflowsClamp(element))
     }, () => {})
   }, [ref, text, lines, expanded, measure])
   useLayoutEffect(() => () => animation.current?.cancel(), [])
@@ -89,7 +96,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
   useLayoutEffect(() => {
     const element = ref.current
     if (!element || !measure || drawn.expanded) return
-    const check = (): void => { if (!animation.current) setOverflows(element.scrollHeight > element.clientHeight + 1) }
+    const check = (): void => { if (!animation.current) setOverflows(overflowsClamp(element)) }
     check()
     if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(check)
@@ -110,9 +117,10 @@ export function QuotedPassage({ text, lines, expandable, as: Tag = 'div', 'aria-
   const t = useT()
   const id = useId()
   const ref = useRef<HTMLElement>(null)
-  const [state, setState] = useState({ text, lines, expanded: false })
-  if (state.text !== text || state.lines !== lines) setState({ text, lines, expanded: false })
-  const expanded = expandable && state.expanded && state.text === text && state.lines === lines
+  // A new clamp or passage starts collapsed; React discards the render that resets it.
+  const [expansion, setExpansion] = useState({ text, lines, expanded: false })
+  if (expansion.text !== text || expansion.lines !== lines) setExpansion({ text, lines, expanded: false })
+  const expanded = expandable && expansion.expanded
   const { drawn, overflows } = useClampTransition(ref, text, { lines, expanded }, expandable)
   return <>
     <Tag ref={ref as never} id={id} className={`rail-card-anchor${drawn.expanded ? ' expanded' : ''}`} title={text}
@@ -120,7 +128,7 @@ export function QuotedPassage({ text, lines, expandable, as: Tag = 'div', 'aria-
     <Collapsible open={expandable && (overflows || expanded)} className="rail-quote-reveal">
       <div className="rail-actions rail-footer rail-quote-footer">
         <DisclosureToggle kind="expand" expanded={expanded} controls={id}
-          onToggle={() => setState((current) => ({ ...current, expanded: !expanded }))}>
+          onToggle={() => setExpansion({ text, lines, expanded: !expanded })}>
           {t(expanded ? 'quoteShowLess' : 'quoteShowMore')}
         </DisclosureToggle>
       </div>

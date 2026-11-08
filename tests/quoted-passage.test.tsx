@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QuotedPassage } from '../ui/review/QuotedPassage'
+import { createReactHost, removeReactHost } from './helpers/dom'
 
 vi.mock('../ui/i18n', () => ({ useT: () => (key: string) => key }))
 
@@ -16,13 +17,10 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
   Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => size.scroll })
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => size.client })
-  host = document.createElement('div')
-  document.body.append(host)
-  root = createRoot(host)
+  ;({ host, root } = createReactHost())
 })
 afterEach(() => {
-  act(() => root.unmount())
-  host.remove()
+  removeReactHost(root, host)
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
   Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
   vi.unstubAllGlobals()
@@ -138,6 +136,20 @@ describe('easing between clamps', () => {
     expect(quote().classList.contains('expanded')).toBe(false)
     expect(quote().hasAttribute('data-settles-to')).toBe(false)
     expect(closing.cancel).toHaveBeenCalled()
+  })
+
+  it('measures overflow again once an animation ends, after a resize it went unmeasured through', async () => {
+    size.scroll = 120; size.client = 30
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
+    act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
+    const offered = () => !!host.querySelector('.rail-quote-reveal:not([inert])')
+    expect(offered()).toBe(true)
+    // The card widens mid-ease, so the passage now fits its clamp.
+    size.client = 120
+    act(() => resize!())
+    expect(offered()).toBe(true)
+    await act(async () => animations.at(-1)!.finish())
+    expect(offered()).toBe(false)
   })
 
   it('changes the clamp at once under reduced motion', () => {

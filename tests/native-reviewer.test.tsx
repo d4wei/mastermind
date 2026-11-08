@@ -561,9 +561,9 @@ it('disables native Find at home and forwards its menu event when a document is 
 })
 
 it.each([
-  [false, '3 files from your last session could not be reopened:'],
-  [true, '上次打开的 3 个文件无法重新打开：'],
-] as const)('reports remembered files that could not be reopened once, as a transient notice (Chinese %s)', async (chinese, headline) => {
+  [false, '3 files from your last session could not be reopened:', 'Dismiss', 'Show notification'],
+  [true, '上次打开的 3 个文件无法重新打开：', '关闭提示', '查看通知'],
+] as const)('keeps remembered files that could not be reopened until dismissed, then recallable (Chinese %s)', async (chinese, headline, dismissLabel, recallLabel) => {
   mocks.chinese = chinese
   let failures = ['/a/lost.md', '/b/lost.md', '/c/gone.md']
   mocks.invoke.mockImplementation(async (command: string) => {
@@ -572,24 +572,25 @@ it.each([
     return other(command)
   })
   await mount()
-  const notice = host.querySelector('.notification-transient')!
-  expect(notice.getAttribute('role')).toBe('status')
-  expect(notice.querySelector('p')?.textContent).toBe(headline)
-  expect(Array.from(notice.querySelectorAll('li'), (item) => item.textContent)).toEqual(['a/lost.md', 'b/lost.md', 'gone.md'])
-  expect(notice.querySelector('[aria-label="Dismiss"], [aria-label="关闭"]')).toBeNull()
+  const notice = () => host.querySelector('.notification-persistent')
+  expect(notice()!.querySelector('p')?.textContent).toBe(headline)
+  expect(Array.from(notice()!.querySelectorAll('li'), (item) => item.textContent)).toEqual(['a/lost.md', 'b/lost.md', 'gone.md'])
   expect(mocks.invoke.mock.calls.filter(([command]) => command === 'dismiss_restore_failures')).toHaveLength(1)
   await poll()
-  expect(host.querySelectorAll('.notification-transient')).toHaveLength(1)
+  await act(async () => vi.advanceTimersByTimeAsync(60_000))
+  expect(host.querySelectorAll('.notification-persistent')).toHaveLength(1)
   expect(mocks.invoke.mock.calls.filter(([command]) => command === 'dismiss_restore_failures')).toHaveLength(1)
-  await act(async () => vi.advanceTimersByTimeAsync(10_000))
-  expect(host.querySelector('.notification-transient')).toBeNull()
+  act(() => notice()!.querySelector<HTMLButtonElement>(`[aria-label="${dismissLabel}"]`)!.click())
+  expect(notice()).toBeNull()
+  act(() => host.querySelector<HTMLButtonElement>(`.notification-recall [aria-label="${recallLabel}"]`)!.click())
+  expect(notice()!.querySelector('p')?.textContent).toBe(headline)
 })
 
 it('names a single remembered file that could not be reopened', async () => {
   mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
     ? { ...snapshot(1, 0), restore_failures: ['/notes/plan.md'] } : other(command))
   await mount()
-  const notice = host.querySelector('.notification-transient')!
+  const notice = host.querySelector('.notification-persistent')!
   expect(notice.querySelector('p')?.textContent).toBe('A file from your last session could not be reopened:')
   expect(notice.querySelector('li')?.textContent).toBe('plan.md')
 })

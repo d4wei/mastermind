@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { DropdownMenu } from 'radix-ui'
 import { deleteResolvedThreadEdits, parseResolvedThreads } from '../../document/review-archive'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import type { TextEdit } from '../../document/types'
 import { SlideOver } from '../app/SlideOver'
 import { useT } from '../i18n'
-import { AlertIcon, HistoryIcon, MoreIcon, TrashIcon } from '../icons'
+import { AlertIcon, HistoryIcon } from '../icons'
+import { DiscussionMenu } from './DiscussionMenu'
 import { RepliesDisclosure } from './RepliesDisclosure'
 import { ThreadMessage } from './ThreadMessage'
 import { QuotedPassage } from './QuotedPassage'
@@ -20,9 +20,20 @@ interface Props {
   onEdit?: (edits: TextEdit[]) => boolean
 }
 
+/**
+ * Keys each record by its quoted passage and discussion, which deleting another record leaves
+ * unchanged, so no card inherits a removed card's state; identical records add their offsets.
+ */
+function recordKeys(entries: readonly { context: string; thread: string; range: { start: number } }[]): string[] {
+  const identities = entries.map((entry) => `${entry.context}\u0000${entry.thread}`)
+  return identities.map((identity, index) => identities.indexOf(identity) === identities.lastIndexOf(identity)
+    ? identity : `${identity}\u0000${entries[index]!.range.start}`)
+}
+
 export function ResolvedThreads({ source, onClose, readOnly = false, onEdit }: Props) {
   const t = useT()
   const archive = parseResolvedThreads(source)
+  const keys = recordKeys(archive.entries)
   return (
     <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} ignoreSelector=".reader-menu" returnFocus=".topbar-overflow">
       <div className="resolved-threads">
@@ -31,7 +42,7 @@ export function ResolvedThreads({ source, onClose, readOnly = false, onEdit }: P
           <p className="resolved-empty-title">{t('resolvedEmpty')}</p>
           <p>{t('resolvedEmptyHint')}</p>
         </div>}
-        {archive.entries.map((entry) => <ResolvedDiscussion key={entry.range.start} context={entry.context} thread={entry.thread}
+        {archive.entries.map((entry, index) => <ResolvedDiscussion key={keys[index]} context={entry.context} thread={entry.thread}
           onDelete={onEdit && !readOnly ? () => {
             const edits = deleteResolvedThreadEdits(source, entry)
             if (edits.length) onEdit(edits)
@@ -58,17 +69,7 @@ function ResolvedDiscussion({ context, thread, onDelete }: { context: string; th
   const comments = useMemo(() => analyzeMarkdown(thread).items.flatMap((item) => item.type === 'thread' ? item.comments : []), [thread])
   const [first, ...replies] = comments
   const quote = context && <QuotedPassage as="blockquote" text={context} lines={6} expandable aria-label={t('resolvedContext')} />
-  const menu = <DropdownMenu.Root modal={false}>
-    <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
-      aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
-    <DropdownMenu.Portal>
-      <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
-        <DropdownMenu.Item className="reader-menu-item" disabled={!onDelete} onSelect={() => onDelete?.()}>
-          <TrashIcon />{t('deleteDiscussion')}
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu.Portal>
-  </DropdownMenu.Root>
+  const menu = <DiscussionMenu label={t('deleteDiscussion')} disabled={!onDelete} onSelect={() => onDelete?.()} />
   const message = (comment: typeof comments[number], index: number) =>
     <ThreadMessage key={index} reply={index > 0} body={comment.body} quote={index === 0 ? quote : undefined}
       author={<span className="rail-author">{comment.author ?? t('comment')}</span>} actions={index === 0 ? menu : undefined} />

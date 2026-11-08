@@ -53,7 +53,6 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       if (!first || !last || !container?.contains(first) || !container.contains(last)) { setSelection(null); return }
       const quote = selected.toString()
       if (!quote.trim()) { setSelection(null); return }
-      const rect = range.getBoundingClientRect()
       if (first !== last) {
         setSelection(null)
         spanning.current = true
@@ -61,6 +60,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
         if (!wasSpanning) announce(SELECTION_TRIM_NOTICE, translate.current('selectionTranslatedBlocks'))
         return
       }
+      const rect = range.getBoundingClientRect()
       setSelection({ artifact, blockId: first.dataset.transBlockId!, quote })
       setPlacement({ top: rect.top, left: rect.left })
       setError(false)

@@ -445,6 +445,41 @@ describe('the selection toolbar', () => {
     expect(notices()).toHaveLength(1)
   })
 
+  it('trims later selections after a press whose release a context menu took', async () => {
+    act(() => root.render(<Review source="Try `open` now." />))
+    // A Ctrl+click on macOS opens the context menu, which swallows the release.
+    act(() => {
+      document.dispatchEvent(new PointerEvent('pointerdown', { button: 0, ctrlKey: true }))
+      window.dispatchEvent(new MouseEvent('contextmenu', { button: 0, ctrlKey: true }))
+    })
+    selectRendered(host.querySelector('article')!, 'Try op')
+    await settle()
+    expect(window.getSelection()!.toString()).toBe('Try ')
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
+  })
+
+  it('ends a press whose release never arrived at the next pointer event with no button held', async () => {
+    act(() => root.render(<Review source="Try `open` now." />))
+    act(() => { document.dispatchEvent(new PointerEvent('pointerdown', { button: 0 })) })
+    selectRendered(host.querySelector('article')!, 'Try op')
+    await settle()
+    expect(host.querySelector('.sel-toolbar')).toBeNull()
+    act(() => { window.dispatchEvent(new PointerEvent('pointermove', { buttons: 0 })) })
+    await act(async () => vi.advanceTimersByTimeAsync(120))
+    expect(window.getSelection()!.toString()).toBe('Try ')
+    expect(buttons()).toEqual(['Suggest change', 'Comment'])
+  })
+
+  it('explains a trim in the interface language chosen after the toolbar mounted', async () => {
+    act(() => root.render(<Review source="Alpha {++beta++} gamma." />))
+    const previous = useConfig.getState()
+    act(() => useConfig.setState({ config: { ...previous.config!, uiLang: 'zh-CN' } }))
+    cleanups.push(() => useConfig.setState(previous))
+    selectRendered(host.querySelector('article')!, 'Alpha beta gamma')
+    await settle()
+    expect(notices()).toEqual(['已将选区缩小为第一处可标记的内容。已有修改建议或讨论的文本不能再次标记。'])
+  })
+
   it('explains the trim in Chinese without spacing between full-width sentences', async () => {
     const previous = useConfig.getState()
     useConfig.setState({ config: { ...previous.config!, uiLang: 'zh-CN' } })

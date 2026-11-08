@@ -15,8 +15,8 @@ the DOM was rendered from another revision; the caller keeps its state and maps 
 render that follows the source change. Neither is a mapping failure.
 
 **Covered** carries the source revision the offsets index, the selected quote, the mapped segments
-in source order, their rendered `fragments`, and the excluded segments in document order, each with
-a reason:
+in source order, their rendered `fragments` (each with the segments it covers), and the excluded
+segments in document order, each with a reason:
 
 | Reason | Selected text |
 | --- | --- |
@@ -92,11 +92,13 @@ A selection with segments offers Suggest change and Comment and nothing else. A 
 is trimmed first, so what looks selected is exactly what will be marked: `fragments` in the
 coverage are the rendered extents of the segments, joined wherever no excluded text separates them.
 The first fragment replaces the document selection, which holds one range in WebKit; when excluded
-text separates several, the later ones are dropped and the toolbar maps the first fragment again,
-so both actions act on exactly what is visibly selected. The selection change a trim causes is
+text separates several, the later ones are dropped with their segments, so both actions act on
+exactly what is visibly selected. The selection change a trim causes is
 recognized as its own echo, so it neither maps again nor notifies again. A trim waits while a
-pointer button or Shift is still extending the selection. Each trim raises one transient
-notification that says whether later parts were dropped and names the distinct exclusion reasons;
+pointer button or Shift is still extending the selection; a press whose release never arrives, as
+when a Ctrl+click opens the context menu, ends with that menu or with the next pointer event that
+holds no button. Each trim raises one transient
+notification, in the current interface language, that says whether later parts were dropped and names the distinct exclusion reasons;
 it replaces the previous selection notice rather than stacking. A selection with no segments shows
 no toolbar, only that notification. A comment composer for several segments, as a wrapper boundary
 inside one fragment yields, says the comment attaches to the first. A comment posts on Enter, with Shift+Enter for a new
@@ -121,7 +123,7 @@ and backward with text and element endpoints, asserts its segments and exclusion
 round-trips a comment, a deletion, and a substitution: rejection restores the original bytes and
 acceptance performs exactly the proposed change. It also covers inactivity, outdated renders, rapid
 reselection, and trimming: one range replacing the document selection, the first of several parts, one
-notification per trim, a trim deferred while dragging, and no actions for an unmarkable selection. `tests/selection-ranges.test.ts`,
+notification per trim, a trim deferred while dragging and resumed after a swallowed release, and no actions for an unmarkable selection. `tests/selection-ranges.test.ts`,
 `formatted-selection.test.tsx`, `inline-code-selection.test.tsx`, and `wrapped-selection.test.tsx`
 check marks, decoded text, wrappers, code, and container continuations in detail;
 `tests/selection-marks.test.ts` checks edit verification.

@@ -33,7 +33,7 @@ const shown = () => Array.from(host.querySelectorAll('.notification-stack .notif
 it('expires a transient notice on its own, without a close control', () => {
   act(() => root.render(<Notifications><Notice tier="transient">Translation unavailable</Notice></Notifications>))
   const notice = host.querySelector('.notification-transient')!
-  expect(notice.getAttribute('role')).toBe('status')
+  expect(notice.closest('[role="status"]')?.getAttribute('aria-live')).toBe('polite')
   expect(notice.querySelector('button, svg')).toBeNull()
   advance(NOTICE_DISMISS_FALLBACK_MS - 1)
   expect(shown()).toEqual(['Translation unavailable'])
@@ -73,6 +73,47 @@ it('plays the exit before removing a transient notice when motion is allowed', (
   expect(host.querySelector('.notification-transient.leaving')).not.toBeNull()
   advance(1000)
   expect(shown()).toEqual([])
+})
+
+it('lets a transient notice leave even when focus enters it during its exit', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  act(() => root.render(<Notifications><Notice tier="transient"><button type="button">Details</button></Notice></Notifications>))
+  advance(NOTICE_DISMISS_FALLBACK_MS)
+  const notice = host.querySelector<HTMLElement>('.notification-transient.leaving')!
+  act(() => {
+    notice.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+    notice.querySelector('button')!.focus()
+  })
+  advance(1000)
+  expect(shown()).toEqual([])
+})
+
+it('adds transient text inside a polite live region that exists before any notice', () => {
+  act(() => root.render(<Notifications>{null}</Notifications>))
+  const region = host.querySelector('.notification-stack [role="status"][aria-live="polite"]')!
+  expect(region.childElementCount).toBe(0)
+  act(() => announce('trim', 'Selection trimmed.'))
+  expect(host.querySelector('.notification-stack [aria-live="polite"]')).toBe(region)
+  expect(region.querySelector('.notification-transient')?.textContent).toBe('Selection trimmed.')
+  expect(region.querySelector('[role]')).toBeNull()
+})
+
+it('re-adds the text of a repeated announcement so the live region announces it again', () => {
+  act(() => root.render(<Notifications>{null}</Notifications>))
+  act(() => announce('trim', 'Selection trimmed.'))
+  const notice = host.querySelector('.notification-transient')!
+  const first = notice.querySelector('.notification-content')
+  act(() => announce('trim', 'Selection trimmed.'))
+  expect(host.querySelector('.notification-transient')).toBe(notice)
+  expect(notice.querySelector('.notification-content')).not.toBe(first)
+  expect(shown()).toEqual(['Selection trimmed.'])
+})
+
+it('keeps persistent notices outside the transient live region', () => {
+  act(() => root.render(<Notifications><Notice tier="persistent">Save failed</Notice></Notifications>))
+  const notice = host.querySelector('.notification-persistent')!
+  expect(notice.getAttribute('role')).toBe('alert')
+  expect(notice.parentElement?.classList.contains('notification-stack')).toBe(true)
 })
 
 it('never takes focus when a transient notice appears', () => {
