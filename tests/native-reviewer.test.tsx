@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { INVENTORY_POLL_MS, NativeReviewer } from '../ui/desktop/NativeReviewer'
 import { useOverlay } from '../ui/app/overlayStore'
+import { LOADING_DELAY_MS } from '../ui/app/LoadingState'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
@@ -210,6 +211,9 @@ it('keeps file admission usable while setup loading fails and supports explicit 
   await mount()
   expect(host.textContent).toContain('Preferences unreadable')
   expect(host.querySelector('.native-setup')).toBeNull()
+  // A failed load is not a wait: the centered note says so without a spinner.
+  expect(host.querySelector('.state-note')?.textContent).toBe('Could not load setup.')
+  expect(host.querySelector('.loading-spinner')).toBeNull()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/0')
   await act(async () => button('Open Markdown files…').click())
   expect(mocks.invoke).toHaveBeenCalledWith('choose_files')
@@ -217,6 +221,17 @@ it('keeps file admission usable while setup loading fails and supports explicit 
   await act(async () => button('Retry loading setup').click())
   expect(host.querySelector('.native-setup')).not.toBeNull()
   expect(host.textContent).not.toContain('Preferences unreadable')
+})
+
+it('shows the setup wait as a delayed loading state', async () => {
+  mocks.invoke.mockImplementation((command: string) =>
+    command === 'setup_snapshot' ? new Promise(() => {}) : Promise.resolve(command === 'snapshot' ? snapshot() : undefined))
+  await mount()
+  expect(host.querySelector('.state-note[role="status"]')).not.toBeNull()
+  expect(host.querySelector('.loading-spinner')).toBeNull()
+  await act(async () => vi.advanceTimersByTimeAsync(LOADING_DELAY_MS))
+  expect(host.querySelector('.loading-spinner')).not.toBeNull()
+  expect(host.querySelector('.state-note')?.textContent).toBe('Loading setup…')
 })
 
 it('does not repeat setup for saved completion or mutate saved choices on open', async () => {

@@ -12,6 +12,7 @@ import { useConfig } from '../ui/app/configStore'
 import { translationActive, useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
+vi.mock('../ui/modes/source/SourceEditor', () => ({ SourceEditor: () => <div data-testid="source-editor" /> }))
 vi.mock('../ui/translate/TranslatedView', () => ({ TranslatedView: ({ containerRef, artifact }: {
   containerRef: React.RefObject<HTMLElement | null>; artifact: PreparedTranslation
 }) => <article ref={containerRef}><div data-trans-block-id={artifact.blocks[0]!.id}>{artifact.blocks[0]!.text}</div></article> }))
@@ -72,10 +73,10 @@ it.each(['same source', 'new source'])('retains the captured passage and draft w
   expect(host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!.value).toBe('Keep my draft')
 })
 
-it('places a remounted composer beside its block rather than at the captured viewport position', () => {
+it('places a remounted composer beside its block rather than at the captured viewport position', async () => {
   const composer = () => host.querySelector<HTMLElement>('.sel-toolbar')!
   expect([composer().style.top, composer().style.left]).toEqual(['8px', '100px'])
-  act(() => useDoc.getState().setMode('source'))
+  await act(async () => useDoc.getState().setMode('source'))
   expect(host.querySelector('.sel-toolbar')).toBeNull()
   const rect = HTMLElement.prototype.getBoundingClientRect
   HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {

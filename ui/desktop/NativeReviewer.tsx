@@ -10,6 +10,7 @@ import { dispatchMenuAction, isMenuAction, type MenuState } from './menu'
 import { FolderIcon } from '../icons'
 import { FileTabs, type OpenDocument } from './FileTabs'
 import { ToolbarTarget } from '../app/ToolbarTarget'
+import { LoadingState, StateNote } from '../app/LoadingState'
 import { nativeBridge } from './bridge'
 import { createCloseHandler } from './close'
 import { confirmClose } from './confirm-close'
@@ -337,9 +338,8 @@ export function NativeReviewer() {
         }} onConfirmed={(confirmed) => {
         setSetup(confirmed)
         setSetupRequired(false)
-      }} /> : <div className="center-note" role="status">
-        {t('loadingSetup')}
-      </div>} /></ToolbarTarget.Provider>
+      }} /> : setupError ? <StateNote role="status">{t('setupUnavailable')}</StateNote>
+        : <LoadingState label={t('loadingSetup')} />} /></ToolbarTarget.Provider>
     {setupRequired === false && route.kind === 'home' && <div className="native-home">
       <pre className="native-wordmark" aria-label="mastermind" role="img"><span className="native-wordmark-row">{'█▀▄▀█ ▄▀█ █▀ ▀█▀ █▀▀ █▀█ █▀▄▀█ █ █▄░█ █▀▄'}</span>{'\n'}<span className="native-wordmark-row">{'█░▀░█ █▀█ ▄█ ░█░ ██▄ █▀▄ █░▀░█ █ █░▀█ █▄▀'}</span></pre>
     </div>}

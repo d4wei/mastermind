@@ -38,6 +38,7 @@ vi.mock('../ui/modes/reading/SelectionToolbar', () => ({ SelectionToolbar: (prop
   return null
 } }))
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
+vi.mock('../ui/modes/source/SourceEditor', () => ({ SourceEditor: () => <div data-testid="source-editor" /> }))
 const nav = vi.hoisted(() => ({ props: null as null | import('../ui/app/Navigator').NavigatorProps }))
 vi.mock('../ui/app/Navigator', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../ui/app/Navigator')>()
@@ -211,7 +212,7 @@ it('fades the wide rail out in place before the document recenters, and shows it
   expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
 })
 
-it.each(['reduced motion', 'Markdown mode'])('removes the wide rail at once for %s', (cause) => {
+it.each(['reduced motion', 'Markdown mode'])('removes the wide rail at once for %s', async (cause) => {
   if (cause === 'reduced motion') {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduced-motion'),
       addEventListener() {}, removeEventListener() {} }))
@@ -219,7 +220,8 @@ it.each(['reduced motion', 'Markdown mode'])('removes the wide rail at once for 
   render('Text {>>@Alex: note<<}')
   expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
   if (cause === 'reduced motion') act(() => host.querySelector<HTMLButtonElement>('.topbar-comments')!.click())
-  else act(() => useDoc.getState().setMode('source'))
+  // The reading view stays until the Markdown editor's chunk loads; the rail leaves with it.
+  else await act(async () => useDoc.getState().setMode('source'))
   expect(host.querySelector('[data-testid="rail"]')).toBeNull()
   expect(host.querySelector('.doc-shell')?.classList.contains('with-rail')).toBe(false)
 })

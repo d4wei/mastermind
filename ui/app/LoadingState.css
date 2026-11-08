@@ -1,0 +1,62 @@
+/* Transitional and empty states sit at the window's center, above whatever view they stand in for,
+   without blocking the controls around them. */
+.state-note {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--bar-clear) calc(var(--space-unit) * 4);
+  pointer-events: none;
+}
+
+.state-note-body {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-unit) * 2);
+  max-width: var(--content-max-width);
+  max-height: 100%;
+  overflow: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  pointer-events: auto;
+}
+
+.state-note-text {
+  flex-direction: column;
+  text-align: center;
+}
+.state-note-text h1 {
+  margin: 0;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--ls-heading);
+  color: var(--color-text);
+}
+.state-note-text p { margin: 0; }
+
+.state-note-enter {
+  animation: mm-fade-in var(--dur-base) var(--ease-standard);
+}
+
+/* An arc of accent ink on a faint ring; it stays visible when motion is reduced, only still. */
+.loading-spinner {
+  flex: none;
+  box-sizing: border-box;
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+  border: calc(var(--control-icon-size) / 7) solid var(--color-text-faint);
+  border-top-color: var(--color-accent-text);
+  border-radius: var(--radius-full);
+}
+.loading-spinner-turning {
+  animation: loading-spinner-turn calc(var(--dur-slow) * 3) linear infinite;
+}
+
+@keyframes loading-spinner-turn {
+  to { transform: rotate(1turn); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-note-enter,
+  .loading-spinner-turning { animation: none; }
+}

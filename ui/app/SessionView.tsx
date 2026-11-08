@@ -1,7 +1,8 @@
 import type { TextEdit } from '../../document/types'
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { DraftScope, useDraftPending, useDraftState, useDraftValue, useDrafts } from '../review/drafts'
-import { lazy, startTransition, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, startTransition, Suspense, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef,
+  useState } from 'react'
 import type { Root } from 'mdast'
 import { DocumentScroll } from './DocumentScroll'
 import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
@@ -37,6 +38,7 @@ import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 import { isImeKey } from '../util/composition'
 import { EXIT_MS_FALLBACK, prefersReducedMotion, usePresence } from '../util/presence'
 import { rootMs } from '../util/css-tokens'
+import { LoadingState, StateNote } from './LoadingState'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -157,7 +159,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const status = useDoc((s) => s.status)
   const error = useDoc((s) => s.error)
   const source = useDoc((s) => s.source)
-  const mode = useDoc((s) => s.mode)
+  const requestedMode = useDoc((s) => s.mode)
+  // The view follows a mode switch in the background, so the outgoing view stays in place until the
+  // incoming mode's chunk has loaded; the document column's one Suspense boundary holds it.
+  const mode = useDeferredValue(requestedMode)
   const externalVersion = useDoc((s) => s.externalVersion)
   const readOnly = useDoc(editingLocked)
   const load = useDoc((s) => s.load)
@@ -518,20 +523,22 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const geometry = reading.space ? readingSpace(reading.space, railPlaced) : null
   useReadingMovement(reading.element, geometry?.left, railPlaced)
   const commentsAvailable = mode === 'reading' && hasThreads && !showTranslated
-  useEffect(() => { publishCommentRail({ available: commentsAvailable, open: commentsAvailable && railOpen }) },
-    [commentsAvailable, railOpen])
+  // The native menu describes the requested mode at once, while the view may still be catching up.
+  const commentsPublished = commentsAvailable && requestedMode === 'reading'
+  useEffect(() => { publishCommentRail({ available: commentsPublished, open: commentsPublished && railOpen }) },
+    [commentsPublished, railOpen])
   useEffect(() => () => publishCommentRail({ available: false, open: false }), [])
 
   if (status === 'error') {
     return (
-      <div className="center-note">
+      <StateNote>
         <h1>{APP_NAME}</h1>
         <p>{error === '__session-not-found__' ? t('sessionNotFound') : error}</p>
-      </div>
+      </StateNote>
     )
   }
   if (status !== 'ready') {
-    return <div className="center-note loading-note">{t('loadingDocument')}</div>
+    return <LoadingState label={t('loadingDocument')} />
   }
 
 
@@ -589,27 +596,22 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           style={geometry ? { marginLeft: geometry.left, width: geometry.width + geometry.extent,
             gridTemplateColumns: `${geometry.width}px${railPlaced ? ` ${geometry.extent}px` : ''}` } : undefined}>
           <div className="doc-column">
-            {showTranslated && (
-              <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-                {translation.artifact && <TranslatedView source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
-              </Suspense>
-            )}
-            {mode === 'reading' && !showTranslated && analysis && (
-              <article className="md-root" ref={articleContainer} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
-                onPointerOver={(event) => {
-                  const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
-                  chooseHovered(target ? Number(target.dataset.spanIndex) : null)
-                }}
-                onPointerLeave={() => chooseHovered(null)}>
-                <MarkdownView analysis={analysis} ctx={renderCtx} />
-                {printFootnotes}
-              </article>
-            )}
-            {mode === 'source' && (
-              <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
-                <SourceEditor key={`s${externalVersion}`} onOutline={setSourceOutline} />
-              </Suspense>
-            )}
+            <Suspense fallback={<LoadingState label={t('loadingDocument')} />}>
+              {showTranslated && translation.artifact &&
+                <TranslatedView source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
+              {mode === 'reading' && !showTranslated && analysis && (
+                <article className="md-root" ref={articleContainer} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
+                  onPointerOver={(event) => {
+                    const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
+                    chooseHovered(target ? Number(target.dataset.spanIndex) : null)
+                  }}
+                  onPointerLeave={() => chooseHovered(null)}>
+                  <MarkdownView analysis={analysis} ctx={renderCtx} />
+                  {printFootnotes}
+                </article>
+              )}
+              {mode === 'source' && <SourceEditor key={`s${externalVersion}`} onOutline={setSourceOutline} />}
+            </Suspense>
           </div>
           {railPlaced && railMountable && commentRail}
         </div>
