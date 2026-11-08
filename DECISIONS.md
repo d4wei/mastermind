@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Every boxed surface over the document carries one of four elevation tiers
+
+**Ruled.** Shadows come only from `themes/common.css` tiers: `--shadow-card` for resting cards
+(comment cards, transient notices), `--shadow-raised` for the selected comment card,
+`--shadow-popover` for floating surfaces (menus, tooltips, Find, the selection toolbar, the file
+list, persistent notices), and `--shadow-panel` for slide-over panels. Controls carry no shadow,
+and a new surface picks the tier its placement matches rather than a shadow of its own.
+
+**Beat:** two tokens applied surface by surface, which left the menus and comment cards flat while
+their neighbors floated.
+
 ## 2026-11-07 — Comment cards ease by section, never by card height
 
 **Ruled.** A comment card's height changes by easing each revealed or hidden section's grid row

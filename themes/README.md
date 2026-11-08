@@ -59,7 +59,11 @@ inside that band.
 Ordinary hover and pressed surfaces mix neutral ink into the elevated background. Selected controls
 retain their selection treatment; disabled controls do not react. Hover never moves or resizes a
 control. Comment-card hover changes the neutral border without resembling the selected discussion.
-Complete shadow tokens supply panel and popover elevation.
+Complete shadow tokens supply four elevation tiers: resting cards (`--shadow-card`: comment cards,
+transient notices), the selected comment card (`--shadow-raised`), floating popovers
+(`--shadow-popover`: menus, tooltips, Find, the selection toolbar, the file list, persistent
+notices), and slide-over panels (`--shadow-panel`). A boxed surface over the document carries one
+of them; controls carry none.
 
 ## Typography and layout
 

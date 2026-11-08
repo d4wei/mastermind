@@ -33,6 +33,7 @@
   line-height: var(--lh-snug);
   overflow-wrap: anywhere;
   pointer-events: auto;
+  box-shadow: var(--shadow-card);
   animation: mm-notice-in var(--dur-base) var(--ease-out);
 }
 .notification-content {
@@ -50,7 +51,7 @@
 .notification-actions { display: flex; flex-wrap: wrap; gap: calc(var(--space-unit) * 2); }
 .notification-actions button { text-align: left; }
 
-/* Persistent notices need the reader: a warning symbol, elevation, and an explicit close. */
+/* Persistent notices need the reader: a warning symbol, popover elevation, and an explicit close. */
 .notification-persistent {
   padding: calc(var(--space-unit) * 3);
   box-shadow: var(--shadow-popover);

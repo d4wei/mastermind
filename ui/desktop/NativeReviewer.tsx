@@ -7,7 +7,7 @@ import { useT } from '../i18n'
 import { requestFind, useCommentRail } from '../app/overlayStore'
 import { useConfig } from '../app/configStore'
 import { dispatchMenuAction, isMenuAction, type MenuState } from './menu'
-import { FileIcon } from '../icons'
+import { FolderIcon } from '../icons'
 import { FileTabs, type OpenDocument } from './FileTabs'
 import { ToolbarTarget } from '../app/ToolbarTarget'
 import { nativeBridge } from './bridge'
@@ -276,7 +276,7 @@ export function NativeReviewer() {
   return <Notifications>
     <div className={`native-documents${navigator.platform.startsWith('Mac') ? ' native-titlebar-overlay' : ''}`} data-tauri-drag-region>
       <button type="button" className={`native-open${atHome ? ' native-open-home' : ' btn-icon'}`} onClick={chooseFiles}
-        aria-label={openLabel} title={openLabel}><FileIcon />
+        aria-label={openLabel} title={openLabel}><FolderIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
       <FileTabs files={files} activeId={id} language={language} needsAttention={documentState.needsAttention}

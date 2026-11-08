@@ -9,7 +9,6 @@ import {
   DotsHorizontalIcon,
   ChevronDownIcon as RChevronDownIcon,
   ChevronRightIcon as RChevronRightIcon,
-  FileIcon as RFileIcon,
   Cross2Icon,
   Pencil1Icon,
   EyeOpenIcon,
@@ -55,7 +54,6 @@ export const CheckIcon = radix(RCheckIcon, 14)
 export const MoreIcon = radix(DotsHorizontalIcon, 15)
 export const ChevronDownIcon = radix(RChevronDownIcon, 13)
 export const ChevronRightIcon = radix(RChevronRightIcon, 13)
-export const FileIcon = radix(RFileIcon, 14)
 
 /* ---- review/chrome verbs ---- */
 export const CrossIcon = radix(Cross2Icon, 14)
@@ -68,6 +66,16 @@ export const LanguageIcon = radix(RGlobeIcon, 14)
 export const TrashIcon = radix(RTrashIcon, 14)
 
 /* ---- hand-drawn glyphs Radix lacks ---- */
+
+/** A folder at Radix's 15-unit grid and hairline stroke, so it weighs like its neighbors. */
+export function FolderIcon(props: IconProps) {
+  return (
+    <svg {...base(props, 14)} viewBox="0 0 15 15" strokeWidth={1}>
+      <path d="M1.5 3.5h4.2l1.3 1.5h6.5v7h-12z" />
+      <path d="M1.5 6.5h12" />
+    </svg>
+  )
+}
 
 export function DiamondIcon(props: IconProps) {
   return (
