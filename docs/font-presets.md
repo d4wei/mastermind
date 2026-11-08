@@ -1,6 +1,6 @@
 ---
 status: living
-updated: 2026-10-29
+updated: 2026-11-07
 exit: A ruling picks the preset set; the registry, stacks, and settings ship it, and this design is deleted.
 ---
 
@@ -33,19 +33,50 @@ platform: `"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK 
 presets, and `"Songti SC", "Hiragino Mincho ProN", "SimSun", "Noto Serif CJK SC"` for serif presets,
 each followed by the generic family. The Interface language's own labels use the same stacks.
 
+## Selection rule
+
+Body faces are chosen for comfort over hours of on-screen reading, and that rule outranks taste:
+low to moderate stroke contrast, a generous x-height, open apertures, sturdy serifs that survive
+dark mode, and even paragraph colour at 16 to 18 pixels. Headings may carry more personality, but
+only where they help a reader find their place in a long document. Geometric and display faces
+are excluded as body text.
+
 ## Recommended set
 
-Four presets, each a deliberate pairing, built from faces already in `themes/fonts/`:
+Three presets, all open-licensed and bundleable. Two share the Adobe Source family, whose Source
+Han faces are the same designs as Noto CJK, so Latin, code, and Chinese come from one lineage.
 
-| Preset | Display | Body | Code | Character |
+| Preset | Headings | Body | Code | CJK stack leads with |
 | --- | --- | --- | --- | --- |
-| Schibsted (default) | Schibsted Grotesk 800 | Schibsted Grotesk | Geist Mono | The house grotesk; matches the base tokens. |
-| Editorial | Bricolage Grotesque 700 | Lora | JetBrains Mono | Expressive headings over a serif built for screens. |
-| Classic | Crimson Pro 600 | Crimson Pro | JetBrains Mono | A book serif throughout for long documents. |
-| Geist | Geist 700 | Geist | Geist Mono | One family across prose and code. |
+| Serif (default) | Source Serif 4, 650 | Source Serif 4 | Source Code Pro, 500 | Songti SC, then Noto Serif SC |
+| Sans | Source Sans 3, 700 | Source Sans 3 | Source Code Pro, 500 | PingFang SC, then Noto Sans SC |
+| Hyperlegible | Atkinson Hyperlegible Next, 700 | Atkinson Hyperlegible Next | Atkinson Hyperlegible Mono | PingFang SC, then Noto Sans SC |
 
-Dropped: Manrope and Outfit (geometric faces that tire as body text), Inter as a body-only face,
-Spline Sans Mono and Ubuntu Sans Mono (no preset pairs with them). Their font files leave with them.
+- **Serif** uses one face throughout. Sans headings were tried and set aside: over a day of
+  reading, the unsurprising single family distracts least from the content. Source Serif 4's
+  optical-size axis sharpens the headings and keeps text sizes sturdy.
+- **Sans** serves readers who prefer sans text, with the same code face and proportions.
+- **Hyperlegible** distinguishes every confusable letter and figure, for tired eyes, low vision,
+  or small text. It is the deliberate offset from the maintainer's own serif preference.
+- **Code at 500** matches Source Code Pro's colour to the body; at 400 inline spans look pale.
+
+The serif body has two runners-up to settle by side-by-side reading before the ruling:
+Charis SIL, the open-licence derivative of Bitstream Charter, which is plainer and sturdier; and
+Literata, the e-book face, with a larger x-height and livelier italic.
+
+Considered and set aside:
+
+- Fraunces and Bricolage Grotesque: strong heading faces, but their character competes with long
+  text; neither helps comfort.
+- Geist and Geist Mono: tidy interface type, but grotesque enough to tire over long text.
+- Fira Code: heavy beside text, and its ligatures disguise the source characters a reviewer
+  needs to see.
+- Recursive: its continuous axis between proportional and monospace suits the Markdown source
+  mode more than reading; recorded as an idea, not part of this set.
+- Charter and Iowan Old Style: benchmarks only; Apple's copies cannot be bundled.
+
+Every face not named in the set leaves the registry, along with its bundled file. The new variable
+files change the bundle size; record measured sizes when they land.
 
 ## Settings and preferences
 
@@ -56,8 +87,9 @@ names its code face. A saved `monoFont` is ignored and dropped on the next prefe
 
 ## Open points for the ruling
 
-- Whether four is the right count, and whether Classic and Editorial both earn a place.
-- Whether to add one bundled CJK face later for a consistent cross-platform rendering, accepting
-  the size.
-- Whether a preset may override the heading tracking per face, as the current registry allows, or
-  tracking becomes a body-derived constant.
+- Serif body: Source Serif 4, Charis SIL, or Literata.
+- Whether two presets are enough, dropping Hyperlegible.
+- Whether to bundle Noto Serif SC and Noto Sans SC for identical Chinese rendering on every
+  platform, accepting their size, or keep system stacks.
+- Whether a dark theme lowers body weight slightly to offset light text on a dark ground looking
+  heavier; the variable faces allow it.
