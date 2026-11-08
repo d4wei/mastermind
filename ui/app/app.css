@@ -934,22 +934,6 @@ mark.critic-hl.critic-anchor:hover,
   background: var(--review-comment-active-bg);
 }
 
-/* ---------- centered status notes ---------- */
-
-.center-note {
-  max-width: var(--content-max-width);
-  margin: 20vh auto 0;
-  padding: 0 calc(var(--space-unit) * 4);
-  text-align: center;
-  color: var(--color-text-muted);
-}
-
-.center-note h1 {
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--ls-heading);
-  color: var(--color-text);
-}
-
 /* ---------- shared slide-over ---------- */
 
 .slide-over {
@@ -1223,11 +1207,7 @@ input[type='checkbox'] {
   }
 }
 
-/* ---------- loading note and comment marker icon ---------- */
-
-.loading-note {
-  color: var(--color-text-muted);
-}
+/* ---------- comment marker icon ---------- */
 
 .critic-comment-marker svg {
   display: inline-block;
@@ -1329,8 +1309,6 @@ input[type='checkbox'] {
   .rail-card,
   .collapsible.rail-quote-reveal,
   .rail-disclosure svg,
-  .outline-tick,
-  .outline-list-tick,
   .seg-btn,
   .btn-primary,
   .sel-toolbar > button {
@@ -1353,21 +1331,45 @@ input[type='checkbox'] {
 
 /* ---------- compact document outline ---------- */
 .compact-outline {
+  --outline-top: calc(var(--bar-clear) + var(--space-unit) * 8);
   position: fixed;
-  top: calc(var(--bar-clear) + var(--space-unit) * 8);
+  top: var(--outline-top);
   left: var(--bar-gap);
   z-index: var(--z-nav);
 }
+/* Ticks keep one row pitch at every heading count; past the window's bottom clearance the
+   window clips them and Navigator shifts the track to keep the active tick in view. */
 .outline-progress {
+  --outline-row: calc(var(--space-unit) * 2);
   width: calc(var(--space-unit) * 9);
-  height: min(calc(var(--heading-count) * var(--space-unit) * 2 + var(--space-unit) * 4), 55vh);
-  display: grid;
-  grid-template-rows: repeat(var(--heading-count), minmax(0, 1fr));
-  align-items: center;
+  height: min(calc(var(--heading-count) * var(--outline-row) + var(--space-unit) * 4),
+    calc(100vh - var(--outline-top) - var(--bar-gap)));
+  display: flex;
+  flex-direction: column;
   padding: calc(var(--space-unit) * 2);
   border: none;
   background: var(--color-bg);
   border-radius: var(--radius-md);
+}
+.outline-window {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.outline-track {
+  --outline-shift: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transform: translateY(calc(var(--outline-shift) * var(--outline-row) * -1));
+}
+/* Navigator marks the track only after a heading set's first placement has painted. */
+.outline-track[data-easing] {
+  transition: transform var(--dur-slow) var(--ease-standard);
+}
+.outline-tick {
+  margin-block: calc((var(--outline-row) - var(--space-unit) * .5) / 2);
 }
 .outline-tick,
 .outline-list-tick {
@@ -1383,6 +1385,14 @@ input[type='checkbox'] {
 .nav-outline button[aria-current] .outline-list-tick {
   width: calc(var(--space-unit) * 5);
   background: var(--color-accent-text);
+}
+/* Follows the outline rules so it overrides their equally specific transitions. */
+@media (prefers-reduced-motion: reduce) {
+  .outline-tick,
+  .outline-list-tick,
+  .outline-track[data-easing] {
+    transition: none;
+  }
 }
 .outline-popover {
   position: absolute;
@@ -1514,15 +1524,6 @@ input[type='checkbox'] {
     font-family: var(--font-mono);
     color: var(--color-text-muted);
   }
-}
-
-.center-note code {
-  font-family: var(--font-mono);
-  font-size: 0.875em;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xs);
-  padding: 0.08em 0.35em;
 }
 
 /* ---------- copy: sentence-case chrome ----------

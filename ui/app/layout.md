@@ -27,7 +27,14 @@ styles omit controls and their reserved space.
 
 `Navigator` shows a compact heading-tick strip when the document has at least two headings, with
 the current section highlighted. Inactive bars shorten at every heading depth; the active section
-always has the longest bar. Both outline surfaces use uniform thickness and square ends. The popup
+always has the longest bar. Both outline surfaces use uniform thickness and square ends. Ticks keep
+one row pitch at every heading count; the strip grows with the count until it reaches the bar gap
+above the window's bottom edge. Past that height it clips a window of ticks that the reader cannot
+scroll. The window holds still while the active tick stays a few rows inside its edges, and moves
+only far enough to keep it there, eased with the shared motion tokens and immediate under reduced
+motion. Each heading set's first placement, on opening or when the headings are replaced, appears in
+place; only later moves ease. Holding still rather than centering keeps the strip calm while reading within one region. A
+window resize re-measures the visible rows. The popup
 aligns bars in a fixed left column and indents only
 heading labels, so changing the active section does not shift the text. Hover, focus,
 or a click opens its scrollable heading list without moving the document. Escape, outside clicks,
@@ -95,6 +102,16 @@ content areas.
 Regression tests cover both interface languages, overflow access, narrow comments, outline
 expansion and progress, and scroll clearance. The manual checklist lives in
 `tests/manual/review-interactions.md`.
+
+Transitional and static states share `LoadingState.tsx`, centered in the window without blocking the
+controls around them. A wait (the document, the setup snapshot, a mode's chunk) shows a small ring
+and its label only after a short delay, so a fast load never flashes it; under reduced motion the
+ring stays still. Static notes, such as a closed document or setup that could not load, take the
+same position without the ring. Switching modes renders the incoming view in the background: the
+document column's one Suspense boundary keeps the outgoing view in place until the chunk loads, so
+the indicator appears only when a document opens in a mode whose chunk has not loaded, or while
+the translated view's chunk first loads. The mode button and native
+menu follow the requested mode at once.
 
 ## Reading and review presentation
 
