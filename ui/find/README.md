@@ -36,7 +36,10 @@ original editor selection, mapping it through intervening edits before restoring
 Typing starts at the first result at or after the current position, wrapping if needed. Enter and
 Shift-Enter navigate; Command-G / Ctrl-G and their Shift variants do the same. Empty queries neither
 highlight nor scroll. Escape closes Find unless an unrelated text input or active IME composition
-owns it. Search never writes a file, submits a draft, or moves focus into a reply field; revealing
+owns it. A pointer press anywhere outside the panel also closes it, including a press on a match in
+the document; it returns focus as the close control does and leaves the press's own selection or
+action intact. Presses on the toolbar Find button, inside portaled menu or popover content, or
+while the close dialog or an inert root is up leave it open. Search never writes a file, submits a draft, or moves focus into a reply field; revealing
 a comment selects its discussion, whose reply field then shows unfocused.
 
 A result inside a collapsed reply opens its thread. If Find opened the comments panel, closing Find
@@ -45,7 +48,8 @@ keeps its controls below Find and does not take input focus when opened by searc
 reveals results clear of the floating panel. Content updates recompute ranges without stealing
 focus. Closing Find removes highlights; source history remains intact.
 
-The tests in `tests/find-feedback.test.tsx`, `tests/find-reading.test.ts`, and
-`tests/source-editor.test.tsx` cover matching, displayed scopes, keyboard and composition guards,
+The tests in `tests/find-feedback.test.tsx`, `tests/find-outside-click.test.tsx`,
+`tests/find-reading.test.ts`, and `tests/source-editor.test.tsx` cover matching, displayed scopes,
+outside-press dismissal, keyboard and composition guards,
 range cleanup, source virtualization, selection restoration, and undo preservation. Native checks
 remain necessary for webview painting, scrolling, menu dispatch, and real input-method behavior.

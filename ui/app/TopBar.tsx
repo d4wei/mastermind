@@ -44,7 +44,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
   const controls = (
     <header className="topbar" ref={headerRef}>
       {mode === 'reading' && <LanguageMenu />}
-      <button type="button" className="btn-ghost btn-icon topbar-icon-btn topbar-find" onClick={requestFind}
+      <button type="button" className="btn-ghost btn-icon topbar-icon-btn topbar-find" data-find-trigger="" onClick={requestFind}
         aria-label={t('find')} title={`${t('find')} (${navigator.platform.startsWith('Mac') ? '⌘F' : 'Ctrl+F'})`}><SearchIcon /></button>
       {mode === 'reading' && commentsAvailable && (
         <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-comments${railOpen ? ' active' : ''}`}

@@ -18,6 +18,8 @@ const retained = documentMap<FindState>()
 const SHORT_QUERY_LENGTH = 2
 const SHORT_QUERY_SOURCE_LENGTH = 100_000
 const SHORT_QUERY_DELAY_MS = 150
+/** Presses that leave Find open: its trigger, and content Radix portals outside the document order. */
+const FIND_OUTSIDE_EXEMPT = '[data-find-trigger], [data-radix-popper-content-wrapper]'
 
 interface Result extends Match { range?: Range; comment?: number; anchor?: number }
 interface Props {
@@ -200,6 +202,21 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
     window.addEventListener('keydown', key, true)
     return () => window.removeEventListener('keydown', key, true)
   }, [open, openFind, close, step, ime])
+
+  // A press outside the bar closes it, a press on a Find match included. The capture phase sees a
+  // press the document stops; closing never prevents its default, so a selection it starts proceeds.
+  // The Find trigger refocuses the bar itself, and portaled menus and popovers own their presses.
+  useEffect(() => {
+    if (!open) return
+    const press = (event: PointerEvent) => {
+      if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
+      const target = event.target as Element | null
+      if (!target || panel.current?.contains(target) || target.closest(FIND_OUTSIDE_EXEMPT)) return
+      close()
+    }
+    window.addEventListener('pointerdown', press, true)
+    return () => window.removeEventListener('pointerdown', press, true)
+  }, [open, close])
 
   // Respond to overlay changes made after this panel mounted: a Find request opens or refocuses it,
   // and opening any other overlay closes it. Find's open state is retained per document, so the
