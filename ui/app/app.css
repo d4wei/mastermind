@@ -569,6 +569,23 @@ button:disabled {
   padding: 0.08em 0.35em;
 }
 
+/* Selection painting fills glyphs only, leaving inline code's padding as a gap in the selected band.
+   Code the band holds whole lays the selection fill over the padding the glyph fill leaves bare,
+   so the fill is never doubled. The document selection fills the full line height, leaving only
+   the side padding; a composer's target highlight fills the glyph boxes, leaving all of it. */
+.md-inline-code.in-selection {
+  background:
+    linear-gradient(var(--color-bg-elevated), var(--color-bg-elevated)) center / 100% 1000% no-repeat content-box padding-box,
+    linear-gradient(var(--color-selection), var(--color-selection)) padding-box,
+    var(--color-bg-elevated);
+}
+.md-inline-code.in-selection-target {
+  background:
+    linear-gradient(var(--color-bg-elevated), var(--color-bg-elevated)) content-box,
+    linear-gradient(var(--color-selection), var(--color-selection)) padding-box,
+    var(--color-bg-elevated);
+}
+
 /* Code inside emphasized text keeps that emphasis rather than the code weight. */
 .md-root :is(h1, h2, h3, h4, h5, h6, strong, th) .md-inline-code {
   font-weight: inherit;

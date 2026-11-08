@@ -12,7 +12,7 @@ import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
 import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
 import { rootMs } from '../../util/css-tokens'
-import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
+import { mapSelection, wholeInlineCode, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict, type VerifyScope } from './marks'
 import { analyzeMarkdown } from '../../../document/markdown/analyze'
@@ -21,6 +21,11 @@ import { analyzeMarkdown } from '../../../document/markdown/analyze'
 const FALLBACK_SIZE = { width: 260, height: 44 }
 /** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
 export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
+/**
+ * Mark inline code the selected band holds whole, in the document selection or in a composer's
+ * target highlight; each paints its glyphs differently, so each has its own fill in `app.css`.
+ */
+export const SELECTED_CODE_CLASS = { selection: 'in-selection', target: 'in-selection-target' } as const
 /** One notice explains the latest trimmed selection; a later trim replaces it. */
 export const SELECTION_TRIM_NOTICE = 'selection-trim'
 
@@ -307,6 +312,36 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
     // A new capture replaces `fragments`; scrolling only moves `rect`, which needs no repaint.
   }, [composing, active?.fragments])
+  // Selection painting fills glyphs only, so inline code's padding would break the selected band;
+  // code the band holds whole is marked to fill its padding. The band is the composer's target
+  // while one is open, and otherwise the live document selection, followed on every change.
+  useLayoutEffect(() => {
+    const root = containerRef.current
+    if (!root) return
+    const target = composing && active
+    const className = target ? SELECTED_CODE_CLASS.target : SELECTED_CODE_CLASS.selection
+    let marked = new Set<HTMLElement>()
+    const mark = (ranges: readonly Range[]): void => {
+      const next = wholeInlineCode(ranges, root)
+      for (const code of marked) if (!next.has(code)) code.classList.remove(className)
+      for (const code of next) code.classList.add(className)
+      marked = next
+    }
+    if (target) {
+      mark(target.fragments.filter((range) => range.commonAncestorContainer.isConnected))
+      return () => mark([])
+    }
+    const follow = (): void => {
+      const sel = window.getSelection()
+      mark(sel && sel.rangeCount ? [sel.getRangeAt(0)] : [])
+    }
+    follow()
+    document.addEventListener('selectionchange', follow)
+    return () => {
+      document.removeEventListener('selectionchange', follow)
+      mark([])
+    }
+  }, [containerRef, composing, active?.fragments])
   // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
   const findOpen = useOverlay((s) => s.open === 'find')
   const [, relayout] = useReducer((n: number) => n + 1, 0)

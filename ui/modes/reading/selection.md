@@ -118,8 +118,16 @@ messages.
 
 Focus entering a composer stops the browser painting the document selection, so while a composer
 is open its fragments carry the `selection-target` CSS Custom Highlight in the selection color;
-closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM
-untouched and is skipped where the Highlight API is absent.
+closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM's
+text and structure untouched and is skipped where the Highlight API is absent.
+
+Both the browser selection and the highlight fill glyphs only, so inline code's padding would
+break the selected band. `wholeInlineCode` finds the code a range holds from its first character
+to its last, and the toolbar marks it with a class whose fill covers the padding the glyph fill
+leaves bare: `in-selection` for the live document selection, followed on every selection change,
+and `in-selection-target` for a composer's target. Code only partly held stays unmarked, matching
+its `partial-code` exclusion; a settled, trimmed selection never holds any. Review marks keep their
+own fill under a selection: a settled selection never holds one, since each is excluded.
 
 ## Tests
 
@@ -133,3 +141,5 @@ notification per trim, a trim deferred while dragging and resumed after a swallo
 check marks, decoded text, wrappers, code, and container continuations in detail;
 `tests/selection-marks.test.ts` checks edit verification in both scopes, and
 `tests/composer-verdict-scope.test.tsx` checks that composers submit only past the full check.
+`tests/selection-band.test.tsx` checks which inline code the selected band marks and that marks
+follow the selection and the composer.

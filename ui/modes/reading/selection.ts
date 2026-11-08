@@ -437,3 +437,29 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
   for (const fragment of fragments) fragment.segments.sort((a, b) => a.from - b.from)
   return { status: 'covered', revision: source, quote, segments, excluded, fragments }
 }
+
+/**
+ * The inline code under `root` that one of `ranges` holds whole. Selection painting fills only
+ * glyph boxes, so such code is drawn selected across its own box; code a range only partly holds
+ * is left to the glyph fill, matching its `partial-code` exclusion.
+ */
+export function wholeInlineCode(ranges: readonly Range[], root: Node): Set<HTMLElement> {
+  const held = new Set<HTMLElement>()
+  for (const range of ranges) {
+    if (range.collapsed) continue
+    const common = range.commonAncestorContainer
+    const scope = common instanceof Element ? common : common.parentElement
+    if (!scope) continue
+    const candidates = [scope.closest<HTMLElement>('[data-atom="code"]'), ...scope.querySelectorAll<HTMLElement>('[data-atom="code"]')]
+    for (const code of candidates) {
+      if (!code || !root.contains(code)) continue
+      // Text points, not element boundaries, so a range from the code's first character counts.
+      const walker = code.ownerDocument.createTreeWalker(code, NodeFilter.SHOW_TEXT)
+      const first = walker.nextNode() as Text | null
+      let last = first
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) last = node as Text
+      if (first && last && range.comparePoint(first, 0) === 0 && range.comparePoint(last, last.length) === 0) held.add(code)
+    }
+  }
+  return held
+}
