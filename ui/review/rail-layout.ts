@@ -28,3 +28,14 @@ export function placeCommentCards(cards: readonly RailMeasurement[], selected: n
   }
   return tops
 }
+
+/**
+ * Each card's top by key, from a placement of `keys` in order. Returns `previous` when nothing
+ * moved, so an unchanged placement re-renders nothing; a card keeps its top across re-placements
+ * by its identity, never by its index among cards that came or went.
+ */
+export function placedTops(keys: readonly string[], tops: readonly number[], previous: ReadonlyMap<string, number>):
+  ReadonlyMap<string, number> {
+  const unchanged = previous.size === keys.length && keys.every((key, i) => previous.get(key) === tops[i])
+  return unchanged ? previous : new Map(keys.map((key, i) => [key, tops[i]!]))
+}

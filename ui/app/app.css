@@ -309,6 +309,8 @@ button:disabled {
 .rail-card.active, .rail-card.paired {
   border-color: var(--review-comment-anchor);
 }
+/* A card waits unseen for its first placement rather than showing at the rail's top. */
+.rail-card.unplaced { visibility: hidden; }
 
 .rail-orphan { padding-inline: calc(var(--space-unit) * 3); }
 .rail-orphan textarea { width: 100%; color: var(--color-text); background: var(--color-bg-elevated); }
@@ -351,8 +353,14 @@ button:disabled {
   overflow: hidden;
 }
 .rail-card-anchor.expanded { display: block; -webkit-line-clamp: none; line-clamp: none; }
-/* The passage's disclosure row sits as close to the quote as the reply count sits to the comment. */
-.rail-card-anchor + .rail-quote-footer { margin-top: calc(var(--space-unit) * -1); }
+/* The passage's disclosure row sits as close to the quote as the reply count sits to the comment.
+   The pull-up is the collapsible's own margin, which collapses with the quote's and eases in with
+   the row, so the closed row leaves the quote's spacing untouched. */
+.rail-quote-reveal .rail-quote-footer { margin-top: 0; }
+.collapsible.rail-quote-reveal {
+  transition: grid-template-rows var(--dur-base) var(--ease-standard), margin-top var(--dur-base) var(--ease-standard);
+}
+.collapsible.rail-quote-reveal.open { margin-top: calc(var(--space-unit) * -1); }
 .rail-comment-reply {
   margin-top: calc(var(--space-unit) * 3);
   padding-top: calc(var(--space-unit) * 2);
@@ -399,6 +407,9 @@ button:disabled {
 .rail-disclosure-expand svg { transform: rotate(90deg); }
 .rail-disclosure-expand[aria-expanded='true'] svg { transform: rotate(-90deg); }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
+/* Inside its collapsible the alert's bottom margin no longer collapses with the action row's top
+   margin, so it keeps only the part that exceeded it. */
+.rail-reply p[role='alert'] { margin-bottom: max(0px, calc(1em - var(--space-unit) * 2)); }
 /* Resizing stops at two full lines, so the placeholder and caret stay readable. */
 .rail-reply textarea {
   display: block;
@@ -1315,6 +1326,7 @@ input[type='checkbox'] {
     animation: none;
   }
   .rail-card,
+  .collapsible.rail-quote-reveal,
   .rail-disclosure svg,
   .outline-tick,
   .outline-list-tick,
@@ -1551,6 +1563,7 @@ input[type='checkbox'] {
   width: 100%;
   margin-bottom: calc(var(--space-unit) * 2);
 }
+.comments-panel .rail-card.unplaced { visibility: visible; }
 
 
 .topbar-language {

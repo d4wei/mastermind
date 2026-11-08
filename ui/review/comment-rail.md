@@ -32,6 +32,19 @@ scrolling; narrow panels scroll their own content. The rail fades in without ani
 provisional positions; hiding wide comments fades it out in place, inert, before the document
 recenters. Narrow panels use the same fade-in. Motion honors reduced-motion preferences.
 
+Sections that appear inside a card, live or resolved, ease open and closed through `Collapsible`:
+the reply composer and its alert, the replies, and the passage's Show more row. Its grid row moves
+between `0fr` and `1fr`, so the card's height follows its content and is never set. Closing content
+stays mounted, inert and hidden from assistive technology, until the collapse ends; reopening it
+mid-collapse keeps the same field and focuses it. A moving section clips with `overflow: clip`,
+because focusing a field inside an `overflow: hidden` clip scrolls the clip and throws its content
+toward the top; clipping ends with the row's transition. The quoted passage eases between clamps
+by animating `max-height` from the height on screen to the next clamp's measured height, and a
+shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
+re-places cards synchronously from its size observer, so neighbors follow an easing card in the
+same frame, and a card not yet placed stays unseen rather than at the rail's top. Placement changes
+that selection itself causes, such as a selected card reclaiming space above it, remain immediate.
+
 The card remains an accessibility group, not a button containing other buttons. Its opening
 message has a native button that opens the discussion and reply composer; Resolve, More, and the
 reply count remain separate keyboard controls. The card has no collapse control: Escape and clicks elsewhere

@@ -1,0 +1,18 @@
+/* Collapsible: the row eases between 0fr and 1fr; the content clips only while it moves. */
+.collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-base) var(--ease-standard);
+}
+.collapsible.open { grid-template-rows: 1fr; }
+.collapsible-content {
+  min-height: 0;
+  overflow: hidden;
+  /* Clip, unlike hidden, is no scroll container, so focusing a field inside cannot scroll it. */
+  overflow: clip;
+}
+.collapsible.settled > .collapsible-content { overflow: visible; }
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible { transition: none; }
+}

@@ -1,12 +1,13 @@
 import { useId, type ReactNode } from 'react'
 import { useT } from '../i18n'
+import { Collapsible } from './Collapsible'
 import { DisclosureToggle } from './DisclosureToggle'
 
 interface Props {
   count: number
   expanded: boolean
   onToggle: () => void
-  /** The replies, rendered only while expanded. */
+  /** The replies, mounted while expanded and while they collapse. */
   children: ReactNode
 }
 
@@ -20,6 +21,6 @@ export function RepliesDisclosure({ count, expanded, onToggle, children }: Props
         {t(count === 1 ? 'countReply' : 'countReplies').replace('{count}', String(count))}
       </DisclosureToggle>
     </div>
-    {expanded && <div id={id}>{children}</div>}
+    <Collapsible open={expanded} id={id}>{children}</Collapsible>
   </>
 }

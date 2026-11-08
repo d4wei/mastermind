@@ -3,17 +3,19 @@ import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
+import { flushSync } from 'react-dom'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
 import { ThreadMessage } from './ThreadMessage'
 import { QuotedPassage } from './QuotedPassage'
+import { Collapsible } from './Collapsible'
 import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
-import { placeCommentCards } from './rail-layout'
+import { placeCommentCards, placedTops } from './rail-layout'
 import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { Analysis } from '../../document/markdown/analyze'
@@ -51,13 +53,15 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const ime = useCompositionGuard()
   const railRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
-  const [positions, setPositions] = useState<number[]>([])
+  const [positions, setPositions] = useState<ReadonlyMap<string, number>>(() => new Map())
   const [railHeight, setRailHeight] = useState(0)
   // The card whose reply composer was explicitly requested and takes focus; the selected card shows
   // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
+  /** A requested composer that could not take focus yet, because it was still collapsing. */
+  const pendingFocus = useRef<string | null>(null)
   const selectedKey = useRef<string | null>(null)
   // Each draft follows its discussion's identity and position, never its ordinal among duplicates.
   const placedDrafts = useMemo(() => {
@@ -95,18 +99,21 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       const measurements = cards.map((card) => ({
         anchorTop: Math.max(0, (doc.querySelector(`[data-span-index="${card.spanIndex}"]`)
           ?.getBoundingClientRect().top ?? railTop) - railTop),
-        height: cardRefs.current.get(card.key)?.offsetHeight ?? 0,
+        height: cardRefs.current.get(card.key)?.getBoundingClientRect().height ?? 0,
       }))
       const next = placeCommentCards(measurements, cards.findIndex((card) => card.spanIndex === activeSpan), CARD_GAP)
-      setPositions((current) => current.length === next.length && current.every((top, i) => top === next[i]) ? current : next)
+      setPositions((current) => placedTops(cards.map((card) => card.key), next, current))
       setRailHeight(Math.max(doc.scrollHeight, ...next.map((top, i) => top + measurements[i]!.height)))
     }
+    // Observers report sizes after layout and before paint; placing synchronously there keeps
+    // neighbors in step with a card that is easing open, frame by frame.
+    const remeasure = () => flushSync(measure)
     measure()
-    const observer = new ResizeObserver(measure)
+    const observer = new ResizeObserver(remeasure)
     observer.observe(doc)
     cardRefs.current.forEach((element) => observer.observe(element))
-    window.addEventListener('resize', measure)
-    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+    window.addEventListener('resize', remeasure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', remeasure) }
   }, [cards, activeSpan, replyFor, docRef])
 
   useEffect(() => {
@@ -134,9 +141,19 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const focusReply = useCallback((key: string) => {
     if (readOnly) return
     setReplyFor(key)
-    // An already-open composer does not remount, so autofocus cannot handle repeat clicks.
-    cardRefs.current.get(key)?.querySelector('textarea')?.focus({ preventScroll: true })
+    // An already-open composer does not remount, so autofocus cannot handle repeat clicks; one that
+    // is still collapsing stays inert until this request reopens it, so it takes focus after commit.
+    const input = cardRefs.current.get(key)?.querySelector('textarea')
+    input?.focus({ preventScroll: true })
+    pendingFocus.current = input && document.activeElement !== input ? key : null
   }, [readOnly])
+  useLayoutEffect(() => {
+    const key = pendingFocus.current
+    if (key === null) return
+    pendingFocus.current = null
+    const input = cardRefs.current.get(key)?.querySelector('textarea')
+    if (input && !input.closest('[inert]')) input.focus({ preventScroll: true })
+  })
   useEffect(() => {
     if (!replyRequest) return
     const card = cards.find((item) => item.spanIndex === replyRequest.spanIndex)
@@ -213,7 +230,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   return <div ref={railRef} className={`rail${leaving ? ' leaving' : ''}`} inert={tableExpanded || leaving}
     aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
-    {cards.map((card, index) => {
+    {cards.map((card) => {
       const selected = activeSpan === card.spanIndex
       const replies = card.thread.comments.length - 1
       // A message reads author, then (opening message only) the quoted passage, then the comment, as
@@ -247,8 +264,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           </>} />
       return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
         ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
-        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}`}
-        style={{ top: positions[index] ?? 0 }}
+        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}${positions.has(card.key) ? '' : ' unplaced'}`}
+        style={{ top: positions.get(card.key) }}
         onPointerEnter={() => onHover?.(card.spanIndex)} onPointerLeave={() => onHover?.(null)}
         onFocus={() => onHover?.(card.spanIndex)}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onHover?.(null) }}
@@ -267,7 +284,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           onToggle={() => selected ? collapse(true) : activate(card.spanIndex)}>
           {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
         </RepliesDisclosure>}
-        {composes(card) && <div className="rail-reply">
+        <Collapsible open={composes(card)}><div className="rail-reply">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
           <textarea autoFocus={replyFor === card.key} readOnly={readOnly} rows={2} {...ime.inputProps}
             value={draftText(card)} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
@@ -278,18 +295,19 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
               if (event.key === 'Enter' && !event.shiftKey && !event.altKey) { event.preventDefault(); submitReply(card) }
               if (event.key === 'Escape') { event.stopPropagation(); collapse() }
             }} />
-          {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&
-            <p role="alert">{t('commentBodyInvalid')}</p>}
+          {/* A collapsing composer is not the open one, so the open composer's verdict is not its own. */}
+          <Collapsible open={composes(card) && !readOnly && !!composerText.trim() && !composerVerified &&
+            !commentBodyFits(authorTag, composerText)}><p role="alert">{t('commentBodyInvalid')}</p></Collapsible>
           <div className="rail-actions">
             {/* Cancel discards the draft; Escape and clicking away keep it for the next selection. */}
             <button type="button" className="btn-ghost btn-compact" onClick={() => {
               removeDraft(placedDrafts.byCard.get(card.key)?.id)
               collapse()
             }}>{t('cancel')}</button>
-            <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
+            <button type="button" className="btn-primary btn-compact" disabled={!composes(card) || !composerVerified}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
-        </div>}
+        </div></Collapsible>
       </div>
     })}
     {orphaned.length > 0 && <div className="rail-orphan" style={{ paddingTop: cards.length ? railHeight : undefined }}>
