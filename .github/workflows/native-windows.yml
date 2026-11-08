@@ -45,6 +45,8 @@ jobs:
         run: |
           npm ci --ignore-scripts
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npx --no-install patch-package
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node --import tsx tools/desktop/build-reviewer.mts
           exit $LASTEXITCODE
       - name: Build Windows release and installer

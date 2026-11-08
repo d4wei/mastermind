@@ -33,5 +33,6 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
+      - run: npx --no-install patch-package
       - run: npm run typecheck
       - run: npm test

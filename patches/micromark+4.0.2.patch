@@ -1,0 +1,70 @@
+diff --git a/node_modules/micromark/dev/lib/create-tokenizer.js b/node_modules/micromark/dev/lib/create-tokenizer.js
+index abd242f..39376b8 100644
+--- a/node_modules/micromark/dev/lib/create-tokenizer.js
++++ b/node_modules/micromark/dev/lib/create-tokenizer.js
+@@ -577,7 +577,7 @@ export function createTokenizer(parser, initialize, from) {
+       point = startPoint
+       context.previous = startPrevious
+       context.currentConstruct = startCurrentConstruct
+-      context.events.length = startEventsIndex
++      while (context.events.length > startEventsIndex) context.events.pop()
+       stack = startStack
+       accountForPotentialSkip()
+       debug('position: restore: `%j`', point)
+diff --git a/node_modules/micromark/dev/lib/initialize/document.js b/node_modules/micromark/dev/lib/initialize/document.js
+index bca159e..ba597c9 100644
+--- a/node_modules/micromark/dev/lib/initialize/document.js
++++ b/node_modules/micromark/dev/lib/initialize/document.js
+@@ -137,7 +137,7 @@ function initializeDocument(effects) {
+       )
+ 
+       // Discard the duplicate exits.
+-      self.events.length = index
++      while (self.events.length > index) self.events.pop()
+ 
+       return checkNewContainers(code)
+     }
+@@ -382,7 +382,7 @@ function initializeDocument(effects) {
+       )
+ 
+       // Discard the duplicate exits.
+-      self.events.length = index
++      while (self.events.length > index) self.events.pop()
+     }
+   }
+ 
+diff --git a/node_modules/micromark/lib/create-tokenizer.js b/node_modules/micromark/lib/create-tokenizer.js
+index 50aded8..1f1347e 100644
+--- a/node_modules/micromark/lib/create-tokenizer.js
++++ b/node_modules/micromark/lib/create-tokenizer.js
+@@ -489,7 +489,7 @@ export function createTokenizer(parser, initialize, from) {
+       point = startPoint;
+       context.previous = startPrevious;
+       context.currentConstruct = startCurrentConstruct;
+-      context.events.length = startEventsIndex;
++      while (context.events.length > startEventsIndex) context.events.pop();
+       stack = startStack;
+       accountForPotentialSkip();
+     }
+diff --git a/node_modules/micromark/lib/initialize/document.js b/node_modules/micromark/lib/initialize/document.js
+index 75e4749..bae1633 100644
+--- a/node_modules/micromark/lib/initialize/document.js
++++ b/node_modules/micromark/lib/initialize/document.js
+@@ -113,7 +113,7 @@ function initializeDocument(effects) {
+       splice(self.events, indexBeforeFlow + 1, 0, self.events.slice(indexBeforeExits));
+ 
+       // Discard the duplicate exits.
+-      self.events.length = index;
++      while (self.events.length > index) self.events.pop();
+       return checkNewContainers(code);
+     }
+     return start(code);
+@@ -320,7 +320,7 @@ function initializeDocument(effects) {
+       splice(self.events, indexBeforeFlow + 1, 0, self.events.slice(indexBeforeExits));
+ 
+       // Discard the duplicate exits.
+-      self.events.length = index;
++      while (self.events.length > index) self.events.pop();
+     }
+   }
+ 
