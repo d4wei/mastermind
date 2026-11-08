@@ -573,6 +573,9 @@ button:disabled {
    Code the band holds whole lays the selection fill over the padding the glyph fill leaves bare,
    so the fill is never doubled. The document selection fills the full line height, leaving only
    the side padding; a composer's target highlight fills the glyph boxes, leaving all of it. */
+/* The band is square, so a held chip drops its rounding: the corners outside its radius would
+   otherwise show the page through the band. */
+.md-inline-code:is(.in-selection, .in-selection-target) { border-radius: 0; }
 .md-inline-code.in-selection {
   background:
     linear-gradient(var(--color-bg-elevated), var(--color-bg-elevated)) center / 100% 1000% no-repeat content-box padding-box,
