@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Shadows mark overlays; comment cards carry none
+
+**Ruled.** A shadow belongs to a surface that can cover others: popovers (`--shadow-popover`,
+notices of either tier included) and slide-over panels (`--shadow-panel`). Comment cards sit in the
+document's margin beside the text, so they carry no shadow at rest or when selected; the accent
+border alone marks the selection. This narrows the same-day four-tier ruling below.
+
+**Beat:** a resting shadow on every card, always visible and so distracting, and a raised shadow on
+the selected card that fought its accent border.
+
 ## 2026-11-07 — Every boxed surface over the document carries one of four elevation tiers
 
 **Ruled.** Shadows come only from `themes/common.css` tiers: `--shadow-card` for resting cards

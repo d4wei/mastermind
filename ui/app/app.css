@@ -304,15 +304,12 @@ button:disabled {
   border-radius: var(--radius-lg);
   padding: calc(var(--space-unit) * 3);
   font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-card);
-  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+  transition: border-color var(--dur-fast) ease;
 }
 
 .rail-card.active, .rail-card.paired {
   border-color: var(--review-comment-anchor);
 }
-/* The selected discussion lifts above its neighbors. */
-.rail-card.active { box-shadow: var(--shadow-raised); }
 /* A card waits unseen for its first placement rather than showing at the rail's top. */
 .rail-card.unplaced { visibility: hidden; }
 

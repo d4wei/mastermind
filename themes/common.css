@@ -74,9 +74,7 @@
   --review-delete-bg: color-mix(in srgb, var(--review-delete-text) 10%, transparent);
   --review-delete-border: var(--review-delete-text);
   --find-match-text: #1a1a1a;
-  /* Elevation tiers: resting cards, a card lifted by selection, floating popovers, then panels. */
-  --shadow-card: 0 1px 3px var(--color-shadow);
-  --shadow-raised: 0 3px 10px var(--color-shadow);
+  /* Shadows mark overlays: surfaces that can cover others. Popovers and panels are the tiers. */
   --shadow-popover: 0 4px 16px var(--color-shadow);
   --shadow-panel: 0 8px 28px var(--color-shadow);
 }
