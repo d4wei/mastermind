@@ -23,8 +23,9 @@ function revealMs(): number {
  * A section of a card that eases open and closed. Its grid row moves between `0fr` and `1fr`, so the
  * section's height follows its content without being measured or set, and the card around it
  * follows the section. Content mounts when the section opens and stays, inert and hidden from
- * assistive technology, until the collapse finishes. Content opened with the component appears
- * without easing, and reduced motion makes every change immediate.
+ * assistive technology, until the collapse finishes, marked as settling to nothing (`settling.ts`).
+ * Content opened with the component appears without easing, and reduced motion makes every change
+ * immediate.
  */
 export function Collapsible({ open, id, className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
@@ -57,7 +58,7 @@ export function Collapsible({ open, id, className, children }: Props) {
   if (!open && !mounted) return null
   const state = shown === 'closed' ? '' : shown === 'opening' ? ' open' : ' open settled'
   return <div ref={ref} id={id} className={`collapsible${state}${className ? ` ${className}` : ''}`}
-    inert={!open} aria-hidden={!open || undefined}>
+    inert={!open} aria-hidden={!open || undefined} data-settles-to={open ? undefined : 0}>
     <div className="collapsible-content">{children}</div>
   </div>
 }

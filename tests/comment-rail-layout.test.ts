@@ -35,3 +35,21 @@ it('keys placed tops by card identity and keeps an unchanged placement', () => {
   expect(placedTops(['a', 'b'], [0, 108], placed)).toBe(placed)
   expect([...placedTops(['b'], [108], placed)]).toEqual([['b', 108]])
 })
+
+it('never pushes a card up for height it is collapsing, and lets the selection rise as it closes', () => {
+  // The upper card closes from 400 to 100; the lower one is now selected beside its anchor at 300.
+  const frames = [400, 250, 160, 100].map((height) => placeCommentCards([
+    { anchorTop: 100, height, settledHeight: 100 },
+    { anchorTop: 300, height: 60 },
+  ], 1, 8))
+  expect(frames.map((tops) => tops[0])).toEqual([100, 100, 100, 100])
+  expect(frames.map((tops) => tops[1])).toEqual([508, 358, 300, 300])
+  // Settled, it places exactly as without the collapse.
+  expect(frames.at(-1)).toEqual(placeCommentCards([{ anchorTop: 100, height: 100 }, { anchorTop: 300, height: 60 }], 1, 8))
+})
+
+it('still reclaims the room a collapsing card keeps, at once rather than past it and back', () => {
+  const tops = placeCommentCards([{ anchorTop: 100, height: 400, settledHeight: 200 }, { anchorTop: 250, height: 60 }], 1, 8)
+  expect(tops).toEqual([42, 450])
+  expect(placeCommentCards([{ anchorTop: 100, height: 200 }, { anchorTop: 250, height: 60 }], 1, 8)).toEqual([42, 250])
+})

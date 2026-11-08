@@ -5,6 +5,7 @@ import { cssMs } from '../util/css-tokens'
 import { prefersReducedMotion } from '../util/presence'
 import { Collapsible } from './Collapsible'
 import { DisclosureToggle } from './DisclosureToggle'
+import { SETTLES_TO, settledMarginBox } from './settling'
 
 interface Props {
   text: string
@@ -33,7 +34,7 @@ function drawClamp(element: HTMLElement, clamp: Clamp): () => void {
  * measured once, in place before paint, and the element's `max-height` animates from the height
  * on screen to the measured one. A growing clamp is drawn at once and revealed; a shrinking one
  * keeps the previous clamp drawn while it closes and takes over when the animation ends, so the
- * ellipsis appears only at the final height. Also reports whether the passage overflows `target`,
+ * ellipsis appears only at the final height, and marks the passage as settling to it. Also reports whether the passage overflows `target`,
  * measured unanimated. Reduced motion, a new text, or a missing token change the clamp at once.
  */
 function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, target: Clamp, measure: boolean) {
@@ -56,6 +57,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
     const from = element.getBoundingClientRect().height
     animation.current?.cancel()
     animation.current = null
+    element.removeAttribute(SETTLES_TO)
     const restore = drawClamp(element, next)
     const to = element.getBoundingClientRect().height
     if (measure && !expanded) setOverflows(element.scrollHeight > element.clientHeight + 1)
@@ -67,6 +69,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
       return
     }
     if (to > from) setDrawn(next)
+    else element.setAttribute(SETTLES_TO, String(settledMarginBox(element, to)))
     const easing = root.getPropertyValue('--ease-standard').trim() || 'ease'
     const running = element.animate([{ maxHeight: `${from}px` }, { maxHeight: `${to}px` }], { duration, easing, fill: 'forwards' })
     animation.current = running
@@ -75,6 +78,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
     running.finished.then(() => {
       if (animation.current !== running) return
       animation.current = null
+      element.removeAttribute(SETTLES_TO)
       flushSync(() => setDrawn(next))
       running.cancel()
     }, () => {})

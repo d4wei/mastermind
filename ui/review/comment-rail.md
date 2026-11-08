@@ -42,8 +42,11 @@ toward the top; clipping ends with the row's transition. The quoted passage ease
 by animating `max-height` from the height on screen to the next clamp's measured height, and a
 shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
 re-places cards synchronously from its size observer, so neighbors follow an easing card in the
-same frame, and a card not yet placed stays unseen rather than at the rail's top. Placement changes
-that selection itself causes, such as a selected card reclaiming space above it, remain immediate.
+same frame, and a card not yet placed stays unseen rather than at the rail's top. Shrinking sections
+mark the size they settle to (`settling.ts`), and earlier cards make room for a selection only by
+the heights they keep: a card collapsing above a new selection never rises for height it is losing,
+while the selection starts below its current bottom and rises as it closes. Placement changes that
+selection itself causes, such as a selected card reclaiming space above it, remain immediate.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
 message has a native button that opens the discussion and reply composer; Resolve, More, and the

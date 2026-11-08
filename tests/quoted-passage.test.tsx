@@ -119,6 +119,7 @@ describe('easing between clamps', () => {
     act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
     act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
     expect(quote().style.getPropertyValue('--quote-lines')).toBe('6')
+    expect(quote().hasAttribute('data-settles-to')).toBe(false)
     expect(animations.map((animation) => animation.keyframes)).toEqual([[{ maxHeight: '30px' }, { maxHeight: '90px' }]])
   })
 
@@ -132,8 +133,10 @@ describe('easing between clamps', () => {
     expect(closing.keyframes).toEqual([{ maxHeight: '120px' }, { maxHeight: '90px' }])
     expect(quote().classList.contains('expanded')).toBe(true)
     expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+    expect(quote().getAttribute('data-settles-to')).toBe('90')
     await act(async () => closing.finish())
     expect(quote().classList.contains('expanded')).toBe(false)
+    expect(quote().hasAttribute('data-settles-to')).toBe(false)
     expect(closing.cancel).toHaveBeenCalled()
   })
 

@@ -16,6 +16,7 @@ import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
 import { placeCommentCards, placedTops } from './rail-layout'
+import { settledHeight } from './settling'
 import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { Analysis } from '../../document/markdown/analyze'
@@ -96,11 +97,16 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     if (!doc || !rail) return
     const measure = () => {
       const railTop = rail.getBoundingClientRect().top
-      const measurements = cards.map((card) => ({
-        anchorTop: Math.max(0, (doc.querySelector(`[data-span-index="${card.spanIndex}"]`)
-          ?.getBoundingClientRect().top ?? railTop) - railTop),
-        height: cardRefs.current.get(card.key)?.getBoundingClientRect().height ?? 0,
-      }))
+      const measurements = cards.map((card) => {
+        const element = cardRefs.current.get(card.key)
+        const height = element?.getBoundingClientRect().height ?? 0
+        return {
+          anchorTop: Math.max(0, (doc.querySelector(`[data-span-index="${card.spanIndex}"]`)
+            ?.getBoundingClientRect().top ?? railTop) - railTop),
+          height,
+          settledHeight: element ? settledHeight(element, height) : height,
+        }
+      })
       const next = placeCommentCards(measurements, cards.findIndex((card) => card.spanIndex === activeSpan), CARD_GAP)
       setPositions((current) => placedTops(cards.map((card) => card.key), next, current))
       setRailHeight(Math.max(doc.scrollHeight, ...next.map((top, i) => top + measurements[i]!.height)))
