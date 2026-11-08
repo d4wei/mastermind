@@ -170,8 +170,8 @@ it('discloses replies through a count with a turning chevron and offers no separ
   const buttonLabels = () => Array.from(host.querySelectorAll('button'), (button) => button.textContent)
   expect(buttonLabels()).not.toContain('Reply')
   const [quiet, replied] = Array.from(host.querySelectorAll('.rail-card'))
-  expect(quiet!.querySelector('.rail-replies-toggle, .rail-footer')).toBeNull()
-  const toggle = replied!.querySelector<HTMLButtonElement>('.rail-replies-toggle')!
+  expect(quiet!.querySelector('.rail-disclosure, .rail-footer')).toBeNull()
+  const toggle = replied!.querySelector<HTMLButtonElement>('.rail-disclosure')!
   expect(toggle.textContent).toBe('1 reply')
   expect(toggle.firstElementChild?.tagName.toLowerCase()).toBe('svg')
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
@@ -234,6 +234,29 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   })))
   expect(store.getState().source).toBe(source + '{>>@reviewer: Answer 中文<<}')
   expect(edit).toHaveBeenCalledTimes(1)
+})
+
+it('offers the full-passage disclosure only on the selected card, styled as the reply count', () => {
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 100 })
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 20 })
+  try {
+    render('{==a long quoted passage==}{>>@Da Wei: question<<}{>>@Sam: answer<<}')
+    expect(host.querySelector('.rail-card-anchor')!.getAttribute('style')).toContain('--quote-lines: 2')
+    expect(host.querySelector('.rail-quote-footer')).toBeNull()
+    openCard()
+    expect(host.querySelector('.rail-card-anchor')!.getAttribute('style')).toContain('--quote-lines: 6')
+    const [passage, replies] = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-card .rail-disclosure'))
+    expect(passage!.closest('.rail-quote-footer')).not.toBeNull()
+    expect(passage!.className).toBe(replies!.className)
+    act(() => passage!.click())
+    expect(host.querySelector('.rail-card-anchor')!.classList.contains('expanded')).toBe(true)
+    collapse()
+    expect(host.querySelector('.rail-quote-footer')).toBeNull()
+    expect(host.querySelector('.rail-card-anchor')!.classList.contains('expanded')).toBe(false)
+  } finally {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
+    Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
+  }
 })
 
 it('posts a reply on Enter, adds a line on Shift+Enter, and leaves Enter to the IME while composing', () => {

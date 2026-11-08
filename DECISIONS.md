@@ -49,12 +49,12 @@ toolbar notes that repeat the same explanation in the composer.
 
 ## 2026-11-07 — A partial selection is trimmed to what will be marked
 
-**Ruled.** The app narrows the visible selection to its markable text, painting fragments when
-there are several, and explains the trim once in a transient notification; an unmarkable selection
-shows no toolbar.
+**Ruled.** The app narrows the document selection to its markable text, or to the first markable
+part when excluded text separates several, so the actions act on exactly what is visibly selected;
+it explains the trim once in a transient notification. An unmarkable selection shows no toolbar.
 
 **Beat:** keeping the reader's full selection with an inline note that only part of it can be
-marked.
+marked, and painting several parts while clearing the selection, which left nothing to copy.
 
 ## 2026-11-07 — Reviewers can delete a resolved discussion from the file
 

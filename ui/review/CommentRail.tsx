@@ -14,7 +14,6 @@ import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
 import { placeCommentCards } from './rail-layout'
-import { easeHeightChanges } from '../util/height-transition'
 import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { Analysis } from '../../document/markdown/analyze'
@@ -109,16 +108,6 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     window.addEventListener('resize', measure)
     return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
   }, [cards, activeSpan, replyFor, docRef])
-
-  // Cards ease their own height changes; the measurement above follows them frame by frame, so
-  // neighbors slide along. Each card element keeps one attachment for as long as it is mounted.
-  const easing = useRef(new Map<HTMLDivElement, () => void>())
-  useLayoutEffect(() => {
-    const live = new Set(cardRefs.current.values())
-    for (const [element, detach] of easing.current) if (!live.has(element)) { detach(); easing.current.delete(element) }
-    for (const element of live) if (!easing.current.has(element)) easing.current.set(element, easeHeightChanges(element))
-  })
-  useEffect(() => () => { easing.current.forEach((detach) => detach()); easing.current.clear() }, [])
 
   useEffect(() => {
     if (activeSpan === null) {
@@ -236,7 +225,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
             onClick={() => activate(card.spanIndex)}>
             <span className="rail-author">{comment.author ?? t('comment')}</span>
           </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-          quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} /> : undefined}
+          quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} expandable={selected} /> : undefined}
           actions={<>
             {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
               title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}

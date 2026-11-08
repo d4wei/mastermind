@@ -351,14 +351,8 @@ button:disabled {
   overflow: hidden;
 }
 .rail-card-anchor.expanded { display: block; -webkit-line-clamp: none; line-clamp: none; }
-.rail-card-anchor:has(+ .rail-quote-toggle) { margin-bottom: var(--space-unit); }
-/* The toggle's label lines up with the quoted text beside the rule; its hover surface overhangs. */
-.rail-quote-toggle {
-  display: block;
-  min-height: 0;
-  margin: 0 0 var(--space-unit) calc(2px + var(--space-unit) * 0.5);
-  padding: calc(var(--space-unit) * 0.5) calc(var(--space-unit) * 1.5);
-}
+/* The passage's disclosure row sits as close to the quote as the reply count sits to the comment. */
+.rail-card-anchor + .rail-quote-footer { margin-top: calc(var(--space-unit) * -1); }
 .rail-comment-reply {
   margin-top: calc(var(--space-unit) * 3);
   padding-top: calc(var(--space-unit) * 2);
@@ -393,14 +387,14 @@ button:disabled {
   min-height: calc(var(--space-unit) * 7);
 }
 .rail-footer { justify-content: flex-start; }
-/* Live and resolved discussions share this reply-count disclosure; its chevron turns while expanded. */
-.rail-replies-toggle {
+/* DisclosureToggle: the reply count and the quoted passage share it; its chevron turns while expanded. */
+.rail-disclosure {
   display: inline-flex;
   align-items: center;
   gap: var(--space-unit);
 }
-.rail-replies-toggle svg { transition: transform var(--dur-fast) var(--ease-standard); }
-.rail-replies-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
+.rail-disclosure svg { transition: transform var(--dur-fast) var(--ease-standard); }
+.rail-disclosure[aria-expanded='true'] svg { transform: rotate(90deg); }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
 /* Resizing stops at two full lines, so the placeholder and caret stay readable. */
 .rail-reply textarea {
@@ -469,8 +463,7 @@ button:disabled {
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
 .sel-composer textarea::placeholder { color: var(--color-invert-text-muted); }
-/* What will be marked keeps the document selection's color while a composer holds focus or a
-   trimmed selection's fragments stand in for it. */
+/* A composer's target keeps the document selection's color while focus is in the composer. */
 ::highlight(selection-target) { background-color: var(--color-selection); }
 
 .sel-composer textarea::selection {
@@ -1319,7 +1312,7 @@ input[type='checkbox'] {
     animation: none;
   }
   .rail-card,
-  .rail-replies-toggle svg,
+  .rail-disclosure svg,
   .outline-tick,
   .outline-list-tick,
   .seg-btn,

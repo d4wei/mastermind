@@ -18,7 +18,7 @@ import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from
 
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
-/** The CSS highlight that shows what will be marked; see `::highlight(selection-target)`. */
+/** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
 export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
 /** One notice explains the latest trimmed selection; a later trim replaces it. */
 export const SELECTION_TRIM_NOTICE = 'selection-trim'
@@ -40,11 +40,6 @@ interface Active {
   ranges: SelRange[]
   /** The rendered text `ranges` cover, in document order. */
   fragments: Range[]
-  /**
-   * The fragments are painted because the document selection, which holds one range, was cleared
-   * rather than show the excluded text between them.
-   */
-  painted: boolean
   rect: { top: number; left: number; width: number; bottom: number }
 }
 
@@ -67,12 +62,15 @@ function sentences(parts: readonly string[]): string {
 }
 
 /**
- * Why a selection was trimmed, or why none of it can be marked: one sentence per distinct reason,
- * in the order the selection meets them.
+ * Why a selection was trimmed, to its markable text or to the first of several markable parts, or
+ * why none of it can be marked: one sentence per distinct reason, in the order the selection meets
+ * them.
  */
-function exclusionNotice(t: (key: MsgKey) => string, excluded: readonly ExcludedSegment[], trimmed: boolean): string {
+function exclusionNotice(t: (key: MsgKey) => string, excluded: readonly ExcludedSegment[],
+  outcome: 'trimmed' | 'first' | 'none'): string {
   const reasons = [...new Set(excluded.map((segment) => segment.reason))].map((reason) => t(REASON_MESSAGES[reason]))
-  return sentences(trimmed ? [t('selectionTrimmed'), ...reasons] : reasons)
+  const lead = outcome === 'trimmed' ? [t('selectionTrimmed')] : outcome === 'first' ? [t('selectionTrimmedFirst')] : []
+  return sentences([...lead, ...reasons])
 }
 
 const rectOf = (range: Range): Active['rect'] => {
@@ -100,11 +98,10 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   activeRef.current = active
   const selectedRange = useRef<Range | null>(null)
   /**
-   * The document selection this toolbar last set while trimming: the markable range, or `cleared`
-   * when several fragments are painted instead. The selection changes that echo it are not new
-   * selections, so they neither map again nor notify again.
+   * The document selection this toolbar last set while trimming. The selection changes that echo
+   * it are not new selections, so they neither map again nor notify again.
    */
-  const applied = useRef<Range | 'cleared' | null>(null)
+  const applied = useRef<Range | null>(null)
   /** Whether a pointer button or Shift is extending the selection; a partial one waits for release. */
   const held = useRef({ pointer: false, shift: false, awaiting: false })
   /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
@@ -134,38 +131,35 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     if (mapped.status === 'outdated') return undefined
     selectedRange.current = range.cloneRange()
     return { excluded: mapped.excluded, active: { source: mapped.revision, ranges: mapped.segments,
-      fragments: mapped.fragments, painted: false, rect: rectOf(range) } }
+      fragments: mapped.fragments, rect: rectOf(range) } }
   }
   /** Whether the document selection is still the one this toolbar set. */
   const echoesTrim = (): boolean => {
     const own = applied.current
     const sel = window.getSelection()
     if (!own || !sel) return false
-    return own === 'cleared' ? sel.rangeCount === 0 : sel.rangeCount === 1 && sameRange(sel.getRangeAt(0), own)
+    return sel.rangeCount === 1 && sameRange(sel.getRangeAt(0), own)
   }
   /**
-   * Narrows a partial selection to what will be marked and explains the trim once. One markable
-   * range becomes the document selection; several are painted, since the selection holds one range.
-   * Returns the toolbar's state, or null when nothing can be marked.
+   * Narrows a partial selection to what will be marked and explains the trim once. The first
+   * markable fragment becomes the document selection, which holds one range, and later fragments
+   * are dropped, so both actions act on exactly what is visibly selected. Returns the toolbar's
+   * state, or null when nothing can be marked.
    */
   const trim = ({ active: next, excluded }: Reading): Active | null => {
     if (!excluded.length) return next
-    announce(SELECTION_TRIM_NOTICE, exclusionNotice(t, excluded, next.ranges.length > 0))
-    if (!next.ranges.length) return null
+    const fragment = next.fragments[0]
+    const remapped = fragment && next.fragments.length > 1 && containerRef.current
+      ? mapSelection(fragment, source, analysis, containerRef.current) : null
+    const ranges = remapped ? remapped.status === 'covered' ? remapped.segments : [] : next.ranges
+    announce(SELECTION_TRIM_NOTICE, exclusionNotice(t, excluded, !ranges.length ? 'none' : remapped ? 'first' : 'trimmed'))
+    if (!fragment || !ranges.length) return null
     const sel = window.getSelection()
-    const first = next.fragments[0]!
-    const last = next.fragments.at(-1)!
-    const painted = next.fragments.length > 1
     sel?.removeAllRanges()
-    if (painted) applied.current = 'cleared'
-    else {
-      sel?.addRange(first.cloneRange())
-      applied.current = first.cloneRange()
-    }
-    const covering = first.cloneRange()
-    covering.setEnd(last.endContainer, last.endOffset)
-    selectedRange.current = covering
-    return { ...next, painted, rect: rectOf(covering) }
+    sel?.addRange(fragment.cloneRange())
+    applied.current = fragment.cloneRange()
+    selectedRange.current = fragment.cloneRange()
+    return { ...next, ranges, fragments: [fragment], rect: rectOf(fragment) }
   }
 
   useEffect(() => {
@@ -173,11 +167,8 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       selectionTimer.current = null
       // Focus entering a composer may collapse the browser selection after this check was queued.
       if (composingRef.current) return
-      if (reread.current) {
-        reread.current = false
-        // Painted fragments have no selection to re-read; their source offsets are stale.
-        if (applied.current === 'cleared') { applied.current = null; setActive(null); return }
-      } else if (echoesTrim()) return
+      if (reread.current) reread.current = false
+      else if (echoesTrim()) return
       applied.current = null
       // An outdated read waits for the render that follows its source change, which reads again.
       const next = readSelection()
@@ -295,17 +286,17 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     observer?.observe(toolbar)
     return () => observer?.disconnect()
   }, [present.mounted, composing])
-  // Focus moving into a composer stops the browser painting the document selection, and a trimmed
-  // selection of several fragments has none; either way the fragments keep a selection-colored
-  // highlight until the toolbar closes. The reading DOM stays untouched.
+  // Focus moving into a composer stops the browser painting the document selection, so its
+  // fragments keep a selection-colored highlight until the composer closes; the reading DOM stays
+  // untouched.
   useLayoutEffect(() => {
-    if (!active || !(composing || active.painted)) return
+    if (!active || !composing) return
     const ranges = active.fragments.filter((range) => !range.collapsed && range.commonAncestorContainer.isConnected)
     if (!ranges.length) return
     paintHighlight(SELECTION_TARGET_HIGHLIGHT, ranges)
     return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
     // A new capture replaces `fragments`; scrolling only moves `rect`, which needs no repaint.
-  }, [composing, active?.fragments, active?.painted])
+  }, [composing, active?.fragments])
   // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
   const findOpen = useOverlay((s) => s.open === 'find')
   const [, relayout] = useReducer((n: number) => n + 1, 0)

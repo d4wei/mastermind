@@ -217,11 +217,12 @@ The existing Resolved shorthand can remain where space is limited.
 Use **discussion** instead of Original thread in the history panel; **quoted passage / 引用片段**
 instead of the vague Context label. Context can remain in the serialized record, whose exact
 meaning is defined in [the archive contract][archive].
-A quoted passage longer than its card shows offers **Show more / 展开**, and once open **Show less /
-收起**.
+A selected or resolved card whose quoted passage is longer than the card shows offers the
+**Full passage / 完整片段** disclosure, whose chevron turns as it opens, like a reply count's.
 
 A selection that only partly maps is trimmed to what can be marked, and a notification says
-**Selection trimmed. / 已缩小选区。** followed by the reasons.
+**Selection trimmed. / 已缩小选区。**, or **Selection trimmed to its first markable part. /
+已将选区缩小为第一处可标记的内容。** when later parts were dropped, followed by the reasons.
 
 Technical distinctions to keep:
 

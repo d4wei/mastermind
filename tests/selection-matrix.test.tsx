@@ -399,32 +399,25 @@ describe('the selection toolbar', () => {
     expect(note()).toBeUndefined()
   })
 
-  it('paints the markable fragments of a selection split by an existing mark and clears the document selection', async () => {
+  it('trims a selection split by an existing mark to its first markable part', async () => {
     const registry = stubHighlights()
+    const announced = countAnnouncements()
     await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
-    expect(window.getSelection()!.rangeCount).toBe(0)
-    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
+    expect(window.getSelection()!.toString()).toBe('Alpha ')
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
     expect(buttons()).toEqual(['Suggest change', 'Comment'])
-    expect(notices()).toEqual(['Selection trimmed. Text that already has a suggestion or discussion cannot be marked again.'])
-    // The cleared selection echoes back as a selection change; the toolbar and its fragments stay.
+    expect(notices()).toEqual(['Selection trimmed to its first markable part. ' +
+      'Text that already has a suggestion or discussion cannot be marked again.'])
     await settle()
-    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
+    expect(announced()).toBe(1)
     press('Suggest change')
-    expect(Array.from(host.querySelectorAll('textarea'), (field) => field.value)).toEqual(['Alpha ', ' gamma'])
-    expect(painted(registry)).toEqual(['Alpha ', ' gamma'])
-    act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
-  })
-
-  it('dismisses painted fragments when the reader selects elsewhere', async () => {
-    const registry = stubHighlights()
-    await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
-    const text = host.querySelector('article p')!.firstChild!.firstChild!
-    act(() => { window.getSelection()!.collapse(text, 1) })
-    await settle()
-    expect(host.querySelector('.sel-toolbar')).toBeNull()
-    await act(async () => vi.advanceTimersByTimeAsync(200))
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    expect(Array.from(host.querySelectorAll('textarea'), (field) => field.value)).toEqual(['Alpha '])
+    expect(painted(registry)).toEqual(['Alpha '])
+    press('Cancel')
+    press('Comment')
+    act(() => inputValue(host.querySelector('textarea')!, 'Why?'))
+    press('Comment')
+    expect(edit).toHaveBeenCalledWith([{ from: 0, to: 6, insert: '{==Alpha ==}{>>@Alex: Why?<<}' }])
   })
 
   it('replaces the trim notice on each new trim instead of stacking copies', async () => {
@@ -457,7 +450,7 @@ describe('the selection toolbar', () => {
     useConfig.setState({ config: { ...previous.config!, uiLang: 'zh-CN' } })
     cleanups.push(() => useConfig.setState(previous))
     await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
-    expect(notices()).toEqual(['已缩小选区。已有修改建议或讨论的文本不能再次标记。'])
+    expect(notices()).toEqual(['已将选区缩小为第一处可标记的内容。已有修改建议或讨论的文本不能再次标记。'])
   })
 
   it('says a comment attaches to the first part of a split selection', async () => {

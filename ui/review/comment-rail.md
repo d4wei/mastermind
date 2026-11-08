@@ -1,8 +1,8 @@
 # Comment rail interaction
 
 A card reads author, quoted passage, then the opening comment, followed by a reply count only when
-replies exist; `RepliesDisclosure` draws that count with the chevron it shares with resolved
-discussions, turned while the replies show. A card without replies has no footer and no Reply
+replies exist; `RepliesDisclosure` draws that count with the chevron toggle it shares with
+resolved discussions, turned while the replies show. A card without replies has no footer and no Reply
 button. Clicking its passage, opening message, or count expands the discussion and focuses the reply
 composer; the expanded count collapses it again and keeps focus. Enter and Space on the passage or
 the card's opening-message button do the same. Repeated activation refocuses an already-open
@@ -12,15 +12,11 @@ chronologically beneath the count. Neighboring opening messages remain fully rea
 interface typography independently of the reading font preset.
 
 `QuotedPassage` clamps the quoted passage to two lines on an unselected card and six on the
-selected card or a resolved one, ending in an ellipsis. Only a passage that overflows its clamp
-offers Show more, measured again whenever the card resizes; it reveals the passage whole inside the
-card, and a new clamp starts collapsed. The full passage stays in the title.
-
-Cards ease their height when their structure changes (the reply field, replies, the full passage,
-an alert, or the paused-editing notice) through `util/height-transition.ts`, attached once per card
-element. The rail's measurement observes the intermediate heights, so neighbors slide with the card
-frame by frame and the selected card stays on its passage; positions themselves do not animate.
-Reduced motion keeps changes immediate, and a text field resized by hand is not eased.
+selected card or a resolved one, ending in an ellipsis. An unselected card only clamps. On a
+selected or resolved card, a passage that overflows its clamp, measured again whenever the card
+resizes, offers the Full passage disclosure, which reveals it whole inside the card; a new clamp
+starts collapsed. The full passage stays in the title. That disclosure and the reply count share
+`DisclosureToggle`, so they look and behave alike.
 
 `rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
 space above crowded anchors; earlier cards stay within the document surface. When there is not

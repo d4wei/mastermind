@@ -29,47 +29,58 @@ afterEach(() => {
 })
 
 const quote = () => host.querySelector<HTMLElement>('.rail-card-anchor')!
-const toggle = () => host.querySelector<HTMLButtonElement>('.rail-quote-toggle')
+const toggle = () => host.querySelector<HTMLButtonElement>('.rail-quote-footer button')
 
 it('clamps to its line count, keeps the full text in the title, and offers no toggle when it fits', () => {
   size.scroll = 30; size.client = 30
-  act(() => root.render(<QuotedPassage text="A short passage" lines={2} />))
-  expect(quote().style.getPropertyValue('--quote-lines')).toBe('2')
+  act(() => root.render(<QuotedPassage text="A short passage" lines={6} expandable />))
+  expect(quote().style.getPropertyValue('--quote-lines')).toBe('6')
   expect(quote().title).toBe('A short passage')
   expect(quote().textContent).toBe('A short passage')
   expect(toggle()).toBeNull()
 })
 
-it('reveals an overflowing passage whole and clamps it again', () => {
+it('offers no toggle on an unselected card, however long its passage', () => {
   size.scroll = 120; size.client = 30
-  act(() => root.render(<QuotedPassage text="A long passage" lines={2} />))
-  expect(toggle()!.textContent).toBe('quoteShowMore')
+  act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
+  expect(quote().style.getPropertyValue('--quote-lines')).toBe('2')
+  expect(toggle()).toBeNull()
+})
+
+it('reveals an overflowing passage whole through the shared chevron disclosure, and clamps it again', () => {
+  size.scroll = 120; size.client = 30
+  act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
+  expect(toggle()!.className).toBe('rail-link rail-disclosure')
+  expect(toggle()!.textContent).toBe('quoteFull')
+  expect(toggle()!.querySelector('svg')).not.toBeNull()
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
+  expect(document.getElementById(toggle()!.getAttribute('aria-controls')!)).toBe(quote())
   act(() => toggle()!.click())
   expect(quote().classList.contains('expanded')).toBe(true)
-  expect(toggle()!.textContent).toBe('quoteShowLess')
   expect(toggle()!.getAttribute('aria-expanded')).toBe('true')
   act(() => toggle()!.click())
   expect(quote().classList.contains('expanded')).toBe(false)
-  expect(toggle()!.textContent).toBe('quoteShowMore')
+  expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
 })
 
-it('starts collapsed under a new clamp and rechecks overflow when resized', () => {
+it('collapses when its card is deselected and rechecks overflow when resized', () => {
   size.scroll = 120; size.client = 30
-  act(() => root.render(<QuotedPassage text="A long passage" lines={2} />))
+  act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
   act(() => toggle()!.click())
-  size.client = 120
-  act(() => root.render(<QuotedPassage text="A long passage" lines={6} />))
+  act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
   expect(quote().classList.contains('expanded')).toBe(false)
-  expect(quote().style.getPropertyValue('--quote-lines')).toBe('6')
+  expect(toggle()).toBeNull()
+  size.client = 120
+  act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
+  expect(quote().classList.contains('expanded')).toBe(false)
   expect(toggle()).toBeNull()
   size.client = 60
   act(() => resize!())
-  expect(toggle()!.textContent).toBe('quoteShowMore')
+  expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
 })
 
 it('quotes a resolved passage as a labeled blockquote', () => {
-  act(() => root.render(<QuotedPassage as="blockquote" text="Archived" lines={6} aria-label="Quoted passage" />))
+  act(() => root.render(<QuotedPassage as="blockquote" text="Archived" lines={6} expandable aria-label="Quoted passage" />))
   expect(quote().tagName).toBe('BLOCKQUOTE')
   expect(quote().getAttribute('aria-label')).toBe('Quoted passage')
 })

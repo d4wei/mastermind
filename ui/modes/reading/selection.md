@@ -91,15 +91,15 @@ outdated read.
 A selection with segments offers Suggest change and Comment and nothing else. A partial selection
 is trimmed first, so what looks selected is exactly what will be marked: `fragments` in the
 coverage are the rendered extents of the segments, joined wherever no excluded text separates them.
-One fragment replaces the document selection; several are painted with the `selection-target` CSS
-highlight and the document selection is cleared, since WebKit holds one range. The selection change
-a trim causes is recognized as its own echo, so it neither maps again nor notifies again; a source
-change under painted fragments dismisses them, since no selection remains to re-read. A trim waits
-while a pointer button or Shift is still extending the selection. Each trim raises one transient
-notification naming the distinct exclusion reasons, which replaces the previous selection notice
-rather than stacking. A selection with no segments shows no toolbar, only that notification. A
-comment composer for several segments says the comment attaches to the first, since the painted
-fragments do not show which one anchors it. A comment posts on Enter, with Shift+Enter for a new
+The first fragment replaces the document selection, which holds one range in WebKit; when excluded
+text separates several, the later ones are dropped and the toolbar maps the first fragment again,
+so both actions act on exactly what is visibly selected. The selection change a trim causes is
+recognized as its own echo, so it neither maps again nor notifies again. A trim waits while a
+pointer button or Shift is still extending the selection. Each trim raises one transient
+notification that says whether later parts were dropped and names the distinct exclusion reasons;
+it replaces the previous selection notice rather than stacking. A selection with no segments shows
+no toolbar, only that notification. A comment composer for several segments, as a wrapper boundary
+inside one fragment yields, says the comment attaches to the first. A comment posts on Enter, with Shift+Enter for a new
 line; suggested text keeps Enter for line breaks, since it edits the document, and both submit on
 Cmd/Ctrl+Enter. Composition keys stay with the IME. Draft text remains intact across focus changes,
 scrolling, and source
@@ -120,7 +120,7 @@ untouched and is skipped where the Highlight API is absent.
 and backward with text and element endpoints, asserts its segments and exclusion reasons, and
 round-trips a comment, a deletion, and a substitution: rejection restores the original bytes and
 acceptance performs exactly the proposed change. It also covers inactivity, outdated renders, rapid
-reselection, and trimming: one range replacing the document selection, painted fragments, one
+reselection, and trimming: one range replacing the document selection, the first of several parts, one
 notification per trim, a trim deferred while dragging, and no actions for an unmarkable selection. `tests/selection-ranges.test.ts`,
 `formatted-selection.test.tsx`, `inline-code-selection.test.tsx`, and `wrapped-selection.test.tsx`
 check marks, decoded text, wrappers, code, and container continuations in detail;
