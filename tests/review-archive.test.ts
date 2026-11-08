@@ -144,7 +144,35 @@ describe('resolved discussion archive', () => {
     const known = '<!-- mastermind:resolved-thread v1\n{"context":"quote","thread":"text"}\n-->'
     const unknown = '<!-- mastermind:resolved-thread v9\n{}\n-->'
     const source = `Text\n${known}\n${unknown}\n`
-    expect(deleteRecord(source)).toBe(`Text\n${unknown}\n`)
+    // Text sits directly on both sides, so the record's line break stays as the blank line between them.
+    expect(deleteRecord(source)).toBe(`Text\n\n${unknown}\n`)
+    expect(deleteRecord(`${known}\n${unknown}\n`)).toBe(`${unknown}\n`)
+  })
+
+  it.each(['\n', '\r\n'])('keeps text typed below a record apart from the text above with %j', (eol) => {
+    const record = parseResolvedThreads(resolve('a {>>@A: note<<}\n')).entries[0]!
+    const archive = resolve('a {>>@A: note<<}\n').slice(record.range.start, record.range.end).replace(/\n/g, eol)
+    for (const below of ['b', '- item', '# Heading', '   ']) {
+      const after = `${below}${eol}`
+      const blank = below.trim() === ''
+      // A blank line already separates the text: the record's line goes with it.
+      expect(deleteRecord(`a${eol}${eol}${archive}${eol}${after}`)).toBe(blank ? `a${eol}${after}` : `a${eol}${eol}${after}`)
+      // No blank line above: the record's line break remains as one.
+      expect(deleteRecord(`a${eol}${archive}${eol}${after}`)).toBe(blank ? `a${eol}${after}` : `a${eol}${eol}${after}`)
+    }
+  })
+
+  it.each([
+    ['LF', 'a {>>@A: note<<}\n'],
+    ['LF without final newline', 'a {>>@A: note<<}'],
+    ['CRLF', 'a\r\nb {>>@A: note<<}\r\n'],
+    ['CRLF without final newline', 'a\r\nb {>>@A: note<<}'],
+    ['CRLF with a bare LF tail', 'a\r\nc\r\nb {>>@A: note<<}\n'],
+  ])('resolving then deleting returns the original bytes: %s', (name, source) => {
+    const start = withoutThread(source)
+    if (name === 'CRLF with a bare LF tail') expect(resolve(source)).toContain(`${start}\r\n\r\n<!--`)
+    expect(deleteRecord(resolve(source))).toBe(start)
+    expect(deleteRecord(resolve(start + '{>>@B: late<<}'))).toBe(start)
   })
 
   it('returns no edits for a captured record that moved or changed', () => {

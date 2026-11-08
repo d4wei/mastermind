@@ -67,11 +67,16 @@ export function parseResolvedThreads(source: string): { entries: ResolvedThread[
 const lineBreakAfter = (source: string, at: number) => source.startsWith('\r\n', at) ? 2 : source[at] === '\n' ? 1 : 0
 const lineBreakBefore = (source: string, at: number) =>
   at >= 2 && source.startsWith('\r\n', at - 2) ? 2 : source[at - 1] === '\n' ? 1 : 0
+const blankLineAt = (source: string, at: number) => /^[ \t]*(?:\r?\n|$)/.test(source.slice(at, at + 256))
 
 /**
  * Removes one resolved-discussion record and the line breaks `resolveThreadEdits` added around it,
  * so the remaining records and text read as if it had never been resolved. A captured record that
  * no longer parses identically at its range yields no edits.
+ *
+ * Text directly below the record keeps a blank line between it and the text above, so removal never
+ * joins blocks the record held apart. At the file tail, deletion inverts the separator resolution
+ * chose for a source that did not end in the dominant line ending.
  */
 export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedThread, 'range' | 'context' | 'thread'>): TextEdit[] {
   const current = parseResolvedThreads(source).entries.find(({ range }) =>
@@ -81,13 +86,25 @@ export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedTh
   const before = lineBreakBefore(source, from)
   const blankBefore = before && lineBreakBefore(source, from - before)
   const after = lineBreakAfter(source, to)
-  if (after) {
-    // The record's own line ending goes with it; so does the blank line that set it apart.
-    to += after
-    if (blankBefore) from -= before
-  } else if (to === source.length && before) {
+  if (!after) {
     // Resolution adds no final line break to a file without one, only the separation before it.
-    from -= before + blankBefore
+    if (to === source.length && before) from -= before + blankBefore
+  } else if (before || from === 0) {
+    const next = to + after
+    if (!blankLineAt(source, next)) {
+      // Content follows: the record's line goes only where a blank line or the file start already
+      // separates that content from the text above; otherwise its line break stays as that blank line.
+      if (blankBefore || from === 0) to = next
+    } else {
+      // The record's own line ending goes with it; so does the blank line that set it apart.
+      to = next
+      if (blankBefore) {
+        from -= before
+        // A tail ending in a bare LF under CRLF dominance received two separators, not one.
+        if (next === source.length && before === 2 && blankBefore === 2 &&
+          lineBreakBefore(source, from - blankBefore) === 1) from -= blankBefore
+      }
+    }
   }
   return [{ from, to, insert: '' }]
 }

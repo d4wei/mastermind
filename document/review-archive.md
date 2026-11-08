@@ -45,10 +45,15 @@ dominant line endings and final-newline convention.
 `deleteResolvedThreadEdits` removes one record the panel captured, after checking that the fresh
 parse still holds an identical entry at its range. It takes the record's own line ending and the
 blank line that separated it from earlier content; at a file tail without a final line break, it
-takes the separation before the record. Deleting a record just appended therefore returns the bytes
-resolution started from, except that a blank line already ending that source is not restored: the
-appended bytes cannot tell it apart from the separator. Other records, diagnostics, and text stay
-byte for byte.
+takes the separation before the record. When the record ends the file and the text before its
+separation ends in a bare LF under CRLF dominance, it takes both separator line endings resolution
+wrote. Deleting a record just appended therefore returns the bytes resolution started from, except
+that a blank line already ending that source is not restored: the appended bytes cannot tell it
+apart from the separator. When non-blank text directly follows the record, deletion leaves exactly
+one blank line between that text and the text above: it removes the record's line only if a blank
+line or the file start already separates them, and otherwise keeps the record's line break as that
+blank line, so removal never joins blocks the record held apart. Other records, diagnostics, and
+text stay byte for byte.
 
 Offsets and parsed comment text identify an active thread for immediate actions, not a durable ID.
 If an unrelated edit recreates an indistinguishable thread at identical offsets, it is the current
