@@ -26,17 +26,25 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse
+## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 
 **Bet.** Even with the micromark truncation patched (`document/markdown/processor.md`), a whole
 document parse costs about 0.5 µs per byte and runs on the renderer's main thread, so a 4 MB file
-blocks for seconds and a 15 MiB one for far longer, during which the window cannot paint. The
-likely remedies are parsing in a Web Worker (the core is isomorphic, so it can run there) and
-re-analyzing only the top-level block an edit touched with offsets shifted after it; both are
-larger than the per-interaction fixes landed so far.
+blocks for seconds and a 15 MiB one for far longer, during which the window cannot paint. Two
+prototypes measured on the `tools/perf` fixtures (2026-11-08, headless Chrome and the jsc shell):
+a markdown-rs WASM parser is 3–5× faster than the JS parser once its own quadratic edit map is
+patched, but stock 1.0.0 is quadratic, panics on an unclosed fence in a list item, and needs a
+compatibility pass to match today's trees, with structural differences left; not adopted.
+Windowed rendering makes the 15 MiB fixture interactive (mount 31.5 s to 0.5 s, 16 ms frames)
+but breaks every reader of the whole DOM (rail anchors, Navigator, reveal, Find, selection,
+print), a two-to-three-week contract change; `content-visibility` gains little and is pathological
+with the rail. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 22 s at 15
+MiB). The JS parser in jsc also grows worse than linear above 4 MiB (25 s at 8 MiB against 6 s in
+Node, after the micromark patch), which is unexplained.
 
-**Exit:** a measured prototype of either on the perf fixtures, then a ruling on which one, or a
-size threshold above which the app offers the source view instead of the reading view.
+**Exit:** a ruling on the size policy (a threshold above which the reading view yields to the
+source view, or windowed rendering for those sizes), and the parse moved off the main thread,
+after the remaining jsc superlinearity is profiled.
 
 ## 2026-11-07 — Restoring remembered files reads every one before the first reply
 
