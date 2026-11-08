@@ -19,9 +19,11 @@ their natural width and have no expansion control.
 
 Normally, the clipping viewport matches the prose column. Edge fades indicate hidden content and
 disappear at the corresponding scroll boundary. A quiet, labeled icon above the upper-right corner
-expands the viewport to the window's content bounds. Only its horizontal position and width animate;
-cell widths, line wrapping, row heights, and surrounding prose positions stay unchanged. The frame
-reserves scrollbar height in both states, but no scrollbar appears when the content fits.
+expands the viewport to the table's width, capped at the window's content bounds; a table narrower
+than the window centers on the prose column without crossing those bounds. Only its horizontal
+position and width animate; cell widths, line wrapping, row heights, and surrounding prose positions
+stay unchanged. The frame reserves scrollbar height and a gap below the table in both states, so an
+overlay scrollbar never covers the last row, but no scrollbar appears when the content fits.
 
 `TableExpansionProvider` coordinates a single expanded table. Outline, comment rail, and mark gutter
 fade away and become inert during expansion; their layout reservations remain. Collapse or Escape

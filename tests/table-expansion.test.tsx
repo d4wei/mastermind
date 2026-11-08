@@ -11,6 +11,7 @@ let host: HTMLDivElement
 let root: ReturnType<typeof createReactHost>['root']
 let naturalWidth: number
 let windowWidth: number
+let hostLeft: number
 const originalWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
 const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth')
 const originalOffset = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
@@ -30,7 +31,8 @@ function Harness({ version = 'same', second = false, show = true, panel = false 
 function geometry(element: Element) {
   const width = element.tagName === 'TABLE' ? Math.min(naturalWidth, parseFloat((element as HTMLElement).style.maxWidth) || Infinity) :
     element.classList.contains('document-scroll') ? windowWidth : 600
-  return { x: 0, y: 0, top: 100, bottom: 300, left: element.tagName === 'TABLE' ? 200 : 0,
+  const left = element.tagName === 'TABLE' ? 200 : element.classList.contains('md-table-block') ? hostLeft : 0
+  return { x: 0, y: 0, top: 100, bottom: 300, left,
     right: width, width, height: 200, toJSON() {} } as DOMRect
 }
 function toggle(index = 0) { act(() => host.querySelectorAll<HTMLButtonElement>('.md-table-toggle')[index]!.click()) }
@@ -42,7 +44,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 16))
   vi.stubGlobal('cancelAnimationFrame', (id: number) => clearTimeout(id))
-  naturalWidth = 1000; windowWidth = 1200
+  naturalWidth = 1000; windowWidth = 1200; hostLeft = 0
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) { return geometry(this) })
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get() {
     if (this.classList.contains('document-scroll')) return windowWidth
@@ -71,7 +73,8 @@ it('expands only the viewport, retaining the same table, cell anchors, and heigh
   toggle()
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
   await finish()
-  expect(frame.style.width).toBe('1168px')
+  expect(frame.style.width).toBe('1000px')
+  expect(frame.style.marginLeft).toBe('16px')
   expect(host.querySelector('table')).toBe(table)
   expect({ width: table.style.width, height: frame.style.height }).toEqual(original)
   expect(table.querySelector('td')!.getAttribute('data-ps')).toBe('30')
@@ -143,7 +146,7 @@ it('uses current geometry when reversed mid-transition and honors reduced motion
   expect(parseFloat(frame.style.width)).toBeGreaterThan(600)
   toggle(); await finish(); expect(frame.style.width).toBe('600px')
   vi.stubGlobal('matchMedia', () => ({ matches: true }))
-  toggle(); expect(frame.style.width).toBe('1168px')
+  toggle(); expect(frame.style.width).toBe('1000px')
 })
 it('settles an interrupted expansion at the resized viewport bounds', async () => {
   act(() => root.render(<Harness />)); toggle()
@@ -178,4 +181,16 @@ it('reserves the scroll gap below the table so an overlay scrollbar clears the l
   const style = document.createElement('style'); style.textContent = '.md-table-scroll { padding-bottom: 12px }'; document.head.append(style)
   act(() => root.render(<Harness />))
   expect(host.querySelector<HTMLElement>('.md-table-viewport')!.style.height).toBe('218px')
+})
+it('centers an expanded table narrower than the window on the reading column', async () => {
+  windowWidth = 3000; hostLeft = 1200
+  act(() => root.render(<Harness />)); toggle(); await finish()
+  const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
+  expect({ width: frame.style.width, left: frame.style.marginLeft }).toEqual({ width: '1000px', left: '-200px' })
+})
+it('fills the window when the table is wider than it', async () => {
+  naturalWidth = 1400
+  act(() => root.render(<Harness />)); toggle(); await finish()
+  const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
+  expect({ width: frame.style.width, left: frame.style.marginLeft }).toEqual({ width: '1168px', left: '16px' })
 })

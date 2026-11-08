@@ -36,6 +36,7 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
     const documentScroll = host.closest<HTMLElement>('.document-scroll')
     const container = documentScroll ?? document.documentElement
     let lastSizing = ''
+    let tableWidth = 0
     let disposed = false
     const edges = () => {
       const overflow = scroll.scrollWidth - scroll.clientWidth > 1
@@ -87,24 +88,28 @@ export function TableViewport({ children, contentKey }: { children: ReactNode; c
       const hostRect = host.getBoundingClientRect()
       const containerRect = container.getBoundingClientRect()
       const available = container.clientWidth - edge * 2
-      const previous = bounds.current
-      bounds.current = { normal: { left: 0, width: host.clientWidth },
-        wide: { left: containerRect.left + edge - hostRect.left, width: available } }
-      const boundsChanged = previous.normal.width !== host.clientWidth ||
-        previous.wide.width !== available || previous.wide.left !== bounds.current.wide.left
       const sizing = `${host.clientWidth}:${available}:${css.font}:${css.letterSpacing}`
       if (sizing !== lastSizing) {
         lastSizing = sizing
         // Size against expanded space once; changing the clipping viewport must not reflow cells.
         table.style.width = 'max-content'
         table.style.maxWidth = `${available}px`
-        const width = table.getBoundingClientRect().width
-        table.style.width = `${width}px`
+        tableWidth = table.getBoundingClientRect().width
+        table.style.width = `${tableWidth}px`
         table.style.maxWidth = 'none'
-        const canExpand = width > host.clientWidth + 1 && available > host.clientWidth + 1
-        setExpandable(canExpand)
-        if (!canExpand && isExpanded.current) change.current(false, true)
       }
+      // An expanded table narrower than the window centers on the reading column, kept within
+      // the window's edges.
+      const wideWidth = Math.min(available, Math.max(tableWidth, host.clientWidth))
+      const minLeft = containerRect.left + edge - hostRect.left
+      const wideLeft = Math.min(Math.max((host.clientWidth - wideWidth) / 2, minLeft), minLeft + available - wideWidth)
+      const previous = bounds.current
+      bounds.current = { normal: { left: 0, width: host.clientWidth }, wide: { left: wideLeft, width: wideWidth } }
+      const boundsChanged = previous.normal.width !== host.clientWidth ||
+        previous.wide.width !== wideWidth || previous.wide.left !== wideLeft
+      const canExpand = tableWidth > host.clientWidth + 1 && available > host.clientWidth + 1
+      setExpandable(canExpand)
+      if (!canExpand && isExpanded.current) change.current(false, true)
       const scrollbar = cssPx(css, '--document-scrollbar-size')
       const gap = parseFloat(getComputedStyle(scroll).paddingBottom) || 0
       view.style.height = `${table.getBoundingClientRect().height + gap + scrollbar}px`
