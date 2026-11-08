@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Comment cards ease by section, never by card height
+
+**Ruled.** A comment card's height changes by easing each revealed or hidden section's grid row
+between `0fr` and `1fr`; the card's own height is never set. Clipping around focusable content uses
+`overflow: clip`, since focus scrolls a `hidden` clip box. Closing content stays mounted and inert
+until its row settles, and rail placement makes room above the selection from settled heights, so
+a collapsing card never rises. Reduced motion keeps every change instant.
+
+**Beat:** animating measured card heights under `overflow: hidden`, which recoiled on focus, left a
+tall empty card while collapsing, and pushed the card above a new selection up and back.
+
 ## 2026-11-07 — Open files reopen at launch; agent opens and closes are idempotent
 
 **Ruled.** The app remembers which documents are open, in order, and which one is active, and
