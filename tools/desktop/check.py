@@ -138,12 +138,12 @@ try:
         check('malformed request rejected', wire(root, b'not json\n')['error'] == 'invalid_request')
         check('oversized frame bounded', wire(root, b'x' * 65537 + b'\n')['error'] in ['invalid_request', 'connection_closed'])
         check('unterminated frame rejected', wire(root, b'{}')['error'] == 'invalid_request')
-        fifo = files / 'pipe'
+        fifo = files / 'pipe.md'
         os.mkfifo(fifo)
         code, response, _ = invoke(root, [fifo])
         check('FIFO rejected without blocking', code == 1 and
               response['results'][0]['error'] == 'not_supported_file')
-        inaccessible = files / 'private'
+        inaccessible = files / 'private.md'
         inaccessible.write_text('private')
         inaccessible.chmod(0)
         code, response, _ = invoke(root, [inaccessible])
