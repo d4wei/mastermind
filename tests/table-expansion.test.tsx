@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react'
+import { act, type ReactElement } from 'react'
 import { Tooltip } from 'radix-ui'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createReactHost, removeReactHost } from './helpers/dom'
@@ -28,6 +28,16 @@ function Harness({ version = 'same', second = false, show = true, panel = false 
     {second && <TableViewport contentKey="second"><table><tbody><tr><td>Another table</td></tr></tbody></table></TableViewport>}
   </div></TableExpansionProvider></Tooltip.Provider>
 }
+function Pair({ source, first = 'first' }: { source: string; first?: string }) {
+  return <Tooltip.Provider><TableExpansionProvider><Surroundings panel={false} /><div className="document-scroll">
+    <TableViewport contentKey={first} source={source}><table id="first"><tbody><tr><td>Passage</td></tr></tbody></table></TableViewport>
+    <TableViewport contentKey="second" source={source}><table id="second"><tbody><tr><td>Another table</td></tr></tbody></table></TableViewport>
+  </div></TableExpansionProvider></Tooltip.Provider>
+}
+function tableReads() {
+  const reads = vi.mocked(HTMLElement.prototype.getBoundingClientRect).mock.contexts as HTMLElement[]
+  return { first: reads.filter((e) => e.id === 'first').length, second: reads.filter((e) => e.id === 'second').length }
+}
 function geometry(element: Element) {
   const width = element.tagName === 'TABLE' ? Math.min(naturalWidth, parseFloat((element as HTMLElement).style.maxWidth) || Infinity) :
     element.classList.contains('document-scroll') ? windowWidth : 600
@@ -36,6 +46,8 @@ function geometry(element: Element) {
     right: width, width, height: 200, toJSON() {} } as DOMRect
 }
 function toggle(index = 0) { act(() => host.querySelectorAll<HTMLButtonElement>('.md-table-toggle')[index]!.click()) }
+/** Table measurement runs in a microtask batch after the commit, so rendering awaits it. */
+async function show(element: ReactElement) { await act(async () => root.render(element)) }
 async function finish() { await act(async () => { vi.advanceTimersByTime(400) }) }
 beforeEach(() => {
   vi.useFakeTimers()
@@ -66,7 +78,7 @@ afterEach(() => {
   }
 })
 it('expands only the viewport, retaining the same table, cell anchors, and height', async () => {
-  act(() => root.render(<Harness />))
+  await show(<Harness />)
   const table = host.querySelector('table')!
   const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
   const original = { width: table.style.width, height: frame.style.height }
@@ -84,7 +96,7 @@ it('expands only the viewport, retaining the same table, cell anchors, and heigh
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('false')
 })
 it('restores horizontal position and only fades edges with hidden content', async () => {
-  act(() => root.render(<Harness />))
+  await show(<Harness />)
   const scroll = host.querySelector<HTMLElement>('.md-table-scroll')!
   const frame = scroll.parentElement!
   expect(frame.dataset.left).toBe('false'); expect(frame.dataset.right).toBe('true')
@@ -94,36 +106,36 @@ it('restores horizontal position and only fades edges with hidden content', asyn
   toggle(); await finish(); expect(scroll.scrollLeft).toBe(400)
 })
 it('labels the expansion control with a themed tooltip arrow', async () => {
-  act(() => root.render(<Harness />))
+  await show(<Harness />)
   act(() => host.querySelector<HTMLButtonElement>('.md-table-toggle')!.focus())
   await finish()
   expect(document.querySelector('.tooltip .tooltip-arrow')).not.toBeNull()
 })
-it('does not offer expansion for small tables', () => {
+it('does not offer expansion for small tables', async () => {
   naturalWidth = 300
-  act(() => root.render(<Harness />))
+  await show(<Harness />)
   expect(host.querySelector('.md-table-toggle')).toBeNull()
 })
 it('restores surrounding UI when the table is removed or the source changes', async () => {
-  act(() => root.render(<Harness />)); toggle(); await finish()
-  act(() => root.render(<Harness version="edited" />))
+  await show(<Harness />); toggle(); await finish()
+  await show(<Harness version="edited" />)
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('false')
-  toggle(); await finish(); act(() => root.render(<Harness show={false} />))
+  toggle(); await finish(); await show(<Harness show={false} />)
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('false')
 })
 it('hands expansion to another table without revealing surrounding controls', async () => {
-  act(() => root.render(<Harness second />)); toggle(); await finish(); toggle(1); await finish()
+  await show(<Harness second />); toggle(); await finish(); toggle(1); await finish()
   expect([...host.querySelectorAll('.md-table-toggle')].map(b => b.getAttribute('aria-expanded'))).toEqual(['false', 'true'])
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
 })
 it('collapses immediately when a discussion needs the comment rail', async () => {
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   act(() => host.querySelector<HTMLButtonElement>('button')!.click())
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('false')
 })
 it('returns focus on Escape while leaving composer Escape alone', async () => {
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   const input = document.createElement('textarea'); host.append(input)
   act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
@@ -131,7 +143,7 @@ it('returns focus on Escape while leaving composer Escape alone', async () => {
   expect(document.activeElement).toBe(host.querySelector('.md-table-toggle'))
 })
 it('ignores an Escape the input method consumes after composition ends', async () => {
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   const imeEscape = new KeyboardEvent('keydown', { key: 'Escape' })
   Object.defineProperty(imeEscape, 'keyCode', { value: 229 })
   act(() => window.dispatchEvent(imeEscape)); await finish()
@@ -140,7 +152,7 @@ it('ignores an Escape the input method consumes after composition ends', async (
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
 })
 it('uses current geometry when reversed mid-transition and honors reduced motion', async () => {
-  act(() => root.render(<Harness />)); toggle()
+  await show(<Harness />); toggle()
   await act(async () => { vi.advanceTimersByTime(80) })
   const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
   expect(parseFloat(frame.style.width)).toBeGreaterThan(600)
@@ -149,7 +161,7 @@ it('uses current geometry when reversed mid-transition and honors reduced motion
   toggle(); expect(frame.style.width).toBe('1000px')
 })
 it('settles an interrupted expansion at the resized viewport bounds', async () => {
-  act(() => root.render(<Harness />)); toggle()
+  await show(<Harness />); toggle()
   await act(async () => { vi.advanceTimersByTime(80) })
   windowWidth = 900
   act(() => window.dispatchEvent(new Event('resize')))
@@ -158,7 +170,7 @@ it('settles an interrupted expansion at the resized viewport bounds', async () =
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
 })
 it('leaves Escape to an open settings panel', async () => {
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   const panel = document.createElement('div')
   panel.className = 'slide-over'; panel.setAttribute('role', 'dialog')
   document.body.append(panel)
@@ -171,26 +183,51 @@ it('leaves Escape to an open settings panel', async () => {
 })
 it('collapses on Escape while the panel it hid stays open', async () => {
   closePanel.mockClear()
-  act(() => root.render(<Harness panel />)); toggle(); await finish()
+  await show(<Harness panel />); toggle(); await finish()
   expect(host.querySelector('aside')!.hasAttribute('inert')).toBe(true)
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
   expect(closePanel).not.toHaveBeenCalled()
 })
-it('reserves the scroll gap below the table so an overlay scrollbar clears the last row', () => {
+it('reserves the scroll gap below the table so an overlay scrollbar clears the last row', async () => {
   const style = document.createElement('style'); style.textContent = '.md-table-scroll { padding-bottom: 12px }'; document.head.append(style)
-  act(() => root.render(<Harness />))
+  await show(<Harness />)
   expect(host.querySelector<HTMLElement>('.md-table-viewport')!.style.height).toBe('218px')
 })
 it('centers an expanded table narrower than the window on the reading column', async () => {
   windowWidth = 3000; hostLeft = 1200
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
   expect({ width: frame.style.width, left: frame.style.marginLeft }).toEqual({ width: '1000px', left: '-200px' })
 })
 it('fills the window when the table is wider than it', async () => {
   naturalWidth = 1400
-  act(() => root.render(<Harness />)); toggle(); await finish()
+  await show(<Harness />); toggle(); await finish()
   const frame = host.querySelector<HTMLElement>('.md-table-viewport')!
   expect({ width: frame.style.width, left: frame.style.marginLeft }).toEqual({ width: '1168px', left: '16px' })
+})
+it('releases expansion on any source change while measuring only the table whose content changed', async () => {
+  await show(<Pair source="a" />); toggle(); await finish()
+  expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockClear()
+  await show(<Pair source="b" />)
+  expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
+  expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('false')
+  expect(host.querySelector<HTMLElement>('#first')!.parentElement!.parentElement!.style.width).toBe('600px')
+  expect(tableReads()).toEqual({ first: 0, second: 0 })
+  await show(<Pair source="c" first="edited" />)
+  expect(tableReads().first).toBeGreaterThan(0)
+  expect(tableReads().second).toBe(0)
+})
+it('measures every table in one batch when the window resizes', async () => {
+  await show(<Pair source="a" />)
+  const layouts = vi.fn(); window.addEventListener('mastermind-table-layout', layouts)
+  windowWidth = 900
+  vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockClear()
+  await act(async () => { window.dispatchEvent(new Event('resize')) })
+  window.removeEventListener('mastermind-table-layout', layouts)
+  expect(layouts).toHaveBeenCalledTimes(1)
+  expect(tableReads().first).toBeGreaterThan(0)
+  expect(tableReads().second).toBeGreaterThan(0)
+  expect([...host.querySelectorAll<HTMLElement>('.md-table-viewport')].map((frame) => frame.style.width)).toEqual(['600px', '600px'])
 })

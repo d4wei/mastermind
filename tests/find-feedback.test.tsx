@@ -233,3 +233,38 @@ it('draws Previous as the centered Next chevron turned half a revolution', async
     expect(getComputedStyle(previous).transform).toBe(`rotate(180deg) ${lift}`)
   } finally { style.remove() }
 })
+
+it('searches the indexed text again only after the document changes', async () => {
+  const walks = () => matches.mock.calls.filter(([selector]) => String(selector).includes('.print-footnotes')).length
+  const matches = vi.spyOn(Element.prototype, 'matches')
+  key('f', { metaKey: true }); fill('Review')
+  expect(walks()).toBeGreaterThan(0)
+  matches.mockClear()
+  fill('Review the'); click('Match case'); click('Next result')
+  expect(walks()).toBe(0)
+  expect(host.querySelector('[role="status"]')?.textContent).toMatch(/^1 of 1/)
+  await act(async () => root.render(<Harness text="Review the review. Review the rest." />))
+  expect(walks()).toBeGreaterThan(0)
+  expect(host.querySelector('[role="status"]')?.textContent).toMatch(/of 2/)
+})
+
+it('waits for typing to pause before searching a one- or two-character query in a long document', () => {
+  vi.useFakeTimers()
+  try {
+    const source = 'Review the proposal.\n\n' + 'filler '.repeat(20_000)
+    act(() => root.render(<Harness source={source} />))
+    key('f', { metaKey: true }); fill('Review')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
+    fill('Re')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
+    fill('Rx')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
+    act(() => { vi.advanceTimersByTime(150) })
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('No results')
+    fill('p')
+    key('Enter')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 4')
+    fill('pro')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
+  } finally { vi.useRealTimers() }
+})

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { parseMarkdown } from '../document/markdown/processor'
 import { segmentBlocks } from '../document/blocks'
@@ -8,7 +8,7 @@ import { applyTextEdits } from '../document/edits'
 import { acceptEdit } from '../document/critic/resolve'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { mapSelection } from '../ui/modes/reading/selection'
-import { metadataProperties } from '../ui/modes/reading/Frontmatter'
+import { loadMetadataParser, metadataProperties } from '../ui/modes/reading/Frontmatter'
 
 const metadata = '---\ntitle: "{>>literal<<}"\nitems:\n  - one\n  - two\n---'
 
@@ -19,6 +19,8 @@ function render(source: string): HTMLElement {
 }
 
 describe('YAML frontmatter', () => {
+  beforeAll(loadMetadataParser)
+
   it('shows ordered scalar properties with decoded strings and exact nonstring spelling', () => {
     const yaml = '# Keep this comment\n"标题": "方案\\n第二行"\ncount: 9007199254740993\nready: TRUE\nempty:\nnone: ~\ncode: 01'
     const root = render(`---\n${yaml}\n---\n\nBody.`)

@@ -23,3 +23,6 @@
 .md-property dd { margin: 0; }
 
 .md-frontmatter > .md-code { margin-top: 0; }
+
+/* Holds the space of the likely display until the metadata parser loads. */
+.md-frontmatter-pending { visibility: hidden; }

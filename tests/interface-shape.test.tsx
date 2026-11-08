@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, beforeAll, expect, it } from 'vitest'
 import { themeTokens } from './helpers/themes'
-import { Frontmatter } from '../ui/modes/reading/Frontmatter'
+import { Frontmatter, loadMetadataParser } from '../ui/modes/reading/Frontmatter'
 
 const radii = themeTokens('grid')
 
@@ -128,6 +128,8 @@ it('gives composer actions one face, size, and height and keeps every chrome con
   // Two full lines of reply text plus the field's vertical padding and border.
   expect(reply.minHeight).toBe('calc(var(--font-size-sm) * var(--lh-snug) * 2 + 4px * 4 + 2px)')
 })
+
+beforeAll(loadMetadataParser)
 
 it('adds no frontmatter top inset and leaves space between properties and below the divider', () => {
   installStyles()

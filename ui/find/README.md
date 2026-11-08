@@ -21,9 +21,13 @@ the panel keeps one width; a visually hidden live region announces the full phra
 leave; its four compact square controls stay grouped when a narrow window wraps the panel. Opening another top-right surface closes
 Find; see the [layout contract](../app/layout.md).
 
-`matches.ts` uses the pinned CodeMirror search package for literal matching and Unicode offsets.
+`matches.ts` uses the pinned CodeMirror search package for literal matching and Unicode offsets;
+its ASCII fast path returns the same matches natively, which `tests/find-reading.test.ts` compares.
 `reading.ts` maps displayed text to DOM ranges without rewriting the renderer's nodes and paints
-them through the CSS Custom Highlight helper in `ui/util/highlights.ts`. Comment
+them through the CSS Custom Highlight helper in `ui/util/highlights.ts`. Its `ReadingIndex` keeps
+the displayed text until a searchable DOM mutation, so a query or case change only rematches.
+One- and two-character queries on documents over the length constant in `FindPanel.tsx` wait for a
+brief typing pause, keeping the previous results meanwhile; Enter searches them at once. Comment
 search uses the same whitespace normalization as `CommentBody`, then maps the visible result when
 its thread opens. `source.ts` connects CodeMirror's query, match decorations, and scrolling to the
 shared controls. Its internal panel has no visible controls. Search navigation preserves the

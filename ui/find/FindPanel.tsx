@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import type { Analysis } from '../../document/markdown/analyze'
 import { useT } from '../i18n'
@@ -7,13 +7,17 @@ import { commentSearchText } from '../review/CommentBody'
 import { closeOverlay, openOverlay, useOverlay } from '../app/overlayStore'
 import { useCompositionGuard } from '../util/composition'
 import { documentMap } from '../util/document-map'
-import { textMatches, type Match } from './matches'
-import { clearMatches, commentRange, paintMatches, readingMatches, revealMatch } from './reading'
+import { TextSearch, type Match } from './matches'
+import { clearMatches, commentRange, paintMatches, ReadingIndex, revealMatch, runMatches } from './reading'
 import { useSourceSearch } from './source'
 import './find.css'
 
 interface FindState { open: boolean; query: string; caseSensitive: boolean }
 const retained = documentMap<FindState>()
+/** Queries this short match much of a long document, so there they wait for a pause in typing. */
+const SHORT_QUERY_LENGTH = 2
+const SHORT_QUERY_SOURCE_LENGTH = 100_000
+const SHORT_QUERY_DELAY_MS = 150
 
 interface Result extends Match { range?: Range; comment?: number; anchor?: number }
 interface Props {
@@ -24,6 +28,21 @@ interface Props {
   analysis: Analysis | null
   onRevealComment: (spanIndex: number) => void
   onClose: () => void
+}
+
+/** Resolves results to ranges, finding each displayed comment body with one document query. */
+function commentRanges(): (result: Result) => Range | null {
+  const bodies = new Map<string, HTMLElement>()
+  for (const element of document.querySelectorAll<HTMLElement>('[data-find-comment]')) {
+    const id = element.dataset.findComment!
+    const body = bodies.has(id) ? null : element.querySelector<HTMLElement>('.rail-body')
+    if (body) bodies.set(id, body)
+  }
+  return (result) => {
+    if (result.range) return result.range
+    const body = bodies.get(String(result.comment))
+    return body ? commentRange(body, result) : null
+  }
 }
 
 export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealComment, onClose }: Props) {
@@ -100,46 +119,54 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
     return () => { observer.disconnect(); document.documentElement.style.removeProperty('--find-panel-height') }
   }, [open])
 
+  const reading = useRef<ReadingIndex | null>(null)
+  const readingIndex = useCallback((root: HTMLElement) => {
+    if (reading.current?.root !== root) {
+      reading.current?.disconnect()
+      reading.current = new ReadingIndex(root, document.querySelector('.app-content') ?? root, () => setRevision((value) => value + 1))
+    }
+    return reading.current
+  }, [])
+  useLayoutEffect(() => {
+    if (open && mode !== 'source') return
+    reading.current?.disconnect()
+    reading.current = null
+  }, [open, mode])
+  useEffect(() => () => { reading.current?.disconnect(); reading.current = null }, [])
+
+  const comments = useMemo(() => mode === 'reading' && analysis ? analysis.threads.flatMap((card) =>
+    card.thread.comments.map((comment, index) => ({ text: commentSearchText(comment.body), comment: card.messages[index], anchor: card.spanIndex }))) : [],
+  [mode, analysis])
+
+  // The previous results stay displayed while a deferred query waits.
+  const deferred = mode !== 'source' && query.length > 0 && query.length <= SHORT_QUERY_LENGTH && source.length > SHORT_QUERY_SOURCE_LENGTH
+  const [settledQuery, setSettledQuery] = useState(query)
   useEffect(() => {
-    if (!open || mode === 'source') return
-    const observer = new MutationObserver((records) => {
-      // Find's own controls and the outline strip change without changing searchable content.
-      if (records.some((record) => !(record.target instanceof Element ? record.target : record.target.parentElement)?.closest('.find-bar, .compact-outline'))) {
-        setRevision((value) => value + 1)
-      }
-    })
-    const root = document.querySelector('.app-content') ?? docRef.current
-    if (root) observer.observe(root, { childList: true, subtree: true, characterData: true })
-    return () => observer.disconnect()
-  }, [open, mode, docRef])
+    if (!deferred) { setSettledQuery(query); return }
+    const timer = setTimeout(() => setSettledQuery(query), SHORT_QUERY_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [query, deferred])
+  const searched = deferred ? settledQuery : query
 
   const [results, setResults] = useState<Result[]>([])
   const latestResults = useRef(results)
   useLayoutEffect(() => {
     const publish = (next: Result[]) => { latestResults.current = next; setResults(next) }
-    if (!open || !query) { publish([]); return }
-    if (mode === 'source') { publish(adapter ? adapter.matches(query, caseSensitive) : []); return }
+    if (!open || !searched) { publish([]); return }
+    if (mode === 'source') { publish(adapter ? adapter.matches(searched, caseSensitive) : []); return }
     const root = docRef.current
-    const body: Result[] = root ? readingMatches(root, query, caseSensitive) : []
-    if (mode === 'reading' && analysis) for (const card of analysis.threads) {
-      card.thread.comments.forEach((comment, index) => {
-        body.push(...textMatches(commentSearchText(comment.body), query, caseSensitive)
-          .map((match) => ({ ...match, comment: card.messages[index], anchor: card.spanIndex })))
-      })
+    const search = new TextSearch(searched, caseSensitive)
+    const body: Result[] = root ? runMatches(readingIndex(root).runs(), search) : []
+    for (const { text, comment, anchor } of comments) {
+      for (const match of search.matches(text)) body.push({ ...match, comment, anchor })
     }
     publish(body)
-  }, [open, query, caseSensitive, mode, adapter, docRef, analysis, source, revision])
+  }, [open, searched, caseSensitive, mode, adapter, docRef, readingIndex, comments, source, revision])
 
   // Search effects update the editor only after React has committed its view.
   useLayoutEffect(() => {
     if (open && mode === 'source') adapter?.query(query, caseSensitive)
   }, [open, mode, query, caseSensitive, adapter])
-
-  const rangeFor = useCallback((result: Result): Range | null => {
-    if (result.range) return result.range
-    const body = document.querySelector<HTMLElement>(`[data-find-comment="${result.comment}"] .rail-body`)
-    return body ? commentRange(body, result) : null
-  }, [])
 
   const currentIndex = Math.min(index, Math.max(0, results.length - 1))
   const step = useCallback((delta: number) => {
@@ -190,6 +217,7 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   useLayoutEffect(() => {
     if (!open) { clearMatches(); return }
     if (results !== latestResults.current) return
+    const rangeFor = commentRanges()
     let selected = currentIndex
     if (chooseFromPosition.current && results.length) {
       const top = document.querySelector('.document-scroll')?.getBoundingClientRect().top ?? 0
@@ -215,7 +243,7 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
       pendingReveal.current = false
     })
     return () => cancelAnimationFrame(frame)
-  }, [open, results, currentIndex, index, mode, adapter, rangeFor, onRevealComment])
+  }, [open, results, currentIndex, index, mode, adapter, onRevealComment])
 
   useEffect(() => () => { clearMatches(); restoreRail.current() }, [])
   useEffect(() => () => { adapter?.close() }, [adapter])
@@ -236,7 +264,11 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
           setState((current) => ({ ...current, query: event.target.value }))
         }} onKeyDown={(event) => {
           if (ime.isComposing(event.nativeEvent)) return
-          if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); step(event.shiftKey ? -1 : 1) }
+          if (event.key !== 'Enter') return
+          event.preventDefault(); event.stopPropagation()
+          // Enter on a deferred query searches it now and reveals its first result instead of stepping.
+          if (searched !== query) setSettledQuery(query)
+          else step(event.shiftKey ? -1 : 1)
         }} />
       {query && <span className="find-count" aria-hidden="true">{counter}</span>}
     </div>

@@ -14,8 +14,15 @@ its header/cell semantics and source positions; overflow does not widen the read
 
 `TableViewport` sizes one table against the window's available content width and freezes that
 geometry across expansion and collapse. Paragraphs wrap within that width; unbreakable content can
-still exceed it. Window size and typography changes recalculate the geometry. Small tables keep
-their natural width and have no expansion control.
+still exceed it. Window size, typography, and web-font loads recalculate the geometry, and so does
+a change to `contentKey`, which identifies what the table renders; a key scoped to the table's own
+source text leaves it unmeasured by edits elsewhere. Small tables keep their natural width and have
+no expansion control.
+
+One module-level owner measures every table: a shared resize observer and window listeners queue
+tables, and a single batch runs before the frame paints, completing each read phase across all
+queued tables before the writes that depend on it. A document's table count therefore does not
+multiply forced layouts.
 
 Normally, the clipping viewport matches the prose column. Edge fades indicate hidden content and
 disappear at the corresponding scroll boundary. A quiet, labeled icon above the upper-right corner
@@ -34,7 +41,8 @@ resizing settles an in-progress transition at the new bounds.
 Opening a discussion or applying a review edit returns to the normal layout. Selection retains the
 same source anchors while expanded, and its composer follows horizontal scrolling. Find reveals
 matches within clipped columns. Source changes, mode changes, and document removal release any
-expansion. Print rendering removes viewport clipping and expansion controls.
+expansion; the viewport's `source` prop carries the whole document for that release, falling back
+to `contentKey`. Print rendering removes viewport clipping and expansion controls.
 
 Fenced code passes its explicit language to `highlight.ts` only when a Code color scheme is enabled.
 The tokenizer recognizes aliases for its supported language families; it does not detect languages

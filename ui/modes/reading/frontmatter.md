@@ -13,6 +13,11 @@ adding a top margin. Only the bottom edge has a divider, with space separating i
 Markdown mode exposes the original source, including YAML comments; property rows have no separate
 source disclosure.
 
+The parser is a separate chunk, loaded the first time a document displays metadata. Until it
+arrives, the block holds hidden, unparsed rows (or literal YAML when the source is not simple
+`key: value` lines) so the body below does not move when the parsed display replaces them; the
+placeholder is `aria-hidden`, which also keeps it out of Find.
+
 Non-mappings, empty mappings, nested structures, nonstring or empty keys, merge keys, anchors, tags,
 explicit directives, parse errors, and warnings fall back to literal YAML. Large metadata also
 stays literal to bound additional parsing work on the render path. The limit belongs to the
@@ -22,4 +27,4 @@ Neither properties nor literal fallbacks receive source-position attributes. The
 outside inline review selection, while body nodes retain their original offsets. Source bytes,
 line endings, translation context, and CriticMarkup exclusion still come from the shared Markdown
 parser. `tests/frontmatter.test.tsx` checks display fallbacks, inert HTML, selection exclusion, and
-exact body splices under LF and CRLF.
+exact body splices under LF and CRLF; `tests/frontmatter-loading.test.tsx` checks the placeholder.

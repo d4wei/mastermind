@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest'
-import { readingMatches, commentRange, revealMatch } from '../ui/find/reading'
-import { textMatches } from '../ui/find/matches'
+import { readingMatches, readingRuns, commentRange, revealMatch, ReadingIndex } from '../ui/find/reading'
+import { searchQuery, textMatches, TextSearch } from '../ui/find/matches'
+import { Text as EditorText } from '@codemirror/state'
 import { commentSearchText } from '../ui/review/CommentBody'
 import { stubHighlights } from './helpers/dom'
 
@@ -45,6 +46,10 @@ it('uses comment display text rather than hard-wrapped source lines', () => {
   root.textContent = commentSearchText('评审\n这个例子')
   const match = textMatches(root.textContent, '评审 这个', false)[0]!
   expect(commentRange(root, match)?.toString()).toBe('评审 这个')
+  root.innerHTML = '<p>One</p><p><em>two</em> three</p>'
+  expect(commentRange(root, { from: 2, to: 5 })?.toString()).toBe('etw')
+  expect(commentRange(root, { from: 6, to: 12 })?.toString()).toBe(' three')
+  expect(commentRange(root, { from: 6, to: 13 })).toBeNull()
 })
 
 it('keeps a result clear of an overlapping floating panel without moving already-visible results', () => {
@@ -97,4 +102,61 @@ it('reveals a match in an offscreen table column without changing the document s
   range.getBoundingClientRect = () => ({ left: 50, right: 150, top: 200, bottom: 220 } as DOMRect)
   revealMatch(range, null)
   expect(tableScroll.scrollLeft).toBe(200)
+})
+
+it('extends a phrase-final collapsed space over whitespace in following nodes', () => {
+  const root = document.createElement('article')
+  root.innerHTML = '<p>A  <strong> useful</strong></p>'
+  expect(readingRuns(root).map((run) => run.text)).toEqual(['A useful'])
+  expect(readingMatches(root, 'A ', true)[0]!.range.toString()).toBe('A   ')
+  expect(readingMatches(root, ' u', true)[0]!.range.toString()).toBe('   u')
+})
+
+it('matches ASCII text natively exactly as the pinned CodeMirror search does', () => {
+  const cursorMatches = (text: string, query: string, caseSensitive: boolean) => {
+    const cursor = searchQuery(query, caseSensitive).getCursor(EditorText.of(text.split('\n')))
+    const found = []
+    for (let result = cursor.next(); !result.done; result = cursor.next()) found.push({ from: result.value.from, to: result.value.to })
+    return found
+  }
+  let seed = 7
+  const random = (n: number) => (seed = (seed * 1103515245 + 12345) % 2147483648) % n
+  const alphabet = 'aAbB \n.'
+  for (let i = 0; i < 400; i++) {
+    const text = Array.from({ length: random(40) }, () => alphabet[random(alphabet.length)]).join('')
+    const query = Array.from({ length: 1 + random(3) }, () => alphabet[random(alphabet.length)]).join('')
+    for (const caseSensitive of [false, true]) {
+      expect(new TextSearch(query, caseSensitive).matches(text)).toEqual(cursorMatches(text, query, caseSensitive))
+    }
+  }
+  // Non-ASCII text and queries keep CodeMirror's normalization.
+  expect(textMatches('\u212a and k', 'k', false)).toEqual([{ from: 0, to: 1 }, { from: 6, to: 7 }])
+  expect(textMatches('a \ufb01le', 'fi', false)).toEqual(cursorMatches('a \ufb01le', 'fi', false))
+  expect(textMatches('a file', '\ufb01', false)).toEqual(cursorMatches('a file', '\ufb01', false))
+})
+
+it('reuses indexed runs until searchable content changes, even before the observer is notified', async () => {
+  const scope = document.createElement('div')
+  const root = document.createElement('article'); root.innerHTML = '<p>Review this</p>'
+  const bar = document.createElement('div'); bar.className = 'find-bar'
+  scope.append(root, bar)
+  let changes = 0
+  const index = new ReadingIndex(root, scope, () => changes++)
+  try {
+    const runs = index.runs()
+    bar.textContent = '1/2'
+    expect(index.runs()).toBe(runs)
+    root.querySelector('p')!.append(' again')
+    const updated = index.runs()
+    expect(updated).not.toBe(runs)
+    expect(updated.map((run) => run.text)).toEqual(['Review this again'])
+    expect(changes).toBe(0)
+    bar.textContent = '2/2'
+    await Promise.resolve()
+    expect(changes).toBe(0)
+    root.querySelector('p')!.append('.')
+    await Promise.resolve()
+    expect(changes).toBe(1)
+    expect(index.runs().map((run) => run.text)).toEqual(['Review this again.'])
+  } finally { index.disconnect() }
 })

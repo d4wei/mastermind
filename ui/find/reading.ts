@@ -1,77 +1,154 @@
 import { clearHighlight, paintHighlight } from '../util/highlights'
-import { textMatches, type Match } from './matches'
+import { isAscii, TextSearch, type Match } from './matches'
 
 interface Point { node: Text; offset: number }
-interface TextRun { text: string; starts: Point[]; ends: Point[] }
+/**
+ * Displayed text of one phrase. Each character starts in the latest segment at or before it, at
+ * its recorded offset, and ends one unit later unless collapsed whitespace extended it.
+ */
+export interface TextRun {
+  text: string
+  ascii: boolean
+  /** The lowercased text, kept from the first case-insensitive search. */
+  folded?: string
+  segments: { node: Text; from: number }[]
+  offsets: number[]
+  extendedEnds: Map<number, Point>
+}
 interface ReadingMatch extends Match { range: Range }
 
 const blocks = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'PRE', 'TD', 'TH', 'DT', 'DD', 'BLOCKQUOTE', 'DIV', 'SECTION', 'ARTICLE'])
 const excluded = 'button, input, textarea, select, script, style, [hidden], [aria-hidden="true"], .print-footnotes, .rail-card-anchor, .rail-author'
+const preserved = 'pre, .rail-body'
+const whitespace = /\s+/g
+// Find's own controls and the outline strip change without changing searchable content.
+const unsearched = '.find-bar, .compact-outline'
+
+function emptyRun(): TextRun {
+  return { text: '', ascii: true, segments: [], offsets: [], extendedEnds: new Map() }
+}
 
 /** Inline text shares a run; block boundaries and excluded chrome never join searchable phrases. */
-function readingRuns(root: HTMLElement): TextRun[] {
+export function readingRuns(root: HTMLElement): TextRun[] {
   const runs: TextRun[] = []
-  let run: TextRun = { text: '', starts: [], ends: [] }
+  let run = emptyRun()
   const flush = () => {
-    if (run.text) runs.push(run)
-    run = { text: '', starts: [], ends: [] }
+    if (run.text) { run.ascii = isAscii(run.text); runs.push(run) }
+    run = emptyRun()
   }
-  const walk = (node: Node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node as Text
-      const preserve = !!text.parentElement?.closest('pre, .rail-body')
-      for (let i = 0; i < text.data.length; i++) {
-        const char = !preserve && /\s/.test(text.data[i]!) ? ' ' : text.data[i]!
-        if (!preserve && char === ' ' && run.text.endsWith(' ')) {
-          run.ends[run.ends.length - 1] = { node: text, offset: i + 1 }
-          continue
-        }
-        run.text += char
-        run.starts.push({ node: text, offset: i })
-        run.ends.push({ node: text, offset: i + 1 })
+  const append = (node: Text, text: string, from: number) => {
+    if (run.segments.at(-1)?.node !== node) run.segments.push({ node, from: run.text.length })
+    run.text += text
+    for (let i = 0; i < text.length; i++) run.offsets.push(from + i)
+  }
+  const appendText = (node: Text, preserve: boolean) => {
+    const data = node.data
+    if (preserve) { append(node, data, 0); return }
+    let at = 0
+    for (const space of data.matchAll(whitespace)) {
+      if (space.index > at) append(node, data.slice(at, space.index), at)
+      const end = space.index + space[0].length
+      // Collapsed whitespace displays as one space whose range covers every whitespace unit.
+      if (run.text.endsWith(' ')) run.extendedEnds.set(run.text.length - 1, { node, offset: end })
+      else {
+        append(node, ' ', space.index)
+        if (end > space.index + 1) run.extendedEnds.set(run.text.length - 1, { node, offset: end })
       }
-      return
+      at = end
     }
+    if (at < data.length) append(node, data.slice(at), at)
+  }
+  const walk = (node: Node, preserve: boolean) => {
+    if (node.nodeType === Node.TEXT_NODE) { appendText(node as Text, preserve); return }
     if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) return
     if (node.matches(excluded)) { flush(); return }
     const boundary = blocks.has(node.tagName) || node.tagName === 'BR'
+    const inner = preserve || node.matches(preserved)
     if (boundary) flush()
-    node.childNodes.forEach(walk)
+    for (let child = node.firstChild; child; child = child.nextSibling) walk(child, inner)
     if (boundary) flush()
   }
-  walk(root)
+  walk(root, !!root.parentElement?.closest(preserved))
   flush()
   return runs
 }
 
+function startPoint(run: TextRun, index: number): Point {
+  let low = 0, high = run.segments.length - 1
+  while (low < high) {
+    const mid = (low + high + 1) >> 1
+    if (run.segments[mid]!.from <= index) low = mid
+    else high = mid - 1
+  }
+  return { node: run.segments[low]!.node, offset: run.offsets[index]! }
+}
+
 function runRange(run: TextRun, match: Match): Range {
-  const start = run.starts[match.from]!
-  const end = run.ends[match.to - 1]!
+  const start = startPoint(run, match.from)
+  const last = match.to - 1
+  const end = run.extendedEnds.get(last) ?? { node: startPoint(run, last).node, offset: run.offsets[last]! + 1 }
   const range = document.createRange()
   range.setStart(start.node, start.offset)
   range.setEnd(end.node, end.offset)
   return range
 }
 
+export function runMatches(runs: readonly TextRun[], search: TextSearch): ReadingMatch[] {
+  const results: ReadingMatch[] = []
+  for (const run of runs) {
+    const folded = run.ascii && !search.caseSensitive ? run.folded ??= run.text.toLowerCase() : undefined
+    for (const match of search.matches(run.text, run.ascii, folded)) results.push({ ...match, range: runRange(run, match) })
+  }
+  return results
+}
+
 export function readingMatches(root: HTMLElement, query: string, caseSensitive: boolean): ReadingMatch[] {
-  return readingRuns(root).flatMap((run) => textMatches(run.text, query, caseSensitive)
-    .map((match) => ({ ...match, range: runRange(run, match) })))
+  return runMatches(readingRuns(root), new TextSearch(query, caseSensitive))
+}
+
+/**
+ * Holds one root's runs until the DOM changes. Mutations are taken synchronously when runs are
+ * requested, so a commit that has not yet notified the observer still invalidates them.
+ */
+export class ReadingIndex {
+  private cached: TextRun[] | null = null
+  private readonly observer: MutationObserver
+
+  constructor(readonly root: HTMLElement, scope: Node, onChange: () => void) {
+    this.observer = new MutationObserver((records) => { if (this.absorb(records)) onChange() })
+    this.observer.observe(scope, { childList: true, subtree: true, characterData: true })
+  }
+
+  runs(): TextRun[] {
+    this.absorb(this.observer.takeRecords())
+    return this.cached ??= readingRuns(this.root)
+  }
+
+  disconnect(): void {
+    this.observer.disconnect()
+    this.cached = null
+  }
+
+  private absorb(records: MutationRecord[]): boolean {
+    if (!records.some(({ target }) => !(target instanceof Element ? target : target.parentElement)?.closest(unsearched))) return false
+    this.cached = null
+    return true
+  }
 }
 
 /** Comment offsets refer to the displayed body, including its preserved paragraph breaks. */
 export function commentRange(root: HTMLElement, match: Match): Range | null {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  const points: Point[] = []
-  let node: Node | null
-  while ((node = walker.nextNode())) {
-    const text = node as Text
-    for (let i = 0; i < text.length; i++) points.push({ node: text, offset: i })
+  let start: Point | null = null
+  let end: Point | null = null
+  for (let seen = 0, node = walker.nextNode() as Text | null; node; seen += node.length, node = walker.nextNode() as Text | null) {
+    if (!start && match.from < seen + node.length) start = { node, offset: match.from - seen }
+    if (start && match.to <= seen + node.length) { end = { node, offset: match.to - seen }; break }
   }
-  const start = points[match.from], end = points[match.to - 1]
   if (!start || !end) return null
   const range = document.createRange()
   range.setStart(start.node, start.offset)
-  range.setEnd(end.node, end.offset + 1)
+  range.setEnd(end.node, end.offset)
   return range
 }
 
