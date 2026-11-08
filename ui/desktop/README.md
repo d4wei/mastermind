@@ -18,10 +18,12 @@ uses a five-second interval; registration failure uses a one-second interval. Cl
 subscription releases its listener and timer, including registrations that finish after navigation.
 Periodic invalidation skips an interval while that document has native reads in flight, so a slow
 read can settle without being superseded by the timer. Reads of other documents do not pause it.
-Native watcher events still invalidate immediately. Each revalidation reads and hashes the active
-file through the versioned native read path even when contents have not changed. This adds periodic
-filesystem and renderer work; it does not repair
-the underlying OS watch. The [notify watcher caveat][notify-watch] describes path replacement
+Native watcher events still invalidate immediately. Each revalidation of a subscribed document
+passes the version the adapter last read or wrote, with its text; when the host
+[confirms that version](../../desktop/src/files.md) the adapter returns the held text without the
+file crossing the bridge, so an unchanged file leaves the document store and interface untouched.
+The periodic check still costs a filesystem stat, or a read and hash shortly after a change; it
+does not repair the underlying OS watch. Unsubscribing releases the held text. The [notify watcher caveat][notify-watch] describes path replacement
 behavior.
 
 [notify-watch]: https://docs.rs/notify/8.2.0/notify/trait.Watcher.html#tymethod.watch
@@ -85,7 +87,12 @@ selection is reported to the host with the revision it observed, so the host can
 [remember the active file](../../desktop/src/restoration.md) for the next launch. Remembered files
 that could not be reopened arrive once in a snapshot; the reviewer names them in a transient notice
 and tells the host they were reported.
-Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native
+The host emits `inventory-changed` after an admission, a setup suggestion, a Save As, a dismissal,
+or a close, and the reviewer reads the inventory then; a five-second poll covers a lost event. A
+request that arrives during a read runs once more after it, so reads never overlap and none is
+lost. An unchanged snapshot leaves renderer state untouched. Once setup is confirmed, refreshes
+stop reading setup state. The reviewer selects only the store fields it shows, and the memoized
+session tree re-renders only through its own subscriptions. Native
 opening, setup, and command errors share the application's notification host. `close.ts` coalesces
 window close requests and awaits native termination cancellation before unlocking the editor. Failed
 setup confirmation keeps the window available. Native lifecycle details live beside the [termination
@@ -123,9 +130,11 @@ With no open files after onboarding, the home displays the two-line block-letter
 Open Markdown files… control (打开 Markdown 文件… in Chinese). The home button combines the file icon,
 label, and platform Open shortcut. The wordmark retains a horizontal slit between its rows.
 `home-motion.ts` drifts each complete row independently, sends the rows beyond opposite window edges
-when the first file is admitted, and fades the outgoing and incoming screens. Cancelling the picker
+when the first file is admitted, and fades the outgoing and incoming screens. The drift is a
+looping keyframe animation of `transform` that begins at rest, so the engine can run it without
+waking the page each frame; departure begins from the row's drifted position. Cancelling the picker
 or failing to open a file leaves home in place. The last document fades only after saving and native
 close succeed, and only when home will replace it rather than setup; ordinary document switching has
 no screen transition. The Open button changes between home and toolbar placement without position
-animation. Reduced motion skips drift and screen transitions. Unmount cancels pending animations and
-animation frames. The native window drag area remains available in both states.
+animation. Reduced motion skips drift and screen transitions, and a change of that preference stops or
+resumes the drift. Unmount cancels pending animations and the drift. The native window drag area remains available in both states.

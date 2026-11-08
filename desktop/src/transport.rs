@@ -168,15 +168,22 @@ pub async fn serve(
         tokio::spawn(async move {
             let _permit = permit;
             let work = async {
-                let (opening, response) = match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
-                    serde_json::from_slice::<Operation>(&bytes).map_err(io::Error::from)
-                }) {
-                    Ok(request) => (
-                        matches!(request, Operation::Open(_)),
-                        respond(request, docs, setup, renderer).await,
-                    ),
-                    Err(_) => (false, Response::error("invalid_request")),
-                };
+                let (opening, suggesting, response) =
+                    match frame(&stream, MAX_FRAME).await.and_then(|bytes| {
+                        serde_json::from_slice::<Operation>(&bytes).map_err(io::Error::from)
+                    }) {
+                        Ok(request) => (
+                            matches!(request, Operation::Open(_)),
+                            matches!(request, Operation::Setup(_)),
+                            respond(request, docs, setup, renderer).await,
+                        ),
+                        Err(_) => (false, false, Response::error("invalid_request")),
+                    };
+                let changes_inventory = (opening || suggesting) && response.error.is_none();
+                // An admission or setup suggestion changes what the renderer shows.
+                if changes_inventory {
+                    crate::opening::inventory_changed(&app);
+                }
                 // Only opening raises the window; closing leaves the person's focus alone.
                 if opening
                     && response

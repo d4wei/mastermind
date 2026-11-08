@@ -362,3 +362,47 @@ it('waits for all concurrent reads of one document before periodic invalidation 
     unsubscribe()
   } finally { vi.useRealTimers() }
 })
+
+it('asks the host to confirm the version it holds and reuses that text while unchanged', async () => {
+  let disk = { version: 'v1', content: 'first', lossy: false }
+  const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+    if (command === 'read_document') return args?.knownVersion === disk.version
+      ? { version: disk.version, unchanged: true } : disk
+    if (command === 'write_document') {
+      disk = { version: 'v2', content: String(args!.content), lossy: false }
+      return { version: 'v2', lossy: false }
+    }
+  }) as NativeBridge['invoke']
+  const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
+  // An unsubscribed document holds nothing, so every read returns content.
+  await host.getFile('0')
+  await host.getFile('0')
+  expect(invoke).not.toHaveBeenCalledWith('read_document', expect.objectContaining({ knownVersion: expect.anything() }))
+  const unsubscribe = host.subscribe('0', () => {})
+  const first = await host.getFile('0')
+  const confirmed = await host.getFile('0')
+  expect(invoke).toHaveBeenLastCalledWith('read_document', { id: '0', knownVersion: 'v1' })
+  expect(confirmed).toBe(first)
+  // A save holds the text it sent, so the save's own watcher event confirms without content.
+  await expect(host.putFile('0', 'second', 'v1')).resolves.toEqual({ version: 'v2', lossy: false })
+  expect(await host.getFile('0')).toEqual({ version: 'v2', content: 'second', lossy: false })
+  expect(invoke).toHaveBeenLastCalledWith('read_document', { id: '0', knownVersion: 'v2' })
+  // An external change returns content again.
+  disk = { version: 'v3', content: 'third', lossy: false }
+  expect(await host.getFile('0')).toBe(disk)
+  unsubscribe()
+  await host.getFile('0')
+  expect(invoke).toHaveBeenLastCalledWith('read_document', { id: '0' })
+})
+
+it('reads content again when a confirmation names a version other than the one it sent', async () => {
+  const replies: unknown[] = [{ version: 'v1', content: 'first' }, { version: 'v9', unchanged: true },
+    { version: 'v9', content: 'ninth' }]
+  const invoke = vi.fn(async (command: string) => command === 'read_document' ? replies.shift() : undefined) as NativeBridge['invoke']
+  const host = createNativeHost({ invoke, listen: async () => () => {} }, [])
+  const unsubscribe = host.subscribe('0', () => {})
+  await host.getFile('0')
+  await expect(host.getFile('0')).resolves.toEqual({ version: 'v9', content: 'ninth' })
+  expect(invoke).toHaveBeenLastCalledWith('read_document', { id: '0' })
+  unsubscribe()
+})

@@ -5,15 +5,22 @@ import { createHomeMotion } from '../ui/desktop/home-motion'
 let surface: HTMLElement
 let motion: ReturnType<typeof createHomeMotion>
 let reduced = false
-let nextFrame: FrameRequestCallback
-const pending: { element: HTMLElement; frames: Keyframe[]; duration: number; finish: () => void; cancel: ReturnType<typeof vi.fn> }[] = []
+let preferenceChange: (() => void) | undefined
+interface Recorded { element: HTMLElement; frames: Keyframe[]; duration: number; iterations?: number; finish: () => void; cancel: ReturnType<typeof vi.fn> }
+const recorded: Recorded[] = []
+/** Screen transitions; drift loops are recorded apart from them. */
+let pending: Recorded[] = []
+const drifts = () => recorded.filter((animation) => animation.iterations === Infinity)
 const originalAnimate = HTMLElement.prototype.animate
 beforeEach(() => {
   reduced = false
-  pending.length = 0
-  vi.stubGlobal('matchMedia', () => ({ get matches() { return reduced } }))
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { nextFrame = callback; return 1 })
-  vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  recorded.length = 0
+  pending = []
+  vi.stubGlobal('matchMedia', () => ({
+    get matches() { return reduced },
+    addEventListener: (_: string, listener: () => void) => { preferenceChange = listener },
+    removeEventListener: () => { preferenceChange = undefined },
+  }))
   surface = document.createElement('main')
   const wordmark = document.createElement('pre')
   for (const text of ['█▀▄▀█', '█░▀░█']) {
@@ -30,7 +37,10 @@ beforeEach(() => {
     let finish!: () => void
     const finished = new Promise<void>((resolve) => { finish = resolve })
     const cancel = vi.fn(() => finish())
-    pending.push({ element: this, frames: frames as Keyframe[], duration: (options as KeyframeAnimationOptions).duration as number, finish, cancel })
+    const { duration, iterations } = options as KeyframeAnimationOptions
+    const animation = { element: this, frames: frames as Keyframe[], duration: duration as number, iterations, finish, cancel }
+    recorded.push(animation)
+    if (iterations !== Infinity) pending.push(animation)
     return { finished, cancel } as unknown as Animation
   }
   motion = createHomeMotion(surface)
@@ -42,21 +52,43 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-it('drifts intact rows within the approved range and resets for reduced motion', () => {
+const offsets = (frame: Keyframe) => String(frame.transform).match(/-?[\d.]+/g)!.map(Number)
+
+it('drifts intact rows within the approved range as a closed compositor loop, starting at rest', () => {
   motion.show(true)
-  nextFrame(10_000)
-  const rows = [...surface.querySelectorAll<HTMLElement>('span')]
-  expect(rows.map((row) => row.textContent)).toEqual(['█▀▄▀█', '█░▀░█'])
-  expect(rows[0]!.style.transform).not.toBe(rows[1]!.style.transform)
-  for (const row of rows) {
-    const [x, y] = row.style.transform.match(/-?[\d.]+/g)!.map(Number)
-    expect(Math.abs(x!)).toBeLessThanOrEqual(3)
-    expect(Math.abs(y!)).toBeLessThanOrEqual(1.5)
-    expect(row.children).toHaveLength(0)
+  const loops = drifts()
+  expect(loops.map((loop) => loop.element.textContent)).toEqual(['█▀▄▀█', '█░▀░█'])
+  expect(JSON.stringify(loops[0]!.frames)).not.toBe(JSON.stringify(loops[1]!.frames))
+  for (const loop of loops) {
+    expect(loop.element.children).toHaveLength(0)
+    expect(loop.element.style.transform).toBe('')
+    expect(offsets(loop.frames[0]!)).toEqual([0, 0])
+    expect(offsets(loop.frames.at(-1)!)).toEqual([0, 0])
+    const moves = loop.frames.map(offsets)
+    expect(moves.some(([x]) => Math.abs(x!) > 0.5)).toBe(true)
+    for (const [x, y] of moves) {
+      expect(Math.abs(x!)).toBeLessThanOrEqual(3)
+      expect(Math.abs(y!)).toBeLessThanOrEqual(1.5)
+    }
   }
+  // No per-frame script runs while the drift plays.
+  expect(pending).toHaveLength(0)
+})
+
+it('stops the drift for reduced motion, resumes it when allowed, and never drifts off home', () => {
   reduced = true
-  nextFrame(10_016)
-  expect(rows.every((row) => row.style.transform === 'translate(0px, 0px)')).toBe(true)
+  motion.show(true)
+  expect(drifts()).toHaveLength(0)
+  reduced = false
+  preferenceChange!()
+  expect(drifts()).toHaveLength(2)
+  reduced = true
+  preferenceChange!()
+  expect(drifts().every((loop) => loop.cancel.mock.calls.length === 1)).toBe(true)
+  reduced = false
+  motion.show(false)
+  preferenceChange!()
+  expect(drifts()).toHaveLength(2)
 })
 
 it('clears both viewport edges before completing departure and fades the new screen', async () => {
@@ -109,13 +141,14 @@ it('skips transitions with reduced motion or an unavailable animation API', asyn
   expect(pending).toHaveLength(0)
 })
 
-it('cancels pending animation and releases departure on unmount', async () => {
+it('cancels pending animation and the drift and releases departure on unmount', async () => {
   motion.show(true)
   const leaving = motion.leave(true)
   motion.dispose()
   await leaving
-  expect(pending.every((animation) => animation.cancel.mock.calls.length === 1)).toBe(true)
-  expect(cancelAnimationFrame).toHaveBeenCalled()
+  expect(recorded.every((animation) => animation.cancel.mock.calls.length === 1)).toBe(true)
+  motion.show(true)
+  expect(drifts()).toHaveLength(2)
 })
 
 it('ignores departures from a screen that is not showing and coalesces repeats', async () => {

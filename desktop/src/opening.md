@@ -49,6 +49,8 @@ observed; a selection older than the latest activation is ignored. The registry 
 remember the active document, without advancing the revision. The open set and active document
 persist across relaunches as [restoring open files](restoration.md) describes.
 
-The host retains admitted documents without a total session limit. Inventory polling and raw OS
-error details remain bounded hardening work. See the [observations](../../tools/desktop/results.md)
+After each admission, setup suggestion, Save As, error dismissal, and close, the host emits
+`inventory-changed` so the renderer reads the inventory at once; its slower poll covers a lost
+event. The host retains admitted documents without a total session limit. Raw OS error details
+remain bounded hardening work. See the [observations](../../tools/desktop/results.md)
 for packaged behavior actually exercised.

@@ -1,7 +1,10 @@
 import { storedConfig } from '../settings/config-values'
 import type { ClientConfig } from '../settings/types'
 import type { ThemeInfo } from '../../themes/types'
-import { failureKind, HostError, type ReviewerHost } from '../app/host'
+import { failureKind, HostError, type FileResponse, type ReviewerHost } from '../app/host'
+
+/** `read_document`'s reply when the caller's `knownVersion` is still the file's version. */
+interface UnchangedRead { version: string; unchanged: true }
 
 export interface NativeBridge {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>
@@ -25,9 +28,26 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     return storedConfig(await invoke<unknown>('read_preferences'))
   }
   const pendingReads = new Map<string, number>()
+  // The last version and text known for each subscribed document, so revalidation can ask the
+  // host to confirm a version instead of sending the whole file again.
+  const held = new Map<string, FileResponse>()
+  const subscribers = new Map<string, number>()
+  const hold = (id: string, file: FileResponse): void => {
+    if (subscribers.has(id) && typeof file?.content === 'string') held.set(id, file)
+  }
+  const read = async (id: string): Promise<FileResponse> => {
+    const known = held.get(id)
+    const reply = await invoke<FileResponse | UnchangedRead>('read_document',
+      known ? { id, knownVersion: known.version } : { id })
+    if (!reply || typeof reply !== 'object' || !('unchanged' in reply)) { hold(id, reply); return reply }
+    if (known?.version === reply.version) return known
+    // Only a confirmation of the version this read sent can stand for its text.
+    held.delete(id)
+    return read(id)
+  }
   const getFile: ReviewerHost['getFile'] = async (id) => {
     pendingReads.set(id, (pendingReads.get(id) ?? 0) + 1)
-    try { return await invoke('read_document', { id }) }
+    try { return await read(id) }
     finally {
       const remaining = pendingReads.get(id)! - 1
       if (remaining) pendingReads.set(id, remaining)
@@ -39,7 +59,12 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     setAppearance: (color, appearance) => invoke<void>('set_appearance', { color, appearance }),
     getSession: (id) => invoke('document_meta', { id }),
     getFile,
-    putFile: (id, content, baseVersion) => invoke('write_document', { id, content, baseVersion }),
+    async putFile(id, content, baseVersion) {
+      const written = await invoke<{ version: string; lossy?: boolean }>('write_document', { id, content, baseVersion })
+      // The host verified that the written file holds exactly `content`.
+      hold(id, { version: written.version, content, lossy: written.lossy })
+      return written
+    },
     saveCopy: (id, content, forClose = false) => invoke('save_document_copy', { id, content, forClose }),
     translations: (id) => invoke('list_translations', { id }),
     config,
@@ -53,6 +78,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     },
     themes: async () => themes,
     subscribe(id, listener) {
+      subscribers.set(id, (subscribers.get(id) ?? 0) + 1)
       let closed = false
       let unlisten: (() => void) | undefined
       let revalidation: ReturnType<typeof setInterval> | undefined
@@ -75,7 +101,13 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
         revalidation = setInterval(poll, 1000)
         invalidate()
       })
-      return () => { closed = true; unlisten?.(); clearInterval(revalidation) }
+      return () => {
+        if (closed) return
+        closed = true; unlisten?.(); clearInterval(revalidation)
+        const remaining = subscribers.get(id)! - 1
+        if (remaining) subscribers.set(id, remaining)
+        else { subscribers.delete(id); held.delete(id) }
+      }
     },
   }
 }

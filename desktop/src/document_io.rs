@@ -7,22 +7,46 @@ use serde_json::{Value, json};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, mpsc},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+    time::Duration,
 };
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 /// Directories registered with the watcher, shared with its event callback. The callback only
-/// moves a removed directory from `parents` to `removed`; `FileWatch` methods release the backend
-/// registration afterwards. Watcher calls can join the thread that runs the callback, so this lock
-/// is never held across a watcher call.
+/// reads it and moves a removed directory from `parents` to `removed`; `FileWatch` methods release
+/// the backend registration afterwards. Watcher calls can join the thread that runs the callback,
+/// so this lock is never held across a watcher call.
 #[derive(Default)]
 struct Directories {
     parents: HashSet<PathBuf>,
     removed: HashSet<PathBuf>,
+    /// Watched documents, so events about their unrelated siblings can be ignored.
+    documents: HashSet<PathBuf>,
 }
 
 impl Directories {
+    /// Whether an event may concern a watched document or its translations. Only an event whose
+    /// every path is another entry beside a watched document is ignored; events without paths,
+    /// such as a rescan request, always concern them.
+    fn concerns(&self, event: &notify::Event) -> bool {
+        event.paths.is_empty()
+            || event.paths.iter().any(|path| {
+                self.documents.contains(path)
+                    || self.parents.contains(path)
+                    || path.file_name() == Some(std::ffi::OsStr::new(".mastermind"))
+                    || !path.parent().is_some_and(|parent| {
+                        self.documents
+                            .iter()
+                            .any(|document| document.parent() == Some(parent))
+                    })
+            })
+    }
+
     fn forget(&mut self, paths: impl IntoIterator<Item = PathBuf>) {
         for path in paths {
             if self.parents.remove(&path) {
@@ -39,23 +63,52 @@ pub struct FileWatch<W = RecommendedWatcher> {
     deferred: mpsc::Receiver<PathBuf>,
 }
 
-/// Records a removed watched directory so the next watch request registers it again. The callback
-/// never waits on `directories`; a contended lock defers the paths to the next `FileWatch` call.
-fn forget_removed(
+/// Records a removed watched directory so the next watch request registers it again, and reports
+/// whether the event concerns a watched document. The callback never waits on `directories`; a
+/// contended lock defers removed paths to the next `FileWatch` call and treats the event as
+/// relevant.
+fn observe(
     directories: &Mutex<Directories>,
     deferred: &mpsc::Sender<PathBuf>,
     event: &notify::Event,
-) {
-    if !event.kind.is_remove() {
-        return;
-    }
+) -> bool {
     match directories.try_lock() {
-        Ok(mut directories) => directories.forget(event.paths.iter().cloned()),
-        Err(_) => {
-            for path in &event.paths {
-                let _ = deferred.send(path.clone());
+        Ok(mut directories) => {
+            let concerns = directories.concerns(event);
+            if event.kind.is_remove() {
+                directories.forget(event.paths.iter().cloned());
             }
+            concerns
         }
+        Err(_) => {
+            if event.kind.is_remove() {
+                for path in &event.paths {
+                    let _ = deferred.send(path.clone());
+                }
+            }
+            true
+        }
+    }
+}
+
+/// How long a burst of watcher events gathers before one invalidation reaches the renderer.
+pub const INVALIDATION_DELAY: Duration = Duration::from_millis(50);
+
+/// Runs `emit` once, `delay` after the first of a burst of calls. A call after the pending flag
+/// clears schedules another run, so no call goes unanswered by a later `emit`.
+pub fn coalesce(delay: Duration, emit: impl Fn() + Send + Sync + 'static) -> impl Fn() + Send {
+    let pending = Arc::new(AtomicBool::new(false));
+    let emit = Arc::new(emit);
+    move || {
+        if pending.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let (pending, emit) = (pending.clone(), emit.clone());
+        std::thread::spawn(move || {
+            std::thread::sleep(delay);
+            pending.store(false, Ordering::SeqCst);
+            emit();
+        });
     }
 }
 
@@ -72,12 +125,13 @@ impl<W: Watcher> FileWatch<W> {
         let (defer, deferred) = mpsc::channel();
         let watcher = W::new(
             move |event: notify::Result<notify::Event>| {
-                if let Ok(event) = &event {
-                    forget_removed(&shared, &defer, event);
-                }
                 // Events are invalidation hints, including overflow/errors; a fresh versioned read
                 // decides.
-                if !matches!(&event, Ok(event) if event.kind.is_access()) {
+                let relevant = match &event {
+                    Ok(event) => observe(&shared, &defer, event) && !event.kind.is_access(),
+                    Err(_) => true,
+                };
+                if relevant {
                     invalidate();
                 }
             },
@@ -107,6 +161,10 @@ impl<W: Watcher> FileWatch<W> {
 
     pub fn retain_documents(&mut self, docs: &Documents) {
         self.release_removed();
+        self.directories().documents.retain(|path| {
+            docs.entries()
+                .any(|(_, document)| Path::new(&document.path) == path)
+        });
         let used: HashSet<PathBuf> = docs
             .entries()
             .flat_map(|(_, document)| crate::translations::watch_paths(Path::new(&document.path)))
@@ -128,6 +186,7 @@ impl<W: Watcher> FileWatch<W> {
 
     fn watch(&mut self, source: &Path) -> notify::Result<()> {
         self.release_removed();
+        self.directories().documents.insert(source.to_owned());
         for parent in crate::translations::watch_paths(source) {
             // Record the directory first so a removal reported during registration is not lost.
             let stale = {
@@ -214,24 +273,82 @@ pub async fn document_meta(id: String, docs: State<'_>) -> Result<Value, FileErr
         .await?
 }
 
-fn read_registered_document(docs: &Mutex<Documents>, id: &str) -> Result<Snapshot, FileError> {
-    let (path, identity) = {
+/// A document read: the snapshot, or only its version when the caller already holds it.
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+pub enum DocumentRead {
+    Changed(Snapshot),
+    Unchanged { version: String, unchanged: bool },
+}
+
+impl DocumentRead {
+    fn unchanged(version: String) -> Self {
+        Self::Unchanged {
+            version,
+            unchanged: true,
+        }
+    }
+}
+
+/// Reads an admitted document. A caller that passes the version it holds receives only that
+/// version when the file still has it: a version an earlier read found settled is confirmed from
+/// descriptor metadata, any other is read and hashed.
+fn read_registered_document(
+    docs: &Mutex<Documents>,
+    id: &str,
+    known: Option<&str>,
+) -> Result<DocumentRead, FileError> {
+    let (path, identity, settled) = {
         let mut docs = docs.lock().unwrap();
         let index = admitted_id(&docs, id)?;
         let document = docs.get_mut(index).unwrap();
         if let Some(snapshot) = document.snapshot.take() {
-            return Ok(snapshot);
+            return Ok(match known {
+                Some(known) if known == snapshot.version => {
+                    DocumentRead::unchanged(snapshot.version)
+                }
+                _ => DocumentRead::Changed(snapshot),
+            });
         }
-        (PathBuf::from(&document.path), document.identity.clone())
+        (
+            PathBuf::from(&document.path),
+            document.identity.clone(),
+            document.settled_version.clone(),
+        )
     };
-    files::read(&path, identity.as_ref())
+    if let Some(known) = known.filter(|known| settled.as_deref() == Some(*known)) {
+        // A failed check falls through to the full read, which reports the failure.
+        if files::unchanged(&path, identity.as_ref(), known).unwrap_or(false) {
+            return Ok(DocumentRead::unchanged(known.to_owned()));
+        }
+    }
+    let snapshot = files::read(&path, identity.as_ref())?;
+    {
+        let mut docs = docs.lock().unwrap();
+        // The document may have closed, or Save As replaced its entry, during the read.
+        if let Some(document) = admitted_id(&docs, id)
+            .ok()
+            .and_then(|index| docs.get_mut(index))
+            && document.path == path.to_string_lossy()
+        {
+            document.settled_version = snapshot.settled.then(|| snapshot.version.clone());
+        }
+    }
+    Ok(match known {
+        Some(known) if known == snapshot.version => DocumentRead::unchanged(snapshot.version),
+        _ => DocumentRead::Changed(snapshot),
+    })
 }
 
 #[tauri::command]
-pub async fn read_document(id: String, docs: State<'_>) -> Result<Snapshot, FileError> {
+pub async fn read_document(
+    id: String,
+    known_version: Option<String>,
+    docs: State<'_>,
+) -> Result<DocumentRead, FileError> {
     let docs = docs.inner().clone();
     crate::worker::blocking_work()
-        .run(move || read_registered_document(&docs, &id))
+        .run(move || read_registered_document(&docs, &id, known_version.as_deref()))
         .await?
 }
 
@@ -247,20 +364,39 @@ fn serialized_write<T>(
     write(path, identity)
 }
 
+/// A save's reply. The renderer already holds the content it sent, so only the new version and
+/// lossiness return.
+#[derive(Debug, PartialEq, serde::Serialize)]
+pub struct Written {
+    version: String,
+    lossy: bool,
+}
+
+fn write_registered_document(
+    docs: &Mutex<Documents>,
+    id: &str,
+    content: &str,
+    base_version: &str,
+) -> Result<Written, FileError> {
+    let written = serialized_write(docs, id, |path, identity| {
+        files::write(&path, content, base_version, identity.as_ref())
+    })?;
+    Ok(Written {
+        version: written.version,
+        lossy: written.lossy,
+    })
+}
+
 #[tauri::command]
 pub async fn write_document(
     id: String,
     content: String,
     base_version: String,
     docs: State<'_>,
-) -> Result<Snapshot, FileError> {
+) -> Result<Written, FileError> {
     let docs = docs.inner().clone();
     crate::worker::blocking_work()
-        .run(move || {
-            serialized_write(&docs, &id, |path, identity| {
-                files::write(&path, &content, &base_version, identity.as_ref())
-            })
-        })
+        .run(move || write_registered_document(&docs, &id, &content, &base_version))
         .await?
 }
 
@@ -349,6 +485,7 @@ pub async fn save_document_copy(
             let saved = save_copy(&docs, &id, &path, &content, for_close)?;
             if !for_close {
                 retain_watches(&watch, &docs.lock().unwrap());
+                crate::opening::inventory_changed(&app);
             }
             Ok(Some(saved))
         })
@@ -744,9 +881,9 @@ mod tests {
         );
         fs::remove_file(&path).unwrap();
         let docs = Mutex::new(docs);
-        let initial = read_registered_document(&docs, "0").unwrap();
+        let initial = changed(read_registered_document(&docs, "0", None));
         assert_eq!(initial.bytes, b"admitted\r\n");
-        let deleted = read_registered_document(&docs, "0").unwrap_err();
+        let deleted = read_registered_document(&docs, "0", None).unwrap_err();
         assert_eq!(deleted.status, 404);
         assert_eq!(deleted.kind, files::FailureKind::Missing);
         assert!(!path.exists());
@@ -757,10 +894,161 @@ mod tests {
     fn reads_require_an_admitted_document_id() {
         let docs = Mutex::new(Documents::default());
         for id in ["0", "-1", "../file.md", "/tmp/file.md"] {
-            let error = read_registered_document(&docs, id).unwrap_err();
+            let error = read_registered_document(&docs, id, None).unwrap_err();
             assert_eq!(error.status, 404);
             // A released or unknown document is not evidence that its file was deleted.
             assert_eq!(error.kind, files::FailureKind::Failure);
         }
+    }
+
+    fn changed(read: Result<DocumentRead, FileError>) -> Snapshot {
+        match read.unwrap() {
+            DocumentRead::Changed(snapshot) => snapshot,
+            unchanged => panic!("expected content, got {unchanged:?}"),
+        }
+    }
+
+    fn admitted_fixture(name: &str, content: &[u8]) -> (TempDir, PathBuf, Mutex<Documents>) {
+        let dir = TempDir::new(name);
+        let path = dir.join("document.md");
+        fs::write(&path, content).unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            language: None,
+            version: VERSION,
+            paths: vec![path.to_str().unwrap().into()],
+        });
+        (dir, path, Mutex::new(docs))
+    }
+
+    #[test]
+    fn a_read_that_knows_the_current_version_returns_no_content() {
+        let (_dir, path, docs) = admitted_fixture("known-version", b"original\r\n");
+        let version = changed(read_registered_document(&docs, "0", None)).version;
+        let read = read_registered_document(&docs, "0", Some(&version)).unwrap();
+        assert_eq!(
+            serde_json::to_value(&read).unwrap(),
+            json!({ "version": version, "unchanged": true })
+        );
+        // The same size with different bytes is read even if the stamp could not tell them apart.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&path, b"Original\r\n").unwrap();
+        let reread = changed(read_registered_document(&docs, "0", Some(&version)));
+        assert_ne!(reread.version, version);
+        assert_eq!(reread.bytes, b"Original\r\n");
+        // A version the caller does not hold returns the snapshot.
+        assert_eq!(
+            changed(read_registered_document(&docs, "0", Some("stale"))).version,
+            reread.version
+        );
+    }
+
+    #[test]
+    fn only_a_settled_version_is_confirmed_by_its_stamp_without_hashing() {
+        let (_dir, _path, docs) = admitted_fixture("settled-version", b"original\r\n");
+        let version = changed(read_registered_document(&docs, "0", None)).version;
+        // A file read just after it changed is not settled, so its next check reads and hashes.
+        assert_eq!(docs.lock().unwrap().get(0).unwrap().settled_version, None);
+        // A version with the file's stamp but other bytes tells the two paths apart: the stamp
+        // alone accepts it, the digest refuses it.
+        let (stamp, _) = version.rsplit_once(':').unwrap();
+        let forged = format!("{stamp}:0");
+        docs.lock().unwrap().get_mut(0).unwrap().settled_version = Some(forged.clone());
+        let read = read_registered_document(&docs, "0", Some(&forged)).unwrap();
+        assert!(matches!(read, DocumentRead::Unchanged { version, .. } if version == forged));
+        docs.lock().unwrap().get_mut(0).unwrap().settled_version = None;
+        assert_eq!(
+            changed(read_registered_document(&docs, "0", Some(&forged))).version,
+            version
+        );
+    }
+
+    #[test]
+    fn a_save_replies_with_its_version_and_lossiness_only() {
+        let (_dir, path, docs) = admitted_fixture("write-reply", b"original\r\n");
+        let base = changed(read_registered_document(&docs, "0", None)).version;
+        let written = write_registered_document(&docs, "0", "edited\r\n", &base).unwrap();
+        let reply = serde_json::to_value(&written).unwrap();
+        assert_eq!(reply.as_object().unwrap().len(), 2);
+        assert_eq!(reply["lossy"], false);
+        assert_eq!(fs::read(&path).unwrap(), b"edited\r\n");
+        // The save's own watcher event reads back the written version without content.
+        let version = reply["version"].as_str().unwrap();
+        assert!(matches!(
+            read_registered_document(&docs, "0", Some(version)).unwrap(),
+            DocumentRead::Unchanged { .. }
+        ));
+    }
+
+    #[test]
+    fn events_about_unrelated_siblings_do_not_invalidate() {
+        use std::sync::atomic::AtomicUsize;
+        let dir = PathBuf::from("/watched");
+        let document = dir.join("doc.md");
+        let count = Arc::new(AtomicUsize::new(0));
+        let counted = count.clone();
+        let mut watch = FileWatch::<Recording>::with_watcher(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+        })
+        .unwrap();
+        watch.watch(&document).unwrap();
+        let mut deliver = |kind: notify::EventKind, paths: &[PathBuf]| {
+            let event = paths.iter().fold(notify::Event::new(kind), |event, path| {
+                event.add_path(path.clone())
+            });
+            watch.watcher.handler.handle_event(Ok(event));
+            count.swap(0, Ordering::SeqCst)
+        };
+        let modify = notify::EventKind::Modify(notify::event::ModifyKind::Any);
+        let access = notify::EventKind::Access(notify::event::AccessKind::Any);
+        assert_eq!(deliver(modify, &[dir.join("sibling.txt")]), 0);
+        assert_eq!(deliver(modify, &[dir.join("other.md")]), 0);
+        assert_eq!(deliver(access, std::slice::from_ref(&document)), 0);
+        assert_eq!(deliver(modify, std::slice::from_ref(&document)), 1);
+        // A rename into place names both the temporary file and the document.
+        let rename = notify::EventKind::Modify(notify::event::ModifyKind::Name(
+            notify::event::RenameMode::Both,
+        ));
+        assert_eq!(
+            deliver(rename, &[dir.join(".doc.md.tmp"), document.clone()]),
+            1
+        );
+        assert_eq!(deliver(modify, &[dir.join(".mastermind")]), 1);
+        let artifact = dir.join(".mastermind/translations/doc.md.fr.json");
+        assert_eq!(deliver(modify, &[artifact]), 1);
+        assert_eq!(deliver(notify::EventKind::Any, &[]), 1);
+        assert_eq!(deliver(modify, std::slice::from_ref(&dir)), 1);
+        // Without the directory set, the event cannot be judged and invalidates.
+        let held = watch.directories.clone();
+        let guard = held.lock().unwrap();
+        assert_eq!(deliver(modify, &[dir.join("sibling.txt")]), 1);
+        drop(guard);
+        watch
+            .watcher
+            .handler
+            .handle_event(Err(notify::Error::generic("overflow")));
+        assert_eq!(count.swap(0, Ordering::SeqCst), 1);
+        // A closed document's siblings, including itself, no longer concern the watch.
+        watch.retain_documents(&Documents::default());
+        assert!(watch.directories().documents.is_empty());
+    }
+
+    #[test]
+    fn a_burst_of_invalidations_emits_once() {
+        use std::sync::atomic::AtomicUsize;
+        use std::time::Duration;
+        let count = Arc::new(AtomicUsize::new(0));
+        let counted = count.clone();
+        let invalidate = coalesce(Duration::from_millis(100), move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+        });
+        for _ in 0..50 {
+            invalidate();
+        }
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        invalidate();
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(count.load(Ordering::SeqCst), 2);
     }
 }

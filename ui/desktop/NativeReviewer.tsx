@@ -1,5 +1,5 @@
 import { useTranslation } from '../translate/translationStore'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { App } from '../app/App'
 import { navigate, useRoute } from '../app/route'
 import { useDoc } from '../documents/store'
@@ -33,6 +33,13 @@ interface OpeningSnapshot {
 // Each poll returns fresh arrays; keeping equal state unchanged spares the session tree a re-render.
 const unlessEqual = <T,>(next: T) => (current: T): T => JSON.stringify(current) === JSON.stringify(next) ? current : next
 
+/** The host announces inventory changes; this poll only covers a lost event. */
+export const INVENTORY_POLL_MS = 5000
+
+// The reviewer re-renders on inventory and document status changes; the document view subscribes
+// to the store itself.
+const ReviewerApp = memo(App)
+
 export function NativeReviewer() {
   const [files, setFiles] = useState<OpenDocument[]>([])
   const closingWindow = useRef(false)
@@ -47,7 +54,10 @@ export function NativeReviewer() {
   const [previewLanguage, setPreviewLanguage] = useState<SetupSnapshot['values']['uiLang']>()
   const refreshSetup = useRef<() => Promise<void>>(async () => {})
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
-  const documentState = useDoc()
+  const documentStatus = useDoc((state) => state.status)
+  const documentMode = useDoc((state) => state.mode)
+  // A string, so only a change in which files need attention re-renders the reviewer.
+  const attention = useDoc((state) => files.filter((file) => state.needsAttention(file.id)).map((file) => file.id).join('\n'))
   // The route selects the file immediately; the store's document lags it while loading or after a failed load.
   const route = useRoute()
   const id = route.kind === 'doc' ? route.sessionId : null
@@ -83,13 +93,13 @@ export function NativeReviewer() {
       value: activePath ? `mastermind - ${activePath}` : 'mastermind',
     }).catch((error) => setError(String(error)))
   }, [activePath])
-  const documentActive = !!activePath && setupRequired === false && documentState.status === 'ready'
+  const documentActive = !!activePath && setupRequired === false && documentStatus === 'ready'
   const commentRail = useCommentRail()
   useEffect(() => {
-    const state: MenuState = { documentActive, mode: documentState.mode,
+    const state: MenuState = { documentActive, mode: documentMode,
       commentsAvailable: commentRail.available, commentsOpen: commentRail.open }
     void nativeBridge.invoke('set_menu_state', { ...state }).catch((error) => setError(String(error)))
-  }, [documentActive, documentState.mode, commentRail.available, commentRail.open])
+  }, [documentActive, documentMode, commentRail.available, commentRail.open])
   const menuContext = useRef({ documentActive, closeActiveFile: () => {} })
   useEffect(() => {
     let disposed = false
@@ -118,13 +128,18 @@ export function NativeReviewer() {
     let disposed = false
     let setupRevision = -1
     let refreshing = false
+    // A request that arrives during a refresh may describe a change that refresh missed.
+    let refreshAgain = false
     const refresh = async (): Promise<void> => {
-      if (refreshing || fileCloseCompletion.current || closingWindow.current) return
+      if (fileCloseCompletion.current || closingWindow.current) return
+      if (refreshing) { refreshAgain = true; return }
       refreshing = true
+      refreshAgain = false
       try {
+        // Setup state is settled once confirmed, so later refreshes skip reading preferences.
         const [opening, onboarding] = await Promise.allSettled([
           nativeBridge.invoke<OpeningSnapshot>('snapshot'),
-          nativeBridge.invoke<SetupSnapshot>('setup_snapshot', {
+          setupComplete.current ? null : nativeBridge.invoke<SetupSnapshot>('setup_snapshot', {
             uiLangDefault: systemInterfaceLanguage(navigator.languages),
           }),
         ])
@@ -147,24 +162,34 @@ export function NativeReviewer() {
             if (snapshot.active_id !== null) navigate(`/d/${snapshot.active_id}`)
           }
         } else if (opening.status === 'rejected') setError(String(opening.reason))
-        if (onboarding.status === 'fulfilled') {
+        if (onboarding.status === 'rejected') setSetupError(String(onboarding.reason))
+        else if (onboarding.value) {
+          const setupSnapshot = onboarding.value
           setSetupError('')
-          if (onboarding.value.revision >= setupRevision) {
-            setupRevision = onboarding.value.revision
-            setSetup(unlessEqual<SetupSnapshot | null>(onboarding.value))
-            setSetupRequired((required) => required ?? !onboarding.value.completed)
+          if (setupSnapshot.revision >= setupRevision) {
+            setupRevision = setupSnapshot.revision
+            setSetup(unlessEqual<SetupSnapshot | null>(setupSnapshot))
+            setSetupRequired((required) => required ?? !setupSnapshot.completed)
           }
-        } else {
-          setSetupError(String(onboarding.reason))
         }
       } catch (error) { if (!disposed) setError(String(error)) }
-      finally { refreshing = false }
+      finally {
+        refreshing = false
+        if (refreshAgain && !disposed) void refresh()
+      }
     }
     refreshSetup.current = refresh
     const revalidate = (): void => { useDoc.getState().notifyDiskChange() }
     window.addEventListener('focus', revalidate)
     void refresh()
-    const timer = setInterval(() => { void refresh() }, 500)
+    const timer = setInterval(() => { void refresh() }, INVENTORY_POLL_MS)
+    let unlistenInventory: (() => void) | undefined
+    void nativeBridge.listen('inventory-changed', () => { void refresh() }).then((stop) => {
+      if (disposed) { stop(); return }
+      unlistenInventory = stop
+      // A change announced before the listener existed is read now rather than at the next poll.
+      void refresh()
+    }).catch((error) => setError(String(error)))
     const close = createCloseHandler({ prepareToClose: async () => {
       await fileCloseCompletion.current
       const confirmation = setupConfirmation.current
@@ -197,7 +222,7 @@ export function NativeReviewer() {
       else { unlistenCloseFiles = stop; return nativeBridge.invoke<void>('close_requests_ready') }
     }).catch((error) => setError(String(error)))
     return () => {
-      disposed = true; clearInterval(timer); unlisten?.(); unlistenCloseFiles?.()
+      disposed = true; clearInterval(timer); unlisten?.(); unlistenCloseFiles?.(); unlistenInventory?.()
       window.removeEventListener('focus', revalidate)
     }
   }, [])
@@ -279,9 +304,10 @@ export function NativeReviewer() {
         aria-label={openLabel} title={openLabel}><FolderIcon />
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
-      <FileTabs files={files} activeId={id} language={language} needsAttention={documentState.needsAttention}
+      <FileTabs files={files} activeId={id} language={language}
+        needsAttention={(fileId) => attention.split('\n').includes(fileId)}
         onSelect={(fileId) => navigate(`/d/${fileId}`)}
-        onAttention={(fileId) => { if (id === fileId) void documentState.openConflict() }} onClose={closeFile} />
+        onAttention={(fileId) => { if (id === fileId) useDoc.getState().openConflict() }} onClose={closeFile} />
       <div className="native-document-controls" ref={setToolbarTarget} />
     </div>
       {openingErrors.length > 0 && <Notification tier="persistent" error onDismiss={dismissOpeningErrors}>
@@ -301,7 +327,7 @@ export function NativeReviewer() {
         </div>
       </Notice>}
     <CloseDialog />
-    <ToolbarTarget.Provider value={toolbarTarget}><App onboarding={setupRequired === false ? undefined : setup
+    <ToolbarTarget.Provider value={toolbarTarget}><ReviewerApp onboarding={setupRequired === false ? undefined : setup
       ? <NativeSetup snapshot={setup} onLanguagePreview={setPreviewLanguage}
         onConfirmationStarted={(completion) => {
           setupConfirmation.current = completion

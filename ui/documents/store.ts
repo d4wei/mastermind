@@ -126,7 +126,13 @@ export function createDocStore() {
     if (patch.source !== undefined && patch.source !== doc.source) patch.revision = doc.revision + 1
     // Leaving recovery ends its dismissal and failed copy; a later recovery starts visible.
     if (patch.recovery === null && doc.recovery !== null) Object.assign(patch, { conflictDismissed: false, copyError: false })
+    const recordChanged = (Object.keys(patch) as (keyof DocumentState)[]).some((key) => !Object.is(doc[key], patch[key]))
     Object.assign(doc, patch)
+    // A patch that changes nothing publishes nothing, so periodic reads of an unchanged file cost
+    // subscribers no render. A changed record of another document still notifies, since
+    // `needsAttention` reads it.
+    const state = store.getState()
+    if (!recordChanged && (Object.keys(published) as (keyof DocStore)[]).every((key) => Object.is(state[key], published[key]))) return
     store.setState(activeId === id ? { ...published, ...documentState(doc) } : published)
   }
   const schedule = (id: string): void => {

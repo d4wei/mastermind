@@ -39,7 +39,14 @@ sync-agent change to the Unix change time, does not reject the next save; change
 replaced file still conflict. Missing paths are conflicts and are never recreated.
 
 Snapshots reach the UI as `{ version, content, lossy }`. `content` is lossily decoded text; `lossy`
-is true when the bytes are not valid UTF-8, so the UI can open such a file read-only. A UTF-8 byte
+is true when the bytes are not valid UTF-8, so the UI can open such a file read-only. A read may
+pass the version the UI holds; when the file still has that version the reply is
+`{ version, unchanged: true }` without content. A version is confirmed from descriptor metadata
+alone (device, inode, size, and modification and change times) only when the read that produced it
+began more than two seconds, the coarsest supported timestamp resolution, after the file's last
+change; a change within one timestamp tick of that read can leave the metadata unchanged, so any
+other version is read and hashed again before the reply. The admitted-path, identity, and symlink
+checks apply to both. A save replies `{ version, lossy }`, since the UI holds the text it sent. A UTF-8 byte
 order mark is valid UTF-8. An unchanged string returns without writing, retaining original bytes
 even when they contain invalid UTF-8. Changed content for a file that is not valid UTF-8 is refused
 with `not_utf8`, because writing it would replace invalid sequences outside the edit; Save As can
@@ -58,15 +65,21 @@ Notify watches parent directories so replacing an individual file preserves the 
 Prepared artifact directories share this lifecycle; see [translation discovery](translations.md).
 Events invalidate the active document; a versioned read decides whether content changed. Access
 events are ignored, including the close after a write, whose modification is reported separately.
-Watch errors also invalidate. A removal event for a watched directory marks it removed; the next
+An event is also ignored when every path it names is another entry beside a watched document,
+other than a `.mastermind` directory; events naming a document, a watched directory, a
+translation path, or no path at all, and events that arrive while the watch set is locked, still
+invalidate. Watch errors also invalidate. A burst of invalidations reaches the UI as one event a
+short delay after its first, and a later event schedules another, so none is dropped. A save's own
+modification event then reads back the saved version without content. A removal event for a watched directory marks it removed; the next
 watch request or close releases its registration and a watch request registers it again, so a
 recreated directory is watched once. The event callback never waits on the watch set, and watch
 calls are never made while holding it, because they can join the thread that runs the callback. The
 UI revalidates on focus and at intervals even when watch registration succeeds; failed registration
 uses a faster interval. When the platform watcher cannot be created, the host still starts and every
 watch request fails with `watch_failed`. Inactive documents revalidate on return; their saves still
-check versions. Network filesystem notifications and parent-directory replacement remain platform
-validation work.
+check versions. Network filesystem notifications, parent-directory replacement, and a file server whose clock
+lags the host's by more than the settling window, which would let a stale stamp confirm a version,
+remain platform validation work.
 
 Native filesystem commands run on the blocking-work gate and admissions on a separate admission
 lane, both described in [`worker.md`](worker.md). Filesystem work runs outside the event loop;

@@ -37,6 +37,8 @@ pub struct Document {
     /// Only test fixtures register a document without one.
     pub identity: Option<crate::files::Identity>,
     pub language: Option<String>,
+    /// The last version a read found `settled`; a read that knows it checks the stamp alone.
+    pub settled_version: Option<String>,
 }
 
 enum Admission {
@@ -265,6 +267,10 @@ impl Documents {
             Document {
                 path,
                 identity: snapshot.as_ref().map(|snapshot| snapshot.identity.clone()),
+                settled_version: snapshot
+                    .as_ref()
+                    .filter(|snapshot| snapshot.settled)
+                    .map(|snapshot| snapshot.version.clone()),
                 snapshot,
                 language: None,
             },

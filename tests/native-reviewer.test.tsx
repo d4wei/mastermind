@@ -2,25 +2,39 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { NativeReviewer } from '../ui/desktop/NativeReviewer'
+import { INVENTORY_POLL_MS, NativeReviewer } from '../ui/desktop/NativeReviewer'
 import { useOverlay } from '../ui/app/overlayStore'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
   listen: vi.fn(), closeDocument: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
-  status: 'ready' as 'loading' | 'ready' | 'error', appRenders: 0,
+  status: 'ready' as 'loading' | 'ready' | 'error', appRenders: 0, routeReads: 0,
+  storeListeners: new Set<() => void>(),
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {
   invoke: mocks.invoke, listen: mocks.listen,
 } }))
 // The route names the active file; the store has no active document while one loads or after it fails.
 vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate,
-  useRoute: () => mocks.id === null ? { kind: 'home' } : { kind: 'doc', sessionId: mocks.id } }))
-vi.mock('../ui/documents/store', () => ({ useDoc: Object.assign(() => ({ sessionId: null, status: mocks.status, mode: 'reading', needsAttention: () => false }), {
+  useRoute: () => {
+    mocks.routeReads++
+    return mocks.id === null ? { kind: 'home' } : { kind: 'doc', sessionId: mocks.id }
+  } }))
+// Store subscribers re-run their selectors on every publication, as zustand's do.
+const publishStore = () => mocks.storeListeners.forEach((listener) => listener())
+vi.mock('../ui/documents/store', async () => {
+  const { useSyncExternalStore } = await import('react')
+  const subscribe = (listener: () => void) => {
+    mocks.storeListeners.add(listener)
+    return () => { mocks.storeListeners.delete(listener) }
+  }
+  return { useDoc: Object.assign((select: (state: unknown) => unknown) => useSyncExternalStore(subscribe, () =>
+  select({ sessionId: null, status: mocks.status, mode: 'reading', needsAttention: () => false })), {
   getState: () => ({ notifyDiskChange: vi.fn(),
     prepareToClose: mocks.prepareToClose, closeDocument: mocks.closeDocument, pendingDocuments: () => [],
     needsAttention: () => false }),
-}) }))
+}) }
+})
 vi.mock('../ui/app/configStore', () => ({ useConfig: Object.assign((select: (state: unknown) => unknown) =>
   select({ config: { uiLang: mocks.chinese ? 'zh-CN' : 'en' } }), {
   getState: () => ({ load: mocks.load }),
@@ -70,7 +84,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 const mount = async () => { await act(async () => root.render(<NativeReviewer />)) }
-const poll = async () => { await act(async () => vi.advanceTimersByTimeAsync(500)) }
+const poll = async () => { await act(async () => vi.advanceTimersByTimeAsync(INVENTORY_POLL_MS)) }
 const button = (label: string) => Array.from(host.querySelectorAll('button'))
   .find((item) => item.textContent === label || item.getAttribute('aria-label') === label)!
 
@@ -451,10 +465,11 @@ it.each([['MacIntel', '⌘O'], ['Win32', 'Ctrl+O']] as const)(
 it('waits for home departure only after admission, then changes screens without moving Open', async () => {
   const original = HTMLElement.prototype.animate
   const pending: { element: HTMLElement; finish: () => void }[] = []
-  HTMLElement.prototype.animate = function () {
+  HTMLElement.prototype.animate = function (_, options) {
     let finish!: () => void
     const finished = new Promise<void>((resolve) => { finish = resolve })
-    pending.push({ element: this, finish })
+    // The home drift loops until departure; only screen transitions are awaited.
+    if ((options as KeyframeAnimationOptions).iterations !== Infinity) pending.push({ element: this, finish })
     return { finished, cancel: finish } as unknown as Animation
   }
   mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
@@ -543,7 +558,62 @@ it('does not re-render the session tree when a poll returns an unchanged snapsho
   mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
     ? snapshot(0, null, ['Missing /lost.md']) : other(command))
   await poll()
-  expect(mocks.appRenders).toBeGreaterThan(renders)
+  // The inventory renders beside the session tree, which keeps its own subscriptions.
+  expect(host.textContent).toContain('Missing /lost.md')
+  expect(mocks.appRenders).toBe(renders)
+})
+
+it('re-renders only for the store fields the reviewer reads', async () => {
+  await mount()
+  const renders = mocks.routeReads
+  // A publication that changes no field the reviewer selects leaves it alone.
+  act(() => publishStore())
+  act(() => publishStore())
+  expect(mocks.routeReads).toBe(renders)
+  mocks.status = 'loading'
+  act(() => publishStore())
+  expect(mocks.routeReads).toBeGreaterThan(renders)
+})
+
+const snapshotReads = () => mocks.invoke.mock.calls.filter(([command]) => command === 'snapshot').length
+const inventoryListener = () => mocks.listen.mock.calls.find(([event]) => event === 'inventory-changed')![1] as () => void
+
+it('reads the inventory when the host announces a change and polls only as a fallback', async () => {
+  await mount()
+  const setupReads = () => mocks.invoke.mock.calls.filter(([command]) => command === 'setup_snapshot').length
+  const setupBefore = setupReads()
+  const reads = snapshotReads()
+  await act(async () => vi.advanceTimersByTimeAsync(500))
+  expect(snapshotReads()).toBe(reads)
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(1, 1) : other(command))
+  await act(async () => inventoryListener()())
+  expect(snapshotReads()).toBe(reads + 1)
+  expect(mocks.navigate).toHaveBeenLastCalledWith('/d/1')
+  await poll()
+  expect(snapshotReads()).toBe(reads + 2)
+  // Setup is complete, so refreshes no longer read preferences.
+  expect(setupReads()).toBe(setupBefore)
+})
+
+it('reads once more after a refresh that an announcement interrupted, never concurrently', async () => {
+  await mount()
+  const pending: Array<() => void> = []
+  let inFlight = 0, overlapped = false
+  mocks.invoke.mockImplementation((command: string) => {
+    if (command !== 'snapshot') return Promise.resolve(other(command))
+    inFlight++
+    overlapped ||= inFlight > 1
+    return new Promise((resolve) => pending.push(() => { inFlight--; resolve(snapshot(1, 0)) }))
+  })
+  const reads = snapshotReads()
+  await act(async () => { inventoryListener()(); inventoryListener()(); inventoryListener()() })
+  expect(snapshotReads()).toBe(reads + 1)
+  await act(async () => pending.shift()!())
+  expect(snapshotReads()).toBe(reads + 2)
+  await act(async () => pending.shift()!())
+  expect(snapshotReads()).toBe(reads + 2)
+  expect(overlapped).toBe(false)
+  expect(mocks.navigate).toHaveBeenCalledTimes(1)
 })
 
 it('disables native Find at home and forwards its menu event when a document is active', async () => {

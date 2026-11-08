@@ -4,9 +4,14 @@ use std::{
     fs::{File, Metadata, OpenOptions},
     io::{self, Read, Seek, SeekFrom, Write},
     path::Path,
+    time::{Duration, SystemTime},
 };
 
 pub const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
+
+/// The coarsest timestamp resolution a supported filesystem may round to (FAT's two seconds).
+/// Two writes of the same size inside one such tick can leave a file's stamp unchanged.
+const TIMESTAMP_GRANULARITY: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone)]
 pub struct Snapshot {
@@ -17,6 +22,10 @@ pub struct Snapshot {
     pub lossy: bool,
     /// The file the bytes were read from; admission registers it for later reads and writes.
     pub identity: Identity,
+    /// The file's timestamps predate the read by more than `TIMESTAMP_GRANULARITY`, so any later
+    /// change gives it a different stamp and `unchanged` can answer for this version without
+    /// reading. A file changed just before its read must be read and hashed again.
+    pub settled: bool,
 }
 
 /// The filesystem object a snapshot was read from.
@@ -372,12 +381,36 @@ fn stamp(file: &File, meta: &Metadata) -> io::Result<String> {
     }
 }
 
+/// The later of the file's modification and, on Unix, status change times.
+fn last_change(meta: &Metadata) -> io::Result<SystemTime> {
+    let modified = meta.modified()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let seconds = Duration::from_secs(meta.ctime().unsigned_abs());
+        let whole = if meta.ctime() >= 0 {
+            SystemTime::UNIX_EPOCH + seconds
+        } else {
+            SystemTime::UNIX_EPOCH - seconds
+        };
+        Ok(modified.max(whole + Duration::from_nanos(meta.ctime_nsec().unsigned_abs())))
+    }
+    #[cfg(windows)]
+    Ok(modified)
+}
+
+/// The version stamp without its digest: what `stamp` reports for an unchanged file.
+fn stamp_of(version: &str) -> Option<&str> {
+    version.rsplit_once(':').map(|(stamp, _)| stamp)
+}
+
 fn finish_snapshot(
     file: &File,
     path: &Path,
     before: &str,
     bytes: Vec<u8>,
     resolution: Resolution,
+    started: SystemTime,
 ) -> Result<Snapshot, FileError> {
     let after = file.metadata()?;
     if bytes.len() as u64 > MAX_FILE_BYTES {
@@ -392,16 +425,28 @@ fn finish_snapshot(
         version: format!("{token}:{:x}", Sha256::digest(&bytes)),
         lossy: std::str::from_utf8(&bytes).is_err(),
         identity: Identity::of(file, &after)?,
+        settled: last_change(&after)? + TIMESTAMP_GRANULARITY < started,
         bytes,
     })
 }
 
-fn snapshot(file: &mut File, path: &Path, resolution: Resolution) -> Result<Snapshot, FileError> {
+/// Reads `file`; `started` is a time no later than the read began, against which `settled` is
+/// judged.
+fn snapshot_from(
+    file: &mut File,
+    path: &Path,
+    resolution: Resolution,
+    started: SystemTime,
+) -> Result<Snapshot, FileError> {
     let before = stamp(file, &file.metadata()?)?;
     file.seek(SeekFrom::Start(0))?;
     let mut bytes = Vec::new();
     file.take(MAX_FILE_BYTES + 1).read_to_end(&mut bytes)?;
-    finish_snapshot(file, path, &before, bytes, resolution)
+    finish_snapshot(file, path, &before, bytes, resolution, started)
+}
+
+fn snapshot(file: &mut File, path: &Path, resolution: Resolution) -> Result<Snapshot, FileError> {
+    snapshot_from(file, path, resolution, SystemTime::now())
 }
 
 /// Refuses a file that does not continue the admitted document's identity.
@@ -417,9 +462,30 @@ fn require_admitted(file: &File, admitted: Option<&Identity>) -> Result<(), File
 /// Reads the file at canonical `path`. `admitted` is the identity registered when the document
 /// was admitted, absent for admission itself and for prepared translations.
 pub fn read(path: &Path, admitted: Option<&Identity>) -> Result<Snapshot, FileError> {
+    read_started(path, admitted, SystemTime::now())
+}
+
+fn read_started(
+    path: &Path,
+    admitted: Option<&Identity>,
+    started: SystemTime,
+) -> Result<Snapshot, FileError> {
     let mut file = open(path, false, Resolution::Canonical)?;
     require_admitted(&file, admitted)?;
-    snapshot(&mut file, path, Resolution::Canonical)
+    snapshot_from(&mut file, path, Resolution::Canonical, started)
+}
+
+/// Whether the file at canonical `path` still carries the stamp of `version`, judged from
+/// descriptor metadata alone. Only a `settled` version may be answered this way; a stamp can
+/// survive a change made within the timestamp resolution of the read that produced it.
+pub fn unchanged(
+    path: &Path,
+    admitted: Option<&Identity>,
+    version: &str,
+) -> Result<bool, FileError> {
+    let file = open(path, false, Resolution::Canonical)?;
+    require_admitted(&file, admitted)?;
+    Ok(stamp_of(version) == Some(stamp(&file, &file.metadata()?)?.as_str()))
 }
 
 pub fn create_copy(path: &Path, content: &str) -> Result<Snapshot, FileError> {
@@ -535,6 +601,31 @@ mod tests {
         fn file(&self) -> std::path::PathBuf {
             self.0.join("document.md")
         }
+    }
+
+    #[test]
+    fn only_a_read_well_after_the_last_change_is_settled() {
+        let f = Fixture::new();
+        assert!(!read(&f.file(), None).unwrap().settled);
+        let later = SystemTime::now() + TIMESTAMP_GRANULARITY + Duration::from_secs(1);
+        assert!(read_started(&f.file(), None, later).unwrap().settled);
+    }
+
+    #[test]
+    fn the_stamp_check_accepts_an_unchanged_file_and_refuses_a_same_size_rewrite() {
+        let f = Fixture::new();
+        let base = read(&f.file(), None).unwrap();
+        assert!(unchanged(&f.file(), None, &base.version).unwrap());
+        // Past one coarse clock tick, so the rewrite's timestamps differ from the base's.
+        std::thread::sleep(Duration::from_millis(20));
+        fs::write(f.file(), b"Original\r\n").unwrap();
+        assert!(!unchanged(&f.file(), None, &base.version).unwrap());
+        assert!(unchanged(&f.file(), None, "not a version").is_ok_and(|same| !same));
+        fs::remove_file(f.file()).unwrap();
+        assert_eq!(
+            unchanged(&f.file(), None, &base.version).unwrap_err().kind,
+            FailureKind::Missing
+        );
     }
 
     #[test]
@@ -857,6 +948,7 @@ mod tests {
             &before,
             b"original\r\n".to_vec(),
             Resolution::Canonical,
+            SystemTime::now(),
         )
         .unwrap_err();
         assert_eq!(changed.status, 409);
@@ -871,6 +963,7 @@ mod tests {
             &before,
             b"mutated in place".to_vec(),
             Resolution::Canonical,
+            SystemTime::now(),
         )
         .unwrap_err();
         assert_eq!(replaced.status, 409);

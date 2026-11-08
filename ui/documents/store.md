@@ -13,7 +13,9 @@ completions. Saves update their originating record even after navigation and sch
 if its buffer changed during the request. Clean external changes reload automatically and clear
 review undo, whose snapshots predate the external text. Markdown-mode typing clears review undo
 for the same reason: the editor keeps its own history, and review undo never reaches past typing.
-Unedited files are not written; ordinary writes restore the original line endings.
+Unedited files are not written; ordinary writes restore the original line endings. An update that
+changes no field publishes nothing, so a read of the version already held costs subscribers no
+render; a changed record of an inactive document still notifies, since file attention reads it.
 
 ## Files that are not valid UTF-8
 

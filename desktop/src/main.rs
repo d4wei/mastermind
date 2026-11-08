@@ -116,9 +116,12 @@ fn main() {
             let setup = Arc::new(setup::Setup::new(preferences));
             app.manage(setup.clone());
             let invalidations = app.handle().clone();
-            let watch = document_io::FileWatch::new(move || {
-                let _ = invalidations.emit("document-invalidated", ());
-            })
+            let watch = document_io::FileWatch::new(document_io::coalesce(
+                document_io::INVALIDATION_DELAY,
+                move || {
+                    let _ = invalidations.emit("document-invalidated", ());
+                },
+            ))
             .inspect_err(|error| eprintln!("File watching is unavailable: {error}"))
             .ok();
             app.manage(Arc::new(Mutex::new(watch)));

@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
 #[derive(serde::Serialize)]
@@ -86,6 +86,7 @@ pub async fn dismiss_restore_failures(
 
 #[tauri::command]
 pub async fn close_document(
+    app: tauri::AppHandle,
     id: usize,
     active_id: Option<usize>,
     activation_revision: u64,
@@ -103,6 +104,14 @@ pub async fn close_document(
         })
         .await
         .map_err(|e| e.to_string())
+        .inspect(|_| inventory_changed(&app))
+}
+
+/// Tells the renderer to read the inventory now instead of at its next fallback poll.
+pub const INVENTORY_EVENT: &str = "inventory-changed";
+
+pub fn inventory_changed(app: &tauri::AppHandle) {
+    let _ = app.emit(INVENTORY_EVENT, ());
 }
 
 pub fn focus(app: &tauri::AppHandle) {
@@ -164,6 +173,7 @@ pub fn open(app: &tauri::AppHandle, paths: Vec<Result<PathBuf, String>>) {
             .await
             .is_ok()
         {
+            inventory_changed(&focus_app);
             focus(&focus_app);
         }
     });
@@ -193,6 +203,7 @@ pub fn choose_files(app: tauri::AppHandle) {
 
 #[tauri::command]
 pub async fn dismiss_opening_errors(
+    app: tauri::AppHandle,
     docs: tauri::State<'_, Arc<Mutex<Documents>>>,
 ) -> Result<(), String> {
     let docs = docs.inner().clone();
@@ -200,6 +211,7 @@ pub async fn dismiss_opening_errors(
         .run(move || docs.lock().unwrap().opening_errors.clear())
         .await
         .map_err(|e| e.to_string())
+        .inspect(|_| inventory_changed(&app))
 }
 
 #[cfg(test)]

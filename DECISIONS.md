@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — A known version is confirmed by its file stamp only once it has settled
+
+**Ruled.** A read that names the renderer's current version answers "unchanged" without content
+when the file's stamp (device, inode, size, mtime, ctime) still matches, but only for a version
+whose read began more than two seconds after the file's last change; any younger version is read
+and hashed again. Coarse timestamps can hide a same-size rewrite inside one tick, and the settling
+window is what rules that out. `desktop/src/files.md` holds the mechanism.
+
+**Beat:** re-reading, re-sending and re-rendering a 600 KB document every five seconds while idle.
+
 ## 2026-11-07 — A click keeps the selected discussion only on a surface marked for it
 
 **Ruled.** Deselection asks one structural question: whether the click landed inside an element
