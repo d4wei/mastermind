@@ -241,6 +241,21 @@ pub(crate) mod tests {
         )
     }
 
+    /// An absolute document path on this platform: `read` drops relative entries, and a
+    /// Unix-style `/a.md` is relative on Windows.
+    fn absolute(root: &TempDir, name: &str) -> String {
+        root.join(name).to_str().unwrap().to_owned()
+    }
+
+    fn absolute_files(root: &TempDir, names: &[&str], active: Option<&str>) -> OpenFiles {
+        let paths: Vec<String> = names.iter().map(|name| absolute(root, name)).collect();
+        let active = active.map(|name| absolute(root, name));
+        files(
+            &paths.iter().map(String::as_str).collect::<Vec<_>>(),
+            active.as_deref(),
+        )
+    }
+
     #[test]
     fn the_inventory_lives_beside_the_preference_file_under_its_name() {
         assert_eq!(
@@ -259,7 +274,7 @@ pub(crate) mod tests {
         let path = root.join("reviewer.open-files.json");
         let remember = Remember::new(path.clone());
         assert_eq!(remember.load(), OpenFiles::default());
-        let saved = files(&["/a.md", "/文档 b.md", "/c.md"], Some("/文档 b.md"));
+        let saved = absolute_files(&root, &["a.md", "文档 b.md", "c.md"], Some("文档 b.md"));
         remember.record(saved.clone());
         remember.wait_idle();
         assert_eq!(read(&path), Some(saved.clone()));
@@ -278,7 +293,7 @@ pub(crate) mod tests {
     fn a_failed_replacement_keeps_the_previous_inventory_and_retries_on_the_next_change() {
         let root = TempDir::new("open-files-failed");
         let path = root.join("reviewer.open-files.json");
-        let first = files(&["/a.md"], Some("/a.md"));
+        let first = absolute_files(&root, &["a.md"], Some("a.md"));
         write(&path, &first).unwrap();
         // A nonempty directory at the temporary path makes creating the temporary file fail.
         let temp = root.join("reviewer.open-files.json.tmp");
@@ -286,11 +301,11 @@ pub(crate) mod tests {
         fs::write(temp.join("kept"), b"").unwrap();
         let remember = Remember::with_writer(path.clone(), Duration::ZERO, Box::new(write));
         remember.load();
-        remember.record(files(&["/a.md", "/b.md"], None));
+        remember.record(absolute_files(&root, &["a.md", "b.md"], None));
         remember.wait_idle();
         assert_eq!(read(&path), Some(first));
         fs::remove_dir_all(&temp).unwrap();
-        let retried = files(&["/b.md"], Some("/b.md"));
+        let retried = absolute_files(&root, &["b.md"], Some("b.md"));
         remember.record(retried.clone());
         remember.wait_idle();
         assert_eq!(read(&path), Some(retried));
@@ -325,12 +340,14 @@ pub(crate) mod tests {
     fn relative_entries_and_a_foreign_active_path_are_dropped_on_read() {
         let root = TempDir::new("open-files-relative");
         let path = root.join("reviewer.open-files.json");
-        fs::write(
-            &path,
-            r#"{"version":1,"files":["relative.md","/a.md"],"active":"relative.md"}"#,
-        )
-        .unwrap();
-        assert_eq!(read(&path), Some(files(&["/a.md"], None)));
+        let kept = absolute(&root, "a.md");
+        let saved = serde_json::json!({
+            "version": 1,
+            "files": ["relative.md", kept],
+            "active": "relative.md",
+        });
+        fs::write(&path, saved.to_string()).unwrap();
+        assert_eq!(read(&path), Some(files(&[kept.as_str()], None)));
     }
 
     #[test]
