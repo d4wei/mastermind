@@ -274,7 +274,11 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
         style={{ top: positions.get(card.key) }}
         onPointerEnter={() => onHover?.(card.spanIndex)} onPointerLeave={() => onHover?.(null)}
         onFocus={() => onHover?.(card.spanIndex)}
-        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onHover?.(null) }}
+        // Focus leaving a card ends only its own emphasis: pressing another card's body moves focus to
+        // nothing, and clearing that card's hover would unlight its passage until the click selects it.
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget) && hoveredSpan === card.spanIndex) onHover?.(null)
+        }}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest('button, a, input, select, textarea, [role="menuitem"]')) return
           if (window.getSelection()?.isCollapsed !== false) activate(card.spanIndex)

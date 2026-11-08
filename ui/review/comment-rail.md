@@ -26,7 +26,8 @@ retain order and separation. Measurements include actual card heights, including
 composer. Narrow comment panels use ordinary vertical flow instead of positioned cards.
 
 Hover and keyboard focus emphasize the matching passage and card without selecting, expanding,
-or repositioning either. Dragging to select text does not open a reply. Navigation reveals an
+or repositioning either. Focus leaving a card ends only that card's emphasis, so pressing another
+card's body keeps its passage lit until the click selects it. Dragging to select text does not open a reply. Navigation reveals an
 offscreen counterpart without moving one that is already visible. Wide cards share document
 scrolling; narrow panels scroll their own content. The rail fades in without animating cards from
 provisional positions; hiding wide comments fades it out in place, inert, before the document

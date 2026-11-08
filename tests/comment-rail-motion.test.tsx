@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useMemo, useRef, useState, type RefObject } from 'react'
+import { act, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Root } from 'react-dom/client'
 import { analyzeMarkdown } from '../document/markdown/analyze'
@@ -22,6 +22,7 @@ beforeEach(() => {
   document.documentElement.style.setProperty('--dur-base', '180ms')
   heights = [100, 50]
   resize = null
+  commits = []
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const index = [...document.querySelectorAll('.rail-card')].indexOf(this)
     return { top: 0, bottom: 0, left: 0, right: 0, width: 0, x: 0, y: 0, height: heights[index] ?? 0, toJSON: () => ({}) }
@@ -41,14 +42,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+const ANALYSIS = analyzeMarkdown(SOURCE)
+/** Each commit's selected and hovered discussion, as the document lights their passages. */
+let commits: { active: number | null; hovered: number | null }[]
+
 function Harness({ detached = false }: { detached?: boolean }) {
-  const analysis = useMemo(() => analyzeMarkdown(SOURCE), [])
+  const analysis = useMemo(() => ANALYSIS, [])
   const docRef = useRef<HTMLElement>(null)
   const [active, setActive] = useState<number | null>(null)
+  const [hovered, setHovered] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<ReplyDraft[]>([])
+  useLayoutEffect(() => { commits.push({ active, hovered }) })
   return <><article ref={detached ? undefined : docRef} />
     <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
-      activeSpan={active} onActivate={setActive} onEdit={() => true} drafts={drafts} onDraftsChange={setDrafts} /></>
+      activeSpan={active} onActivate={setActive} hoveredSpan={hovered} onHover={setHovered} onEdit={() => true}
+      drafts={drafts} onDraftsChange={setDrafts} /></>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
 const open = (index: number) => act(() => cards()[index]!.querySelector<HTMLButtonElement>('.rail-select')!.click())
@@ -101,4 +109,22 @@ it('leaves with the collapse when selection moves to another card, without the o
   expect(document.activeElement).toBe(cards()[1]!.querySelector('textarea'))
   act(() => vi.advanceTimersByTime(180))
   expect(cards()[0]!.querySelector('.rail-reply')).toBeNull()
+})
+
+it('keeps a passage lit through every commit while its card is pressed and selected from another', () => {
+  act(() => root.render(<Harness />))
+  open(0)
+  const target = cards()[1]!
+  const span = ANALYSIS.threads[1]!.spanIndex
+  act(() => { target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })) })
+  expect(commits.at(-1)!.hovered).toBe(span)
+  commits = []
+  // A press on the card's body moves focus out of the other card's field to nothing, as browsers do.
+  act(() => {
+    target.querySelector('.rail-body')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    ;(document.activeElement as HTMLElement).blur()
+  })
+  act(() => target.querySelector<HTMLElement>('.rail-body')!.click())
+  expect(commits.at(-1)!.active).toBe(span)
+  expect(commits.filter((commit) => commit.active !== span && commit.hovered !== span)).toEqual([])
 })
