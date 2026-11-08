@@ -21,6 +21,8 @@ driver_binary = Path(sys.argv[2]).resolve()
 edge_driver = Path(sys.argv[3]).resolve()
 base = 'http://127.0.0.1:4444'
 element_key = 'element-6066-11e4-a52e-4f735466cecf'
+recovery_panel = '.notification:has(.conflict-actions)'
+recovery_warning = '.recovery-warning[aria-label$="Needs attention"]'
 
 
 def request(method, route, payload=None):
@@ -63,6 +65,15 @@ def element(session, selector):
     return found[element_key]
 
 
+def elements(session, selector):
+    found = command(session, 'POST', '/elements', {'using': 'css selector', 'value': selector})
+    return [item[element_key] for item in found]
+
+
+def present(session, selector):
+    return bool(elements(session, selector))
+
+
 def text(session, selector):
     return command(session, 'GET', f'/element/{element(session, selector)}/text')
 
@@ -77,6 +88,11 @@ def property_value(session, selector, name):
 
 def click(session, selector):
     command(session, 'POST', f'/element/{element(session, selector)}/click', {})
+
+
+def click_labelled(session, selector, label):
+    until(f'{label} is offered', lambda: text(session, selector).strip() == label)
+    click(session, selector)
 
 
 def replace_text(session, selector, content):
@@ -205,8 +221,10 @@ def check(session, path, namespace, preferences):
     check_setup(session, path, namespace, preferences, initial)
     until('installed reviewer renders the admitted Markdown',
           lambda: 'Original.' in text(session, 'article'))
-    click(session, '.seg-btn[aria-label="Markdown"]')
-    until('Markdown editor loads the source', lambda: 'Original.' in editor(session))
+    click(session, '.topbar-icon-btn[aria-label="Markdown"]')
+    until('Markdown editor loads the source and offers a way back to reading',
+          lambda: 'Original.' in editor(session) and
+          present(session, '.topbar-icon-btn[aria-label="Read"]'))
 
     first = path.with_name('first admitted.md')
     second = path.with_name('second admitted 中文.md')
@@ -217,17 +235,21 @@ def check(session, path, namespace, preferences):
     assert batch['pid'] == pid, batch
     until('multi-file request activates its first successful file',
           lambda: 'First successful request file.' in editor(session))
-    expected_files = [initial['results'][0]['canonical'],
-                      batch['results'][1]['canonical'], batch['results'][2]['canonical']]
+    expected_files = [(initial['results'][0]['canonical'], path.name),
+                      (batch['results'][1]['canonical'], first.name),
+                      (batch['results'][2]['canonical'], second.name)]
 
     def inventory_matches():
-        options = command(session, 'POST', '/elements',
-                          {'using': 'css selector', 'value': '.native-documents option[value]'})
-        paths = [command(session, 'GET', f'/element/{option[element_key]}/text')
-                 for option in options[1:]]
-        return paths == expected_files
+        # The tab row's measuring copy lists every open file, including those behind the overflow.
+        tabs = elements(session, '.native-file-measure .native-file-select')
+        files = [(command(session, 'GET', f'/element/{tab}/attribute/title'),
+                  command(session, 'GET', f'/element/{tab}/property/textContent')) for tab in tabs]
+        return files == expected_files
 
-    until('file inventory preserves admission order and omits the failed path', inventory_matches)
+    until('file tabs preserve admission order and omit the failed path', inventory_matches)
+    until('the first successful file is the active tab',
+          lambda: attribute(session, '.native-file-pill [aria-current="page"]', 'title') ==
+          batch['results'][1]['canonical'])
     reopened = admit([path], namespace, ['already_open'])
     assert reopened['pid'] == pid, reopened
     until('repeat CLI open restores the original document', lambda: 'Original.' in editor(session))
@@ -290,91 +312,83 @@ def check(session, path, namespace, preferences):
     until('parent replacement check restores the clean source for conflict checks',
           lambda: 'External clean edit.' in editor(session), 20)
 
+    def save_paused(local_text, disk_text):
+        return ('Could not save your changes' in text(session, recovery_panel) and
+                'Needs attention' in (attribute(
+                    session, '.native-file-pill.active .native-file-attention', 'aria-label') or '') and
+                attribute(session, '.cm-content', 'contenteditable') == 'false' and
+                local_text in editor(session) and path.read_bytes() == disk_text.encode())
+
     path.chmod(0o444)
     local = '# reviewer\n\nUnsaved local edit.\n'
     replace_editor(session, local)
-    until('local changes remain in the editor before the failed save',
-          lambda: 'Unsaved local edit.' in editor(session))
-    until('failed autosave reports an error and keeps disk bytes',
-          lambda: 'Autosave failed' in (attribute(
-              session, '.toast-error [aria-label]', 'aria-label') or '') and
-          path.read_bytes() == disk.encode(), 20)
+    until('failed autosave pauses editing, retains local text, and keeps disk bytes',
+          lambda: save_paused('Unsaved local edit.', disk), 20)
     admit([first], namespace, ['already_open'])
     until('switching documents keeps the other admitted source available',
           lambda: 'First successful request file.' in editor(session))
     reopened = admit([path], namespace, ['already_open'])
     assert reopened['pid'] == pid, reopened
-    until('reopening a failed-save document retains its unsaved source',
-          lambda: 'Unsaved local edit.' in editor(session))
-    assert path.read_bytes() == disk.encode(), 'Reopening changed the failed-save disk version'
+    until('reopening a failed-save document retains its unsaved source and paused state',
+          lambda: save_paused('Unsaved local edit.', disk), 20)
+
+    def conflict_shown(local_text, disk_text):
+        return ('The file changed on disk' in text(session, recovery_panel) and
+                local_text in editor(session) and path.read_bytes() == disk_text.encode())
+
     path.chmod(0o666)
     competing = '# reviewer\r\n\r\nExternal competing edit.\r\n'
     path.write_bytes(competing.encode())
-    until('external change while dirty opens a conflict',
-          lambda: 'Saving paused' in text(session, '.conflict-notice'), 20)
-    click(session, '.conflict-compare')
-    until('comparison retains base, local, and disk versions',
-          lambda: 'External clean edit.' in text(
-              session, '.conflict-versions section:nth-child(1)') and
-          'Unsaved local edit.' in text(session, '.conflict-versions section:nth-child(2)') and
-          'External competing edit.' in text(session, '.conflict-versions section:nth-child(3)'))
-    result = '# reviewer\n\nMerged result 中文.\n'
-    replace_text(session, '.conflict-result textarea', result)
-
-    def comparison_matches(expected_disk):
-        return (property_value(session, '.conflict-versions section:nth-child(1) pre',
-                               'textContent') == disk.replace('\r\n', '\n') and
-                property_value(session, '.conflict-versions section:nth-child(2) pre',
-                               'textContent') == local and
-                property_value(session, '.conflict-versions section:nth-child(3) pre',
-                               'textContent') == expected_disk and
-                property_value(session, '.conflict-result textarea', 'value') == result)
-
-    until('comparison stores the edited Result without writing it',
-          lambda: comparison_matches(competing) and path.read_bytes() == competing.encode())
+    until('external change while dirty pauses saving and retains both versions',
+          lambda: conflict_shown('Unsaved local edit.', competing), 20)
     switched = admit([first], namespace, ['already_open'])
     assert switched['pid'] == pid, switched
-    until('switching away from comparison renders another retained document',
+    until('switching away from a conflict renders another retained document',
           lambda: 'First successful request file.' in editor(session))
     reopened = admit([path], namespace, ['already_open'])
     assert reopened['pid'] == pid, reopened
-    until('repeat CLI open retains comparison Base Local Disk and edited Result',
-          lambda: comparison_matches(competing) and
-          'Unsaved local edit.' in editor(session) and
-          path.read_bytes() == competing.encode())
+    until('repeat CLI open retains the conflict and the unsaved source',
+          lambda: conflict_shown('Unsaved local edit.', competing), 20)
 
     later_disk = '# reviewer\r\n\r\nLater external competing edit.\r\n'
     path.write_bytes(later_disk.encode())
-    until('later disk change makes comparison stale while retaining edited Result',
-          lambda: comparison_matches(later_disk) and
-          'Refresh them before saving' in text(session, '.conflict-comparison [role="alert"]') and
-          property_value(session, '.conflict-actions .btn-cta', 'disabled') is True, 20)
-    click(session, '.conflict-actions .btn-cta')
-    assert path.read_bytes() == later_disk.encode(), 'Stale Save result overwrote the later disk edit'
-    assert comparison_matches(later_disk), 'Stale Save result discarded comparison state'
-    click(session, '.conflict-actions button:first-child')
-    until('explicit refresh retains edited Result and enables reviewed saving',
-          lambda: comparison_matches(later_disk) and
-          property_value(session, '.conflict-actions .btn-cta', 'disabled') is False and
+    click(session, f'{recovery_panel} > .notification-dismiss')
+    until('a dismissed conflict remains reachable from its warning',
+          lambda: present(session, recovery_warning) and not present(session, '.conflict-actions'))
+    click(session, recovery_warning)
+    until('the warning reopens the conflict', lambda: conflict_shown('Unsaved local edit.', later_disk))
+    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-ghost', 'Use incoming')
+    until('Use incoming asks before discarding unsaved edits',
+          lambda: 'discard your unsaved edits?' in text(session, recovery_panel) and
+          conflict_shown('Unsaved local edit.', later_disk))
+    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-primary', 'Use incoming')
+    until('confirmed Use incoming adopts the latest disk version without writing',
+          lambda: 'Later external competing edit.' in editor(session) and
+          not present(session, '.conflict-actions') and
+          not present(session, '.native-file-attention') and
+          attribute(session, '.cm-content', 'contenteditable') == 'true' and
           path.read_bytes() == later_disk.encode(), 20)
-    click(session, '.conflict-actions .btn-cta')
-    until('reviewed merge result reaches disk with CRLF',
-          lambda: path.read_bytes() == result.replace('\n', '\r\n').encode(), 20)
 
     path.chmod(0o444)
     replace_editor(session, '# reviewer\n\nFailed quit edit.\n')
-    until('second failed save preserves the file',
-          lambda: 'Autosave failed' in (attribute(
-              session, '.toast-error [aria-label]', 'aria-label') or '') and
-          path.read_bytes() == result.replace('\n', '\r\n').encode(), 20)
+    until('second failed save pauses editing and preserves the file',
+          lambda: save_paused('Failed quit edit.', later_disk), 20)
     close_window(pid)
-    until('title-bar close refuses unsaved changes',
-          lambda: window_for(pid) and 'Changes remain unsaved' in text(session, '[role="alert"]'))
+    until('title-bar close asks before discarding unsaved changes',
+          lambda: window_for(pid) and
+          'Save changes before closing?' in text(session, '.close-dialog[open]') and
+          path.name in text(session, '.close-dialog[open] li'))
     assert 'Failed quit edit.' in editor(session), 'Unsaved editor text was lost'
+    click_labelled(session, '.close-dialog[open] .close-actions button:nth-child(2)', 'Cancel')
+    until('cancelling the close keeps the window and its unsaved text',
+          lambda: window_for(pid) and not present(session, '.close-dialog[open]') and
+          property_value(session, '#root', 'inert') is False and
+          'Failed quit edit.' in editor(session) and path.read_bytes() == later_disk.encode())
     path.chmod(0o666)
-    replace_editor(session, '# reviewer\n\nRecovered after failed quit.\n')
-    until('editing after failed quit retries autosave',
-          lambda: path.read_bytes() == b'# reviewer\r\n\r\nRecovered after failed quit.\r\n', 20)
+    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-ghost', 'Retry')
+    until('Retry after restoring access saves the retained text',
+          lambda: path.read_bytes() == b'# reviewer\r\n\r\nFailed quit edit.\r\n' and
+          not present(session, '.conflict-actions'), 20)
     close_window(pid)
     until('title-bar close exits after save', lambda: not window_for(pid))
 
