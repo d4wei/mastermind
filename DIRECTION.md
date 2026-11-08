@@ -37,8 +37,13 @@ patched, but stock 1.0.0 is quadratic, panics on an unclosed fence in a list ite
 compatibility pass to match today's trees, with structural differences left; not adopted.
 Windowed rendering makes the 15 MiB fixture interactive (mount 31.5 s to 0.5 s, 16 ms frames)
 but breaks every reader of the whole DOM (rail anchors, Navigator, reveal, Find, selection,
-print), a two-to-three-week contract change; `content-visibility` gains little and is pathological
-with the rail. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 22 s at 15
+print), a two-to-three-week contract change. `content-visibility: auto` on every block, with the
+rail, Find, mark gutter and smooth scrolls taught to read a skipped block's box instead of positions
+inside it, removes every cost it added at 600 KB and keeps all readers correct, and WebKit supports
+the properties and the state-change event (no scroll anchoring, so a manual compensation is
+needed); but at 15 MiB Chrome spends about 700 ms per frame managing 98k skipped elements even
+while idle, so per-block skipping does not scale, and whether skipping larger chunks does is
+unmeasured. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 22 s at 15
 MiB). The JavaScriptCore blow-up seen earlier (25 s at 8 MiB against 6 s in Node) did not
 reproduce on an idle machine: it was memory pressure (a parse holds 3–4 GB at 8–15 MiB, and the
 runs were made at load 29–36), and the mild superlinearity both engines shared was a quadratic
@@ -52,9 +57,8 @@ micromark's already does. A size threshold above which the reading view yields t
 is a candidate policy, not a ruling.
 
 **Exit:** the parse moved off the main thread, or re-parsed per changed block; the parse's memory
-footprint measured inside WKWebView; a measurement of whether `content-visibility: auto` with a rail
-that measures skipped blocks rather than their anchors avoids most of the contract change; then a
-ruling on the size policy, if one is still needed.
+footprint measured inside WKWebView; `content-visibility` either measured on chunks of blocks at
+15 MiB or left alone; then a ruling on the size policy, if one is still needed.
 
 ## 2026-11-07 — Restoring remembered files reads every one before the first reply
 
