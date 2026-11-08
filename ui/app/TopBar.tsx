@@ -60,7 +60,7 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
             title={t('moreActions')}><MoreIcon /></button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content className="reader-menu" align="end" sideOffset={8}
+          <DropdownMenu.Content data-keeps-discussion="" className="reader-menu" align="end" sideOffset={8}
             onCloseAutoFocus={(event) => {
               if (openingPanel.current) event.preventDefault()
               openingPanel.current = false

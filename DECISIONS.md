@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — A click keeps the selected discussion only on a surface marked for it
+
+**Ruled.** Deselection asks one structural question: whether the click landed inside an element
+carrying `data-keeps-discussion`. Each surface sets the marker where it is defined (comment cards,
+discussion passages and marks, menus, dialogs, tooltips, slide-over panels, Find, the selection
+toolbar, the notification stack); a new overlay keeps the selection only once it is marked, and the
+narrow comments panel passes `keepsDiscussion={false}` so clicks on its empty space still deselect.
+
+**Beat:** a central allow-list of selector classes with a carve-out, which a renamed class or an
+unlisted new overlay silently turned into deselection.
+
 ## 2026-11-07 — Shadows mark overlays; comment cards carry none
 
 **Ruled.** A shadow belongs to a surface that can cover others: popovers (`--shadow-popover`,

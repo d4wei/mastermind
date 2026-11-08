@@ -225,7 +225,7 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   const announcement = results.length ? t('findCount').replace('{current}', String(currentIndex + 1))
     .replace('{total}', String(results.length)) : query ? t('findNone') : ''
   const counter = results.length ? `${currentIndex + 1}/${results.length}` : '0/0'
-  return <div className="find-bar" role="search" aria-label={t('find')} ref={panel}>
+  return <div className="find-bar" data-keeps-discussion="" role="search" aria-label={t('find')} ref={panel}>
     <div className="find-field">
       <SearchIcon />
       <input {...ime.inputProps} ref={setInput}

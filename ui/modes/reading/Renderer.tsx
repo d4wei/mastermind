@@ -76,6 +76,7 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
         <del
           key={key}
           className="critic critic-del"
+          data-keeps-discussion=""
           data-span-index={n.data.spanIndex}
           {...deletionProps(ctx, plainText(n))}
         >
@@ -94,6 +95,7 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
         <mark
           key={key}
           className="critic critic-hl critic-anchor"
+          data-keeps-discussion=""
           data-span-index={n.data.spanIndex}
           role="button"
           tabIndex={0}
@@ -120,6 +122,7 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
         <span
           key={key}
           className={`critic ${ctx.commentMarkers?.has(n.data.spanIndex) ? 'critic-comment-marker' : 'critic-comment-reference'}`}
+          data-keeps-discussion={ctx.commentMarkers?.has(n.data.spanIndex) ? '' : undefined}
           data-span-index={n.data.spanIndex}
           title={n.data.content}
           role="button"

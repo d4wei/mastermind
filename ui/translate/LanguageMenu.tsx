@@ -33,7 +33,7 @@ export function LanguageMenu() {
         <LanguageIcon /><span>{label}</span><ChevronDownIcon />
       </button>
     </DropdownMenu.Trigger>
-    <DropdownMenu.Portal><DropdownMenu.Content className="reader-menu" align="end" sideOffset={8}>
+    <DropdownMenu.Portal><DropdownMenu.Content data-keeps-discussion="" className="reader-menu" align="end" sideOffset={8}>
       <DropdownMenu.RadioGroup value={targetLang ?? ''} onValueChange={(value) => { void change(value || null) }}>
         {[{ code: '', label: t('original') }, ...available.map((item) => ({ code: item.targetLang, label: languageName(item.targetLang) }))]
           .map((item) => <DropdownMenu.RadioItem className="reader-menu-item" key={item.code} value={item.code}>

@@ -27,7 +27,7 @@ export function CloseDialog() {
     dialog.current?.showModal()
     dialog.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus()
   }, [prompt])
-  return createPortal(<dialog ref={dialog} className="close-dialog" aria-labelledby="close-title"
+  return createPortal(<dialog ref={dialog} data-keeps-discussion="" className="close-dialog" aria-labelledby="close-title"
     onCancel={(event) => { event.preventDefault(); choose('cancel') }}
     onKeyDown={(event) => { if (ime.isComposing(event.nativeEvent)) event.stopPropagation() }}>
     {prompt && <>

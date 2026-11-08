@@ -13,12 +13,12 @@ let host: HTMLDivElement
 let root: Root
 /** Each card's rendered height, by its order in the rail. */
 let heights: number[]
-let resize: (() => void) | null
+let resize: ResizeObserverCallback | null
 beforeEach(() => {
   vi.useFakeTimers()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
-  vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback } observe() {} disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class { constructor(callback: ResizeObserverCallback) { resize = callback } observe() {} unobserve() {} disconnect() {} })
   document.documentElement.style.setProperty('--dur-base', '180ms')
   heights = [100, 50]
   resize = null
@@ -46,18 +46,19 @@ afterEach(() => {
 const ANALYSIS = analyzeMarkdown(SOURCE)
 const edit = vi.fn(() => true)
 /** Each commit's selected and hovered discussion, as the document lights their passages. */
-let commits: { active: number | null; hovered: number | null }[]
+let commits: { active: number | null; hovered: number | null; focused: number | null }[]
 
 function Harness({ detached = false }: { detached?: boolean }) {
   const analysis = useMemo(() => ANALYSIS, [])
   const docRef = useRef<HTMLElement>(null)
   const [active, setActive] = useState<number | null>(null)
   const [hovered, setHovered] = useState<number | null>(null)
+  const [focused, setFocused] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<ReplyDraft[]>([])
-  useLayoutEffect(() => { commits.push({ active, hovered }) })
+  useLayoutEffect(() => { commits.push({ active, hovered, focused }) })
   return <><article ref={detached ? undefined : docRef} />
     <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
-      activeSpan={active} onActivate={setActive} hoveredSpan={hovered} onHover={setHovered} onEdit={edit}
+      activeSpan={active} onActivate={setActive} hoveredSpan={hovered} focusedSpan={focused} onHover={setHovered} onFocusSpan={setFocused} onEdit={edit}
       drafts={drafts} onDraftsChange={setDrafts} /></>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
@@ -83,7 +84,8 @@ it('moves neighbors within the size observer callback, before the frame paints',
   heights = [160, 50]
   // Outside act, so only a synchronous commit can show the new placement on return.
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', false)
-  resize!()
+  resize!([{ target: cards()[0]!, borderBoxSize: [{ blockSize: 160, inlineSize: 0 }] } as unknown as ResizeObserverEntry],
+    {} as ResizeObserver)
   expect(cards()[1]!.style.top).toBe('168px')
 })
 
@@ -145,4 +147,17 @@ it('keeps a passage lit through every commit while its card is pressed and selec
   act(() => target.querySelector<HTMLElement>('.rail-body')!.click())
   expect(commits.at(-1)!.active).toBe(span)
   expect(commits.filter((commit) => commit.active !== span && commit.hovered !== span)).toEqual([])
+})
+
+it('keeps a focused card emphasized while the pointer passes over another card and leaves', () => {
+  act(() => root.render(<Harness />))
+  const [focused, other] = cards()
+  act(() => focused!.querySelector<HTMLButtonElement>('.rail-select')!.focus())
+  expect(focused!.classList.contains('paired')).toBe(true)
+  act(() => { other!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })) })
+  expect([focused!.classList.contains('paired'), other!.classList.contains('paired')]).toEqual([true, true])
+  act(() => { other!.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })) })
+  expect([focused!.classList.contains('paired'), other!.classList.contains('paired')]).toEqual([true, false])
+  act(() => (document.activeElement as HTMLElement).blur())
+  expect(focused!.classList.contains('paired')).toBe(false)
 })

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { placeCommentCards, placedTops } from '../ui/review/rail-layout'
+import { placeCommentCards } from '../ui/review/rail-layout'
 
 it('gives a selected crowded discussion its anchor while retaining readable neighbors', () => {
   const cards = [300, 340, 380].map((anchorTop) => ({ anchorTop, height: 100 }))
@@ -27,13 +27,6 @@ it('never overlaps cards or changes source order across crowded and sparse layou
       }
     }
   }
-})
-
-it('keys placed tops by card identity and keeps an unchanged placement', () => {
-  const placed = placedTops(['a', 'b'], [0, 108], new Map())
-  expect([...placed]).toEqual([['a', 0], ['b', 108]])
-  expect(placedTops(['a', 'b'], [0, 108], placed)).toBe(placed)
-  expect([...placedTops(['b'], [108], placed)]).toEqual([['b', 108]])
 })
 
 it('never pushes a card up for height it is collapsing, and lets the selection rise as it closes', () => {

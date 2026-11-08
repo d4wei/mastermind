@@ -58,7 +58,7 @@ export function Notifications({ children }: { children: ReactNode }) {
     {children}
     {announcements.map(({ id, text, serial }) => <Notification key={id} tier="transient" restart={serial}
       onExpire={() => withdraw(id, serial)}>{text}</Notification>)}
-    <div ref={setStack} className="notification-stack">
+    <div ref={setStack} className="notification-stack" data-keeps-discussion="">
       <div ref={setTransients} className="notification-transients" role="status" aria-live="polite" />
     </div>
   </NotificationTarget.Provider>

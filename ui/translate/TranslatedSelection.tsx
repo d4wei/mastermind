@@ -118,7 +118,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
   useDraftGuard('translated', t('comment'), composing && !!body.trim(),
     () => { requestAnimationFrame(() => composer.current?.querySelector('textarea')?.focus()) }, close)
   if (!selection || !placement) return null
-  return <div ref={composer} className="sel-toolbar" style={{ top: Math.max(8, placement.top - (composing ? 150 : 44)),
+  return <div ref={composer} data-keeps-discussion="" className="sel-toolbar" style={{ top: Math.max(8, placement.top - (composing ? 150 : 44)),
     left: Math.max(8, Math.min(placement.left, window.innerWidth - 280)) }}
     onMouseDown={(event) => { if ((event.target as HTMLElement).tagName !== 'TEXTAREA') event.preventDefault() }}>
     {!composing ? <button type="button" disabled={readOnly} onClick={() => setComposing(true)}>{t('comment')}</button> :

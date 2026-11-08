@@ -11,10 +11,13 @@ interface Props {
   /** Receives focus on close when the element focused before opening is unavailable. */
   returnFocus: string
   focusOnOpen?: boolean
+  /** Whether a click inside leaves the selected discussion selected; false for a panel holding the rail. */
+  keepsDiscussion?: boolean
   children: ReactNode
 }
 
-export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOnOpen = true, children }: Props) {
+export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOnOpen = true, keepsDiscussion = true,
+  children }: Props) {
   const t = useT()
   const panelRef = useRef<HTMLDivElement | null>(null)
 
@@ -63,7 +66,8 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOn
   }, [onClose, ignoreSelector, returnFocus, focusOnOpen])
 
   return (
-    <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}>
+    <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}
+      data-keeps-discussion={keepsDiscussion ? '' : undefined}>
       <div className="slide-over-head">
         <span className="slide-over-title">{title}</span>
         <button type="button" className="btn-ghost btn-icon slide-over-close" onClick={onClose} aria-label={t('close')}>

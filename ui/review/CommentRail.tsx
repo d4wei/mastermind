@@ -3,7 +3,6 @@ import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
 import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
-import { flushSync } from 'react-dom'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
 import { ThreadMessage } from './ThreadMessage'
@@ -15,8 +14,7 @@ import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-ar
 import './ResolvedThreads.css'
 import { useCompositionGuard } from '../util/composition'
 import { revealElement } from '../util/scroll'
-import { placeCommentCards, placedTops } from './rail-layout'
-import { settledHeight } from './settling'
+import { RailPlacement } from './rail-layout'
 import { locateThread, threadRef, type ReplyDraft } from './thread-identity'
 import type { ThreadCard } from '../../document/critic/types'
 import type { Analysis } from '../../document/markdown/analyze'
@@ -32,8 +30,12 @@ interface Props {
   activeSpan: number | null
   replyRequest?: { spanIndex: number } | null
   onReplyHandled?: () => void
+  /** The discussion under the pointer; it and `focusedSpan` are emphasized without selecting. */
   hoveredSpan?: number | null
+  /** The discussion whose card holds keyboard focus. */
+  focusedSpan?: number | null
   onHover?: (spanIndex: number | null) => void
+  onFocusSpan?: (spanIndex: number | null) => void
   onActivate: (spanIndex: number | null) => void
   /** Returns whether the edits applied; the owner rebases `drafts` through those that did. */
   onEdit: (edits: TextEdit[]) => boolean
@@ -46,16 +48,27 @@ interface Props {
 
 const CARD_GAP = 8
 
-export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
-  onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false, leaving = false }: Props) {
+export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, focusedSpan, onHover,
+  onFocusSpan, onActivate, onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false, leaving = false }: Props) {
   const cards = analysis.threads
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
   const ime = useCompositionGuard()
-  const railRef = useRef<HTMLDivElement>(null)
-  const cardRefs = useRef(new Map<string, HTMLDivElement>())
-  const [positions, setPositions] = useState<ReadonlyMap<string, number>>(() => new Map())
-  const [railHeight, setRailHeight] = useState(0)
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const [placed, setPlaced] = useState<ReadonlySet<string>>(() => new Set())
+  const [placement] = useState(() => new RailPlacement(CARD_GAP, (keys) => setPlaced(new Set(keys))))
+  const attachRail = useCallback((element: HTMLDivElement | null) => {
+    railRef.current = element
+    placement.setRail(element)
+  }, [placement])
+  const attachDrafts = useCallback((element: HTMLDivElement | null) => placement.setDrafts(element), [placement])
+  // Stable per card, so a render neither releases nor re-observes a card that stays.
+  const cardRefs = useRef(new Map<string, (element: HTMLDivElement | null) => (() => void) | undefined>())
+  const cardRef = (key: string) => {
+    let ref = cardRefs.current.get(key)
+    if (!ref) cardRefs.current.set(key, ref = (element) => element ? placement.attach(key, element) : undefined)
+    return ref
+  }
   // The card whose reply composer was explicitly requested and takes focus; the selected card shows
   // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
@@ -92,35 +105,13 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   }
 
   useLayoutEffect(() => {
-    const rail = railRef.current
-    const doc = docRef.current
-    if (!doc || !rail) return
-    const measure = () => {
-      const railTop = rail.getBoundingClientRect().top
-      const measurements = cards.map((card) => {
-        const element = cardRefs.current.get(card.key)
-        const height = element?.getBoundingClientRect().height ?? 0
-        return {
-          anchorTop: Math.max(0, (doc.querySelector(`[data-span-index="${card.spanIndex}"]`)
-            ?.getBoundingClientRect().top ?? railTop) - railTop),
-          height,
-          settledHeight: element ? settledHeight(element, height) : height,
-        }
-      })
-      const next = placeCommentCards(measurements, cards.findIndex((card) => card.spanIndex === activeSpan), CARD_GAP)
-      setPositions((current) => placedTops(cards.map((card) => card.key), next, current))
-      setRailHeight(Math.max(doc.scrollHeight, ...next.map((top, i) => top + measurements[i]!.height)))
-    }
-    // Observers report sizes after layout and before paint; placing synchronously there keeps
-    // neighbors in step with a card that is easing open, frame by frame.
-    const remeasure = () => flushSync(measure)
-    measure()
-    const observer = new ResizeObserver(remeasure)
-    observer.observe(doc)
-    cardRefs.current.forEach((element) => observer.observe(element))
-    window.addEventListener('resize', remeasure)
-    return () => { observer.disconnect(); window.removeEventListener('resize', remeasure) }
-  }, [cards, activeSpan, replyFor, docRef])
+    placement.connect()
+    return () => placement.disconnect()
+  }, [placement])
+  useLayoutEffect(() => placement.update(docRef.current, cards, activeSpan), [placement, docRef, cards, activeSpan])
+  useEffect(() => {
+    for (const key of cardRefs.current.keys()) if (!cards.some((card) => card.key === key)) cardRefs.current.delete(key)
+  }, [cards])
 
   useEffect(() => {
     if (activeSpan === null) {
@@ -133,7 +124,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     if (!card || selectedKey.current === card.key) return
     selectedKey.current = card.key
     if (activatedFromCard.current === activeSpan) { activatedFromCard.current = null; return }
-    const element = cardRefs.current.get(card.key)
+    const element = placement.element(card.key)
     if (!element) return
     const frame = requestAnimationFrame(() => {
       const target = element.querySelector('textarea') ?? element.querySelector('.rail-message-header') ?? element
@@ -149,7 +140,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     setReplyFor(key)
     // An already-open composer does not remount, so autofocus cannot handle repeat clicks; one that
     // is still collapsing stays inert until this request reopens it, so it takes focus after commit.
-    const input = cardRefs.current.get(key)?.querySelector('textarea')
+    const input = placement.element(key)?.querySelector('textarea')
     input?.focus({ preventScroll: true })
     pendingFocus.current = input && document.activeElement !== input ? key : null
   }, [readOnly])
@@ -157,7 +148,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     const key = pendingFocus.current
     if (key === null) return
     pendingFocus.current = null
-    const input = cardRefs.current.get(key)?.querySelector('textarea')
+    const input = placement.element(key)?.querySelector('textarea')
     if (input && !input.closest('[inert]')) input.focus({ preventScroll: true })
   })
   useEffect(() => {
@@ -177,7 +168,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   /** Deselects the discussion; `keepFocus` leaves focus on a control that stays rendered. */
   const collapse = (keepFocus = false) => {
     const card = cards.find((item) => item.spanIndex === activeSpan)
-    const element = card && cardRefs.current.get(card.key)
+    const element = card && placement.element(card.key)
     if (!keepFocus && element?.contains(document.activeElement)) element.querySelector<HTMLButtonElement>('.rail-select')?.focus({ preventScroll: true })
     setReplyFor(null)
     onActivate(null)
@@ -226,15 +217,15 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     onActivate(card.spanIndex)
     setReplyFor(card.key)
     requestAnimationFrame(() => {
-      const input = cardRefs.current.get(card.key)?.querySelector('textarea')
+      const input = placement.element(card.key)?.querySelector('textarea')
       input?.focus(); input?.scrollIntoView({ block: 'nearest' })
     })
   }, () => { setDrafts([]); setReplyFor(null) })
 
   const orphaned = drafts.filter((draft) => draft.text.trim() && !placedDrafts.cardOf.has(draft.id))
   if (!cards.length && !orphaned.length) return null
-  return <div ref={railRef} className={`rail${leaving ? ' leaving' : ''}`} inert={tableExpanded || leaving}
-    aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
+  return <div ref={attachRail} className={`rail${leaving ? ' leaving' : ''}`} inert={tableExpanded || leaving}
+    aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.map((card) => {
       const selected = activeSpan === card.spanIndex
@@ -260,16 +251,12 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
             }} />
           </>} />
       return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
-        ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
-        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}${positions.has(card.key) ? '' : ' unplaced'}`}
-        style={{ top: positions.get(card.key) }}
+        ref={cardRef(card.key)} data-keeps-discussion=""
+        className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex || focusedSpan === card.spanIndex
+          ? ' paired' : ''}${placed.has(card.key) ? '' : ' unplaced'}`}
         onPointerEnter={() => onHover?.(card.spanIndex)} onPointerLeave={() => onHover?.(null)}
-        onFocus={() => onHover?.(card.spanIndex)}
-        // Focus leaving a card ends only its own emphasis: pressing another card's body moves focus to
-        // nothing, and clearing that card's hover would unlight its passage until the click selects it.
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget) && hoveredSpan === card.spanIndex) onHover?.(null)
-        }}
+        onFocus={() => onFocusSpan?.(card.spanIndex)}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onFocusSpan?.(null) }}
         onClick={(event) => {
           if ((event.target as HTMLElement).closest('button, a, input, select, textarea, [role="menuitem"]')) return
           if (window.getSelection()?.isCollapsed !== false) activate(card.spanIndex)
@@ -311,7 +298,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
         </div></Collapsible>
       </div>
     })}
-    {orphaned.length > 0 && <div className="rail-orphan" style={{ paddingTop: cards.length ? railHeight : undefined }}>
+    {orphaned.length > 0 && <div ref={attachDrafts} className="rail-orphan">
       <p>{t('draftTargetChanged')}</p>
       {orphaned.map((draft) => <div key={draft.id}>
         <label>{t('reply')}<textarea readOnly value={draft.text} /></label>

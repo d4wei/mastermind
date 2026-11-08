@@ -92,12 +92,10 @@ function isTypingTarget(e: KeyboardEvent): boolean {
 }
 
 /**
- * Where a click leaves the selected discussion selected; see the deselection effect. The narrow
- * comments panel is a slide-over dialog but holds the rail itself, so its empty space deselects.
+ * Marks a surface where a click leaves the selected discussion selected; see the deselection
+ * effect. Each discussion surface and each floating layer carries it where it is defined.
  */
-const KEEPS_DISCUSSION = ['.rail-card', '.critic-anchor', '.critic-comment-marker', '.critic-del',
-  '[data-radix-popper-content-wrapper]', '[role="menu"]', 'dialog', '.tooltip',
-  ':is([role="dialog"], .slide-over):not(.comments-panel > *)', '.find-bar', '.sel-toolbar', '.notification-stack'].join(', ')
+const KEEPS_DISCUSSION = '[data-keeps-discussion]'
 /** Pointer travel, in pixels, beyond which a press and release is a drag rather than a click. */
 const DRAG_DISTANCE = 4
 
@@ -201,7 +199,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const highlightCode = (useConfig((s) => s.config?.codeTheme) ?? 'none') !== 'none'
   const cards = analysis?.threads ?? null
   const [activeSpan, chooseActive, rebaseActive] = useThreadChoice(cards, source)
+  // Pointer hover and keyboard focus each emphasize a discussion; neither ends the other's.
   const [hoveredSpan, chooseHovered, rebaseHovered] = useThreadChoice(cards, source)
+  const [focusedSpan, chooseFocused, rebaseFocused] = useThreadChoice(cards, source)
   // Owned here rather than by the rail, which is unmounted while the narrow comments panel is closed.
   const [replyDrafts, setReplyDrafts] = useDraftState<ReplyDraft[]>('replies', [])
   // Each analysis re-anchors the drafts, so their uniqueness describes the source the next change
@@ -221,10 +221,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     collapseTable()
     rebaseActive(edits, base)
     rebaseHovered(edits, base)
+    rebaseFocused(edits, base)
     setReplyDrafts((drafts) => rebaseReplies(drafts, base, edits))
     doc.applyEdits(edits)
     return true
-  }, [sessionId, collapseTable, rebaseActive, rebaseHovered, setReplyDrafts])
+  }, [sessionId, collapseTable, rebaseActive, rebaseHovered, rebaseFocused, setReplyDrafts])
   const applyEdits = useCallback((edits: TextEdit[]) => applyReviewEdits(edits, source), [applyReviewEdits, source])
   const revealFindComment = useCallback((spanIndex: number) => {
     collapseTable()
@@ -237,7 +238,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     void load(sessionId)
     chooseActive(null)
     chooseHovered(null)
-  }, [sessionId, load, chooseActive, chooseHovered])
+    chooseFocused(null)
+  }, [sessionId, load, chooseActive, chooseHovered, chooseFocused])
 
   useEffect(() => {
     if (status !== 'ready') return
@@ -327,9 +329,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     },
     [undoDeletion, activateThread],
   )
-  // A click anywhere but the selected discussion's card or a discussion's passage deselects it,
-  // keeping its reply draft as Escape does. Cards and passages select through their own handlers;
-  // menus, tooltips, dialogs, panels, Find, notifications, and the selection toolbar leave it.
+  // A click anywhere but a surface marked `KEEPS_DISCUSSION` deselects the discussion, keeping its
+  // reply draft as Escape does. Cards and passages carry the mark and select through their own
+  // handlers; menus, tooltips, dialogs, panels, Find, notifications, and the selection toolbar carry
+  // it and leave the selection. The narrow comments panel holds the rail, so only its cards do.
   useEffect(() => {
     if (activeSpan === null) return
     // The press that began the coming click. A press that ends without one (a context menu, a touch
@@ -386,8 +389,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     const doc = articleRef.current
     if (!doc) return
     doc.querySelectorAll('.critic.paired').forEach((element) => element.classList.remove('paired'))
-    if (hoveredSpan !== null) doc.querySelector(`.critic[data-span-index="${hoveredSpan}"]`)?.classList.add('paired')
-  }, [hoveredSpan, analysis])
+    for (const span of [hoveredSpan, focusedSpan]) {
+      if (span !== null) doc.querySelector(`.critic[data-span-index="${span}"]`)?.classList.add('paired')
+    }
+  }, [hoveredSpan, focusedSpan, analysis])
 
   const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
     replyDrafts.some((draft) => !!draft.text.trim())
@@ -431,7 +436,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       replyRequest={replyRequest}
       onReplyHandled={replyHandled}
       hoveredSpan={hoveredSpan}
+      focusedSpan={focusedSpan}
       onHover={chooseHovered}
+      onFocusSpan={chooseFocused}
       onActivate={chooseActive}
       drafts={replyDrafts}
       onDraftsChange={setReplyDrafts}
@@ -522,7 +529,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       {showRail && analysis && !showTranslated && narrow && (
         <div className="comments-panel" inert={tableExpanded} aria-hidden={tableExpanded}
           data-table-hidden={tableExpanded}>
-          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar"
+          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar" keepsDiscussion={false}
             returnFocus=".topbar-comments" focusOnOpen={!findOpenedRail.current}>
             {commentRail}
           </SlideOver>

@@ -17,9 +17,9 @@ import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
 
-const rail = vi.hoisted(() => ({ leaving: false, request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void),
+const rail = vi.hoisted(() => ({ leaving: false, request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, focused: null as number | null, onHover: null as null | ((span: number | null) => void), onFocusSpan: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void),
   drafts: [] as readonly ReplyDraft[], onDraftsChange: null as null | ((drafts: ReplyDraft[]) => void) }))
-vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { leaving?: boolean; replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void; drafts: readonly ReplyDraft[]; onDraftsChange: (drafts: ReplyDraft[]) => void }) => {
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { leaving?: boolean; replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; focusedSpan: number | null; onHover: (span: number | null) => void; onFocusSpan: (span: number | null) => void; drafts: readonly ReplyDraft[]; onDraftsChange: (drafts: ReplyDraft[]) => void }) => {
   rail.onEdit = props.onEdit
   rail.leaving = !!props.leaving
   rail.drafts = props.drafts
@@ -28,6 +28,8 @@ vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { leaving?: bo
   rail.request = props.replyRequest ?? null
   rail.hovered = props.hoveredSpan
   rail.onHover = props.onHover
+  rail.focused = props.focusedSpan
+  rail.onFocusSpan = props.onFocusSpan
   return <div data-testid="rail" />
 } }))
 const toolbar = vi.hoisted(() => ({ onEdit: null as null | ((edits: TextEdit[]) => boolean) }))
@@ -236,6 +238,19 @@ it('pairs passage and card hover without selecting a discussion', () => {
   expect(rail.active).toBeNull()
 })
 
+it('lights a focused discussion and a hovered one independently', () => {
+  render('a {==X==}{>>x<<} b {==Y==}{>>y<<}')
+  const [x, y] = Array.from(host.querySelectorAll<HTMLElement>('.critic-anchor'))
+  act(() => rail.onFocusSpan!(0))
+  act(() => y!.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+  expect([rail.focused, rail.hovered]).toEqual([0, 2])
+  expect([x!.classList.contains('paired'), y!.classList.contains('paired')]).toEqual([true, true])
+  act(() => y!.dispatchEvent(new MouseEvent('pointerout', { bubbles: true, relatedTarget: document.body })))
+  expect([x!.classList.contains('paired'), y!.classList.contains('paired')]).toEqual([true, false])
+  act(() => rail.onFocusSpan!(null))
+  expect(x!.classList.contains('paired')).toBe(false)
+})
+
 it('selects from the passage and clears selection on ordinary document clicks or Escape', () => {
   render('Before {==passage==}{>>@Alex: note<<} after.')
   const passage = host.querySelector<HTMLElement>('.critic-anchor')!
@@ -251,8 +266,8 @@ it('selects from the passage and clears selection on ordinary document clicks or
   expect(rail.active).toBeNull()
 })
 
-it('deselects on a click anywhere but the selected card, a passage, or UI the card opened', () => {
-  render('Before {==passage==}{>>@Alex: note<<} after.')
+it('deselects on a click anywhere but a surface marked as keeping the discussion', () => {
+  render('Before {==passage==}{>>@Alex: note<<} after {--gone--}.')
   const passage = host.querySelector<HTMLElement>('.critic-anchor')!
   const select = () => { act(() => passage.click()); expect(rail.active).toBe(0) }
   const clickOn = (element: Element, init: MouseEventInit = {}) =>
@@ -263,15 +278,22 @@ it('deselects on a click anywhere but the selected card, a passage, or UI the ca
     host.append(holder)
     return holder.querySelector<HTMLElement>('[data-target]')!
   }
-  const card = add('<div class="rail-card active"><div class="rail-reply"><textarea data-target></textarea></div></div>')
-  const menu = add('<div data-radix-popper-content-wrapper><div role="menu"><div role="menuitem" data-target>Delete</div></div></div>')
-  const dialog = add('<div class="slide-over" role="dialog"><p data-target>Settings</p></div>')
+  const marked = add('<div data-keeps-discussion><div><textarea data-target></textarea></div></div>')
   const narrowRail = add('<div class="comments-panel"><div class="slide-over" role="dialog"><div class="rail" data-target></div></div></div>')
   select()
-  for (const kept of [card, menu, dialog, passage]) {
+  openReaderMenu(host)
+  const menu = document.querySelector<HTMLElement>('[role="menu"]')!
+  for (const kept of [marked, menu, passage]) {
     clickOn(kept)
     expect(rail.active).toBe(0)
   }
+  act(() => readerMenuItem('Resolved (0)').click())
+  const panel = host.querySelector<HTMLElement>('.slide-over[role="dialog"]')!
+  clickOn(panel.querySelector('.slide-over-title')!)
+  expect(rail.active).toBe(0)
+  // A click on a deletion restores it and keeps the discussion.
+  clickOn(host.querySelector('.critic-del')!)
+  expect(rail.active).toBe(0)
   for (const elsewhere of [host.querySelector('.topbar')!, host.querySelector('[data-testid="rail"]')!,
     host.querySelector('.doc-shell')!, narrowRail]) {
     select()

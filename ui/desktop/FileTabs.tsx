@@ -145,7 +145,7 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
           title={t('openFiles')}>+{hidden}<ChevronDownIcon /></button>
       </Popover.Trigger>}
       <Popover.Portal>
-        <Popover.Content ref={list} className="native-file-list" aria-label={t('openFiles')}
+        <Popover.Content ref={list} data-keeps-discussion="" className="native-file-list" aria-label={t('openFiles')}
           align="end" sideOffset={8} collisionPadding={8} onKeyDown={move}
           onOpenAutoFocus={(event) => {
             event.preventDefault(); selecting.current = false

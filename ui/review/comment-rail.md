@@ -26,8 +26,10 @@ retain order and separation. Measurements include actual card heights, including
 composer. Narrow comment panels use ordinary vertical flow instead of positioned cards.
 
 Hover and keyboard focus emphasize the matching passage and card without selecting, expanding,
-or repositioning either. Focus leaving a card ends only that card's emphasis, so pressing another
-card's body keeps its passage lit until the click selects it. Dragging to select text does not open a reply. Navigation reveals an
+or repositioning either. They are separate sources, and either one emphasizes: the pointer leaving
+a card or passage ends only hover, and focus leaving a card ends only focus, so a focused card stays
+lit while the pointer crosses other cards and passages, and pressing another card's body keeps its
+passage lit until the click selects it. Dragging to select text does not open a reply. Navigation reveals an
 offscreen counterpart without moving one that is already visible. Wide cards share document
 scrolling; narrow panels scroll their own content. The rail fades in without animating cards from
 provisional positions; hiding wide comments fades it out in place, inert, before the document
@@ -46,7 +48,11 @@ moves. The quoted passage eases between clamps
 by animating `max-height` from the height on screen to the next clamp's measured height, and a
 shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
 re-places cards synchronously from its size observer, so neighbors follow an easing card in the
-same frame, and a card not yet placed stays unseen rather than at the rail's top. Shrinking sections
+same frame, and a card not yet placed stays unseen rather than at the rail's top. One observer
+watches the document and every card for the rail's lifetime (`RailPlacement` in `rail-layout.ts`); an
+observation re-reads only the cards it reports, and anchor offsets only when the document resized,
+and writes positions to the cards without rendering them. A new selection or set of cards measures
+everything once. Shrinking sections
 mark the size they settle to (`settling.ts`), and earlier cards make room for a selection only by
 the heights they keep: a card collapsing above a new selection never rises for height it is losing,
 while the selection starts below its current bottom and rises as it closes. Placement changes that
@@ -63,9 +69,11 @@ to one message; Resolve archives the complete discussion through the existing so
 
 Escape collapses selection, as does a click anywhere but the selected card and the discussion
 passages: the empty rail, margins, top bar, outline, or another card's controls. Another card's
-background selects that card instead. Clicks inside menus, tooltips, dialogs, slide-over panels other
-than the narrow comments panel, Find, notifications, and the selection toolbar keep it, as do a drag
-and a click that ends a text selection in the document. Escape that closes a panel, popover, or menu
+background selects that card instead. A surface keeps the selection by carrying
+`data-keeps-discussion` where it is defined: cards, discussion passages, deletion marks, menus,
+tooltips, dialogs, slide-over panels other than the narrow comments panel, Find, notifications, and
+the selection toolbar; an unmarked surface deselects. A drag and a click that ends a text selection
+in the document keep it too. Escape that closes a panel, popover, or menu
 does not collapse it. Reply drafts stay with their discussions, including when switching or collapsing
 cards. Each analysis builds its thread cards once (`threadCards` beside `group`), carrying every
 member's span index; `thread-identity.ts` identifies a discussion by its anchor text and opening

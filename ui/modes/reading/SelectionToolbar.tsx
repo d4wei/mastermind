@@ -380,7 +380,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     : Math.max(ceiling, Math.min(view.rect.bottom + 8, window.innerHeight - toolbarSize.height - 8))
 
   return (
-    <div ref={toolbarRef}
+    <div ref={toolbarRef} data-keeps-discussion=""
       className={`sel-toolbar${present.exiting ? ' closing' : ''}`}
       style={{ top, left }}
       onMouseDown={(e) => {
