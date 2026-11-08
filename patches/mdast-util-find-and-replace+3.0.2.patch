@@ -1,0 +1,55 @@
+diff --git a/node_modules/mdast-util-find-and-replace/lib/index.js b/node_modules/mdast-util-find-and-replace/lib/index.js
+index af84ba6..904f3f4 100644
+--- a/node_modules/mdast-util-find-and-replace/lib/index.js
++++ b/node_modules/mdast-util-find-and-replace/lib/index.js
+@@ -80,11 +80,32 @@ export function findAndReplace(tree, list, options) {
+   const ignored = convert(settings.ignore || [])
+   const pairs = toPairs(list)
+   let pairIndex = -1
++  /** @type {WeakMap<Array<Nodes>, number>} */
++  let lastIndex
+ 
+   while (++pairIndex < pairs.length) {
++    lastIndex = new WeakMap()
+     visitParents(tree, 'text', visitor)
+   }
+ 
++  /**
++   * `siblings.indexOf(node)`, resuming at the index last found in `siblings`.
++   * The walk meets siblings in document order, so scanning each `children` from its start would
++   * make the walk quadratic in the length of the longest one (the root's, in a long document).
++   * A node occurs once among its parent's children, so the first hit is its index.
++   *
++   * @param {Array<Nodes>} siblings
++   * @param {Nodes} node
++   * @returns {number}
++   */
++  function indexIn(siblings, node) {
++    const from = lastIndex.get(siblings) || 0
++    let index = siblings[from] === node ? from : siblings.indexOf(node, from)
++    if (index === -1) index = siblings.indexOf(node)
++    lastIndex.set(siblings, index)
++    return index
++  }
++
+   /** @type {BuildVisitor<Root, 'text'>} */
+   function visitor(node, parents) {
+     let index = -1
+@@ -99,7 +120,7 @@ export function findAndReplace(tree, list, options) {
+       if (
+         ignored(
+           parent,
+-          siblings ? siblings.indexOf(parent) : undefined,
++          siblings ? indexIn(siblings, parent) : undefined,
+           grandparent
+         )
+       ) {
+@@ -131,7 +152,7 @@ export function findAndReplace(tree, list, options) {
+     let start = 0
+     /** @type {Array<Nodes>} */
+     const siblings = parent.children
+-    const index = siblings.indexOf(node)
++    const index = indexIn(siblings, node)
+     let change = false
+     /** @type {Array<PhrasingContent>} */
+     let nodes = []

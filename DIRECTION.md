@@ -39,17 +39,22 @@ Windowed rendering makes the 15 MiB fixture interactive (mount 31.5 s to 0.5 s, 
 but breaks every reader of the whole DOM (rail anchors, Navigator, reveal, Find, selection,
 print), a two-to-three-week contract change; `content-visibility` gains little and is pathological
 with the rail. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 22 s at 15
-MiB). The JS parser in jsc also grows worse than linear above 4 MiB (25 s at 8 MiB against 6 s in
-Node, after the micromark patch), which is unexplained. Neither parser has an active upstream:
+MiB). The JavaScriptCore blow-up seen earlier (25 s at 8 MiB against 6 s in Node) did not
+reproduce on an idle machine: it was memory pressure (a parse holds 3–4 GB at 8–15 MiB, and the
+runs were made at load 29–36), and the mild superlinearity both engines shared was a quadratic
+sibling lookup in `mdast-util-find-and-replace`, now patched (`document/markdown/processor.md`);
+after it the parse is near-linear in both engines (jsc 9.2 s, Node 7.4 s at 15 MiB), with the next
+quadratic in mdast-util-from-markdown's list handling and nothing measured inside WKWebView, whose
+memory limits may bind before time does. Neither parser has an active upstream:
 markdown-rs has been quiet for over a year with the panics and the quadratic profile already
 reported, and micromark is barely maintained, so fixes to either live in a local patch or fork, as
 micromark's already does. A size threshold above which the reading view yields to the source view
 is a candidate policy, not a ruling.
 
-**Exit:** the jsc superlinearity profiled and, if it is another patch-sized defect, fixed; the parse
-moved off the main thread; a measurement of whether virtualizing only block contents, keeping every
-block's element and height in the DOM, avoids most of the contract change; then a ruling on the
-size policy, if one is still needed.
+**Exit:** the parse moved off the main thread, or re-parsed per changed block; the parse's memory
+footprint measured inside WKWebView; a measurement of whether `content-visibility: auto` with a rail
+that measures skipped blocks rather than their anchors avoids most of the contract change; then a
+ruling on the size policy, if one is still needed.
 
 ## 2026-11-07 — Restoring remembered files reads every one before the first reply
 
