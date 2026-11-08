@@ -52,7 +52,8 @@ author length bound. A repository-local identity is never consulted.
 
 `MM_LAUNCH_CHECK_PREFERENCES` is a trusted test-harness override naming an absolute preference
 file. A relative override rejects startup. Without it, preferences use the existing native app
-config directory's `reviewer.json`. Process checks use disposable files so saved choices and
+config directory's `reviewer.json`. The [remembered open files](restoration.md) live beside the
+preference file under its name, so the override isolates them as well. Process checks use disposable files so saved choices and
 completion never depend on the developer's preferences. This does not settle production storage
 or application identity.
 

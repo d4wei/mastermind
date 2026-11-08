@@ -28,6 +28,7 @@ and restarts its lifetime, so repeated events never stack copies.
 | File changed on disk, missing, unreadable, or unsaved (recovery actions) | `ConflictPanel` | Persistent, dismissible to a recall and file attention |
 | File is not valid UTF-8, so read-only | `ConflictPanel` | Persistent, no close control until resolved by Save As |
 | Files refused at opening | `NativeReviewer` | Persistent, dismissible |
+| Files from the last session that could not be reopened | `NativeReviewer` | Transient |
 | Native command failures, including a close refused because the file changed again | `NativeReviewer` | Persistent, dismissible to a recall |
 | Setup could not load, with Retry | `NativeReviewer` | Persistent, dismissible to a recall |
 | Settings could not be saved | `App` | Persistent, dismissible to a recall |

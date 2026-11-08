@@ -17,7 +17,7 @@ vi.mock('../ui/app/route', () => ({ navigate: mocks.navigate,
 vi.mock('../ui/app/App', () => ({ App: () => null }))
 
 const snapshot = () => ({ files: [{ id: '0', path: '/first.md' }, { id: '1', path: '/second.md' }],
-  activation_revision: 0, active_id: null, opening_errors: [] })
+  activation_revision: 0, active_id: null, opening_errors: [], restore_failures: [] })
 const setup = () => ({ completed: true, revision: 0, values: { authorTag: 'Alex', uiLang: 'en' },
   saved: { authorTag: true, uiLang: true }, protected: { authorTag: false, uiLang: false } })
 const initialDocuments = useDoc.getState()

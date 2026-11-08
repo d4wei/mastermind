@@ -263,10 +263,10 @@ its lifetime, and **app session** for app lifetime.
 Use **document buffer** for unsaved in-memory text, and **review state** for the broader state.
 
 Example: “This document is no longer open. Open the file again.”
-Use **Restore open files / 恢复已打开的文件** for the deferred public capability, and **review-state
-restoration** for its technical scope. Naming does not decide which buffers, positions, or panels
-persist; the local persisted work buffers entry in [DIRECTION.md][direction] carries the open
-question.
+Use **Restore open files / 恢复已打开的文件** for reopening the open documents and the active one at
+launch, and **review-state restoration** for the broader, still deferred scope. Restoring open files
+does not decide which buffers, positions, or panels persist; the local persisted work buffers entry
+in [DIRECTION.md][direction] carries that open question.
 
 Blank-draft creation is retired; do not introduce an untitled-document workflow through
 terminology changes.

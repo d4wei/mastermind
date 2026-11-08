@@ -26,6 +26,19 @@ entry that has already resolved.
 
 * * *
 
+## 2026-11-07 — Several agents on one file
+
+**Gap.** Opening and closing assume one agent hands a file to the person and takes it back. A close
+from one agent removes a document another agent still has under review, and two agents editing the
+same document race each other and the person through the file. The host also cannot forget a
+remembered document while it is not running, so a close then reports `not_open` and the document
+reopens at the next launch. Each needs a change to the handoff model, such as per-agent ownership
+of open documents, not a patch to the close path.
+
+**Exit:** a ruling on ownership of open documents across agents, then a handoff that closes only
+what no one else holds and forgets remembered documents without a running host, or an accepted
+single-agent limit recorded in `DECISIONS.md`.
+
 ## 2026-11-07 — Recursive for the Markdown source mode
 
 **Bet.** Recursive's continuous axis between proportional and monospace could suit the Markdown
@@ -67,13 +80,16 @@ masking sentinels' flanking class refuses rather than silently breaking. The rem
 **Exit:** settle the quoted-comment representation or drop it, verify the matrix in the native
 app, and choose mask sentinels whose flanking class matches the delimiters they replace.
 
-## 2026-10-17 — Local persisted work buffers
+## 2026-10-17 — Local persisted work buffers (updated 2026-11-07)
 
 **Bet.** A local persisted buffer can preserve pending document edits and unfinished comments,
 replies, and suggested changes together with the source revision, target, and context they depend
 on. Autosave alone does not cover these interrupted operations. Persistence preserves the work;
 resuming still requires target validation, and undo must not restore an obsolete file snapshot.
 Accepted review feedback continues to reach agents through the Markdown file only.
+
+The set of open documents already reopens at launch (2026-11-07 ruling); everything else in the
+review session ends on quit.
 
 **Exit:** settle storage, retention/discard rules, restoration scope, and stale-target behavior;
 reconcile the ephemeral-session and no-database constraints in a ruling, then implement and test

@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::{
     fs,
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
 };
 use tauri::Manager;
@@ -46,12 +46,33 @@ pub(crate) fn write_preferences_file(path: PathBuf, config: Value) -> Result<(),
     if !config.is_object() || bytes.len() > MAX_PREFERENCE_BYTES {
         return Err("invalid_preferences".into());
     }
+    replace_file(&path, &bytes, false)
+}
+
+/// Replaces `path` with `bytes` through a synced temporary file beside it, so readers see either
+/// the previous or the new complete contents. Callers serialize writes to one path, since they
+/// share its temporary file. `private` limits a Unix file to its owner.
+pub(crate) fn replace_file(path: &Path, bytes: &[u8], private: bool) -> Result<(), String> {
     fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    let temp = path.with_extension("json.tmp");
+    let mut temp = path.as_os_str().to_owned();
+    temp.push(".tmp");
+    let temp = PathBuf::from(temp);
     let mut file = fs::File::create(&temp).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    let restricted = if private {
+        use std::os::unix::fs::PermissionsExt;
+        file.set_permissions(fs::Permissions::from_mode(0o600))
+    } else {
+        Ok(())
+    };
+    #[cfg(not(unix))]
+    let restricted: std::io::Result<()> = {
+        let _ = private;
+        Ok(())
+    };
     // Sync before renaming so the replaced path never names an unwritten file after a crash.
-    let replaced = file
-        .write_all(&bytes)
+    let replaced = restricted
+        .and_then(|()| file.write_all(bytes))
         .and_then(|()| file.sync_all())
         .and_then(|()| fs::rename(&temp, path));
     if let Err(error) = replaced {

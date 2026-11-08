@@ -14,6 +14,7 @@ pub struct Snapshot {
     activation_revision: u64,
     active_id: Option<usize>,
     opening_errors: Vec<String>,
+    restore_failures: Vec<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -38,6 +39,7 @@ impl Snapshot {
             activation_revision: docs.activation_revision,
             active_id: docs.active_id,
             opening_errors: docs.opening_errors.clone(),
+            restore_failures: docs.restore_failures.clone(),
         }
     }
 }
@@ -46,7 +48,38 @@ impl Snapshot {
 pub async fn snapshot(state: tauri::State<'_, Arc<Mutex<Documents>>>) -> Result<Snapshot, String> {
     let state = state.inner().clone();
     crate::worker::blocking_work()
-        .run(move || Snapshot::from_documents(&state.lock().unwrap()))
+        .run(move || {
+            let mut docs = state.lock().unwrap();
+            // The first inventory a renderer reads already holds the remembered documents.
+            docs.restore();
+            Snapshot::from_documents(&docs)
+        })
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Records the renderer's selection for the remembered inventory; see `restoration.md`.
+#[tauri::command]
+pub async fn select_document(
+    id: usize,
+    activation_revision: u64,
+    state: tauri::State<'_, Arc<Mutex<Documents>>>,
+) -> Result<(), String> {
+    let state = state.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || state.lock().unwrap().select(id, activation_revision))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Clears the remembered documents that could not be reopened once the renderer has reported them.
+#[tauri::command]
+pub async fn dismiss_restore_failures(
+    docs: tauri::State<'_, Arc<Mutex<Documents>>>,
+) -> Result<(), String> {
+    let docs = docs.inner().clone();
+    crate::worker::blocking_work()
+        .run(move || docs.lock().unwrap().restore_failures.clear())
         .await
         .map_err(|e| e.to_string())
 }
@@ -199,6 +232,34 @@ mod tests {
             docs.get(0).unwrap().snapshot.as_ref().unwrap().bytes,
             b"original\r\n"
         );
+    }
+
+    #[test]
+    fn inventory_snapshots_report_remembered_documents_that_could_not_be_reopened() {
+        let dir = crate::test_support::TempDir::new("restore-snapshot");
+        let kept = dir.join("kept.md");
+        let lost = dir.join("lost.md");
+        std::fs::write(&kept, b"kept").unwrap();
+        let inventory = dir.join("reviewer.open-files.json");
+        let paths = [&kept, &lost].map(|path| path.to_str().unwrap().to_owned());
+        std::fs::write(
+            &inventory,
+            serde_json::to_vec(&crate::restoration::OpenFiles::new(
+                paths.to_vec(),
+                Some(paths[1].clone()),
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut docs = Documents::default();
+        docs.remember(crate::restoration::Remember::new(inventory));
+        docs.restore();
+        let snapshot = serde_json::to_value(Snapshot::from_documents(&docs)).unwrap();
+        assert_eq!(snapshot["restore_failures"], serde_json::json!([paths[1]]));
+        assert_eq!(snapshot["files"][0]["path"], paths[0]);
+        assert_eq!(snapshot["active_id"], 0);
+        assert_eq!(snapshot["activation_revision"], 1);
+        assert!(snapshot["opening_errors"].as_array().unwrap().is_empty());
     }
 
     #[test]

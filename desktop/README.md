@@ -39,8 +39,9 @@ releases.
 
 `main.rs` assembles the native states and command handlers. `launcher.rs` handles command parsing
 and local transport startup; `admission.rs` owns the admitted-document registry; `opening.rs`
-handles graphical opening and inventory snapshots; `closing.rs` relays launcher close requests to
-the renderer; `document_io.rs` serves admitted document operations and watches. [Translation
+handles graphical opening and inventory snapshots; [`restoration.rs`](src/restoration.md)
+remembers the open documents and reopens them at launch; `closing.rs` relays launcher close
+requests to the renderer; `document_io.rs` serves admitted document operations and watches. [Translation
 discovery](src/translations.md) offers available reading versions; `lifecycle.rs` creates the
 window, keeps its navigation within the app's own origin, and dispatches close requests and
 application events; [`menu.rs`](src/menu.md) builds the localized application menu and routes its
@@ -50,7 +51,8 @@ owns its color source and synchronization timing.
 
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),
-[opening](src/opening.md), [menu](src/menu.md), [setup](src/setup.md),
+[opening](src/opening.md), [restoring open files](src/restoration.md), [menu](src/menu.md),
+[setup](src/setup.md),
 [preferences](src/preferences.md),
 [worker execution](src/worker.md), and
 [termination](src/termination.md). The [UI adapter](../ui/desktop/README.md) connects these

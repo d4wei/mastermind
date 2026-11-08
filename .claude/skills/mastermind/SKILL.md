@@ -25,22 +25,28 @@ belongs to this application. Translation never prevents opening the original. Wh
 returns with feedback, reread the files; do not infer approval from admission.
 
 One `open` accepts at most 64 paths. Each given path and, for a symlink, its target must end in
-`.md` or `.markdown`. Exit status is 0 on full success, 1 when any file failed (see its result), 2
-for invalid invocation, and 3 (`outcome_unknown`) when the reply was lost; admission is idempotent,
-so retrying after 3 is safe. A file that is not valid UTF-8 opens with replacement characters, but
+`.md` or `.markdown`. Each result is `opened`, `already_open`, or `error`. Opening a file that is
+already open is a successful no-op: it keeps the person's edits and drafts there and reports
+`already_open`. Exit status is 0 when every file is opened or already open, 1 when any file failed
+(see its result), 2 for invalid invocation, and 3 (`outcome_unknown`) when the reply was lost;
+retrying after 3 is safe. A file that is not valid UTF-8 opens with replacement characters, but
 saving any edit to it is refused (`not_utf8`); Save As writes a UTF-8 copy.
 
 ## Close reviewed documents
 
 When the person hands documents back to you, reread them, then close the ones you opened or were
 asked to address so the person does not keep editing a file you are rewriting:
-`node /path/to/mastermind/bin/mastermind.js close -- FILE...`. Never close other open files; they
-may belong to the person or another session. Each result is `closed`, `not_open` (already closed;
-closing is idempotent), `blocked` with a `reason`, or `error`. `blocked` means the person still has
+`node /path/to/mastermind/bin/mastermind.js close -- FILE...`. The app reopens its open files when
+it next starts, so a file you leave open stays in front of the person across restarts; close what
+you opened once its review is done. Never close other open files; they
+may belong to the person or another session. Each result is `closed`, `not_open` (already closed, a
+successful no-op), `blocked` with a `reason`, or `error`. `blocked` means the person still has
 work there: an unfinished draft, unsaved edits, a recovery choice, or a reader that could not
 answer. Do not override it; tell the person which file stayed open and why. Exit status is 0 when
 every file is closed or not open, 1 when any is blocked or failed, 2 for invalid invocation, and 3
-when the reply was lost.
+when the reply was lost. While the app is not running, every file reports `not_open`, but the app
+still reopens the files it remembered at its next start. Several agents sharing one open file are
+not supported: closing a file another session is still reviewing takes it away from both.
 
 ## Prepare a translation
 

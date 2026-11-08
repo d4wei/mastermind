@@ -11,6 +11,7 @@ mod lifecycle;
 mod menu;
 mod opening;
 mod preferences;
+mod restoration;
 mod setup;
 mod translations;
 use tauri::{Emitter, Manager};
@@ -88,6 +89,8 @@ fn main() {
             opening::close_document,
             opening::choose_files,
             opening::dismiss_opening_errors,
+            opening::select_document,
+            opening::dismiss_restore_failures,
             document_io::document_meta,
             document_io::read_document,
             document_io::write_document,
@@ -106,9 +109,11 @@ fn main() {
             closing::complete_close_request,
         ])
         .setup(move |app| {
-            let setup = Arc::new(setup::Setup::new(preferences::preference_path(
-                app.handle(),
-            )?));
+            let preferences = preferences::preference_path(app.handle())?;
+            let remember = restoration::Remember::new(restoration::inventory_path(&preferences));
+            docs.lock().unwrap().remember(remember.clone());
+            app.manage(remember);
+            let setup = Arc::new(setup::Setup::new(preferences));
             app.manage(setup.clone());
             let invalidations = app.handle().clone();
             let watch = document_io::FileWatch::new(move || {
@@ -122,6 +127,14 @@ fn main() {
             app.set_menu(menu)?;
             app.manage(menu_handles);
             let runtime = tauri::async_runtime::handle();
+            // Restoration queues on the admission lane ahead of launcher requests; any request
+            // that still reaches the registry first restores before admitting.
+            let restoring = docs.clone();
+            runtime.spawn(async move {
+                let _ = worker::admission_work()
+                    .run(move || restoring.lock().unwrap().restore())
+                    .await;
+            });
             runtime.spawn(transport::serve(
                 listener,
                 docs,

@@ -276,9 +276,10 @@ try:
         stop(pid)
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
             runs = list(pool.map(lambda _: invoke(identifier, [files / 'a.md']), range(6)))
+        # The restarted host reopens the files it remembered, a.md among them, before any request.
         check('host termination and concurrent cold starts keep one owner',
               all(r[0] == 0 for r in runs) and len({r[1]['pid'] for r in runs}) == 1 and
-              sum(r[1]['results'][0]['status'] == 'opened' for r in runs) == 1)
+              all(r[1]['results'][0]['status'] == 'already_open' for r in runs))
         stop(runs[0][1]['pid'])
         code, response, elapsed = invoke(uuid.uuid4().hex, [files / 'a.md'],
                                          extra={'MM_LAUNCH_CHECK_UI_DELAY_MS': '5000'})

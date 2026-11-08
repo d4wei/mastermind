@@ -213,7 +213,9 @@ pub async fn close(
     let paths = request.close;
     let resolved = crate::worker::blocking_work()
         .run(move || {
-            let docs = docs.lock().unwrap();
+            let mut docs = docs.lock().unwrap();
+            // A close reaching a host before its startup restoration still sees remembered files.
+            docs.restore();
             let resolved: Vec<_> = paths
                 .into_iter()
                 .map(|path| {

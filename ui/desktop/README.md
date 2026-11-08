@@ -80,7 +80,11 @@ answered as unavailable while the window is closing. The
 [launch protocol](../../desktop/src/protocol.md#closing) defines the results.
 
 Inventory snapshots retain graphical opening errors until dismissal or the next graphical request. A
-newer activation revision selects the admitted file; repeated polls preserve manual selection.
+newer activation revision selects the admitted file; repeated polls preserve manual selection. Each
+selection is reported to the host with the revision it observed, so the host can
+[remember the active file](../../desktop/src/restoration.md) for the next launch. Remembered files
+that could not be reopened arrive once in a snapshot; the reviewer names them in a transient notice
+and tells the host they were reported.
 Polling never overlaps requests, and an unchanged snapshot leaves renderer state untouched. Native
 opening, setup, and command errors share the application's notification host. `close.ts` coalesces
 window close requests and awaits native termination cancellation before unlocking the editor. Failed

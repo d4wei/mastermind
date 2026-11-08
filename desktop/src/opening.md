@@ -44,6 +44,11 @@ subscribes with `close_requests_ready`, and page navigation or a lost web conten
 unsubscribes it and fails waiting requests. The [launch protocol](protocol.md#closing) owns the
 results.
 
+The renderer reports the person's selection with `select_document` and the activation revision it
+observed; a selection older than the latest activation is ignored. The registry uses it only to
+remember the active document, without advancing the revision. The open set and active document
+persist across relaunches as [restoring open files](restoration.md) describes.
+
 The host retains admitted documents without a total session limit. Inventory polling and raw OS
 error details remain bounded hardening work. See the [observations](../../tools/desktop/results.md)
 for packaged behavior actually exercised.

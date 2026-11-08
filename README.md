@@ -24,7 +24,8 @@ mastermind is maintained by [Da Wei](https://github.com/d4wei) and based on Kevi
    agent's proposed edits. Edits save continuously.
 3. Ask the agent to continue. It rereads the file, answers each discussion with a signed reply, and
    resolves what is settled. Resolved history stays in the file, hidden from reading. It closes the
-   files it opened, leaving open any where you still have unfinished work.
+   files it opened, leaving open any where you still have unfinished work. Opening an open file or
+   closing a closed one changes nothing, so the agent can repeat either safely.
 
 The [bundled skill](.claude/skills/mastermind/SKILL.md) teaches an agent the whole loop, and
 [agent setup](assets/agent/README.md) shows how to install it. The
@@ -74,7 +75,8 @@ signed or notarized.
   unsaved edits pauses and offers Use incoming or Save As…, so neither version is lost. The
   [native file contract](desktop/src/files.md) describes concurrency and filesystem limits.
 - **Closing.** Closing waits for saves. A failed save keeps the text recoverable and blocks the
-  close.
+  close. Files still open when you quit reopen the next time mastermind starts; unfinished drafts
+  and undo history do not carry over.
 
 Themes, font presets, text width, and code colors live in Settings. Serif, Sans, and Hyperlegible
 presets each set heading, body, code, and Chinese faces, all bundled with the app. The

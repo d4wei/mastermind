@@ -29,6 +29,18 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Open files reopen at launch; agent opens and closes are idempotent
+
+**Ruled.** The app remembers which documents are open, in order, and which one is active, and
+reopens them when it next starts; this lifts the 2026-10-10 session-restoration deferral for that
+set alone. Buffers, drafts, undo history, and selections stay ephemeral, and the file on disk
+remains the only review channel; the remembered set is local app state like preferences. Opening an
+open file (`already_open`) and closing a closed one (`not_open`) are successful no-ops, so agents
+may repeat either.
+
+**Beat:** starting every launch empty, which made people reopen files an agent had handed them, and
+restoring the whole review session, which DIRECTION.md's persisted work buffers entry still weighs.
+
 ## 2026-11-07 — Enter posts comments and replies; suggested text keeps Enter for line breaks
 
 **Ruled.** Comment and reply fields post on Enter and add a line on Shift+Enter, as chat-style

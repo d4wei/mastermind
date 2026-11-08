@@ -19,12 +19,18 @@ with `unexpected_endpoint_owner`; on Windows the pipe's access list admits only 
 launcher checks the server's owner.
 
 For a valid opening request, results retain input order and distinguish `opened`, `already_open`,
-and `error`. Admission checks existing regular files, obtains an initial versioned snapshot, and
-registers canonical identity before success. Selected paths and their canonical targets must have
-a Markdown extension; [file access](files.md) owns the supported extensions. Markdown aliases reuse
-the document. Reopening retains the document's buffer, undo, and recovery state. One file's
-failure does not prevent other valid files from opening. See [opening](opening.md) and
-[file access](files.md) for activation, graphical requests, and filesystem limits.
+and `error`. `already_open` is success, so opening is idempotent. Admission checks existing regular
+files, obtains an initial versioned snapshot, and registers canonical identity before success.
+Selected paths and their canonical targets must have a Markdown extension; [file access](files.md)
+owns the supported extensions. Markdown aliases reuse the document. Reopening retains the document's
+buffer, undo, and recovery state. One file's failure does not prevent other valid files from
+opening. See [opening](opening.md) and [file access](files.md) for activation, graphical requests,
+and filesystem limits.
+
+A host remembers its open documents across relaunches and readmits them before a request that
+starts it, as [restoring open files](restoration.md) describes. The reply reports only the
+requested paths; one the host restored reports `already_open`. Documents stay open until the
+person or an agent closes them.
 
 The optional initial reading-language hint follows [translation discovery](translations.md).
 
@@ -34,7 +40,9 @@ The optional initial reading-language hint follows [translation discovery](trans
 path against admitted documents; a deleted file matches through its canonical parent. Closing does
 not require a Markdown extension. Results retain input order and report `closed`, `not_open`,
 `blocked` with a `reason`, or `error` with a code. `not_open` is success, so closing is idempotent,
-and with no host running every path is `not_open` without starting one. No option discards work.
+and with no host running every path is `not_open` without starting one. That reply leaves a
+[remembered](restoration.md) document remembered, so it reopens at the next launch. No option
+discards work.
 
 The host never removes a document itself. It asks the subscribed renderer with a
 `close-files-requested` event carrying a request ID and the document IDs, then waits a bounded

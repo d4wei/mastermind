@@ -104,6 +104,11 @@ pub fn run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
                 .collect(),
         );
     }
+    if let tauri::RunEvent::Exit = event
+        && let Some(remember) = app.try_state::<std::sync::Arc<crate::restoration::Remember>>()
+    {
+        remember.flush();
+    }
     if let tauri::RunEvent::ExitRequested { api, .. } = event {
         if app
             .state::<CloseGate>()

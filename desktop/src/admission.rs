@@ -1,9 +1,11 @@
 use crate::files::FileError;
+use crate::restoration::{OpenFiles, Remember};
 use mastermind_launch_check::protocol::{FileResult, MAX_FILES, Request, Response, VERSION};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub const MARKDOWN_EXTENSIONS: &[&str] = &["md", "markdown"];
@@ -50,6 +52,10 @@ pub struct Documents {
     pub activation_revision: u64,
     pub active_id: Option<usize>,
     pub opening_errors: Vec<String>,
+    /// Remembered documents that could not be reopened, until the renderer reports them.
+    pub restore_failures: Vec<String>,
+    remembered: Option<Arc<Remember>>,
+    restore_pending: bool,
 }
 
 fn utf8_path(path: &Path) -> Result<String, FileError> {
@@ -63,6 +69,71 @@ fn utf8_path(path: &Path) -> Result<String, FileError> {
 }
 
 impl Documents {
+    /// Remembers the open documents through `remember` and restores its inventory on first use;
+    /// see `restoration.md`.
+    pub fn remember(&mut self, remember: Arc<Remember>) {
+        self.remembered = Some(remember);
+        self.restore_pending = true;
+    }
+
+    /// Readmits the remembered documents once, before anything else enters the registry. Every
+    /// registry entry point that admits or resolves documents calls it, so a request racing the
+    /// startup restoration still finds the remembered documents admitted first.
+    pub fn restore(&mut self) {
+        if !std::mem::take(&mut self.restore_pending) {
+            return;
+        }
+        let Some(remember) = self.remembered.clone() else {
+            return;
+        };
+        let saved = remember.load();
+        let (mut first, mut active) = (None, None);
+        for path in &saved.files {
+            match self.open(path) {
+                Ok(Admission::Opened(id) | Admission::AlreadyOpen(id)) => {
+                    first.get_or_insert(id);
+                    if saved.active.as_ref() == Some(path) {
+                        active = Some(id);
+                    }
+                }
+                Err(_) => self.restore_failures.push(path.clone()),
+            }
+        }
+        // A file open event delivered before the host attached its inventory already chose the
+        // active document; restoration only fills an empty selection.
+        if self.active_id.is_none()
+            && let Some(id) = active.or(first)
+        {
+            self.active_id = Some(id);
+            self.activation_revision += 1;
+        }
+        self.changed();
+    }
+
+    /// Records the renderer's selection so the active document is remembered. A selection made
+    /// before a newer activation is ignored, as that activation's choice stands.
+    pub fn select(&mut self, id: usize, activation_revision: u64) {
+        if activation_revision == self.activation_revision && self.entries.contains_key(&id) {
+            self.active_id = Some(id);
+            self.changed();
+        }
+    }
+
+    /// Schedules the inventory write after a change to the open documents or the selection.
+    fn changed(&self) {
+        // Writing before restoration would replace the remembered inventory with a partial one.
+        if self.restore_pending {
+            return;
+        }
+        if let Some(remember) = &self.remembered {
+            let path = |id: usize| self.entries.get(&id).map(|d| d.path.clone());
+            remember.record(OpenFiles::new(
+                self.entries.values().map(|d| d.path.clone()).collect(),
+                self.active_id.and_then(path),
+            ));
+        }
+    }
+
     pub fn entries(&self) -> impl Iterator<Item = (usize, &Document)> {
         self.entries.iter().map(|(id, document)| (*id, document))
     }
@@ -131,6 +202,7 @@ impl Documents {
         {
             return Response::error("invalid_request");
         }
+        self.restore();
         let mut first = None;
         let results: Vec<FileResult> = request
             .paths
@@ -168,6 +240,7 @@ impl Documents {
         if first.is_some() {
             self.active_id = first;
             self.activation_revision += 1;
+            self.changed();
         }
         Response {
             version: VERSION,
@@ -198,6 +271,7 @@ impl Documents {
                 .map(|(id, _)| *id);
         }
         self.activation_revision += 1;
+        self.changed();
     }
 
     fn open(&mut self, path: &str) -> Result<Admission, FileError> {
@@ -247,6 +321,7 @@ impl Documents {
         if replaces_origin && self.active_id == Some(origin) {
             self.active_id = Some(id);
         }
+        self.changed();
         Ok(id)
     }
 }
@@ -417,6 +492,245 @@ mod tests {
             docs.check_copy_destination(0, &alias).unwrap_err().error,
             "already_open"
         );
+    }
+
+    /// A registry remembering through `inventory`, as a fresh host would.
+    fn remembering(inventory: &Path) -> (Documents, Arc<Remember>) {
+        let remember = Remember::new(inventory.to_owned());
+        let mut docs = Documents::default();
+        docs.remember(remember.clone());
+        (docs, remember)
+    }
+
+    fn remembered(inventory: &Path) -> OpenFiles {
+        Remember::new(inventory.to_owned()).load()
+    }
+
+    fn paths(docs: &Documents) -> Vec<String> {
+        docs.entries().map(|(_, d)| d.path.clone()).collect()
+    }
+
+    #[test]
+    fn open_documents_and_the_selection_are_restored_in_order_after_a_relaunch() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md", "c.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        docs.restore();
+        docs.admit(fixture.request(&["c.md", "a.md"]));
+        docs.admit(fixture.request(&["b.md"]));
+        docs.select(1, docs.activation_revision);
+        crate::restoration::tests::wait_idle(&remember);
+        let saved = remembered(&inventory);
+        assert_eq!(saved.files, paths(&docs));
+        assert_eq!(saved.active, Some(docs.get(1).unwrap().path.clone()));
+
+        let (mut relaunched, _) = remembering(&inventory);
+        relaunched.restore();
+        assert_eq!(paths(&relaunched), saved.files);
+        assert_eq!(relaunched.active_id, Some(1));
+        assert_eq!(relaunched.activation_revision, 1);
+        assert!(relaunched.restore_failures.is_empty());
+        // Restoration only reads; the files keep their bytes.
+        for name in ["a.md", "b.md", "c.md"] {
+            assert_eq!(fs::read_to_string(fixture.0.join(name)).unwrap(), name);
+        }
+        relaunched.restore();
+        assert_eq!(relaunched.len(), 3);
+        assert_eq!(relaunched.activation_revision, 1);
+    }
+
+    #[test]
+    fn a_triggering_request_admits_after_the_remembered_documents_and_takes_the_selection() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md", "new.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        docs.admit(fixture.request(&["a.md", "b.md"]));
+        docs.select(1, docs.activation_revision);
+        crate::restoration::tests::wait_idle(&remember);
+
+        // The request reaches the registry before the startup restoration ran.
+        let (mut relaunched, remember) = remembering(&inventory);
+        let response = relaunched.admit(fixture.request(&["missing.md", "new.md", "a.md"]));
+        assert_eq!(
+            response
+                .results
+                .iter()
+                .map(|r| r.status.as_str())
+                .collect::<Vec<_>>(),
+            ["error", "opened", "already_open"]
+        );
+        let names: Vec<_> = paths(&relaunched)
+            .iter()
+            .map(|p| {
+                Path::new(p)
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        assert_eq!(names, ["a.md", "b.md", "new.md"]);
+        assert_eq!(relaunched.active_id, Some(2));
+        relaunched.restore();
+        assert_eq!(relaunched.len(), 3);
+        crate::restoration::tests::wait_idle(&remember);
+        assert_eq!(
+            remembered(&inventory).active,
+            Some(paths(&relaunched)[2].clone())
+        );
+
+        // A request whose files all fail leaves the remembered selection.
+        let (mut failed, _) = remembering(&inventory);
+        failed.admit(fixture.request(&["missing.md"]));
+        assert_eq!(failed.active_id, Some(2));
+
+        // A request admitted before the inventory was attached keeps its selection.
+        let mut early = Documents::default();
+        early.admit(fixture.request(&["b.md"]));
+        early.remember(Remember::new(inventory.clone()));
+        early.restore();
+        assert_eq!(early.len(), 3);
+        assert_eq!((early.active_id, early.activation_revision), (Some(0), 1));
+    }
+
+    #[test]
+    fn missing_and_refused_remembered_documents_are_reported_and_forgotten() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "gone.md", "moved.md", "b.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        docs.admit(fixture.request(&["a.md", "gone.md", "moved.md", "b.md"]));
+        docs.select(1, docs.activation_revision);
+        crate::restoration::tests::wait_idle(&remember);
+        fs::remove_file(fixture.0.join("gone.md")).unwrap();
+        fs::rename(fixture.0.join("moved.md"), fixture.0.join("moved.txt")).unwrap();
+        let large = fs::File::create(fixture.0.join("b.md")).unwrap();
+        large.set_len(crate::files::MAX_FILE_BYTES + 1).unwrap();
+        let gone = paths(&docs)[1].clone();
+
+        let (mut relaunched, remember) = remembering(&inventory);
+        relaunched.restore();
+        assert_eq!(
+            relaunched.restore_failures,
+            paths(&docs)[1..].to_vec(),
+            "each refused document is reported once"
+        );
+        assert_eq!(paths(&relaunched), paths(&docs)[..1]);
+        // The remembered selection is gone, so the first restored document is active.
+        assert_eq!(relaunched.active_id, Some(0));
+        crate::restoration::tests::wait_idle(&remember);
+        let saved = remembered(&inventory);
+        assert_eq!(saved.files, paths(&docs)[..1]);
+        assert!(!saved.files.contains(&gone));
+    }
+
+    #[test]
+    fn nothing_remembered_restores_nothing_and_writes_nothing() {
+        let fixture = Fixture::new();
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        docs.restore();
+        crate::restoration::tests::wait_idle(&remember);
+        assert_eq!(
+            (docs.len(), docs.active_id, docs.activation_revision),
+            (0, None, 0)
+        );
+        assert!(!inventory.exists());
+    }
+
+    #[test]
+    fn closing_and_save_as_update_the_remembered_inventory() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        docs.admit(fixture.request(&["a.md", "b.md"]));
+        fs::write(fixture.0.join("copy.md"), "a").unwrap();
+        let destination = copy_destination(&fixture.0.join("copy.md")).unwrap();
+        let snapshot = crate::files::read(Path::new(&destination), None).unwrap();
+        docs.replace_with_copy(0, destination.clone(), snapshot)
+            .unwrap();
+        crate::restoration::tests::wait_idle(&remember);
+        let saved = remembered(&inventory);
+        assert_eq!(saved.files, paths(&docs));
+        assert_eq!(saved.active, Some(destination));
+        docs.close(1, Some(2), docs.activation_revision);
+        docs.close(2, Some(2), docs.activation_revision);
+        crate::restoration::tests::wait_idle(&remember);
+        assert_eq!(remembered(&inventory), OpenFiles::default());
+    }
+
+    #[test]
+    fn a_selection_older_than_the_latest_activation_is_not_remembered() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md", "c.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        docs.admit(fixture.request(&["a.md", "b.md"]));
+        let observed = docs.activation_revision;
+        docs.admit(fixture.request(&["c.md"]));
+        docs.select(1, observed);
+        assert_eq!(docs.active_id, Some(2));
+        docs.select(7, docs.activation_revision);
+        assert_eq!(docs.active_id, Some(2));
+        docs.select(0, docs.activation_revision);
+        assert_eq!((docs.active_id, docs.activation_revision), (Some(0), 2));
+    }
+
+    #[test]
+    fn restoration_keeps_the_most_recent_documents_within_the_request_bound() {
+        let fixture = Fixture::new();
+        let names: Vec<String> = (0..MAX_FILES + 2).map(|i| format!("{i}.md")).collect();
+        for name in &names {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let inventory = fixture.0.join("reviewer.open-files.json");
+        let (mut docs, remember) = remembering(&inventory);
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        docs.admit(fixture.request(&refs[..MAX_FILES]));
+        docs.admit(fixture.request(&refs[MAX_FILES..]));
+        crate::restoration::tests::wait_idle(&remember);
+        let (mut relaunched, _) = remembering(&inventory);
+        relaunched.restore();
+        assert_eq!(relaunched.len(), MAX_FILES);
+        assert_eq!(paths(&relaunched), paths(&docs)[2..]);
+        assert_eq!(
+            relaunched.get(relaunched.active_id.unwrap()).unwrap().path,
+            docs.get(docs.active_id.unwrap()).unwrap().path
+        );
+    }
+
+    #[test]
+    fn reopening_an_open_file_is_a_successful_no_op() {
+        let fixture = Fixture::new();
+        fs::write(fixture.0.join("a.md"), "a").unwrap();
+        let mut docs = Documents::default();
+        let opened = docs.admit(fixture.request(&["a.md"]));
+        let reopened = docs.admit(fixture.request(&["a.md", "./a.md"]));
+        assert_eq!(
+            reopened
+                .results
+                .iter()
+                .map(|r| (r.status.as_str(), r.canonical.as_deref()))
+                .collect::<Vec<_>>(),
+            [("already_open", opened.results[0].canonical.as_deref()); 2]
+        );
+        for response in [&opened, &reopened] {
+            assert_eq!(mastermind_launch_check::protocol::exit_status(response), 0);
+        }
+        assert_eq!(docs.len(), 1);
     }
 
     struct Fixture(TempDir);

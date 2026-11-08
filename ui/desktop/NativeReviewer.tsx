@@ -18,6 +18,7 @@ import { CloseDialog } from './CloseDialog'
 import { releaseDrafts } from '../review/drafts'
 import { Notifications, Notice, Notification } from '../app/Notifications'
 import { createHomeMotion } from './home-motion'
+import { fileLabels } from './file-labels'
 import { NativeSetup, systemInterfaceLanguage, type SetupSnapshot } from './NativeSetup'
 
 interface OpeningSnapshot {
@@ -25,6 +26,8 @@ interface OpeningSnapshot {
   activation_revision: number
   active_id: number | null
   opening_errors: string[]
+  /** Remembered files the host could not reopen at launch, reported once. */
+  restore_failures: string[]
 }
 
 // Each poll returns fresh arrays; keeping equal state unchanged spares the session tree a re-render.
@@ -36,6 +39,7 @@ export function NativeReviewer() {
   const fileCloseCompletion = useRef<Promise<void> | null>(null)
   const activationRevision = useRef(0)
   const [openingErrors, setOpeningErrors] = useState<string[]>([])
+  const [restoreFailures, setRestoreFailures] = useState<string[]>([])
   const [error, setError] = useState('')
   const [setup, setSetup] = useState<SetupSnapshot | null>(null)
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
@@ -49,6 +53,12 @@ export function NativeReviewer() {
   const id = route.kind === 'doc' ? route.sessionId : null
   const activeRoute = useRef(id)
   useLayoutEffect(() => { activeRoute.current = id }, [id])
+  // The host remembers the selected file for the next launch; it ignores a selection older than its latest activation.
+  useEffect(() => {
+    if (id === null) return
+    void nativeBridge.invoke<void>('select_document', { id: Number(id), activationRevision: activationRevision.current })
+      .catch((error) => setError(String(error)))
+  }, [id])
   const answerCloseRequest = useRef<(request: CloseFilesRequest) => Promise<RequestedCloseResult[]>>(
     async ({ ids }) => unavailable(ids))
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
@@ -128,6 +138,10 @@ export function NativeReviewer() {
           for (const file of snapshot.files) if (file.language) useTranslation.getState().hint(file.id, file.language)
           setFiles(unlessEqual(snapshot.files))
           setOpeningErrors(unlessEqual(snapshot.opening_errors))
+          if (snapshot.restore_failures.length > 0) {
+            setRestoreFailures(snapshot.restore_failures)
+            void nativeBridge.invoke<void>('dismiss_restore_failures').catch((error) => setError(String(error)))
+          }
           if (snapshot.activation_revision > activationRevision.current) {
             activationRevision.current = snapshot.activation_revision
             if (snapshot.active_id !== null) navigate(`/d/${snapshot.active_id}`)
@@ -273,6 +287,11 @@ export function NativeReviewer() {
       {openingErrors.length > 0 && <Notification tier="persistent" error onDismiss={dismissOpeningErrors}>
         <ul>{openingErrors.map((message, index) => <li key={index}>{message}</li>)}</ul>
       </Notification>}
+      {restoreFailures.length > 0 && <Notice key={restoreFailures.join('\n')} tier="transient">
+        <p>{restoreFailures.length === 1 ? t('restoreFailedOne')
+          : t('restoreFailedMany').replace('{count}', String(restoreFailures.length))}</p>
+        <ul>{fileLabels(restoreFailures).map((label, index) => <li key={index}>{label}</li>)}</ul>
+      </Notice>}
       {error && <Notice key={error} tier="persistent">{error}</Notice>}
       {setupError && <Notice key={setupError} tier="persistent"><p>{setupError}</p>
         <div className="notification-actions">
