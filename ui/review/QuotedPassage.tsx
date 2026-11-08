@@ -15,7 +15,7 @@ interface Props {
 
 /**
  * A discussion's quoted passage, clamped to `lines`. An expandable passage that overflows its clamp
- * offers the Full passage disclosure, which reveals it whole inside the card; a new clamp or passage
+ * offers the Show more disclosure, which reveals it whole inside the card; a new clamp or passage
  * starts collapsed. The full text stays in the title, and the clamp is visual, so assistive
  * technology reads it all.
  */
@@ -42,9 +42,9 @@ export function QuotedPassage({ text, lines, expandable, as: Tag = 'div', 'aria-
     <Tag ref={ref as never} id={id} className={`rail-card-anchor${expanded ? ' expanded' : ''}`} title={text}
       aria-label={label} style={{ '--quote-lines': lines } as CSSProperties}>{text}</Tag>
     {expandable && (overflows || expanded) && <div className="rail-actions rail-footer rail-quote-footer">
-      <DisclosureToggle expanded={expanded} controls={id}
+      <DisclosureToggle kind="expand" expanded={expanded} controls={id}
         onToggle={() => setState((current) => ({ ...current, expanded: !expanded }))}>
-        {t('quoteFull')}
+        {t(expanded ? 'quoteShowLess' : 'quoteShowMore')}
       </DisclosureToggle>
     </div>}
   </>

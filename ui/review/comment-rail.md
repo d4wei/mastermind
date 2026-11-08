@@ -14,9 +14,10 @@ interface typography independently of the reading font preset.
 `QuotedPassage` clamps the quoted passage to two lines on an unselected card and six on the
 selected card or a resolved one, ending in an ellipsis. An unselected card only clamps. On a
 selected or resolved card, a passage that overflows its clamp, measured again whenever the card
-resizes, offers the Full passage disclosure, which reveals it whole inside the card; a new clamp
-starts collapsed. The full passage stays in the title. That disclosure and the reply count share
-`DisclosureToggle`, so they look and behave alike.
+resizes, offers Show more, which reveals it whole inside the card and then reads Show less; a new
+clamp starts collapsed. The full passage stays in the title. That disclosure and the reply count
+share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
+below, and the passage's turns from down to up as it grows in place.
 
 `rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
 space above crowded anchors; earlier cards stay within the document surface. When there is not

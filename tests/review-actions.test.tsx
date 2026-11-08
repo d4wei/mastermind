@@ -236,7 +236,7 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   expect(edit).toHaveBeenCalledTimes(1)
 })
 
-it('offers the full-passage disclosure only on the selected card, styled as the reply count', () => {
+it('offers Show more only on the selected card, styled as the reply count with an upward-closing chevron', () => {
   Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 100 })
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 20 })
   try {
@@ -247,7 +247,7 @@ it('offers the full-passage disclosure only on the selected card, styled as the 
     expect(host.querySelector('.rail-card-anchor')!.getAttribute('style')).toContain('--quote-lines: 6')
     const [passage, replies] = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-card .rail-disclosure'))
     expect(passage!.closest('.rail-quote-footer')).not.toBeNull()
-    expect(passage!.className).toBe(replies!.className)
+    expect(passage!.className).toBe(`${replies!.className} rail-disclosure-expand`)
     act(() => passage!.click())
     expect(host.querySelector('.rail-card-anchor')!.classList.contains('expanded')).toBe(true)
     collapse()

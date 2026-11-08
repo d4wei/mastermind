@@ -50,14 +50,15 @@ it('offers no toggle on an unselected card, however long its passage', () => {
 it('reveals an overflowing passage whole through the shared chevron disclosure, and clamps it again', () => {
   size.scroll = 120; size.client = 30
   act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
-  expect(toggle()!.className).toBe('rail-link rail-disclosure')
-  expect(toggle()!.textContent).toBe('quoteFull')
+  expect(toggle()!.className).toBe('rail-link rail-disclosure rail-disclosure-expand')
+  expect(toggle()!.textContent).toBe('quoteShowMore')
   expect(toggle()!.querySelector('svg')).not.toBeNull()
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
   expect(document.getElementById(toggle()!.getAttribute('aria-controls')!)).toBe(quote())
   act(() => toggle()!.click())
   expect(quote().classList.contains('expanded')).toBe(true)
   expect(toggle()!.getAttribute('aria-expanded')).toBe('true')
+  expect(toggle()!.textContent).toBe('quoteShowLess')
   act(() => toggle()!.click())
   expect(quote().classList.contains('expanded')).toBe(false)
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')

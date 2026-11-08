@@ -395,6 +395,9 @@ button:disabled {
 }
 .rail-disclosure svg { transition: transform var(--dur-fast) var(--ease-standard); }
 .rail-disclosure[aria-expanded='true'] svg { transform: rotate(90deg); }
+/* A passage that grows in place points down to open and up to close. */
+.rail-disclosure-expand svg { transform: rotate(90deg); }
+.rail-disclosure-expand[aria-expanded='true'] svg { transform: rotate(-90deg); }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
 /* Resizing stops at two full lines, so the placeholder and caret stay readable. */
 .rail-reply textarea {
