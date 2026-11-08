@@ -1,7 +1,7 @@
 :where([data-theme]) {
-  --font-display: 'Schibsted Grotesk', system-ui, sans-serif;
-  --font-body: 'Schibsted Grotesk', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-body: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-mono: 'Source Code Pro', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-size-body: 1rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.8125rem;
@@ -9,12 +9,13 @@
   --lh-title: 1.2;
   --lh-snug: 1.4;
   --lh-body: 1.6;
-  --ls-heading: -0.02em;
+  --ls-heading: -0.01em;
   --ls-normal: 0;
   --ls-caps: 0.06em;
   --ls-label: 0.08em;
   --weight-medium: 600;
-  --weight-bold: 800;
+  --weight-bold: 650;
+  --weight-code: 500;
 
   --content-max-width: 46rem;
   --space-unit: 4px;

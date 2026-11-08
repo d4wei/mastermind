@@ -26,15 +26,22 @@ entry that has already resolved.
 
 * * *
 
-## 2026-10-29 — Curated font presets
+## 2026-11-07 — Body weight on dark themes
 
-**Bet.** Presets should be complete pairings of display, body, code, and CJK fallback faces, and
-fewer of them; most current presets pair a display face with itself as body text and name no CJK
-face. The recommended set and the preference migration are in
-[curated font presets](docs/font-presets.md).
+**Open question.** Light text on a dark ground reads heavier, and the bundled variable faces could
+take a slightly lower body weight on dark themes; whether the offset helps, and by how much, is
+unmeasured.
 
-**Exit:** a ruling on the preset set, then the registry, stacks, and settings ship it and the
-design is deleted.
+**Exit:** a side-by-side reading of each preset on a dark and a light theme rules on a per-theme
+weight adjustment or rejects it.
+
+## 2026-11-07 — Recursive for the Markdown source mode
+
+**Bet.** Recursive's continuous axis between proportional and monospace could suit the Markdown
+source mode better than the preset's code face, keeping prose readable while syntax stays aligned.
+It was set aside from the font presets because it serves editing, not reading.
+
+**Exit:** a source-mode trial with Recursive bundled adopts it as the source face or drops the idea.
 
 ## 2026-10-29 — Pathological autolink parsing
 

@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
-import { FONT_FACES, bodyStack, displayStack, monoById, monoStack, fontPresetById } from './fonts'
+import { FONT_FACES_HREF, bodyStack, displayStack, monoStack, fontPresetById } from './fonts'
 import { prefersReducedMotion } from '../util/presence'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
 
 const TOKENS_LINK_ID = 'theme-tokens'
-const FONTS_STYLE_ID = 'theme-fonts'
+const FONTS_LINK_ID = 'theme-fonts'
 
 /** Applies theme + per-user overrides to the document. Render once in App. */
 export function ThemeEffects() {
@@ -76,16 +76,12 @@ export function ThemeEffects() {
 
   // Declare local font faces independently of the selected theme.
   useEffect(() => {
-    let style = document.getElementById(FONTS_STYLE_ID) as HTMLStyleElement | null
-    if (!style) {
-      style = document.createElement('style')
-      style.id = FONTS_STYLE_ID
-      document.head.appendChild(style)
-    }
-    style.textContent = FONT_FACES.map(
-      (f) =>
-        `@font-face { font-family: '${f.family}'; src: url('${f.url}') format('woff2'); font-weight: ${f.weight}; font-display: swap; }`,
-    ).join('\n')
+    if (document.getElementById(FONTS_LINK_ID)) return
+    const link = document.createElement('link')
+    link.id = FONTS_LINK_ID
+    link.rel = 'stylesheet'
+    link.href = FONT_FACES_HREF
+    document.head.appendChild(link)
   }, [])
 
   // Personal overrides remain independent of the selected theme.
@@ -96,12 +92,13 @@ export function ThemeEffects() {
     root.setProperty('--lh-body', String(config.lineHeight))
     root.setProperty('--content-max-width', `${config.contentWidth / 16}rem`)
 
-    const set = fontPresetById(config.fontPreset)
-    root.setProperty('--font-display', displayStack(set))
-    root.setProperty('--font-body', bodyStack(set))
-    root.setProperty('--weight-bold', String(set.displayWeight))
-    root.setProperty('--ls-heading', set.displayTracking)
-    root.setProperty('--font-mono', monoStack(monoById(config.monoFont)))
+    const preset = fontPresetById(config.fontPreset)
+    root.setProperty('--font-display', displayStack(preset))
+    root.setProperty('--font-body', bodyStack(preset))
+    root.setProperty('--weight-bold', String(preset.displayWeight))
+    root.setProperty('--ls-heading', preset.displayTracking)
+    root.setProperty('--font-mono', monoStack(preset))
+    root.setProperty('--weight-code', String(preset.codeWeight))
 
     // `none` clears the --code-* tokens; the renderer also skips tokenizing for it.
     const vars = codeThemeVars(codeThemeById(config.codeTheme), theme?.appearance ?? 'light')

@@ -36,6 +36,7 @@
     "dev": "node tools/desktop/tauri.mjs dev",
     "desktop:assets": "node --import tsx tools/desktop/build-reviewer.mts",
     "desktop:build": "npm run desktop:assets && node tools/desktop/tauri.mjs build --bundles app -- --locked",
+    "fonts:vendor": "node --import tsx tools/fonts/vendor-fonts.mts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
@@ -62,6 +63,13 @@
   },
   "devDependencies": {
     "@asamuzakjp/css-color": "5.1.11",
+    "@fontsource-variable/atkinson-hyperlegible-mono": "5.3.0",
+    "@fontsource-variable/atkinson-hyperlegible-next": "5.3.0",
+    "@fontsource-variable/noto-sans-sc": "5.3.1",
+    "@fontsource-variable/noto-serif-sc": "5.3.1",
+    "@fontsource-variable/source-code-pro": "5.3.1",
+    "@fontsource-variable/source-sans-3": "5.3.1",
+    "@fontsource-variable/source-serif-4": "5.3.1",
     "@types/mdast": "^4.0.4",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",

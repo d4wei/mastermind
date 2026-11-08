@@ -1,4 +1,5 @@
 import { usableAuthorName } from '../../document/author'
+import { isFontPresetId } from '../theme/fontRegistry'
 import { DEFAULT_CONFIG } from './defaults'
 import type { MastermindConfig } from './types'
 
@@ -13,12 +14,14 @@ function acceptsConfigValue(key: keyof MastermindConfig, value: unknown): boolea
   if (typeof value === 'number') return Number.isFinite(value) && value > 0
   if (key === 'uiLang') return Object.hasOwn(UI_LANGUAGES, value as string)
   if (key === 'authorTag') return usableAuthorName(value as string) === value
+  if (key === 'fontPreset') return isFontPresetId(value as string)
   return true
 }
 
 /**
  * Stored preferences may be hand-edited, so each unacceptable field falls back to its default alone.
- * An author name is read normalized, as the native host normalizes it.
+ * An author name is read normalized, as the native host normalizes it. Unknown keys, including the
+ * retired `monoFont`, are not read; a font preset no longer in the registry reads as the default.
  */
 export function storedConfig(saved: unknown): MastermindConfig {
   const config: Record<string, unknown> = { ...DEFAULT_CONFIG }

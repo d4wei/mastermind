@@ -11,6 +11,8 @@ use std::{
 
 const FIELDS: [&str; 2] = ["authorTag", "uiLang"];
 const COMPLETED: &str = "onboardingCompleted";
+/// Retired keys: reads drop them, so the next write omits them, and patches reject them.
+const RETIRED: [&str; 2] = ["translationLanguage", "monoFont"];
 const MAX_AUTHOR_UTF16_UNITS: usize = 64;
 const SUBPROCESS_OUTPUT_BYTES: usize = 4096;
 const SUBPROCESS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
@@ -229,7 +231,7 @@ impl Setup {
     fn read_raw(&self) -> Result<Option<Value>, String> {
         let mut raw = read_preferences_file(self.path.clone())?;
         if let Some(object) = raw.as_mut().and_then(Value::as_object_mut) {
-            object.remove("translationLanguage");
+            object.retain(|key, _| !RETIRED.contains(&key.as_str()));
         }
         if raw.as_ref().is_some_and(|value| !value.is_object()) {
             return Err("invalid_preferences".into());
@@ -404,7 +406,7 @@ impl Setup {
 
     fn patch_preferences(&self, patch: Value) -> Result<(), String> {
         let patch = patch.as_object().ok_or("invalid_preferences")?;
-        if patch.contains_key(COMPLETED) || patch.contains_key("translationLanguage") {
+        if patch.contains_key(COMPLETED) || RETIRED.iter().any(|key| patch.contains_key(*key)) {
             return Err("invalid_preferences".into());
         }
         let setup_fields: Map<String, Value> = patch
@@ -509,6 +511,32 @@ mod tests {
     }
     fn values() -> Value {
         json!({"authorTag":" @Reader ","uiLang":"zh-CN"})
+    }
+
+    #[test]
+    fn retired_code_font_preference_is_not_exposed_or_written_back() {
+        let fixture = Fixture::new();
+        let setup = fixture.setup();
+        std::fs::write(
+            &setup.path,
+            json!({"monoFont":"jetbrains","fontPreset":"grid","theme":"sepia"}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            setup.read_preferences().unwrap().unwrap(),
+            json!({"fontPreset":"grid","theme":"sepia"})
+        );
+        assert!(
+            setup
+                .patch_preferences(json!({"monoFont":"geist"}))
+                .is_err()
+        );
+        setup
+            .patch_preferences(json!({"fontPreset":"serif"}))
+            .unwrap();
+        let saved: Value =
+            serde_json::from_str(&std::fs::read_to_string(&setup.path).unwrap()).unwrap();
+        assert_eq!(saved, json!({"fontPreset":"serif","theme":"sepia"}));
     }
 
     #[test]

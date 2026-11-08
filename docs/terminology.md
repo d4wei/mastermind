@@ -312,11 +312,11 @@ commands are historical terms.
 Evidence: [settings][settings], [font presets][fonts], [code color schemes][colors], and
 [themes][themes].
 
-Use **Font preset / 字体预设**: it selects heading and body font families, heading weight, and
-heading letter spacing. For example, the Bricolage preset uses Bricolage Grotesque for headings and
-Inter for body text. Some presets use the same family for both. If the feature later selects only a
-font, label it Font. Use `fontPreset` for the preference, `FontPreset` for its type, and
-`FONT_PRESETS` for the registry.
+Use **Font preset / 字体预设**: it selects heading, body, and code font families, heading weight
+and letter spacing, code weight, and the Chinese fallback faces. Use `fontPreset` for the
+preference, `FontPreset` for its type, and `FONT_PRESETS` for the registry. Name the presets by
+their character, not their families: **Serif / 衬线**, **Sans / 无衬线**, and
+**Hyperlegible / 易读**. There is no separate code font setting.
 
 Use **Code color scheme / 代码配色**. The choice is among code color palettes or Off. The
 established feature name is [syntax highlighting][syntax-highlighting], but this control selects its
@@ -331,9 +331,6 @@ this app's setting directly; it does not imply paper dimensions or a hard line-w
 Keep Font size, Line height, Theme, Appearance, and System default.
 
 Keep theme names and actual font-family names as proper names.
-Label the font preset with stored ID `grid` **Schibsted**, matching its family and avoiding a false
-association between choosing that font and changing the Grid theme. Keep its stored ID unless a
-coordinated registry change is approved. No new creative preset names are needed.
 
 Use **Comments / 评论** in visible controls, **comment sidebar / 评论侧栏** in user explanations,
 and **comment rail** for the margin-layout implementation. Keep **callout / 提示块** and its

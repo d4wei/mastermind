@@ -13,7 +13,7 @@ const bundledThemes = await scanThemes(path.resolve('themes'))
 
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
-  authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
+  authorTag: 'alex', fontPreset: 'serif', codeTheme: 'none',
   uiLang: 'en',
 }
 
@@ -76,10 +76,10 @@ it.each([
 
 it.each([
   { uiLang: 'en', name: 'Your name', hint: 'This name appears beside your comments.',
-    font: 'Font preset', color: 'Code color scheme', width: 'Text width',
+    font: 'Font preset', sans: 'Sans', color: 'Code color scheme', width: 'Text width',
     language: 'Translation language', interfaceLanguage: 'Interface language', soft: 'Soft' },
   { uiLang: 'zh-CN', name: '你的名字', hint: '这个名字会显示在你的评论旁。',
-    font: '字体预设', color: '代码配色', width: '正文宽度',
+    font: '字体预设', sans: '无衬线', color: '代码配色', width: '正文宽度',
     language: '译文语言', interfaceLanguage: '界面语言', soft: '柔和' },
 ] as const)('uses canonical settings labels in $uiLang without changing preference keys', (labels) => {
   useConfig.setState({ config: { ...config, uiLang: labels.uiLang } })
@@ -94,10 +94,10 @@ it.each([
   expect(update).toHaveBeenLastCalledWith({ authorTag: '李 明' })
   const button = (name: string) => Array.from(host.querySelectorAll('button'))
     .find((item) => item.textContent === name)!
-  const font = button('Schibsted')
+  const font = button(labels.sans)
   expect(font.closest('.settings-row')?.querySelector('span')?.textContent).toBe(labels.font)
   act(() => font.click())
-  expect(update).toHaveBeenLastCalledWith({ fontPreset: 'grid' })
+  expect(update).toHaveBeenLastCalledWith({ fontPreset: 'sans' })
   const soft = button(labels.soft)
   expect(soft.closest('.settings-row')?.querySelector('span')?.textContent).toBe(labels.color)
   act(() => soft.click())
@@ -105,6 +105,19 @@ it.each([
   expect(host.querySelector(`[aria-label="${labels.width}"]`)).not.toBeNull()
   expect(host.textContent).not.toContain(labels.language)
   expect(host.textContent).toContain(labels.interfaceLanguage)
+})
+
+it.each([
+  { uiLang: 'en', presets: ['Serif', 'Sans', 'Hyperlegible'], code: ['Code color scheme'] },
+  { uiLang: 'zh-CN', presets: ['衬线', '无衬线', '易读'], code: ['代码配色'] },
+] as const)('offers the three font presets and no separate code font in $uiLang', ({ uiLang, presets, code }) => {
+  useConfig.setState({ config: { ...config, uiLang } })
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  const [, , reading, codeSection] = host.querySelectorAll('section')
+  const presetRow = reading!.querySelector('.settings-row')!
+  expect(Array.from(presetRow.querySelectorAll('button'), (chip) => chip.textContent)).toEqual(presets)
+  expect(presetRow.querySelector('[aria-pressed="true"]')?.textContent).toBe(presets[0])
+  expect(Array.from(codeSection!.querySelectorAll('.settings-row > span'), (row) => row.textContent)).toEqual(code)
 })
 
 it.each(['Alex: Admin', 'Alex{Chen', 'Alex@Chen', 'a'.repeat(65)])(

@@ -524,6 +524,7 @@ button:disabled {
 
 .md-inline-code {
   font-family: var(--font-mono);
+  font-weight: var(--weight-code);
   font-size: 0.875em;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
@@ -531,8 +532,14 @@ button:disabled {
   padding: 0.08em 0.35em;
 }
 
+/* Code inside emphasized text keeps that emphasis rather than the code weight. */
+.md-root :is(h1, h2, h3, h4, h5, h6, strong, th) .md-inline-code {
+  font-weight: inherit;
+}
+
 .md-code {
   font-family: var(--font-mono);
+  font-weight: var(--weight-code);
   font-size: var(--md-font-size-sm);
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
@@ -860,6 +867,7 @@ mark.critic-hl.critic-anchor:hover,
 
 .source-host {
   font-family: var(--font-mono);
+  font-weight: var(--weight-code);
 }
 
 .source-host .cm-editor {

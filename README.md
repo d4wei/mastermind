@@ -76,7 +76,8 @@ signed or notarized.
 - **Closing.** Closing waits for saves. A failed save keeps the text recoverable and blocks the
   close.
 
-Themes, fonts, text width, and code colors live in Settings. The
+Themes, font presets, text width, and code colors live in Settings. Serif, Sans, and Hyperlegible
+presets each set heading, body, code, and Chinese faces, all bundled with the app. The
 [design system](themes/README.md) explains the theme contract, and
 [product terminology](docs/terminology.md) lists the English and Chinese labels.
 

@@ -1,46 +1,53 @@
-export interface FontFace {
-  family: string
-  url: string
-  /** CSS font-weight descriptor — a range for variable faces, a single value for static. */
-  weight: string
-}
+import type { MsgKey } from '../i18n'
 
+/** CJK faces after the Latin face: the bundled Noto face, then system faces if its slice cannot load. */
+export const CJK_STACKS = {
+  serif: ['Noto Serif SC', 'Songti SC', 'SimSun'],
+  sans: ['Noto Sans SC', 'PingFang SC', 'Microsoft YaHei'],
+} as const
+
+export type CjkStyle = keyof typeof CJK_STACKS
+
+/** A complete reading choice: every face the document needs. The [contract](fonts.md) explains. */
 export interface FontPreset {
   id: string
-  name: string
+  /** Interface message naming the preset in Settings. */
+  label: Extract<MsgKey, `fontPreset${string}`>
   displayFamily: string
   displayWeight: number
   displayTracking: string
   bodyFamily: string
+  /** Serif or sans: picks the CJK faces and the generic family that follow the Latin face. */
+  style: CjkStyle
+  codeFamily: string
+  codeWeight: number
 }
 
-export interface MonoFont {
-  id: string
-  name: string
-  family: string
-}
-
-/** Curated display+body pairings. `grid` is the default and matches the base tokens. */
+/** `serif` is the default and matches the base tokens in `themes/common.css`. */
 export const FONT_PRESETS: FontPreset[] = [
-  { id: 'grid', name: 'Schibsted', displayFamily: 'Schibsted Grotesk', displayWeight: 800, displayTracking: '-0.02em', bodyFamily: 'Schibsted Grotesk' },
-  { id: 'geist', name: 'Geist', displayFamily: 'Geist', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Geist' },
-  { id: 'bricolage', name: 'Bricolage', displayFamily: 'Bricolage Grotesque', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Inter' },
-  { id: 'lora', name: 'Lora', displayFamily: 'Lora', displayWeight: 600, displayTracking: '-0.01em', bodyFamily: 'Lora' },
-  { id: 'crimson', name: 'Crimson', displayFamily: 'Crimson Pro', displayWeight: 600, displayTracking: '0', bodyFamily: 'Crimson Pro' },
-  { id: 'manrope', name: 'Manrope', displayFamily: 'Manrope', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Manrope' },
-  { id: 'outfit', name: 'Outfit', displayFamily: 'Outfit', displayWeight: 700, displayTracking: '-0.02em', bodyFamily: 'Outfit' },
+  {
+    id: 'serif', label: 'fontPresetSerif', style: 'serif',
+    displayFamily: 'Source Serif 4', displayWeight: 650, displayTracking: '-0.01em',
+    bodyFamily: 'Source Serif 4', codeFamily: 'Source Code Pro', codeWeight: 500,
+  },
+  {
+    id: 'sans', label: 'fontPresetSans', style: 'sans',
+    displayFamily: 'Source Sans 3', displayWeight: 700, displayTracking: '-0.01em',
+    bodyFamily: 'Source Sans 3', codeFamily: 'Source Code Pro', codeWeight: 500,
+  },
+  {
+    id: 'hyperlegible', label: 'fontPresetHyperlegible', style: 'sans',
+    displayFamily: 'Atkinson Hyperlegible Next', displayWeight: 700, displayTracking: '0',
+    bodyFamily: 'Atkinson Hyperlegible Next', codeFamily: 'Atkinson Hyperlegible Mono', codeWeight: 400,
+  },
 ]
 
-export const MONO_FONTS: MonoFont[] = [
-  { id: 'geist', name: 'Geist Mono', family: 'Geist Mono' },
-  { id: 'jetbrains', name: 'JetBrains Mono', family: 'JetBrains Mono' },
-  { id: 'spline', name: 'Spline Sans Mono', family: 'Spline Sans Mono' },
-  { id: 'ubuntu', name: 'Ubuntu Sans Mono', family: 'Ubuntu Sans Mono' },
-]
+export const DEFAULT_FONT_PRESET = FONT_PRESETS[0]!
+
+export function isFontPresetId(id: string): boolean {
+  return FONT_PRESETS.some((preset) => preset.id === id)
+}
 
 export function fontPresetById(id: string | undefined): FontPreset {
-  return FONT_PRESETS.find((s) => s.id === id) ?? FONT_PRESETS[0]!
-}
-export function monoById(id: string | undefined): MonoFont {
-  return MONO_FONTS.find((m) => m.id === id) ?? MONO_FONTS[0]!
+  return FONT_PRESETS.find((preset) => preset.id === id) ?? DEFAULT_FONT_PRESET
 }

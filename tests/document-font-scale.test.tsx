@@ -8,6 +8,7 @@ import { useConfig } from '../ui/app/configStore'
 import { installHost } from '../ui/app/host'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { ThemeEffects } from '../ui/theme/ThemeProvider'
+import { FONT_FACES_HREF, fontPresetById, monoStack } from '../ui/theme/fonts'
 import { fakeHost } from './helpers/host'
 import { declarations } from './helpers/themes'
 
@@ -73,6 +74,26 @@ it('scales frontmatter properties with the body font size while chrome keeps its
   expect(sizeOf('.md-properties', tokens, body)).toBe(0.875 * 20)
   expect(sizeOf('.sel-toolbar > button', tokens, body)).toBe(pixels('var(--font-size-sm)', tokens, body))
   expect(sizeOf('.sel-toolbar > button', tokens, body)).toBe(0.875 * ROOT_PX)
+})
+
+it('loads the bundled faces once and applies the chosen preset, code face included', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  vi.stubGlobal('matchMedia', () => ({ matches: false }))
+  installHost(fakeHost())
+  useConfig.setState({ config: { ...DEFAULT_CONFIG, fontPreset: 'hyperlegible' }, themes: [] })
+  const root = createRoot(document.createElement('div'))
+  act(() => root.render(<ThemeEffects />))
+  act(() => root.render(<ThemeEffects />))
+  const style = document.documentElement.style
+  const preset = fontPresetById('hyperlegible')
+  expect(Array.from(document.head.querySelectorAll('link[rel="stylesheet"]'), (link) => link.getAttribute('href')))
+    .toContain(FONT_FACES_HREF)
+  expect(document.head.querySelectorAll(`link[href="${FONT_FACES_HREF}"]`)).toHaveLength(1)
+  expect(style.getPropertyValue('--font-body')).toContain("'Atkinson Hyperlegible Next', 'Noto Sans SC'")
+  expect(style.getPropertyValue('--font-mono')).toBe(monoStack(preset))
+  expect(style.getPropertyValue('--weight-code')).toBe(String(preset.codeWeight))
+  expect(style.getPropertyValue('--weight-bold')).toBe(String(preset.displayWeight))
+  act(() => root.unmount())
 })
 
 it('sizes document-body text relative to the body, never with a fixed rem size', () => {

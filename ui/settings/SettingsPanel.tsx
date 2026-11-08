@@ -4,7 +4,7 @@ import { usableAuthorName } from '../../document/author'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
 import { useT, type MsgKey } from '../i18n'
-import { FONT_PRESETS, MONO_FONTS, displayStack, monoStack } from '../theme/fonts'
+import { FONT_PRESETS, displayStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme, type CodeThemeId } from '../theme/codeThemes'
 import type { ThemeInfo } from '../../themes/types'
 
@@ -185,7 +185,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   style={{ fontFamily: displayStack(s) }}
                   onClick={() => patch({ fontPreset: s.id })}
                 >
-                  {s.name}
+                  {t(s.label)}
                 </button>
               ))}
             </div>
@@ -250,23 +250,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
         <section>
           <h4>{t('codeSection')}</h4>
-          <div className="settings-row">
-            <span>{t('codeFont')}</span>
-            <div className="settings-theme-row">
-              {MONO_FONTS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`theme-chip${config.monoFont === m.id ? ' active' : ''}`}
-                  aria-pressed={config.monoFont === m.id}
-                  style={{ fontFamily: monoStack(m) }}
-                  onClick={() => patch({ monoFont: m.id })}
-                >
-                  {m.name}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="settings-row">
             <span>{t('codeColor')}</span>
             <div className="settings-theme-row">

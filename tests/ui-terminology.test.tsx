@@ -19,7 +19,7 @@ const initialConfig = useConfig.getState()
 const initialDoc = useDoc.getState()
 const config: ClientConfig = {
   version: 1, theme: 'grid', fontSize: 16, lineHeight: 1.6, contentWidth: 736,
-  authorTag: 'alex', fontPreset: 'grid', monoFont: 'geist', codeTheme: 'none',
+  authorTag: 'alex', fontPreset: 'serif', codeTheme: 'none',
   uiLang: 'en',
 }
 const bar = { settings: { open: false, onToggle: () => {} }, resolved: { count: 0, open: false, onToggle: () => {} },

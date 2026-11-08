@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Three complete font presets, Source Serif 4 by default, Noto SC bundled
+
+**Ruled.** Settings offer exactly Serif (Source Serif 4, default), Sans (Source Sans 3), and
+Hyperlegible (Atkinson Hyperlegible Next); each names its code face and a CJK stack, and Noto Serif
+SC and Noto Sans SC ship in the bundle so Chinese renders identically on every platform. Comfort
+over long on-screen reading outranks taste when choosing body faces.
+
+**Beat:** seven display-led presets with a separate code font and system-only CJK fallback;
+Charis SIL and Literata as the serif body.
+
 ## 2026-10-29 — Agents close the documents they handed out, through the renderer
 
 **Ruled.** `close -- FILE...` names explicit paths and returns a result per path in input order;

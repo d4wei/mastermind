@@ -18,10 +18,11 @@ not need a browser or a second palette. Do not maintain swatch or appearance cop
 Discovery also defines the files the reviewer serves in development and ships: the tree without
 its TypeScript sources and Markdown docs.
 
-The [font registry](../ui/theme/fontRegistry.ts) owns font presets, and the
-[asset registry](../ui/theme/fonts.ts) owns their local files and fallback stacks. Code fonts and
-[code colors](../ui/theme/codeThemes.ts) are independent preferences. Their runtime overrides use
-the same CSS variables as the theme defaults.
+The [font registry](../ui/theme/fontRegistry.ts) owns font presets, each naming display, body,
+code, and CJK faces; [fonts.ts](../ui/theme/fonts.ts) builds their stacks, and
+[fonts/](fonts/README.md) holds the bundled files and their `@font-face` sheet.
+[Code colors](../ui/theme/codeThemes.ts) are an independent preference. Runtime overrides use the
+same CSS variables as the theme defaults.
 
 ## Color roles
 
@@ -58,7 +59,8 @@ Complete shadow tokens supply panel and popover elevation.
 
 ## Typography and layout
 
-Font presets override reading fonts, heading weight, and letter spacing. Markdown headings use
+Font presets override reading and code fonts, heading weight and letter spacing, and code weight
+(`--weight-code`). Markdown headings use
 body-relative sizes; shared block, heading, and list gaps establish the reading rhythm. All
 document-body text sizes from `--font-size-body` (`--md-font-size-sm` or `em`) so the font size
 setting scales it, while application chrome keeps the fixed `--font-size-sm/xs/micro` rem tokens.

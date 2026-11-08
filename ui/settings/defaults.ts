@@ -1,4 +1,5 @@
 import { DEFAULT_AUTHOR_TAG } from '../app/constants'
+import { DEFAULT_FONT_PRESET } from '../theme/fontRegistry'
 import type { MastermindConfig } from './types'
 
 export const DEFAULT_CONFIG: MastermindConfig = {
@@ -8,8 +9,7 @@ export const DEFAULT_CONFIG: MastermindConfig = {
   lineHeight: 1.6,
   contentWidth: 736,
   authorTag: DEFAULT_AUTHOR_TAG,
-  fontPreset: 'grid',
-  monoFont: 'geist',
+  fontPreset: DEFAULT_FONT_PRESET.id,
   codeTheme: 'none',
   uiLang: 'en',
 }

@@ -61,6 +61,8 @@ names, atomic confirmation failure/retry, ordinary patches, and restart behavior
 check separate setup responses and truthful admission state; the installed reviewer harness
 exercises human confirmation and its recovery flow.
 
-The retired `translationLanguage` field is ignored when reading existing preferences and rejected
-in new patches and setup suggestions. A subsequent write drops it while preserving other settings.
-Reading language belongs to the document session, not native preferences.
+The retired `translationLanguage` and `monoFont` fields are ignored when reading existing
+preferences and rejected in new patches and setup suggestions. A subsequent write drops them while
+preserving other settings. Reading language belongs to the document session, not native
+preferences; the font preset names the code face. The host stores `fontPreset` without checking it
+against the registry; the interface reads an unknown preset as the default.

@@ -1,50 +1,65 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync, readdirSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+import postcss from 'postcss'
 import {
-  FONT_FACES,
+  CJK_STACKS,
+  DEFAULT_FONT_PRESET,
+  FONT_FACES_HREF,
   FONT_PRESETS,
-  MONO_FONTS,
+  bodyStack,
+  displayStack,
   fontPresetById,
-  monoById,
+  monoStack,
 } from '../ui/theme/fonts'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
+import { storedConfig } from '../ui/settings/config-values'
+import { declarations } from './helpers/themes'
 
-describe('font registry', () => {
-  const families = new Set(FONT_FACES.map((f) => f.family))
+const facesSheet = path.resolve(FONT_FACES_HREF.slice(1))
+const declaredFamilies = new Set<string>()
+postcss.parse(readFileSync(facesSheet, 'utf8')).walkAtRules('font-face', (rule) => {
+  rule.walkDecls('font-family', (decl) => { declaredFamilies.add(decl.value.replace(/^'|'$/g, '')) })
+})
 
-  it('every font preset references declared display + body families', () => {
-    for (const s of FONT_PRESETS) {
-      expect(families.has(s.displayFamily), `${s.id} display "${s.displayFamily}"`).toBe(true)
-      expect(families.has(s.bodyFamily), `${s.id} body "${s.bodyFamily}"`).toBe(true)
+describe('font presets', () => {
+  it('offers exactly the serif, sans, and hyperlegible presets, with serif the default', () => {
+    expect(FONT_PRESETS.map((preset) => preset.id)).toEqual(['serif', 'sans', 'hyperlegible'])
+    expect(DEFAULT_FONT_PRESET.id).toBe('serif')
+    expect(DEFAULT_CONFIG.fontPreset).toBe('serif')
+  })
+
+  it('names only faces the bundled sheet declares', () => {
+    for (const preset of FONT_PRESETS) {
+      const named = [preset.displayFamily, preset.bodyFamily, preset.codeFamily, ...CJK_STACKS[preset.style].slice(0, 1)]
+      for (const family of named) expect(declaredFamilies.has(family), `${preset.id} "${family}"`).toBe(true)
     }
   })
 
-  it('every mono option references a declared family', () => {
-    for (const m of MONO_FONTS) expect(families.has(m.family), `${m.id} "${m.family}"`).toBe(true)
-  })
-
-  it('every declared face has a vendored woff2 on disk', () => {
-    for (const f of FONT_FACES) {
-      const rel = f.url.replace(/^\/themes\//, '')
-      const path = fileURLToPath(new URL(`../themes/${rel}`, import.meta.url))
-      expect(existsSync(path), `${f.family} → ${f.url}`).toBe(true)
+  it('carries the preset CJK stack in the body and display stacks', () => {
+    for (const preset of FONT_PRESETS) {
+      const cjk = CJK_STACKS[preset.style].map((family) => `'${family}'`).join(', ')
+      expect(bodyStack(preset)).toBe(`'${preset.bodyFamily}', ${cjk}, ${preset.style === 'serif' ? 'serif' : 'sans-serif'}`)
+      expect(displayStack(preset)).toContain(`'${preset.displayFamily}', ${cjk}, `)
+      expect(monoStack(preset)).toMatch(new RegExp(`^'${preset.codeFamily}', 'Noto Sans SC', .*monospace$`))
     }
   })
 
-  it('every vendored woff2 on disk is a declared face', () => {
-    const themes = fileURLToPath(new URL('../themes/', import.meta.url))
-    const declared = new Set(FONT_FACES.map((f) => f.url.replace(/^\/themes\//, '')))
-    const vendored = readdirSync(themes, { recursive: true, encoding: 'utf8' })
-      .filter((rel) => rel.endsWith('.woff2'))
-      .map((rel) => rel.split('\\').join('/'))
-    expect(vendored.filter((rel) => !declared.has(rel))).toEqual([])
+  it('matches the base tokens to the default preset', () => {
+    const tokens = declarations(readFileSync('themes/common.css', 'utf8'))
+    expect(tokens['--font-display']).toBe(displayStack(DEFAULT_FONT_PRESET))
+    expect(tokens['--font-body']).toBe(bodyStack(DEFAULT_FONT_PRESET))
+    expect(tokens['--font-mono']).toBe(monoStack(DEFAULT_FONT_PRESET))
+    expect(tokens['--weight-bold']).toBe(String(DEFAULT_FONT_PRESET.displayWeight))
+    expect(tokens['--ls-heading']).toBe(DEFAULT_FONT_PRESET.displayTracking)
+    expect(tokens['--weight-code']).toBe(String(DEFAULT_FONT_PRESET.codeWeight))
   })
 
-  it('defaults resolve, and unknown ids fall back to the first option', () => {
-    expect(fontPresetById(DEFAULT_CONFIG.fontPreset).id).toBe(DEFAULT_CONFIG.fontPreset)
-    expect(monoById(DEFAULT_CONFIG.monoFont).id).toBe(DEFAULT_CONFIG.monoFont)
-    expect(fontPresetById('nope').id).toBe(FONT_PRESETS[0]!.id)
-    expect(monoById('nope').id).toBe(MONO_FONTS[0]!.id)
+  it('reads a removed or unknown preset as the default and drops the retired code font', () => {
+    expect(fontPresetById('grid')).toBe(DEFAULT_FONT_PRESET)
+    expect(fontPresetById(undefined)).toBe(DEFAULT_FONT_PRESET)
+    expect(storedConfig({ fontPreset: 'grid', monoFont: 'jetbrains' })).toEqual(DEFAULT_CONFIG)
+    expect(storedConfig({ fontPreset: 'hyperlegible' }).fontPreset).toBe('hyperlegible')
+    expect(storedConfig({ monoFont: 'geist' })).not.toHaveProperty('monoFont')
   })
 })
