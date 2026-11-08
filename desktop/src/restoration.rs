@@ -3,8 +3,6 @@
 use mastermind_launch_check::protocol::MAX_FILES;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    io::Read,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     time::Duration,
@@ -59,26 +57,30 @@ pub fn inventory_path(preferences: &Path) -> PathBuf {
     preferences.with_file_name(format!("{stem}.open-files.json"))
 }
 
-/// Reads the inventory. `None` means the file is unreadable, corrupt, oversized, or of another
-/// version, and restoration starts empty; a missing file is an empty inventory.
-fn read(path: &Path) -> Option<OpenFiles> {
-    let file = match fs::File::open(path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Some(OpenFiles::default());
-        }
-        Err(_) => return None,
+/// What the inventory file held when restoration read it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Saved {
+    /// A usable inventory; a missing file is an empty one.
+    Read(OpenFiles),
+    /// Corrupt, oversized, or of another version. Restoration starts empty and replaces it.
+    Unusable,
+    /// The file could not be read this time, as with a sharing violation. Restoration starts
+    /// empty and leaves the file until the open documents change.
+    Unreadable,
+}
+
+fn read(path: &Path) -> Saved {
+    let bytes = match crate::preferences::read_bounded(path, MAX_INVENTORY_BYTES) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Saved::Read(OpenFiles::default()),
+        Err(error) if error.kind() == std::io::ErrorKind::FileTooLarge => return Saved::Unusable,
+        Err(_) => return Saved::Unreadable,
     };
-    let mut bytes = Vec::new();
-    file.take((MAX_INVENTORY_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .ok()?;
-    if bytes.len() > MAX_INVENTORY_BYTES {
-        return None;
-    }
-    let saved: OpenFiles = serde_json::from_slice(&bytes).ok()?;
+    let Ok(saved) = serde_json::from_slice::<OpenFiles>(&bytes) else {
+        return Saved::Unusable;
+    };
     if saved.version != FORMAT_VERSION {
-        return None;
+        return Saved::Unusable;
     }
     // Admission resolves relative paths against the working directory, which is not the person's.
     let files = saved
@@ -86,7 +88,7 @@ fn read(path: &Path) -> Option<OpenFiles> {
         .into_iter()
         .filter(|path| Path::new(path).is_absolute())
         .collect();
-    Some(OpenFiles::new(files, saved.active))
+    Saved::Read(OpenFiles::new(files, saved.active))
 }
 
 fn write(path: &Path, files: &OpenFiles) -> Result<(), String> {
@@ -94,25 +96,37 @@ fn write(path: &Path, files: &OpenFiles) -> Result<(), String> {
     crate::preferences::replace_file(path, &bytes, true)
 }
 
-type Writer = Box<dyn Fn(&Path, &OpenFiles) -> Result<(), String> + Send + Sync>;
+pub(crate) type Writer = Box<dyn Fn(&Path, &OpenFiles) -> Result<(), String> + Send + Sync>;
 
 #[derive(Default)]
 struct WriterState {
-    /// The latest inventory not yet written.
+    /// The latest recorded inventory the writer has not yet taken.
     pending: Option<OpenFiles>,
-    /// What the file holds, when known, so an unchanged inventory is not rewritten.
+    /// What the file holds, when known. Only the writer thread compares against it, and only
+    /// between writes, so it never stands for a write still in flight.
     written: Option<OpenFiles>,
-    running: bool,
+    writing: bool,
+    /// Set by `flush` and on drop: the writer stops waiting for the settling delay.
+    urgent: bool,
+    /// Set on drop: the writer exits once nothing is pending.
+    closed: bool,
+    /// The writer thread could not start, so nothing writes recorded inventories.
+    stopped: bool,
 }
 
-/// Writes the inventory off the caller's thread. Changes arriving while a write waits or runs
-/// replace one pending value, so a burst costs at most one more write.
-pub struct Remember {
+struct Shared {
     path: PathBuf,
     settle: Duration,
     write: Writer,
     state: Mutex<WriterState>,
-    idle: Condvar,
+    /// Signals a recorded inventory, urgency, and the end of each write.
+    changed: Condvar,
+}
+
+/// Writes the inventory on one writer thread. Changes arriving while a write waits or runs
+/// replace one pending value, so a burst costs at most one more write.
+pub struct Remember {
+    shared: Arc<Shared>,
 }
 
 impl Remember {
@@ -120,107 +134,125 @@ impl Remember {
         Self::with_writer(path, SETTLE, Box::new(write))
     }
 
-    fn with_writer(path: PathBuf, settle: Duration, write: Writer) -> Arc<Self> {
-        Arc::new(Self {
+    pub(crate) fn with_writer(path: PathBuf, settle: Duration, write: Writer) -> Arc<Self> {
+        let shared = Arc::new(Shared {
             path,
             settle,
             write,
             state: Mutex::default(),
-            idle: Condvar::new(),
-        })
+            changed: Condvar::new(),
+        });
+        let writer = shared.clone();
+        let spawned = std::thread::Builder::new()
+            .name("open-files".into())
+            .spawn(move || writer.run());
+        if let Err(error) = spawned {
+            shared.state.lock().unwrap().stopped = true;
+            eprintln!("Could not remember open files: {error}");
+        }
+        Arc::new(Self { shared })
     }
 
-    /// Reads the remembered inventory for restoration; see [`read`].
-    pub fn load(&self) -> OpenFiles {
-        let saved = read(&self.path);
-        self.state.lock().unwrap().written = saved.clone();
-        saved.unwrap_or_default()
+    /// Reads the remembered inventory for restoration and notes what the file holds. Restoration
+    /// calls it before anything is recorded.
+    pub fn load(&self) -> Saved {
+        let saved = read(&self.shared.path);
+        self.shared.state.lock().unwrap().written = match &saved {
+            Saved::Read(files) => Some(files.clone()),
+            Saved::Unusable | Saved::Unreadable => None,
+        };
+        saved
     }
 
     /// Schedules `files` to be written. Never waits on the filesystem.
-    pub fn record(self: &Arc<Self>, files: OpenFiles) {
-        let mut state = self.state.lock().unwrap();
-        if state.pending.is_none() && state.written.as_ref() == Some(&files) {
+    pub fn record(&self, files: OpenFiles) {
+        let mut state = self.shared.state.lock().unwrap();
+        if state.stopped {
             return;
         }
         state.pending = Some(files);
-        if state.running {
-            return;
-        }
-        state.running = true;
-        let remember = self.clone();
-        let spawned = std::thread::Builder::new()
-            .name("open-files".into())
-            .spawn(move || remember.drain());
-        if let Err(error) = spawned {
-            state.running = false;
-            eprintln!("Could not remember open files: {error}");
-        }
+        self.shared.changed.notify_all();
     }
 
-    fn drain(&self) {
-        std::thread::sleep(self.settle);
-        loop {
-            let files = {
-                let mut state = self.state.lock().unwrap();
-                match state.pending.take() {
-                    Some(files) if state.written.as_ref() != Some(&files) => files,
-                    Some(_) => continue,
-                    None => {
-                        state.running = false;
-                        self.idle.notify_all();
-                        return;
-                    }
-                }
-            };
-            self.write_now(files);
-        }
-    }
-
-    /// A failed write leaves the session untouched; the next change tries again.
-    fn write_now(&self, files: OpenFiles) {
-        match (self.write)(&self.path, &files) {
-            Ok(()) => self.state.lock().unwrap().written = Some(files),
-            Err(error) => {
-                self.state.lock().unwrap().written = None;
-                eprintln!("Could not remember open files: {error}");
-            }
-        }
-    }
-
-    /// Writes a pending inventory before the process exits, after a write already running.
+    /// Returns once the latest recorded inventory is on disk, including one recorded during a
+    /// write in progress, or after a bounded wait.
     pub fn flush(&self) {
-        let state = self.state.lock().unwrap();
+        let mut state = self.shared.state.lock().unwrap();
+        state.urgent = true;
+        self.shared.changed.notify_all();
         let (mut state, _) = self
-            .idle
-            .wait_timeout_while(state, FLUSH_WAIT, |state| state.running)
+            .shared
+            .changed
+            .wait_timeout_while(state, FLUSH_WAIT, |state| state.busy())
             .unwrap();
-        if state.running {
-            return;
-        }
-        let Some(files) = state.pending.take() else {
-            return;
-        };
-        if state.written.as_ref() == Some(&files) {
-            return;
-        }
-        // Holding the state keeps a new writer thread from racing this write.
-        state.running = true;
-        drop(state);
-        self.write_now(files);
-        let mut state = self.state.lock().unwrap();
-        state.running = false;
-        self.idle.notify_all();
+        state.urgent = state.closed;
     }
 
     #[cfg(test)]
     fn wait_idle(&self) {
-        let state = self.state.lock().unwrap();
+        let state = self.shared.state.lock().unwrap();
         let (state, timeout) = self
-            .idle
-            .wait_timeout_while(state, Duration::from_secs(5), |state| state.running)
+            .shared
+            .changed
+            .wait_timeout_while(state, Duration::from_secs(5), |state| state.busy())
             .unwrap();
-        assert!(!timeout.timed_out() && !state.running);
+        assert!(!timeout.timed_out() && !state.busy());
+    }
+}
+
+impl Drop for Remember {
+    /// Writes what is pending without settling, then lets the writer thread exit.
+    fn drop(&mut self) {
+        let mut state = self.shared.state.lock().unwrap();
+        state.closed = true;
+        state.urgent = true;
+        self.shared.changed.notify_all();
+    }
+}
+
+impl WriterState {
+    fn busy(&self) -> bool {
+        !self.stopped && (self.pending.is_some() || self.writing)
+    }
+}
+
+impl Shared {
+    fn run(&self) {
+        let mut state = self.state.lock().unwrap();
+        loop {
+            state = self
+                .changed
+                .wait_while(state, |state| state.pending.is_none() && !state.closed)
+                .unwrap();
+            if state.pending.is_none() {
+                return;
+            }
+            // Waiting lets a burst of changes replace the pending value before one write.
+            state = self
+                .changed
+                .wait_timeout_while(state, self.settle, |state| !state.urgent)
+                .unwrap()
+                .0;
+            let files = state.pending.take().unwrap();
+            if state.written.as_ref() == Some(&files) {
+                self.changed.notify_all();
+                continue;
+            }
+            state.writing = true;
+            drop(state);
+            let result = (self.write)(&self.path, &files);
+            state = self.state.lock().unwrap();
+            // A failed write leaves the session untouched; the next change tries again.
+            state.written = match result {
+                Ok(()) => Some(files),
+                Err(error) => {
+                    eprintln!("Could not remember open files: {error}");
+                    None
+                }
+            };
+            state.writing = false;
+            self.changed.notify_all();
+        }
     }
 }
 
@@ -228,7 +260,7 @@ impl Remember {
 pub(crate) mod tests {
     use super::*;
     use crate::test_support::TempDir;
-    use std::sync::mpsc;
+    use std::{fs, sync::mpsc};
 
     pub(crate) fn wait_idle(remember: &Remember) {
         remember.wait_idle();
@@ -273,12 +305,12 @@ pub(crate) mod tests {
         let root = TempDir::new("open-files-round-trip");
         let path = root.join("reviewer.open-files.json");
         let remember = Remember::new(path.clone());
-        assert_eq!(remember.load(), OpenFiles::default());
+        assert_eq!(remember.load(), Saved::Read(OpenFiles::default()));
         let saved = absolute_files(&root, &["a.md", "文档 b.md", "c.md"], Some("文档 b.md"));
         remember.record(saved.clone());
         remember.wait_idle();
-        assert_eq!(read(&path), Some(saved.clone()));
-        assert_eq!(Remember::new(path.clone()).load(), saved);
+        assert_eq!(read(&path), Saved::Read(saved.clone()));
+        assert_eq!(Remember::new(path.clone()).load(), Saved::Read(saved));
         let temp = root.join("reviewer.open-files.json.tmp");
         assert!(!temp.exists());
         #[cfg(unix)]
@@ -303,12 +335,12 @@ pub(crate) mod tests {
         remember.load();
         remember.record(absolute_files(&root, &["a.md", "b.md"], None));
         remember.wait_idle();
-        assert_eq!(read(&path), Some(first));
+        assert_eq!(read(&path), Saved::Read(first));
         fs::remove_dir_all(&temp).unwrap();
         let retried = absolute_files(&root, &["b.md"], Some("b.md"));
         remember.record(retried.clone());
         remember.wait_idle();
-        assert_eq!(read(&path), Some(retried));
+        assert_eq!(read(&path), Saved::Read(retried));
     }
 
     #[test]
@@ -328,11 +360,11 @@ pub(crate) mod tests {
         ] {
             fs::write(&path, &contents).unwrap();
             let remember = Remember::new(path.clone());
-            assert_eq!(remember.load(), OpenFiles::default(), "{contents:.40}");
+            assert_eq!(remember.load(), Saved::Unusable, "{contents:.40}");
             // Even an empty inventory replaces an unreadable file.
             remember.record(OpenFiles::default());
             remember.wait_idle();
-            assert_eq!(read(&path), Some(OpenFiles::default()));
+            assert_eq!(read(&path), Saved::Read(OpenFiles::default()));
         }
     }
 
@@ -347,7 +379,7 @@ pub(crate) mod tests {
             "active": "relative.md",
         });
         fs::write(&path, saved.to_string()).unwrap();
-        assert_eq!(read(&path), Some(files(&[kept.as_str()], None)));
+        assert_eq!(read(&path), Saved::Read(files(&[kept.as_str()], None)));
     }
 
     #[test]
@@ -362,17 +394,70 @@ pub(crate) mod tests {
         assert_eq!(kept.active.as_deref(), paths.last().map(String::as_str));
     }
 
-    #[test]
-    fn a_burst_of_changes_writes_once_and_unchanged_inventories_are_not_rewritten() {
+    /// A remembering writer that reports every inventory it writes.
+    pub(crate) fn recording(
+        path: PathBuf,
+        settle: Duration,
+    ) -> (Arc<Remember>, mpsc::Receiver<OpenFiles>) {
         let (sender, writes) = mpsc::channel();
         let remember = Remember::with_writer(
-            PathBuf::from("/unused"),
-            Duration::from_millis(200),
+            path,
+            settle,
             Box::new(move |_, files| {
                 sender.send(files.clone()).unwrap();
                 Ok(())
             }),
         );
+        (remember, writes)
+    }
+
+    /// A writer whose writes each wait for `release` after announcing themselves on `started`.
+    struct Gated {
+        remember: Arc<Remember>,
+        started: mpsc::Receiver<()>,
+        release: mpsc::Sender<()>,
+        writes: mpsc::Receiver<Vec<String>>,
+    }
+
+    impl Gated {
+        fn new() -> Self {
+            let (started_tx, started) = mpsc::channel();
+            let (release, release_rx) = mpsc::channel::<()>();
+            let release_rx = Mutex::new(release_rx);
+            let (sender, writes) = mpsc::channel();
+            let remember = Remember::with_writer(
+                PathBuf::from("/unused"),
+                Duration::ZERO,
+                Box::new(move |_, files| {
+                    started_tx.send(()).unwrap();
+                    release_rx
+                        .lock()
+                        .unwrap()
+                        .recv_timeout(Duration::from_secs(5))
+                        .unwrap();
+                    sender.send(files.files.clone()).unwrap();
+                    Ok(())
+                }),
+            );
+            remember.load();
+            Self {
+                remember,
+                started,
+                release,
+                writes,
+            }
+        }
+
+        /// Waits for the next write to start, then lets it finish.
+        fn finish_next(&self) {
+            self.started.recv_timeout(Duration::from_secs(5)).unwrap();
+            self.release.send(()).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_burst_of_changes_writes_once_and_unchanged_inventories_are_not_rewritten() {
+        let (remember, writes) = recording(PathBuf::from("/unused"), Duration::from_millis(200));
         remember.load();
         for count in 1..=5 {
             let paths: Vec<String> = (0..count).map(|i| format!("/{i}.md")).collect();
@@ -389,55 +474,77 @@ pub(crate) mod tests {
 
     #[test]
     fn changes_during_a_write_coalesce_into_one_more_write() {
-        let (started_tx, started) = mpsc::channel();
-        let (release, release_rx) = mpsc::channel::<()>();
-        let release_rx = Mutex::new(release_rx);
-        let (sender, writes) = mpsc::channel();
-        let remember = Remember::with_writer(
-            PathBuf::from("/unused"),
-            Duration::ZERO,
-            Box::new(move |_, files| {
-                started_tx.send(()).unwrap();
-                release_rx
-                    .lock()
-                    .unwrap()
-                    .recv_timeout(Duration::from_secs(5))
-                    .unwrap();
-                sender.send(files.files.clone()).unwrap();
-                Ok(())
-            }),
-        );
-        remember.load();
-        remember.record(files(&["/a.md"], None));
-        started.recv_timeout(Duration::from_secs(5)).unwrap();
+        let gated = Gated::new();
+        gated.remember.record(files(&["/a.md"], None));
+        gated.started.recv_timeout(Duration::from_secs(5)).unwrap();
         for paths in [&["/a.md", "/b.md"][..], &["/a.md", "/b.md", "/c.md"]] {
-            remember.record(files(paths, None));
+            gated.remember.record(files(paths, None));
         }
-        release.send(()).unwrap();
-        started.recv_timeout(Duration::from_secs(5)).unwrap();
-        release.send(()).unwrap();
-        remember.wait_idle();
+        gated.release.send(()).unwrap();
+        gated.finish_next();
+        gated.remember.wait_idle();
         assert_eq!(
-            writes.try_iter().collect::<Vec<_>>(),
+            gated.writes.try_iter().collect::<Vec<_>>(),
             [vec!["/a.md"], vec!["/a.md", "/b.md", "/c.md"]]
         );
     }
 
     #[test]
-    fn flush_returns_after_the_pending_inventory_is_written() {
-        let (sender, writes) = mpsc::channel();
-        let remember = Remember::with_writer(
-            PathBuf::from("/unused"),
-            Duration::from_millis(300),
-            Box::new(move |_, files| {
-                sender.send(files.files.clone()).unwrap();
-                Ok(())
-            }),
+    fn returning_to_the_saved_inventory_during_a_write_is_written_again() {
+        // `load` found no file, so the file is taken to hold the empty inventory.
+        let gated = Gated::new();
+        gated.remember.record(files(&["/a.md"], None));
+        gated.started.recv_timeout(Duration::from_secs(5)).unwrap();
+        gated.remember.record(OpenFiles::default());
+        gated.release.send(()).unwrap();
+        gated.finish_next();
+        gated.remember.wait_idle();
+        assert_eq!(
+            gated.writes.try_iter().collect::<Vec<_>>(),
+            [vec!["/a.md"], vec![]]
         );
+    }
+
+    #[test]
+    fn flush_returns_after_the_pending_inventory_is_written() {
+        let (remember, writes) = recording(PathBuf::from("/unused"), Duration::from_secs(5));
         remember.load();
         remember.record(files(&["/a.md"], None));
-        // The settling writer thread counts as running, so flush waits for it.
+        // Flushing skips the settling delay rather than waiting it out.
+        let started = std::time::Instant::now();
         remember.flush();
-        assert_eq!(writes.try_iter().collect::<Vec<_>>(), [vec!["/a.md"]]);
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert_eq!(
+            writes.try_iter().map(|f| f.files).collect::<Vec<_>>(),
+            [vec!["/a.md"]]
+        );
+    }
+
+    #[test]
+    fn flush_waits_for_an_inventory_recorded_during_a_write_in_progress() {
+        let gated = Gated::new();
+        gated.remember.record(files(&["/a.md"], None));
+        gated.started.recv_timeout(Duration::from_secs(5)).unwrap();
+        let flushing = {
+            let remember = gated.remember.clone();
+            std::thread::spawn(move || remember.flush())
+        };
+        gated.remember.record(files(&["/b.md"], None));
+        gated.release.send(()).unwrap();
+        gated.finish_next();
+        flushing.join().unwrap();
+        assert_eq!(
+            gated.writes.try_iter().collect::<Vec<_>>(),
+            [vec!["/a.md"], vec!["/b.md"]]
+        );
+    }
+
+    #[test]
+    fn an_unreadable_inventory_is_reported_apart_from_a_corrupt_one() {
+        let root = TempDir::new("open-files-unreadable");
+        // Reading a directory fails as an I/O error on every platform.
+        let path = root.join("reviewer.open-files.json");
+        fs::create_dir(&path).unwrap();
+        assert_eq!(Remember::new(path).load(), Saved::Unreadable);
     }
 }

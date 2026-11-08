@@ -111,7 +111,7 @@ fn main() {
         .setup(move |app| {
             let preferences = preferences::preference_path(app.handle())?;
             let remember = restoration::Remember::new(restoration::inventory_path(&preferences));
-            docs.lock().unwrap().remember(remember.clone());
+            let restoration = docs.lock().unwrap().remember(remember.clone());
             app.manage(remember);
             let setup = Arc::new(setup::Setup::new(preferences));
             app.manage(setup.clone());
@@ -127,12 +127,16 @@ fn main() {
             app.set_menu(menu)?;
             app.manage(menu_handles);
             let runtime = tauri::async_runtime::handle();
-            // Restoration queues on the admission lane ahead of launcher requests; any request
-            // that still reaches the registry first restores before admitting.
+            // Restoration queues on the admission lane ahead of launcher requests and reads the
+            // remembered documents before taking the registry lock; any entry point that still
+            // reaches the registry first restores before acting.
             let restoring = docs.clone();
             runtime.spawn(async move {
                 let _ = worker::admission_work()
-                    .run(move || restoring.lock().unwrap().restore())
+                    .run(move || {
+                        restoration.prepare();
+                        restoring.lock().unwrap().restore();
+                    })
                     .await;
             });
             runtime.spawn(transport::serve(

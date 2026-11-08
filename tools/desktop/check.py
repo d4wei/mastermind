@@ -71,6 +71,21 @@ def wire(root, payload):
         return json.loads(b''.join(chunks)) if chunks else {'error': 'connection_closed'}
 
 
+def remembers(preferences, path, deadline=5):
+    """Waits for the host's open-files inventory beside `preferences` to name `path`."""
+    inventory = preferences.with_name(preferences.stem + '.open-files.json')
+    until = time.monotonic() + deadline
+    while time.monotonic() < until:
+        try:
+            entries = json.loads(inventory.read_text(encoding='utf-8'))['files']
+            if any(os.path.samefile(entry, path) for entry in entries):
+                return True
+        except (OSError, ValueError, KeyError):
+            pass
+        time.sleep(0.05)
+    return False
+
+
 def stop(pid):
     os.kill(pid, signal.SIGKILL)
     owned_pids.discard(pid)
@@ -154,13 +169,23 @@ try:
         bad = os.fsencode(files) + b'/bad-\xff.md'
         code, response, _ = invoke(root, [os.fsdecode(bad)])
         check('unrepresentable filename rejected without substitution', code == 2)
+        check('host records its open files before termination', remembers(preferences, files / 'a.md'))
         stop(pid)
+        # The restarted host restores a.md; the race uses a file it does not remember, so exactly
+        # one cold start admits it.
+        contended = files / 'contended.md'
+        contended.write_bytes(b'# contended\n')
+        before[contended] = contended.read_bytes()
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
-            runs = list(pool.map(lambda _: invoke(root, [files / 'a.md']), range(6)))
-        # The restarted host reopens the files it remembered, a.md among them, before any request.
-        check('concurrent cold starts and stale socket recovery keep one owner',
+            runs = list(pool.map(lambda _: invoke(root, [contended]), range(6)))
+        check('concurrent cold starts and stale socket recovery keep one owner and admit once',
               all(r[0] == 0 for r in runs) and len({r[1]['pid'] for r in runs}) == 1 and
-              all(r[1]['results'][0]['status'] == 'already_open' for r in runs))
+              sorted(r[1]['results'][0]['status'] for r in runs) ==
+              ['already_open'] * 5 + ['opened'])
+        code, response, _ = invoke(root, [files / 'a.md'])
+        check('restarted host restores remembered files', code == 0 and
+              response['pid'] == runs[0][1]['pid'] and
+              response['results'][0]['status'] == 'already_open')
         stop(runs[0][1]['pid'])
         delayed_root = base / 'delayed'
         code, response, elapsed = invoke(delayed_root, [files / 'a.md'],

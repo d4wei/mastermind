@@ -145,6 +145,21 @@ def wire(identifier, payload):
     return response
 
 
+def remembers(preferences, path, deadline=5):
+    """Waits for the host's open-files inventory beside `preferences` to name `path`."""
+    inventory = preferences.with_name(preferences.stem + '.open-files.json')
+    until = time.monotonic() + deadline
+    while time.monotonic() < until:
+        try:
+            entries = json.loads(inventory.read_text(encoding='utf-8'))['files']
+            if any(os.path.samefile(entry, path) for entry in entries):
+                return True
+        except (OSError, ValueError, KeyError):
+            pass
+        time.sleep(0.05)
+    return False
+
+
 def stop(pid):
     subprocess.run(['taskkill', '/PID', str(pid), '/F'], capture_output=True, check=True)
     owned_pids.discard(pid)
@@ -273,13 +288,23 @@ try:
         check('oversized frame bounded',
               wire(identifier, b'x' * 65537 + b'\n')['error'] in ['invalid_request', 'connection_closed'])
         check('unterminated frame bounded', wire(identifier, b'{}')['error'] == 'connection_closed')
+        check('host records its open files before termination', remembers(preferences, files / 'a.md'))
         stop(pid)
+        # The restarted host restores a.md; the race uses a file it does not remember, so exactly
+        # one cold start admits it.
+        contended = files / 'contended.md'
+        contended.write_bytes(b'# contended\r\n')
+        originals[contended] = contended.read_bytes()
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
-            runs = list(pool.map(lambda _: invoke(identifier, [files / 'a.md']), range(6)))
-        # The restarted host reopens the files it remembered, a.md among them, before any request.
-        check('host termination and concurrent cold starts keep one owner',
+            runs = list(pool.map(lambda _: invoke(identifier, [contended]), range(6)))
+        check('host termination and concurrent cold starts keep one owner and admit once',
               all(r[0] == 0 for r in runs) and len({r[1]['pid'] for r in runs}) == 1 and
-              all(r[1]['results'][0]['status'] == 'already_open' for r in runs))
+              sorted(r[1]['results'][0]['status'] for r in runs) ==
+              ['already_open'] * 5 + ['opened'])
+        code, response, _ = invoke(identifier, [files / 'a.md'])
+        check('restarted host restores remembered files', code == 0 and
+              response['pid'] == runs[0][1]['pid'] and
+              response['results'][0]['status'] == 'already_open')
         stop(runs[0][1]['pid'])
         code, response, elapsed = invoke(uuid.uuid4().hex, [files / 'a.md'],
                                          extra={'MM_LAUNCH_CHECK_UI_DELAY_MS': '5000'})

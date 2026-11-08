@@ -22,18 +22,14 @@ pub(crate) fn preference_path(app: &tauri::AppHandle) -> Result<PathBuf, String>
 const MAX_PREFERENCE_BYTES: usize = 64 * 1024;
 
 pub(crate) fn read_preferences_file(path: PathBuf) -> Result<Option<Value>, String> {
-    let file = match fs::File::open(path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+    let bytes = match read_bounded(&path, MAX_PREFERENCE_BYTES) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::FileTooLarge => {
+            return Err("preferences_too_large".into());
+        }
         Err(error) => return Err(error.to_string()),
     };
-    let mut bytes = Vec::new();
-    file.take((MAX_PREFERENCE_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .map_err(|e| e.to_string())?;
-    if bytes.len() > MAX_PREFERENCE_BYTES {
-        return Err("preferences_too_large".into());
-    }
     serde_json::from_slice(&bytes)
         .map(Some)
         .map_err(|e| e.to_string())
@@ -47,6 +43,22 @@ pub(crate) fn write_preferences_file(path: PathBuf, config: Value) -> Result<(),
         return Err("invalid_preferences".into());
     }
     replace_file(&path, &bytes, false)
+}
+
+/// Reads at most `max` bytes of `path`. A missing file is `None`; a larger one fails with
+/// `FileTooLarge` after reading one byte past the limit, without reading the rest.
+pub(crate) fn read_bounded(path: &Path, max: usize) -> std::io::Result<Option<Vec<u8>>> {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let mut bytes = Vec::new();
+    file.take((max + 1) as u64).read_to_end(&mut bytes)?;
+    if bytes.len() > max {
+        return Err(std::io::ErrorKind::FileTooLarge.into());
+    }
+    Ok(Some(bytes))
 }
 
 /// Replaces `path` with `bytes` through a synced temporary file beside it, so readers see either

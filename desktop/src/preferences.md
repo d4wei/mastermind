@@ -11,7 +11,7 @@ failures keep their string response shape; document and admission errors use the
 
 Writes sync a temporary file in the same directory, then rename it over the preference path, so
 readers see either the previous or the new complete object. The
-[open-file inventory](restoration.md) shares this replacement. A failed write removes its temporary
+[open-file inventory](restoration.md) shares this replacement and the bounded read. A failed write removes its temporary
 file. The rename itself is not synced, and it replaces a symlinked preference path with a regular
 file. The writer mutex protects that temporary path from competing writes within this host. This is
 separate from the setup mutex, which protects the complete read-modify-write operation.

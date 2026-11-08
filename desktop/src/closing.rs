@@ -540,6 +540,28 @@ mod tests {
     }
 
     #[test]
+    fn a_close_before_startup_restoration_resolves_remembered_documents() {
+        let fixture = Fixture::new(&[]);
+        let remembered = ["a.md", "b.md"].map(|name| {
+            let path = fixture.dir.join(name);
+            fs::write(&path, b"# Text\r\n").unwrap();
+            path.to_str().unwrap().to_owned()
+        });
+        let inventory = fixture.dir.join("reviewer.open-files.json");
+        let saved = crate::restoration::OpenFiles::new(remembered.to_vec(), None);
+        fs::write(&inventory, serde_json::to_vec(&saved).unwrap()).unwrap();
+        fixture
+            .docs
+            .lock()
+            .unwrap()
+            .remember(crate::restoration::Remember::new(inventory));
+        let (renderer, asked) = answering(|id| Outcome::Closed { id: id.into() });
+        let response = runtime().block_on(fixture.close(&["b.md"], &renderer));
+        assert_eq!(statuses(&response), [("closed", None)]);
+        assert_eq!(*asked.lock().unwrap(), [["1"]]);
+    }
+
+    #[test]
     fn deleted_and_aliased_files_resolve_to_their_admitted_document() {
         let fixture = Fixture::new(&["a.md", "b.md"]);
         fs::remove_file(fixture.dir.join("a.md")).unwrap();
