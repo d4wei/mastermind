@@ -18,8 +18,13 @@ let store: ReturnType<typeof createDocStore>
 let activate: ReturnType<typeof vi.fn<(spanIndex: number | null) => void>>
 let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => boolean>>
 
-function Harness({ request }: { request?: { spanIndex: number } }) {
+/** `request` asks for a focused reply and `select` only selects, as a passage click and navigation do. */
+function Harness({ request, select }: { request?: { spanIndex: number }; select?: number }) {
   const [active, setActive] = useState<number | null>(null)
+  useEffect(() => {
+    const target = request?.spanIndex ?? select
+    if (target !== undefined) setActive(target)
+  }, [request, select])
   const [drafts, setDrafts] = useDraftState<ReplyDraft[]>('replies', [])
   const source = store((state) => state.source)
   const analysis = useMemo(() => analyzeMarkdown(source), [source])
@@ -66,6 +71,10 @@ function render(source: string) {
 /** Escape on the selected card collapses it; the card has no separate collapse control. */
 function collapse() {
   act(() => host.querySelector('.rail-card.active .rail-select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+}
+/** Opens a discussion through its opening message's button, which also focuses its reply field. */
+function openCard(index = 0) {
+  act(() => host.querySelectorAll<HTMLButtonElement>('.rail-select')[index]!.click())
 }
 function click(label: string, index = 0) {
   if (label === 'Delete comment') {
@@ -156,9 +165,46 @@ it('collapses a selected discussion with Escape rather than a header control', (
   expect(host.querySelector('.rail-card.active')).toBeNull()
 })
 
+it('discloses replies through a count with a turning chevron and offers no separate Reply button', () => {
+  render('{==first==}{>>@Alex: one<<} {==second==}{>>@Sam: two<<}{>>@Kai: answer<<}')
+  const buttonLabels = () => Array.from(host.querySelectorAll('button'), (button) => button.textContent)
+  expect(buttonLabels()).not.toContain('Reply')
+  const [quiet, replied] = Array.from(host.querySelectorAll('.rail-card'))
+  expect(quiet!.querySelector('.rail-replies-toggle, .rail-footer')).toBeNull()
+  const toggle = replied!.querySelector<HTMLButtonElement>('.rail-replies-toggle')!
+  expect(toggle.textContent).toBe('1 reply')
+  expect(toggle.firstElementChild?.tagName.toLowerCase()).toBe('svg')
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(toggle.hasAttribute('aria-controls')).toBe(false)
+  act(() => toggle.click())
+  expect(replied!.classList.contains('active')).toBe(true)
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(document.getElementById(toggle.getAttribute('aria-controls')!)!.textContent).toContain('answer')
+  expect(document.activeElement).toBe(replied!.querySelector('.rail-reply textarea'))
+  act(() => toggle.focus())
+  act(() => toggle.click())
+  expect(activate).toHaveBeenLastCalledWith(null)
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(host.querySelector('.rail-comment-reply, textarea')).toBeNull()
+  expect(document.activeElement).toBe(toggle)
+})
+
+it('offers the reply field on a discussion selected without a reply request, leaving focus alone', () => {
+  render('{==context==}{>>@Alex: question<<}')
+  act(() => root.render(<Harness select={0} />))
+  const textarea = host.querySelector<HTMLTextAreaElement>('.rail-card.active .rail-reply textarea')!
+  expect(textarea).not.toBeNull()
+  expect(document.activeElement).not.toBe(textarea)
+  expect(Array.from(host.querySelectorAll('button'), (button) => button.textContent)).toEqual(
+    expect.not.arrayContaining(['1 reply']))
+  click('Cancel')
+  expect(host.querySelector('textarea')).toBeNull()
+  expect(host.querySelector('.rail-card.active')).toBeNull()
+})
+
 it('pairs Cancel and Reply as matching compact buttons and marks Delete comment with an icon', () => {
   render('{==first==}{>>@Alex: one<<}')
-  click('Reply')
+  openCard()
   const actions = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-reply .rail-actions button'))
   expect(actions.map((button) => button.textContent)).toEqual(['Cancel', 'Reply'])
   expect(actions.map((button) => button.className)).toEqual(['btn-ghost btn-compact', 'btn-primary btn-compact'])
@@ -172,7 +218,7 @@ it('pairs Cancel and Reply as matching compact buttons and marks Delete comment 
 it('reply textarea focus preserves activation and keyboard submission still edits the file', () => {
   const source = '{==context==}{>>@Da Wei: question<<}'
   render(source)
-  click('Reply')
+  openCard()
   const textarea = host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!
   expect(textarea.closest('[role="button"]')).toBeNull()
   expect(document.activeElement).toBe(textarea)
@@ -193,7 +239,7 @@ it('reply textarea focus preserves activation and keyboard submission still edit
 it('disables a reply whose backtick would pair with code after the thread or whose line opens a list', () => {
   const source = '{==context==}{>>@Da Wei: question<<} then `code` here.'
   render(source)
-  click('Reply')
+  openCard()
   const textarea = host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!
   const type = (text: string) => act(() => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, text)
@@ -219,7 +265,7 @@ it('disables a reply whose backtick would pair with code after the thread or who
 
 it('keeps the reply draft and ignores submit while the IME handles keys', () => {
   render('{>>@Da Wei: question<<}')
-  click('Reply')
+  openCard()
   const textarea = host.querySelector('textarea')!
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Existing reply')
@@ -239,21 +285,21 @@ it('keeps the reply draft and ignores submit while the IME handles keys', () => 
 
 it('retains separate reply drafts when collapsing and switching discussions', () => {
   render('{==first==}{>>@Alex: one<<} {==second==}{>>@Sam: two<<}')
-  click('Reply', 0)
+  openCard(0)
   const type = (value: string) => act(() => {
     const input = host.querySelector('textarea')!
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, value)
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   type('First unfinished reply')
-  click('Reply', 1)
+  openCard(1)
   expect(host.querySelector('textarea')!.value).toBe('')
   type('Second unfinished reply')
   act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(host.querySelector('textarea')).toBeNull()
-  click('Reply', 0)
+  openCard(0)
   expect(host.querySelector('textarea')!.value).toBe('First unfinished reply')
-  click('Reply', 1)
+  openCard(1)
   expect(host.querySelector('textarea')!.value).toBe('Second unfinished reply')
   expect(edit).not.toHaveBeenCalled()
 })
@@ -271,7 +317,7 @@ it('keeps hover separate from selection and never changes card positions on hove
 it('preserves the expanded thread and reading position after appending a reply', () => {
   const reveal = vi.spyOn(reviewScroll, 'revealElement')
   render('{==context==}{>>@Alex: question<<}')
-  click('Reply')
+  openCard()
   const input = host.querySelector('textarea')!
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'Answer')
@@ -283,7 +329,7 @@ it('preserves the expanded thread and reading position after appending a reply',
   click('Reply')
   expect(host.querySelector('.rail-card')).toBe(card)
   expect(host.querySelectorAll('.rail-body')).toHaveLength(2)
-  expect(host.querySelector('textarea')).toBeNull()
+  expect(host.querySelector('textarea')!.value).toBe('')
   expect(host.querySelector('.rail-select')!.getAttribute('aria-expanded')).toBe('true')
   act(() => vi.advanceTimersByTime(40))
   expect(reveal).not.toHaveBeenCalled()
@@ -292,7 +338,7 @@ it('preserves the expanded thread and reading position after appending a reply',
 
 it('retains the draft but disables mutation if a conflict arrives while replying', () => {
   render('{>>@Alex: question<<}')
-  click('Reply')
+  openCard()
   const textarea = host.querySelector('textarea')!
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'Keep this draft')
@@ -314,7 +360,7 @@ it('keeps the quoted passage visible before, during and after replying', () => {
   render('{==context==}{>>@Alex: question<<}')
   const quote = () => host.querySelector('.rail-card-anchor')?.textContent
   expect(quote()).toBe('context')
-  click('Reply')
+  openCard()
   expect(quote()).toBe('context')
   collapse()
   expect(quote()).toBe('context')
@@ -347,7 +393,7 @@ it('does not open a reply when selecting comment text', () => {
 
 it('opens a reply for each passage request, including after cancelling the same thread', () => {
   render('{==context==}{>>@Alex: question<<}')
-  click('Reply')
+  openCard()
   click('Cancel')
   expect(host.querySelector('textarea')).toBeNull()
   act(() => root.render(<Harness request={{ spanIndex: 0 }} />))
@@ -359,7 +405,7 @@ it('opens a reply for each passage request, including after cancelling the same 
 
 it('returns keyboard focus to the card when Escape closes the composer', () => {
   render('{>>@Alex: question<<}')
-  click('Reply')
+  openCard()
   act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
   expect(document.activeElement).toBe(host.querySelector('.rail-select'))
 })
@@ -382,25 +428,25 @@ function typeReply(value: string) {
 
 it('drops the reply draft of a resolved discussion instead of moving it to an identical one', () => {
   render('{==a==}{>>@bo: same<<} x {==a==}{>>@bo: same<<}')
-  click('Reply', 0)
+  openCard(0)
   typeReply('meant for the first')
   click('Resolve', 0)
   expect(analyzeMarkdown(store.getState().source).items.filter((item) => item.type === 'thread')).toHaveLength(1)
-  click('Reply', 0)
+  openCard(0)
   expect(host.querySelector('textarea')!.value).toBe('')
   expect(host.querySelector('.rail-orphan')).toBeNull()
 })
 
 it('keeps a reply draft on its discussion when an identical earlier one is resolved', () => {
   render('{==a==}{>>@bo: same<<} x {==a==}{>>@bo: same<<} y {==a==}{>>@bo: same<<}')
-  click('Reply', 2)
+  openCard(2)
   typeReply('meant for the third')
   collapse()
   click('Resolve', 0)
   expect(host.querySelector('.rail-orphan')).toBeNull()
-  click('Reply', 0)
+  openCard(0)
   expect(host.querySelector('textarea')!.value).toBe('')
-  click('Reply', 1)
+  openCard(1)
   expect(host.querySelector('textarea')!.value).toBe('meant for the third')
 })
 
@@ -408,7 +454,7 @@ it('discards an orphaned reply draft on request', () => {
   store.setState({ source: '{==a==}{>>@bo: one<<}', savedSource: '{==a==}{>>@bo: one<<}', status: 'ready' })
   act(() => root.render(<DraftScope id="orphan"><Harness /></DraftScope>))
   try {
-    click('Reply')
+    openCard()
     typeReply('unsent')
     act(() => store.setState({ source: 'a {==b==}{>>@bo: two<<}' }))
     expect(host.querySelector<HTMLTextAreaElement>('.rail-orphan textarea')!.value).toBe('unsent')
@@ -423,7 +469,7 @@ const draftsHolding = (text: string) => Array.from(host.querySelectorAll('textar
 
 it('orphans a reply draft whose discussion vanished beside an identical one', () => {
   render('{>>@bo: +1<<} x {>>@bo: +1<<}')
-  click('Reply', 0)
+  openCard(0)
   typeReply('meant for the first')
   act(() => store.setState({ source: 'x {>>@bo: +1<<}' }))
   expect(draftsHolding('meant for the first').map((input) => !!input.closest('.rail-orphan'))).toEqual([true])
@@ -432,7 +478,7 @@ it('orphans a reply draft whose discussion vanished beside an identical one', ()
 
 it('follows a unique discussion through an external change that rewrites around it', () => {
   render('p {==a==}{>>@bo: one<<}')
-  click('Reply')
+  openCard()
   typeReply('kept')
   act(() => store.setState({ source: '{==a==}{>>@bo: one<<} q' }))
   expect(host.querySelector('.rail-orphan')).toBeNull()
@@ -442,7 +488,7 @@ it('follows a unique discussion through an external change that rewrites around 
 it('orphans a reply draft when an external change could have inserted a lookalike on either side', () => {
   const discussion = '{==x==}{>>@a: ok<<}'
   render(`${discussion}\n\nrest`)
-  click('Reply')
+  openCard()
   typeReply('meant for the original')
   act(() => store.setState({ source: `${discussion}{>>@b: r<<}\n\n${discussion}\n\nrest` }))
   expect(draftsHolding('meant for the original').map((input) => !!input.closest('.rail-orphan'))).toEqual([true])
@@ -451,7 +497,7 @@ it('orphans a reply draft when an external change could have inserted a lookalik
 it('keeps a sent reply draft when its edit does not apply', () => {
   const source = '{==a==}{>>@bo: question<<}'
   render(source)
-  click('Reply')
+  openCard()
   typeReply('not lost')
   edit.mockImplementationOnce(() => false)
   act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))

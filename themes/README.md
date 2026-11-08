@@ -43,7 +43,8 @@ same CSS variables as the theme defaults.
   both carry `--find-match-text`. Palettes set the two fills for their appearance; they stay
   distinguishable from the translucent `--review-highlight-bg`.
 - **Selection and focus:** neutral selection fill and a neutral keyboard focus ring remain separate
-  from review colors. Focus never substitutes for a selected state.
+  from review colors. A composer's target keeps the `--color-selection` fill while focus is in the
+  composer. Focus never substitutes for a selected state.
 - **Document content:** ordinary links retain underlines and neutral ink; task checkboxes are
   neutral. Code colors are off by default. Their enabled palettes follow the theme's light/dark
   appearance and are calibrated against the elevated code-block surface.
@@ -90,7 +91,8 @@ icon button. Segmented selectors retain full-width rectangular choices without `
 Letter-based symbols such as Find's Aa count as icons; their implementation as text does not change
 their role.
 
-Reading measure, margins, outline reservation, comment width, and gap are shared tokens. The
+Reading measure, margins, outline reservation, comment width, gap, and the overlay panel width
+(`--panel-width`, shared by Settings, Resolved, and Find) are shared tokens. The
 [layout contract](../ui/app/layout.md) owns centering, panel fallback, scrolling, and movement.
 The [native appearance adapter](../ui/theme/appearance.md) synchronizes the window after stylesheet
 load. The operating system owns window corners and traffic lights.

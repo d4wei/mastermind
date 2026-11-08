@@ -71,7 +71,9 @@ the narrow comments panel moves below Find rather than closing it. On narrow lay
 comments. Settings-save feedback belongs to application
 preferences and can appear without an active document.
 
-Settings and history panels fit within the viewport width and scroll their bodies when needed.
+Settings, history, and Find share `--panel-width` and fit within the viewport width; panels scroll
+their bodies when needed. A panel's compact close control lines its glyph up with the body's content
+inset while keeping a full hit target.
 `Notifications` places a bounded, scrollable stack at the bottom left, outside document scrolling.
 Conflict recovery, save failures, and translation feedback share it; Find floats below the top-right
 document controls. Dismissed failures remain reachable from a compact control. Conflict state also

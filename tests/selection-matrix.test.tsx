@@ -18,7 +18,7 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { mapSelection, type ExclusionReason, type SelRange } from '../ui/modes/reading/selection'
 import { changeVerdict, commentVerdict } from '../ui/modes/reading/marks'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
-import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { SELECTION_TARGET_HIGHLIGHT, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { useConfig } from '../ui/app/configStore'
 
 /** A source slice by its text and, when it recurs, the occurrence meant. */
@@ -453,6 +453,54 @@ describe('the selection toolbar', () => {
     await act(async () => vi.advanceTimersByTimeAsync(120))
     expect(buttons()).toEqual(['Suggest change', 'Comment'])
     expect(note()).toBeUndefined()
+  })
+
+  /** jsdom lacks the CSS Custom Highlight API; this registry stands in for `CSS.highlights`. */
+  function stubHighlights(): Map<string, Set<Range>> {
+    const registry = new Map<string, Set<Range>>()
+    vi.stubGlobal('Highlight', class extends Set<Range> {})
+    vi.stubGlobal('CSS', { highlights: registry })
+    cleanups.push(() => vi.unstubAllGlobals())
+    return registry
+  }
+  const painted = (registry: Map<string, Set<Range>>) =>
+    Array.from(registry.get(SELECTION_TARGET_HIGHLIGHT) ?? [], (range) => range.toString())
+
+  it('keeps the target looking selected while a composer is open and clears it when the composer closes', async () => {
+    const registry = stubHighlights()
+    await show('Alpha bravo charlie.', 'bravo')
+    expect(painted(registry)).toEqual([])
+    press('Comment')
+    expect(painted(registry)).toEqual(['bravo'])
+    // The document selection collapsing as focus enters the composer leaves the highlight in place.
+    act(() => { window.getSelection()!.removeAllRanges(); document.dispatchEvent(new Event('selectionchange')) })
+    await act(async () => vi.advanceTimersByTimeAsync(120))
+    expect(painted(registry)).toEqual(['bravo'])
+    press('Cancel')
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+  })
+
+  it('clears the target highlight when a suggestion is submitted or the selection is dismissed', async () => {
+    const registry = stubHighlights()
+    await show('Alpha bravo charlie.', 'bravo')
+    press('Suggest change')
+    expect(painted(registry)).toEqual(['bravo'])
+    act(() => inputValue(host.querySelector('textarea')!, 'delta'))
+    press('Suggest change')
+    expect(edit).toHaveBeenCalledTimes(1)
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    await show('Alpha bravo charlie.', 'charlie')
+    press('Comment')
+    expect(painted(registry)).toEqual(['charlie'])
+    act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+  })
+
+  it('opens the composer without painting where the Highlight API is absent', async () => {
+    expect(globalThis.CSS?.highlights).toBeUndefined()
+    await show('Alpha bravo charlie.', 'bravo')
+    press('Comment')
+    expect(host.querySelector('.sel-composer textarea')).not.toBeNull()
   })
 
   it('acts on the latest of rapid reselections', async () => {

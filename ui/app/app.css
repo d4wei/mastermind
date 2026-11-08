@@ -318,6 +318,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--space-unit);
+  min-height: var(--control-size-compact);
   margin-bottom: var(--space-unit);
 }
 .rail-message-header > .rail-author, .rail-select { flex: 1; min-width: 0; }
@@ -380,6 +381,14 @@ button:disabled {
   min-height: calc(var(--space-unit) * 7);
 }
 .rail-footer { justify-content: flex-start; }
+/* Live and resolved discussions share this reply-count disclosure; its chevron turns while expanded. */
+.rail-replies-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-unit);
+}
+.rail-replies-toggle svg { transition: transform var(--dur-fast) var(--ease-standard); }
+.rail-replies-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
 .rail-reply { margin-top: calc(var(--space-unit) * 3); }
 /* Resizing stops at two full lines, so the placeholder and caret stay readable. */
 .rail-reply textarea {
@@ -458,6 +467,8 @@ button:disabled {
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
 .sel-composer textarea::placeholder { color: var(--color-invert-text-muted); }
+/* A composer's target keeps the document selection's color while focus is in the composer. */
+::highlight(selection-target) { background-color: var(--color-selection); }
 
 .sel-composer textarea::selection {
   background: var(--color-invert-text);
@@ -936,7 +947,7 @@ mark.critic-hl.critic-anchor:hover,
   top: var(--bar-clear);
   right: var(--bar-gap);
   z-index: var(--z-panel);
-  width: min(340px, calc(100% - var(--bar-gap) * 2));
+  width: min(var(--panel-width), calc(100% - var(--bar-gap) * 2));
   max-height: calc(100vh - var(--bar-clear) - var(--bar-gap));
   display: flex;
   flex-direction: column;
@@ -969,6 +980,16 @@ mark.critic-hl.critic-anchor:hover,
   background: var(--color-bg-elevated);
   border-bottom: 1px solid var(--color-border);
 }
+/* The compact close control keeps a full hit target while its glyph's right edge lines up with the
+   body's content inset; negative block margins keep the header height. */
+.slide-over-close.btn-icon {
+  width: calc(var(--space-unit) * 7);
+  height: calc(var(--space-unit) * 7);
+  margin-block: calc(var(--space-unit) * -1);
+  margin-right: calc(var(--space-unit) * -2);
+  border-radius: var(--radius-md);
+}
+.slide-over-close.btn-icon > svg { width: calc(var(--space-unit) * 3); height: calc(var(--space-unit) * 3); }
 .slide-over-title {
   font-weight: var(--weight-medium);
   font-size: var(--font-size-sm);
@@ -1286,6 +1307,9 @@ input[type='checkbox'] {
     animation: none;
   }
   .rail-card,
+  .rail-replies-toggle svg,
+  .outline-tick,
+  .outline-list-tick,
   .seg-btn,
   .btn-primary,
   .sel-toolbar > button {
@@ -1332,6 +1356,7 @@ input[type='checkbox'] {
   height: calc(var(--space-unit) * .5);
   border-radius: 0;
   background: var(--color-text-faint);
+  transition: width var(--dur-base) var(--ease-standard), background-color var(--dur-base) var(--ease-standard);
 }
 .outline-tick.active,
 .nav-outline button[aria-current] .outline-list-tick {

@@ -75,10 +75,10 @@ it.each([
 })
 
 it.each([
-  { uiLang: 'en', name: 'Your name', hint: 'This name appears beside your comments.',
+  { uiLang: 'en', name: 'Display name', hint: 'This name appears beside your comments.',
     font: 'Font preset', sans: 'Sans', color: 'Code color scheme', width: 'Text width',
     language: 'Translation language', interfaceLanguage: 'Interface language', soft: 'Soft' },
-  { uiLang: 'zh-CN', name: '你的名字', hint: '这个名字会显示在你的评论旁。',
+  { uiLang: 'zh-CN', name: '显示名称', hint: '这个名字会显示在你的评论旁。',
     font: '字体预设', sans: '无衬线', color: '代码配色', width: '正文宽度',
     language: '译文语言', interfaceLanguage: '界面语言', soft: '柔和' },
 ] as const)('uses canonical settings labels in $uiLang without changing preference keys', (labels) => {

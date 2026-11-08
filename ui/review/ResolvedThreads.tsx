@@ -3,8 +3,9 @@ import { parseResolvedThreads } from '../../document/review-archive'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import { SlideOver } from '../app/SlideOver'
 import { useT } from '../i18n'
-import { AlertIcon, ChevronRightIcon, CodeIcon, HistoryIcon } from '../icons'
+import { AlertIcon, HistoryIcon } from '../icons'
 import { CommentBody } from './CommentBody'
+import { RepliesToggle } from './RepliesToggle'
 import './ResolvedThreads.css'
 
 export function ResolvedThreads({ source, onClose }: { source: string; onClose: () => void }) {
@@ -31,40 +32,30 @@ export function ResolvedThreads({ source, onClose }: { source: string; onClose: 
   )
 }
 
-/** One archived discussion: its quoted passage, opening comment, and on request its replies and Markdown source. */
+/** One archived discussion, laid out like a live comment card: author, quoted passage, then comment and its replies. */
 function ResolvedDiscussion({ context, thread }: { context: string; thread: string }) {
   const t = useT()
   const [repliesOpen, setRepliesOpen] = useState(false)
-  const [sourceOpen, setSourceOpen] = useState(false)
   const repliesId = useId()
-  const sourceId = useId()
   const comments = analyzeMarkdown(thread).items.flatMap((item) => item.type === 'thread' ? item.comments : [])
   const [first, ...replies] = comments
-  const replyCount = t(replies.length === 1 ? 'countReply' : 'countReplies').replace('{count}', String(replies.length))
-  // A record whose thread no longer parses as comments still shows its stored text.
-  const showSource = sourceOpen || !first
+  const quote = context && <blockquote className="rail-card-anchor" aria-label={t('resolvedContext')} title={context}>{context}</blockquote>
   const message = (comment: typeof comments[number], index: number) =>
-    <div className={`resolved-comment${index ? ' resolved-reply' : ''}`} key={index}>
-      <div className="rail-message-header">
-        <span className="rail-author">{comment.author ?? t('comment')}</span>
-        {index === 0 && <button type="button" className="btn-ghost btn-icon rail-icon resolved-source-toggle"
-          aria-expanded={sourceOpen} aria-controls={sourceOpen ? sourceId : undefined} aria-label={t('markdownSource')}
-          title={t('markdownSource')} onClick={() => setSourceOpen((open) => !open)}><CodeIcon /></button>}
-      </div>
+    <div className={`rail-comment${index ? ' rail-comment-reply' : ''}`} key={index}>
+      <div className="rail-message-header"><span className="rail-author">{comment.author ?? t('comment')}</span></div>
+      {index === 0 && quote}
       <CommentBody body={comment.body} />
     </div>
   return (
     <article className="resolved-card" aria-label={t('resolvedOriginal')}>
-      {context && <blockquote className="resolved-quote" aria-label={t('resolvedContext')} title={context}>{context}</blockquote>}
-      {first && message(first, 0)}
-      {replies.length > 0 && <div className="rail-actions rail-footer resolved-footer">
-        <button type="button" className="resolved-toggle" aria-expanded={repliesOpen}
-          aria-controls={repliesOpen ? repliesId : undefined} onClick={() => setRepliesOpen((open) => !open)}>
-          <ChevronRightIcon />{replyCount}
-        </button>
-      </div>}
+      {first ? message(first, 0) : <>
+        {quote}
+        {/* A record whose thread no longer parses as comments still shows its stored text. */}
+        <pre className="resolved-source">{thread}</pre>
+      </>}
+      {replies.length > 0 && <RepliesToggle count={replies.length} expanded={repliesOpen} controls={repliesId}
+        onToggle={() => setRepliesOpen((open) => !open)} />}
       {repliesOpen && <div id={repliesId}>{replies.map((reply, index) => message(reply, index + 1))}</div>}
-      {showSource && <pre className="resolved-source" id={sourceId}>{thread}</pre>}
     </article>
   )
 }

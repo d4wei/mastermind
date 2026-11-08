@@ -67,7 +67,7 @@ it('hands focus from the overflow menu into its panel without restoring the trig
     return <><TopBar settings={{ open, onToggle: () => setOpen(!open) }} resolved={{ count: 0, open: false, onToggle: () => {} }}
       railOpen={false} onToggleRail={() => {}} commentsAvailable={false} />
       {open && <SlideOver title="Settings" onClose={onClose} returnFocus=".topbar-overflow">
-        <input aria-label="Your name" />
+        <input aria-label="Display name" />
       </SlideOver>}</>
   }
   act(() => root.render(<Harness />))

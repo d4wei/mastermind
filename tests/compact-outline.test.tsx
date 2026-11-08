@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import postcss from 'postcss'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -146,4 +148,22 @@ it('tracks element scrolling while the window stays stationary', () => {
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(window.scrollY).toBe(0)
   viewport.remove()
+})
+
+it('eases outline bar width and color with the shared motion tokens, and not under reduced motion', () => {
+  const sheet = postcss.parse(readFileSync('ui/app/app.css', 'utf8'))
+  const declared = (selector: string, inReducedMotion: boolean) => {
+    const values: string[] = []
+    sheet.walkRules((rule) => {
+      const reduced = rule.parent?.type === 'atrule' && /prefers-reduced-motion:\s*reduce/.test((rule.parent as postcss.AtRule).params)
+      if (reduced !== inReducedMotion || !rule.selectors.includes(selector)) return
+      rule.walkDecls('transition', (decl) => { values.push(decl.value) })
+    })
+    return values
+  }
+  for (const tick of ['.outline-tick', '.outline-list-tick']) {
+    const [transition] = declared(tick, false)
+    expect(transition, tick).toMatch(/^width var\(--dur-[a-z]+\) var\(--ease-standard\), background-color var\(--dur-[a-z]+\) var\(--ease-standard\)$/)
+    expect(declared(tick, true), tick).toEqual(['none'])
+  }
 })

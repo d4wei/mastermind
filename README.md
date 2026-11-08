@@ -57,7 +57,7 @@ node bin/mastermind.js open -- plan.md
 ```
 
 The macOS build creates `desktop/target/release/bundle/macos/mastermind.app`. The first launch asks
-for your name and Interface language; files opened during setup stay open afterward. Builds are not
+for your display name and Interface language; files opened during setup stay open afterward. Builds are not
 signed or notarized.
 
 ## Reading and reviewing

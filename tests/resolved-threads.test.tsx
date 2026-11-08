@@ -42,19 +42,28 @@ it('renders archived Unicode/spaced authors and literal original text safely', (
   expect(Array.from(host.querySelectorAll('.rail-author'), (author) => author.textContent)).toEqual(['Da Wei', '李 明'])
   expect(host.querySelector('img')).toBeNull()
   expect(host.querySelector('pre')).toBeNull()
-  act(() => button('Markdown source').click())
-  expect(host.querySelector('pre')!.textContent).toBe(source)
 })
 
-it('quotes the passage and discloses replies and Markdown source with the app chevron', () => {
+it('lays each card out like a live comment: author, quoted passage, then comment, with no source view', () => {
   const source = '{==the quoted passage==}{>>@Alex: opening<<}{>>@Sam: first<<}{>>@Alex: second<<}'
   act(() => root.render(<ResolvedThreads source={archive(source)} onClose={() => {}} />))
-  const quote = host.querySelector('blockquote.resolved-quote')!
+  const opening = host.querySelector('.resolved-card > .rail-comment')!
+  expect(Array.from(opening.children, (child) => child.className)).toEqual(['rail-message-header', 'rail-card-anchor', 'rail-body'])
+  const quote = opening.querySelector('blockquote.rail-card-anchor')!
   expect(quote.textContent).toBe('the quoted passage')
   expect(quote.getAttribute('aria-label')).toBe('Quoted passage')
+  expect(opening.querySelector('.rail-message-header')!.textContent).toBe('Alex')
+  expect(Array.from(host.querySelectorAll('.resolved-card button'), (item) => item.textContent)).toEqual(['2 replies'])
+  expect(host.textContent).not.toContain('Markdown source')
+})
+
+it('discloses replies with the chevron toggle the live comment rail shares', () => {
+  const source = '{==the quoted passage==}{>>@Alex: opening<<}{>>@Sam: first<<}{>>@Alex: second<<}'
+  act(() => root.render(<ResolvedThreads source={archive(source)} onClose={() => {}} />))
   expect(host.querySelector('details, summary')).toBeNull()
   expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['opening'])
   const toggle = button('2 replies')
+  expect(toggle.className).toBe('rail-replies-toggle')
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
   expect(toggle.querySelector('svg')).not.toBeNull()
   act(() => toggle.click())
@@ -62,7 +71,7 @@ it('quotes the passage and discloses replies and Markdown source with the app ch
   expect(document.getElementById(toggle.getAttribute('aria-controls')!)).not.toBeNull()
   expect(Array.from(host.querySelectorAll('.rail-body'), (body) => body.textContent)).toEqual(['opening', 'first', 'second'])
   act(() => toggle.click())
-  expect(host.querySelectorAll('.resolved-reply')).toHaveLength(0)
+  expect(host.querySelectorAll('.rail-comment-reply')).toHaveLength(0)
 })
 
 it.each(['<!-- mastermind:resolved-thread v99\nunknown\n-->', '<!-- mastermind:resolved-thread v1\nnot json\n-->'])(

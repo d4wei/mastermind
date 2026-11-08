@@ -1,9 +1,10 @@
+/* Find takes the shared panel width, so it lines up with Settings and Resolved below the controls. */
 .find-bar {
   position: fixed;
   top: var(--bar-clear);
   right: var(--bar-gap);
   z-index: var(--z-popover);
-  max-width: calc(100% - var(--bar-gap) * 2);
+  width: min(var(--panel-width), calc(100% - var(--bar-gap) * 2));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -16,15 +17,16 @@
   padding: calc(var(--space-unit) * 1.5);
   font-size: var(--font-size-sm);
 }
-/* The search glyph and result counter sit inside the field; its padding reserves both, so typing
-   never runs under the counter and the panel keeps its width whatever the count. */
+/* The field takes the bar's width left beside the controls, wrapping above them only when the bar
+   is narrower than the panel; the search glyph and result counter sit inside it, and its padding
+   reserves both, so typing never runs under the counter and the bar keeps its width. */
 .find-field {
   position: relative;
   display: flex;
   align-items: center;
-  width: var(--find-input-width);
-  min-width: 0;
-  flex: 1 1 var(--find-input-width);
+  flex-grow: 1;
+  flex-basis: 0;
+  min-width: calc(var(--panel-width) / 2);
 }
 .find-field > svg {
   position: absolute;

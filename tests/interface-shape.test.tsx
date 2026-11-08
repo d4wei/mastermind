@@ -44,7 +44,7 @@ it('keeps icon-only hover targets square without inherited text-button padding',
   installStyles()
   const controls = [
     ['btn-ghost btn-icon topbar-icon-btn', 30], ['native-open btn-icon', 30],
-    ['btn-ghost btn-icon find-nav', 24], ['btn-ghost btn-icon slide-over-close', 24],
+    ['btn-ghost btn-icon find-nav', 24], ['btn-ghost btn-icon slide-over-close', 28],
     ['btn-ghost btn-icon notification-dismiss', 24], ['btn-ghost btn-icon recovery-warning', 24],
     ['native-file-close btn-icon', 24], ['native-file-attention btn-ghost btn-icon', 24],
     ['btn-ghost btn-icon rail-icon', 24],
@@ -54,8 +54,9 @@ it('keeps icon-only hover targets square without inherited text-button padding',
     const button = document.createElement('button'); button.className = classes
     parent.append(button); document.body.append(parent)
     const style = getComputedStyle(button)
-    expect(style.width, classes).toBe(`${size}px`)
-    expect(style.height, classes).toBe(`${size}px`)
+    // jsdom keeps a calc() wrapper around token arithmetic.
+    expect(style.width.replace(/^calc\((.*)\)$/, '$1'), classes).toBe(`${size}px`)
+    expect(style.height.replace(/^calc\((.*)\)$/, '$1'), classes).toBe(`${size}px`)
     for (const edge of ['Top', 'Right', 'Bottom', 'Left'] as const) expect(style[`padding${edge}`], classes).toBe('0px')
     expect(style.flexShrink, classes).toBe('0')
   }
@@ -71,14 +72,37 @@ it('keeps segmented choices wide', () => {
   expect(preset.padding).toBe('0px')
 })
 
-it('keeps the Find counter inside a fixed-width field and groups compact controls without gaps', () => {
+it('insets the panel close control to the content edge with a compact glyph and a full hit target', () => {
   installStyles()
-  document.body.innerHTML = '<div class="find-bar"><div class="find-field"><svg></svg><input class="settings-input find-input"><span class="find-count">1/12</span></div><div class="find-actions"></div></div>'
+  document.body.innerHTML = '<div class="slide-over"><div class="slide-over-head"><span class="slide-over-title">Settings</span>' +
+    '<button class="btn-ghost btn-icon slide-over-close"><svg></svg></button></div><div class="slide-over-body"></div></div>'
+  const head = getComputedStyle(document.querySelector('.slide-over-head')!)
+  const close = getComputedStyle(document.querySelector('.slide-over-close')!)
+  const glyph = getComputedStyle(document.querySelector('.slide-over-close svg')!)
+  const body = getComputedStyle(document.querySelector('.slide-over-body')!)
+  // The glyph's right edge sits where the body's content begins: head padding + margin + half the spare width.
+  const px = (value: string) => Number(value.replace(/^calc\((.*)\)$/, '$1').replace(/px$/, '').replace(/^(-?\d+)px \* (-?\d+)$/, (_, a, b) => String(a * b)))
+  const glyphInset = px(head.paddingRight) + px(close.marginRight) + (px(close.width) - px(glyph.width)) / 2
+  expect(glyphInset).toBe(px(body.paddingRight))
+  expect(px(head.paddingRight) + px(close.marginRight)).toBe(8)
+  expect(px(close.width)).toBeGreaterThanOrEqual(28)
+  expect(px(glyph.width)).toBeLessThan(14)
+})
+
+it('gives Find the shared panel width and keeps the counter inside a field that never sets its own width', () => {
+  installStyles()
+  document.body.innerHTML = '<div class="find-bar"><div class="find-field"><svg></svg><input class="settings-input find-input"><span class="find-count">1/12</span></div><div class="find-actions"></div></div>' +
+    '<div class="slide-over"></div>'
+  const bar = getComputedStyle(document.querySelector('.find-bar')!)
   const field = getComputedStyle(document.querySelector('.find-field')!)
   const input = getComputedStyle(document.querySelector('.find-input')!)
   const count = getComputedStyle(document.querySelector('.find-count')!)
+  expect(bar.width).toBe(getComputedStyle(document.querySelector('.slide-over')!).width)
+  expect(bar.width).toContain('var(--panel-width)')
   expect(field.position).toBe('relative')
-  expect(field.width).toBe('var(--find-input-width)')
+  expect(field.flexGrow).toBe('1')
+  expect(field.width).toBe('auto')
+  expect(field.minWidth).toContain('var(--panel-width)')
   expect(count.position).toBe('absolute')
   expect(count.fontVariantNumeric).toBe('tabular-nums')
   // The input's right padding covers the counter's offset and widest box, so typing never reaches it.

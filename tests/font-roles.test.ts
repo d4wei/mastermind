@@ -7,7 +7,7 @@ import { afterEach, expect, it } from 'vitest'
 // Reading presets set the document faces; interface chrome keeps the system face whatever the preset.
 const READING_FACES = /var\(--font-(body|display)\)/
 /** Selectors whose elements render document text: the Markdown body and quotations of it. */
-const DOCUMENT_TEXT = /^(\.md-root\b|\.trans-view \.md-callout\b|\.translated-comment-quote$|\.resolved-quote$)/
+const DOCUMENT_TEXT = /^(\.md-root\b|\.trans-view \.md-callout\b|\.translated-comment-quote$)/
 
 const uiRoot = path.resolve('ui')
 const sheets = readdirSync(uiRoot, { recursive: true }).map(String).filter((name) => name.endsWith('.css'))
@@ -38,14 +38,13 @@ it('resolves interface controls to the UI face and document text to the reading 
       <div class="sel-composer-actions"><button class="btn-compact">Cancel</button><button class="btn-primary btn-compact">Suggest change</button></div></div></div>
     <div class="rail-card"><span class="rail-author">Alex</span><div class="rail-body">note</div>
       <div class="rail-reply"><textarea></textarea></div></div>
-    <article class="resolved-card"><blockquote class="resolved-quote">passage</blockquote></article>
+    <article class="resolved-card"><blockquote class="rail-card-anchor">passage</blockquote></article>
     <article class="md-root"><p>prose</p><button class="md-table-toggle">expand</button></article>`
   const family = (selector: string) => getComputedStyle(document.querySelector(selector)!).fontFamily
   expect(family('body')).toBe('var(--font-ui)')
   for (const control of ['button', 'input', 'textarea', '.sel-composer textarea', '.rail-reply textarea',
-    '.btn-primary', '.md-table-toggle', '.rail-card']) {
+    '.btn-primary', '.md-table-toggle', '.rail-card', '.resolved-card .rail-card-anchor']) {
     expect(family(control), control).toBe('var(--font-ui)')
   }
   expect(family('.md-root')).toBe('var(--font-body)')
-  expect(family('.resolved-quote')).toBe('var(--font-body)')
 })

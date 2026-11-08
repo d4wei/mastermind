@@ -1,3 +1,4 @@
+import { clearHighlight, paintHighlight } from '../util/highlights'
 import { textMatches, type Match } from './matches'
 
 interface Point { node: Text; offset: number }
@@ -75,24 +76,13 @@ export function commentRange(root: HTMLElement, match: Match): Range | null {
 }
 
 export function paintMatches(ranges: Range[], current: Range | null): void {
-  if (!globalThis.CSS?.highlights || typeof Highlight === 'undefined') return
-  for (const [name, members] of [
-    ['find-results', ranges],
-    ['find-current', current ? [current.cloneRange()] : []],
-  ] as const) {
-    // Mutate registered sets so WebKit invalidates the removed ranges when a query changes.
-    const highlight = CSS.highlights.get(name) ?? new Highlight()
-    highlight.clear()
-    for (const range of members) highlight.add(range)
-    CSS.highlights.set(name, highlight)
-  }
+  paintHighlight('find-results', ranges)
+  paintHighlight('find-current', current ? [current.cloneRange()] : [])
 }
 
 export function clearMatches(): void {
-  for (const name of ['find-results', 'find-current']) {
-    globalThis.CSS?.highlights?.get(name)?.clear()
-    globalThis.CSS?.highlights?.delete(name)
-  }
+  clearHighlight('find-results')
+  clearHighlight('find-current')
 }
 
 export function revealMatch(range: Range, panel: HTMLElement | null): void {

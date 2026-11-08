@@ -97,6 +97,11 @@ opens block syntax, markup that would not reparse, or a mark that would change t
 formatting; submission verifies the final text. Stale drafts and paused editing keep their own
 messages. Selection limits never raise global notifications.
 
+Focus entering a composer stops the browser painting the document selection, so while a composer
+is open its captured range carries the `selection-target` CSS Custom Highlight in the selection
+color; closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM
+untouched and is skipped where the Highlight API is absent.
+
 ## Tests
 
 `tests/selection-matrix.test.tsx` renders each fixture with the React client, selects it forward

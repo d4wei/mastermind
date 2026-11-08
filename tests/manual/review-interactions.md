@@ -112,7 +112,8 @@ and Chinese interface labels, a prepared translation, and light and dark themes.
   check that the current-section indicator follows it.
 - With headings from H1 through H6, bars have uniform thickness and square ends. Inactive bars
   shorten at each depth; the active bar is always longest. In the popup, bars share a left edge
-  while labels retain their indentation. Changing sections does not shift the labels.
+  while labels retain their indentation. Changing sections does not shift the labels. Bars ease to
+  their new width and color as the section changes, and change instantly with reduced motion.
 - Frontmatter property rows have only a bottom divider, with breathing room before the document
   body. Literal YAML fallbacks retain their code-block spacing.
 - The first heading starts below the controls. Scrolling and choosing an outline heading keep both
@@ -128,7 +129,15 @@ and Chinese interface labels, a prepared translation, and light and dark themes.
 - With Find open, open the More menu, the language menu, settings, and resolved history: each closes
   Find. Matches show yellow and the current match orange in light and dark themes, distinct from a
   highlighted comment passage; the `1/2` counter stays inside the field and the panel width does
-  not change while typing. Select text just below Find; the selection toolbar opens below it.
+  not change while typing. Find's left and right edges line up with Settings and Resolved. Select
+  text just below Find; the selection toolbar opens below it.
+- In Settings and Resolved, the close X sits close to the panel's right edge, aligned with the
+  cards' right edge, and its hover square is comfortable to hit.
+- A comment card without replies shows author, quote, and comment with no footer; one with replies
+  shows a chevron count that turns when expanded. Selecting either shows the reply field directly.
+  Resolved cards use the same order and chevron.
+- Select text, choose Comment or Suggest change: the selected text stays highlighted while typing
+  in the composer and loses the highlight on Cancel, submission, or Escape.
 - Overscroll the top and bottom in light and dark themes, then change themes and repeat. The
   revealed surface matches the current page background in both reading modes. File controls,
   outline, and open overlay panels stay fixed throughout scrolling and overscroll.

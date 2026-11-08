@@ -16,12 +16,14 @@ Every match takes the saturated `--find-match-bg` fill and the current match `--
 both with `--find-match-text` ink and without an underline or outline; the fills stay distinct from
 the translucent review highlight. A compact `current/total` counter (`0/0` without matches) sits
 right-aligned inside the field, whose padding reserves its space, so typing never runs under it and
-the panel keeps one width; a visually hidden live region announces the full phrase. Its four
-compact square controls stay grouped when the panel wraps. Opening another top-right surface closes
+the panel keeps one width; a visually hidden live region announces the full phrase. The panel takes
+`--panel-width`, the width Settings and Resolved share, and the field fills what the controls
+leave; its four compact square controls stay grouped when a narrow window wraps the panel. Opening another top-right surface closes
 Find; see the [layout contract](../app/layout.md).
 
 `matches.ts` uses the pinned CodeMirror search package for literal matching and Unicode offsets.
-`reading.ts` maps displayed text to DOM ranges without rewriting the renderer's nodes. Comment
+`reading.ts` maps displayed text to DOM ranges without rewriting the renderer's nodes and paints
+them through the CSS Custom Highlight helper in `ui/util/highlights.ts`. Comment
 search uses the same whitespace normalization as `CommentBody`, then maps the visible result when
 its thread opens. `source.ts` connects CodeMirror's query, match decorations, and scrolling to the
 shared controls. Its internal panel has no visible controls. Search navigation preserves the
@@ -30,7 +32,8 @@ original editor selection, mapping it through intervening edits before restoring
 Typing starts at the first result at or after the current position, wrapping if needed. Enter and
 Shift-Enter navigate; Command-G / Ctrl-G and their Shift variants do the same. Empty queries neither
 highlight nor scroll. Escape closes Find unless an unrelated text input or active IME composition
-owns it. Search never writes a file, submits a draft, or opens a reply composer.
+owns it. Search never writes a file, submits a draft, or moves focus into a reply field; revealing
+a comment selects its discussion, whose reply field then shows unfocused.
 
 A result inside a collapsed reply opens its thread. If Find opened the comments panel, closing Find
 restores its previous closed state unless the person explicitly changed it. A narrow comments panel

@@ -1,12 +1,15 @@
 # Comment rail interaction
 
-A collapsed card shows its quoted passage, opening message, and a reply count. Clicking its passage,
-opening message, or count expands the discussion and focuses the reply composer. Enter and Space on
-the passage or the card's opening-message button do the same. Repeated activation refocuses an
-already-open composer. Replies appear chronologically beneath the quoted passage. Neighboring
-opening messages remain fully readable. Cards use interface typography independently of the reading
-font
-preset.
+A card reads author, quoted passage, then the opening comment, followed by a reply count only when
+replies exist; `RepliesToggle` draws that count with the chevron it shares with resolved
+discussions, turned while the replies show. A card without replies has no footer and no Reply
+button. Clicking its passage, opening message, or count expands the discussion and focuses the reply
+composer; the expanded count collapses it again and keeps focus. Enter and Space on the passage or
+the card's opening-message button do the same. Repeated activation refocuses an already-open
+composer. A selected card always shows its reply field, so a discussion selected without a reply
+request (by Find revealing a reply, for example) offers it without taking focus. Replies appear
+chronologically beneath the count. Neighboring opening messages remain fully readable. Cards use
+interface typography independently of the reading font preset.
 
 `rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
 space above crowded anchors; earlier cards stay within the document surface. When there is not
@@ -22,11 +25,12 @@ provisional positions. Narrow
 panels use the same fade. Motion honors reduced-motion preferences.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
-message has a native button that opens the discussion and reply composer; Resolve, More, and Reply
-remain separate keyboard controls. The card has no collapse control: Escape and clicks elsewhere
+message has a native button that opens the discussion and reply composer; Resolve, More, and the
+reply count remain separate keyboard controls. The card has no collapse control: Escape and clicks elsewhere
 collapse it. More uses the shared Radix menu behavior; its Delete comment item carries the delete
-icon, as other menu items carry theirs. Reply's Cancel and Reply buttons share one compact face,
-size, and height, and the reply field resizes vertically down to two lines. Delete comment belongs
+icon, as other menu items carry theirs. The composer's Cancel and Reply buttons share one compact
+face, size, and height; Cancel collapses the card like Escape. The reply field resizes vertically
+down to two lines. Delete comment belongs
 to one message; Resolve archives the complete discussion through the existing source-splice helpers.
 
 Escape and clicks elsewhere in the article collapse selection; Escape that closes a panel, popover,
@@ -39,16 +43,18 @@ exactly; after an external change, a discussion with a duplicate is found only w
 region's alignments agree on its offset. Appending a reply retains the selected card. Source changes
 that replace the opening message or anchor create a different card identity and clear a selection or
 hover on the old one. Resolve and deleting the opening message discard that discussion's draft, and
-posting the reply clears it, once the edit applies; a refused edit keeps the draft.
+posting the reply clears it, once the edit applies, leaving the emptied field open on the
+still-selected card; a refused edit keeps the draft.
 
 The reply textarea retains normal text-input semantics and its submission shortcut. Composition
 keys remain with the IME. Conflict state prevents submission, deletion, and resolution while
-retaining the draft. Actions stop stale activation after a source splice.
+retaining the draft; a selected card shows its reply field then only if it holds a draft or was
+already open. Actions stop stale activation after a source splice.
 
 ## Resolved discussions
 
-The history panel lists each archived discussion as a card in the rail's typography: the quoted
-passage as a quotation in the reading face, clamped to three lines; the opening comment; a
-reply-count disclosure with the shared chevron; and a Markdown source toggle in the message header
-that shows the stored thread text. Unrecognized records show their diagnostic and raw text. Cards
+The history panel lists each archived discussion as a card laid out like a live one, reusing the
+rail's message classes: author, the quoted passage with its left rule and one-line truncation, the
+opening comment, then the shared reply-count disclosure. A record whose thread no longer parses as
+comments shows its stored text instead; unrecognized records show their diagnostic and raw text. Cards
 offer no jump to the passage, since resolution removes its anchor.

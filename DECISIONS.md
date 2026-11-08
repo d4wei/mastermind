@@ -29,6 +29,23 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — The comment-author setting is labeled Display name
+
+**Ruled.** Label the comment-author preference Display name / 显示名称 in Settings, the customary
+label for the name shown on one's comments, correcting the 2026-10-14 Your name / 你的名字 label.
+The onboarding question What should we call you? / 怎么称呼你？ is unchanged.
+
+**Beat:** Your name / 你的名字, which reads as a request for a personal or legal name.
+
+## 2026-11-07 — A selected discussion offers its reply field without a Reply button
+
+**Ruled.** A selected comment card always shows its reply field, focused only when activation asked
+for a reply, so cards carry no Reply button; a reply count with the shared chevron appears only
+when replies exist, as on resolved discussions. Paused editing still opens no new reply field.
+
+**Beat:** a footer Reply button on every card without replies, and resolved cards with a separate
+Markdown source view.
+
 ## 2026-11-07 — Transient find highlights may color the document body
 
 **Ruled.** Find paints every match in a saturated yellow and the current match in orange, theme

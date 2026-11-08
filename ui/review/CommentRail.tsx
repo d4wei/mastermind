@@ -1,11 +1,12 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
-import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
+import { useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { DropdownMenu } from 'radix-ui'
 import { useT } from '../i18n'
 import { CommentBody } from './CommentBody'
+import { RepliesToggle } from './RepliesToggle'
 import { CheckIcon, MoreIcon, TrashIcon } from '../icons'
 import { deleteCommentEdits, resolveThreadEdits } from '../../document/review-archive'
 import './ResolvedThreads.css'
@@ -49,7 +50,10 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
   const [positions, setPositions] = useState<number[]>([])
   const [railHeight, setRailHeight] = useState(0)
+  // The card whose reply composer was explicitly requested and takes focus; the selected card shows
+  // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
+  const repliesId = useId()
   const [resolveError, setResolveError] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   const selectedKey = useRef<string | null>(null)
@@ -145,10 +149,11 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     if (card) focusReply(card.key)
     revealElement(docRef.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null, true)
   }
-  const collapse = () => {
+  /** Deselects the discussion; `keepFocus` leaves focus on a control that stays rendered. */
+  const collapse = (keepFocus = false) => {
     const card = cards.find((item) => item.spanIndex === activeSpan)
     const element = card && cardRefs.current.get(card.key)
-    if (element?.contains(document.activeElement)) element.querySelector<HTMLButtonElement>('.rail-select')?.focus({ preventScroll: true })
+    if (!keepFocus && element?.contains(document.activeElement)) element.querySelector<HTMLButtonElement>('.rail-select')?.focus({ preventScroll: true })
     setReplyFor(null)
     onActivate(null)
   }
@@ -167,9 +172,12 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   // but cannot submit, and a body whose own lines break the mark says so.
   const pendingReply = (card: ThreadCard, text: string): TextEdit[] | null =>
     readOnly || !text.trim() ? null : replyEdits(source, card.thread.end, authorTag, text, analysis)
+  // A paused document opens no new composer but keeps one that holds a draft or was already open.
+  const composes = (card: ThreadCard) => card.spanIndex === activeSpan &&
+    (!readOnly || replyFor === card.key || draftText(card) !== '')
   // Verifying reparses the document, so the open composer's verdict follows its deferred text and
   // is kept across renders that change neither; submission verifies the final text.
-  const composerCard = cards.find((card) => card.spanIndex === activeSpan && card.key === replyFor)
+  const composerCard = cards.find(composes)
   const composerText = useDeferredValue(composerCard ? draftText(composerCard) : '')
   const composerEnd = composerCard?.thread.end
   const composerVerified = useMemo(() => composerEnd === undefined || readOnly || !composerText.trim() ? null
@@ -205,7 +213,37 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     {cards.map((card, index) => {
       const selected = activeSpan === card.spanIndex
       const replies = card.thread.comments.length - 1
-      const replyCount = t(replies === 1 ? 'countReply' : 'countReplies').replace('{count}', String(replies))
+      // A message reads author, then (opening message only) the quoted passage, then the comment, as
+      // a resolved discussion does; the reply count follows the opening message.
+      const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
+        <div key={messageIndex} data-find-comment={card.messages[messageIndex]} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
+          <div className="rail-message-header">
+            {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
+              aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
+              onClick={() => activate(card.spanIndex)}>
+              <span className="rail-author">{comment.author ?? t('comment')}</span>
+            </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
+            {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
+              title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
+            <DropdownMenu.Root modal={false}>
+              <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
+                aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
+                  <DropdownMenu.Item className="reader-menu-item" disabled={readOnly} onSelect={() => {
+                    if (readOnly) return
+                    onHover?.(null)
+                    // Deleting the opening message ends the discussion's identity.
+                    const ended = messageIndex === 0 ? card : undefined
+                    if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
+                  }}><TrashIcon />{t('deleteComment')}</DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </div>
+          {messageIndex === 0 && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
+          <CommentBody body={comment.body} />
+        </div>
       return <div key={card.key} role="group" aria-label={t('resolvedOriginal')}
         ref={(element) => { if (element) cardRefs.current.set(card.key, element); else cardRefs.current.delete(card.key) }}
         className={`rail-card${selected ? ' active' : ''}${hoveredSpan === card.spanIndex ? ' paired' : ''}`}
@@ -223,38 +261,15 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
             collapse()
           }
         }}>
-        {(selected ? card.thread.comments : card.thread.comments.slice(0, 1)).map((comment, messageIndex) =>
-          <div key={messageIndex} data-find-comment={card.messages[messageIndex]} className={`rail-comment${messageIndex ? ' rail-comment-reply' : ''}`}>
-            <div className="rail-message-header">
-              {messageIndex === 0 ? <button type="button" className="rail-select" aria-expanded={selected}
-                aria-label={`${t('resolvedOriginal')}: ${comment.author ?? t('comment')}`}
-                onClick={() => activate(card.spanIndex)}>
-                <span className="rail-author">{comment.author ?? t('comment')}</span>
-              </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-              {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
-                title={t('resolve')} disabled={readOnly} onClick={() => resolveThread(card)}><CheckIcon /></button>}
-              <DropdownMenu.Root modal={false}>
-                <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
-                  aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
-                    <DropdownMenu.Item className="reader-menu-item" disabled={readOnly} onSelect={() => {
-                      if (readOnly) return
-                      onHover?.(null)
-                      // Deleting the opening message ends the discussion's identity.
-                      const ended = messageIndex === 0 ? card : undefined
-                      if (edit(deleteCommentEdits(source, card.thread, messageIndex), ended)) collapse()
-                    }}><TrashIcon />{t('deleteComment')}</DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            </div>
-            {messageIndex === 0 && card.anchorText && <div className="rail-card-anchor" title={card.anchorText}>{card.anchorText}</div>}
-            <CommentBody body={comment.body} />
-          </div>)}
-        {selected && replyFor === card.key ? <div className="rail-reply">
+        {message(card.thread.comments[0]!, 0)}
+        {replies > 0 && <RepliesToggle count={replies} expanded={selected} controls={`${repliesId}-${index}`}
+          onToggle={() => selected ? collapse(true) : activate(card.spanIndex)} />}
+        {selected && replies > 0 && <div id={`${repliesId}-${index}`}>
+          {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
+        </div>}
+        {composes(card) && <div className="rail-reply">
           {readOnly && <p role="status">{t('editingPaused')}</p>}
-          <textarea autoFocus readOnly={readOnly} rows={2} {...ime.inputProps}
+          <textarea autoFocus={replyFor === card.key} readOnly={readOnly} rows={2} {...ime.inputProps}
             value={draftText(card)} placeholder={t('replyPlaceholder')} aria-label={t('replyPlaceholder')}
             onChange={(event) => setDraftText(card, event.target.value)}
             onKeyDown={(event) => {
@@ -265,16 +280,10 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
           {!readOnly && composerText.trim() && !composerVerified && !commentBodyFits(authorTag, composerText) &&
             <p role="alert">{t('commentBodyInvalid')}</p>}
           <div className="rail-actions">
-            <button type="button" className="btn-ghost btn-compact" onClick={() => setReplyFor(null)}>{t('cancel')}</button>
+            <button type="button" className="btn-ghost btn-compact" onClick={() => collapse()}>{t('cancel')}</button>
             <button type="button" className="btn-primary btn-compact" disabled={!composerVerified}
               onClick={() => submitReply(card)}>{t('reply')}</button>
           </div>
-        </div> : <div className="rail-actions rail-footer">
-          {!selected && replies > 0 && <button type="button" aria-expanded={false}
-            onClick={() => activate(card.spanIndex)}>{replyCount}</button>}
-          {(selected || replies === 0) && <button type="button" disabled={readOnly} onClick={() => {
-            activate(card.spanIndex)
-          }}>{t('reply')}</button>}
         </div>}
       </div>
     })}

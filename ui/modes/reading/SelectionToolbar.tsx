@@ -7,6 +7,7 @@ import type { TextEdit } from '../../../document/types'
 import { useT, type MsgKey } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
 import { usePresence } from '../../util/presence'
+import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
 import { cssMs } from '../../util/css-tokens'
 import { mapSelection, type ExcludedSegment, type ExclusionReason, type SelRange } from './selection'
@@ -15,6 +16,8 @@ import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from
 
 /** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
 const FALLBACK_EXIT_MS = 120
+/** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
+export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
 
 interface Props {
   readOnly?: boolean
@@ -174,6 +177,14 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     observer?.observe(toolbar)
     return () => observer?.disconnect()
   }, [present.mounted, composing])
+  // Focus moving into a composer stops the browser painting the document selection, so its range
+  // keeps a selection-colored highlight until the composer closes; the reading DOM stays untouched.
+  useLayoutEffect(() => {
+    const range = selectedRange.current
+    if (!composing || !active || !range || range.collapsed || !range.commonAncestorContainer.isConnected) return
+    paintHighlight(SELECTION_TARGET_HIGHLIGHT, [range])
+    return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
+  }, [composing, active])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
   const verify = (text: string, changes: readonly string[]): MarkVerdict => {

@@ -109,7 +109,7 @@ node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader
 
 Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions are transient and
 cannot overwrite saved or actively edited choices. Do not force a questionnaire before opening.
-People confirm Your name and Interface language graphically and change them later in Settings.
+People confirm Display name and Interface language graphically and change them later in Settings.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; optional translation follows the same preparation
