@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import { useShallow } from 'zustand/react/shallow'
 import type { Analysis } from '../../document/markdown/analyze'
 import { useT } from '../i18n'
-import { ChevronDownIcon, ChevronUpIcon, CrossIcon, SearchIcon } from '../icons'
+import { ChevronDownIcon, CrossIcon, SearchIcon } from '../icons'
 import { commentSearchText } from '../review/CommentBody'
 import { closeOverlay, openOverlay, useOverlay } from '../app/overlayStore'
 import { useCompositionGuard } from '../util/composition'
@@ -248,9 +248,9 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
           setState((current) => ({ ...current, caseSensitive: !current.caseSensitive }))
         }}>Aa</button>
       <button className="btn-ghost btn-icon find-nav" type="button" disabled={!results.length} aria-label={t('findPrevious')}
-        title={t('findPrevious')} onClick={() => step(-1)}><ChevronUpIcon /></button>
+        title={t('findPrevious')} onClick={() => step(-1)}><ChevronDownIcon className="find-nav-icon find-previous-icon" /></button>
       <button className="btn-ghost btn-icon find-nav" type="button" disabled={!results.length} aria-label={t('findNext')}
-        title={t('findNext')} onClick={() => step(1)}><ChevronDownIcon /></button>
+        title={t('findNext')} onClick={() => step(1)}><ChevronDownIcon className="find-nav-icon" /></button>
       <button className="btn-ghost btn-icon find-nav" type="button" aria-label={t('findClose')} title={t('findClose')}
         onClick={close}><CrossIcon /></button>
     </div>

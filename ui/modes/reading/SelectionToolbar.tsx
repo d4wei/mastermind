@@ -7,7 +7,7 @@ import type { Analysis } from '../../../document/markdown/analyze'
 import type { TextEdit } from '../../../document/types'
 import { useT, type MsgKey } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
-import { usePresence } from '../../util/presence'
+import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
 import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
 import { cssMs } from '../../util/css-tokens'
@@ -16,7 +16,6 @@ import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict } from './marks'
 
 /** The exit lasts `--dur-fast`; this stands in when the theme stylesheet is absent. */
-const FALLBACK_EXIT_MS = 120
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
 /** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
@@ -164,7 +163,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     () => { requestAnimationFrame(() => toolbarRef.current?.querySelector('textarea')?.focus()) },
     dismiss)
 
-  const exitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? FALLBACK_EXIT_MS, [])
+  const exitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? EXIT_MS_FALLBACK, [])
   // Preserve the last position while the toolbar exits.
   const present = usePresence(!!active, exitMs)
   useLayoutEffect(() => {

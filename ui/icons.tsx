@@ -7,7 +7,6 @@ import {
   ExclamationTriangleIcon,
   CheckIcon as RCheckIcon,
   DotsHorizontalIcon,
-  ChevronUpIcon as RChevronUpIcon,
   ChevronDownIcon as RChevronDownIcon,
   ChevronRightIcon as RChevronRightIcon,
   FileIcon as RFileIcon,
@@ -54,7 +53,6 @@ export const ChatIcon = radix(ChatBubbleIcon, 14)
 export const AlertIcon = radix(ExclamationTriangleIcon, 14)
 export const CheckIcon = radix(RCheckIcon, 14)
 export const MoreIcon = radix(DotsHorizontalIcon, 15)
-export const ChevronUpIcon = radix(RChevronUpIcon, 13)
 export const ChevronDownIcon = radix(RChevronDownIcon, 13)
 export const ChevronRightIcon = radix(RChevronRightIcon, 13)
 export const FileIcon = radix(RFileIcon, 14)

@@ -29,6 +29,14 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-07 — Reviewers can delete a resolved discussion from the file
+
+**Ruled.** Each Resolved discussions card offers Delete discussion / 删除讨论, which splices its
+record and the separation resolution added out of the file, with undo; paused editing disables it.
+Resolved history stays in the file until someone deletes it, so pruning it no longer needs an agent.
+
+**Beat:** keeping resolved records undeletable in the app while agents may already clean them up.
+
 ## 2026-11-07 — The comment-author setting is labeled Display name
 
 **Ruled.** Label the comment-author preference Display name / 显示名称 in Settings, the customary

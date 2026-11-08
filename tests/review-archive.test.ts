@@ -3,7 +3,8 @@ import { segmentBlocks } from '../document/blocks'
 import { group, scan } from '../document/critic/scanner'
 import { applyTextEdits } from '../document/edits'
 import { scanMarkdown } from '../document/markdown/scan'
-import { deleteCommentEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread } from '../document/review-archive'
+import { deleteCommentEdits, deleteResolvedThreadEdits, parseResolvedThreads, resolveThreadEdits, type ReviewThread }
+  from '../document/review-archive'
 
 function threads(source: string): ReviewThread[] {
   return group(scanMarkdown(source), source).filter((item): item is ReviewThread => item.type === 'thread')
@@ -98,6 +99,60 @@ describe('resolved discussion archive', () => {
     const last = applyTextEdits(deleted, deleteCommentEdits(deleted, threads(deleted)[0]!, 0))
     expect(last).toBe('{++suggestion++} anchor')
     expect(parseResolvedThreads(last).entries).toEqual([])
+  })
+
+  /** The source after the thread's spans are removed, as resolution leaves it before appending. */
+  function withoutThread(source: string): string {
+    return applyTextEdits(source, resolveThreadEdits(source, threads(source)[0]!).slice(0, -1))
+  }
+  function deleteRecord(source: string, index = 0): string {
+    return applyTextEdits(source, deleteResolvedThreadEdits(source, parseResolvedThreads(source).entries[index]!))
+  }
+
+  it.each([
+    'Start {==quoted words==}{>>@A: note<<} end.\n',
+    'Start {==quoted words==}{>>@A: note<<} end.',
+    '# Title\r\n\r\nBody {>>@A: note<<}{>>@B: reply<<} tail\r\n',
+    '# Title\r\n\r\nBody {>>@A: note<<} tail',
+    '{>>@A: only<<}',
+    '{>>@A: only<<}\n',
+  ])('deleting a just-resolved record leaves the bytes resolution started from: %j', (source) => {
+    const resolved = resolve(source)
+    expect(deleteRecord(resolved)).toBe(withoutThread(source))
+  })
+
+  it('cannot restore a blank line that already ended the source, since it matches the separator', () => {
+    expect(deleteRecord(resolve('Body {>>@A: note<<}\n\n'))).toBe('Body \n')
+  })
+
+  it.each(['\n', '\r\n'])('deletes one record and keeps the others byte for byte with %j', (eol) => {
+    const source = `First {>>@A: one<<}.${eol}${eol}Second {>>@B: two<<}.${eol}`
+    const both = resolve(resolve(source))
+    const [first, second] = parseResolvedThreads(both).entries
+    const withoutFirst = deleteRecord(both, 0)
+    // The remaining record reads exactly as if only the second discussion had been resolved.
+    expect(withoutFirst).toBe(resolve(withoutThread(source)))
+    expect(parseResolvedThreads(withoutFirst).entries.map((entry) => entry.thread)).toEqual([second!.thread])
+    const withoutSecond = deleteRecord(both, 1)
+    expect(withoutSecond).toBe(withoutThread(resolve(source)))
+    expect(parseResolvedThreads(withoutSecond).entries.map((entry) => entry.thread)).toEqual([first!.thread])
+    expect(deleteRecord(withoutSecond)).toBe(withoutThread(withoutThread(source)))
+    if (eol === '\r\n') expect(withoutFirst.replace(/\r\n/g, '')).not.toContain('\n')
+  })
+
+  it('deletes a hand-placed adjacent record without touching its neighbours or diagnostics', () => {
+    const known = '<!-- mastermind:resolved-thread v1\n{"context":"quote","thread":"text"}\n-->'
+    const unknown = '<!-- mastermind:resolved-thread v9\n{}\n-->'
+    const source = `Text\n${known}\n${unknown}\n`
+    expect(deleteRecord(source)).toBe(`Text\n${unknown}\n`)
+  })
+
+  it('returns no edits for a captured record that moved or changed', () => {
+    const resolved = resolve('{>>@A: note<<}\n')
+    const entry = parseResolvedThreads(resolved).entries[0]!
+    expect(deleteResolvedThreadEdits(`prefix\n${resolved}`, entry)).toEqual([])
+    expect(deleteResolvedThreadEdits(resolved, { ...entry, context: 'other' })).toEqual([])
+    expect(deleteResolvedThreadEdits(resolved, { ...entry, thread: '{>>@A: edited<<}' })).toEqual([])
   })
 
   it('ignores invalid comment indexes', () => {

@@ -58,6 +58,10 @@
   font-size: var(--font-size-xs);
 }
 .find-nav[aria-pressed='true'] { background: var(--color-selection); }
+/* Radix draws the down chevron below its box's center. The lift centers the glyph in its button, and
+   Previous turns that centered glyph half a revolution, so the pair mirror exactly. */
+.find-nav-icon { transform: translateY(calc(-0.875 / 15 * 100%)); }
+.find-nav-icon.find-previous-icon { transform: rotate(180deg) translateY(calc(-0.875 / 15 * 100%)); }
 .find-announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* Matches take the customary find colors: every match one saturated fill, the current one another. */
 ::highlight(find-results) {

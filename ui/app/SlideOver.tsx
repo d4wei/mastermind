@@ -30,8 +30,10 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOn
       }
     })
     const onKey = (e: KeyboardEvent): void => {
-      // A panel hidden under an inert ancestor leaves Escape to whatever hid it.
-      if (e.key === 'Escape' && !isImeKey(e) && !panelRef.current?.closest('[inert]')) {
+      // A panel hidden under an inert ancestor leaves Escape to whatever hid it, and an open menu
+      // closes alone.
+      if (e.key === 'Escape' && !isImeKey(e) && !panelRef.current?.closest('[inert]') &&
+        !(e.target instanceof Element && e.target.closest('[role="menu"]'))) {
         // Sibling window listeners still run; defaultPrevented tells them this Escape is consumed.
         e.preventDefault()
         e.stopPropagation()

@@ -21,8 +21,8 @@ Hover and keyboard focus emphasize the matching passage and card without selecti
 or repositioning either. Dragging to select text does not open a reply. Navigation reveals an
 offscreen counterpart without moving one that is already visible. Wide cards share document
 scrolling; narrow panels scroll their own content. The rail fades in without animating cards from
-provisional positions. Narrow
-panels use the same fade. Motion honors reduced-motion preferences.
+provisional positions; hiding wide comments fades it out in place, inert, before the document
+recenters. Narrow panels use the same fade-in. Motion honors reduced-motion preferences.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
 message has a native button that opens the discussion and reply composer; Resolve, More, and the
@@ -57,4 +57,7 @@ The history panel lists each archived discussion as a card laid out like a live 
 rail's message classes: author, the quoted passage with its left rule and one-line truncation, the
 opening comment, then the shared reply-count disclosure. A record whose thread no longer parses as
 comments shows its stored text instead; unrecognized records show their diagnostic and raw text. Cards
-offer no jump to the passage, since resolution removes its anchor.
+offer no jump to the passage, since resolution removes its anchor. The opening message carries the
+live card's More menu, whose Delete discussion removes the record through `deleteResolvedThreadEdits`
+and the document's review-edit path, so undo, saving, and paused editing behave as for live cards;
+paused editing disables the item. Unrecognized records offer no deletion.

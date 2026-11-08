@@ -43,16 +43,16 @@ export function TopBar({ railOpen, onToggleRail, commentsAvailable, resolved, se
 
   const controls = (
     <header className="topbar" ref={headerRef}>
+      {mode === 'reading' && <LanguageMenu />}
       <button type="button" className="btn-ghost btn-icon topbar-icon-btn topbar-find" onClick={requestFind}
         aria-label={t('find')} title={`${t('find')} (${navigator.platform.startsWith('Mac') ? '⌘F' : 'Ctrl+F'})`}><SearchIcon /></button>
-      <button type="button" className="btn-ghost btn-icon topbar-icon-btn" onClick={() => setMode(destination)}
-        aria-label={t(destination)} title={t(destination)}><ModeIcon /></button>
-      {mode === 'reading' && <LanguageMenu />}
       {mode === 'reading' && commentsAvailable && (
         <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-comments${railOpen ? ' active' : ''}`}
           onClick={onToggleRail} aria-label={railOpen ? t('hideComments') : t('showComments')}
           aria-pressed={railOpen} title={t('toggleRail')}><ChatIcon /></button>
       )}
+      <button type="button" className="btn-ghost btn-icon topbar-icon-btn" onClick={() => setMode(destination)}
+        aria-label={t(destination)} title={t(destination)}><ModeIcon /></button>
       <DropdownMenu.Root modal={false} open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenu.Trigger asChild>
           <button type="button" className={`btn-ghost btn-icon topbar-icon-btn topbar-overflow${settings.open || resolved.open ? ' active' : ''}`}

@@ -36,12 +36,14 @@ interface Props {
   /** Unsent replies; their owner outlives the rail and re-anchors them to each analysis. */
   drafts: readonly ReplyDraft[]
   onDraftsChange: (next: SetStateAction<ReplyDraft[]>) => void
+  /** The rail is fading out after comments were hidden; it takes no input. */
+  leaving?: boolean
 }
 
 const CARD_GAP = 8
 
 export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, onHover, onActivate,
-  onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false }: Props) {
+  onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false, leaving = false }: Props) {
   const cards = analysis.threads
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
@@ -207,7 +209,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
 
   const orphaned = drafts.filter((draft) => draft.text.trim() && !placedDrafts.cardOf.has(draft.id))
   if (!cards.length && !orphaned.length) return null
-  return <div ref={railRef} className="rail" inert={tableExpanded} aria-hidden={tableExpanded || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
+  return <div ref={railRef} className={`rail${leaving ? ' leaving' : ''}`} inert={tableExpanded || leaving}
+    aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded} style={{ height: railHeight || undefined }}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.map((card, index) => {
       const selected = activeSpan === card.spanIndex

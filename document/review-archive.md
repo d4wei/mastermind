@@ -42,6 +42,14 @@ document store, which retains the source before applying these edits. Existing s
 unchanged outside the selected spans and the tail insertion; new archive lines follow the source's
 dominant line endings and final-newline convention.
 
+`deleteResolvedThreadEdits` removes one record the panel captured, after checking that the fresh
+parse still holds an identical entry at its range. It takes the record's own line ending and the
+blank line that separated it from earlier content; at a file tail without a final line break, it
+takes the separation before the record. Deleting a record just appended therefore returns the bytes
+resolution started from, except that a blank line already ending that source is not restored: the
+appended bytes cannot tell it apart from the separator. Other records, diagnostics, and text stay
+byte for byte.
+
 Offsets and parsed comment text identify an active thread for immediate actions, not a durable ID.
 If an unrelated edit recreates an indistinguishable thread at identical offsets, it is the current
 thread; no cross-process identity is inferred. Saved-file conflicts remain the document writer's

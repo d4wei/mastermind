@@ -1226,6 +1226,15 @@ input[type='checkbox'] {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+@keyframes mm-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+/* Hidden comments fade out where they stood; the document recenters once they are gone. */
+.rail.leaving {
+  animation: mm-fade-out var(--dur-fast) var(--ease-standard) forwards;
+  pointer-events: none;
+}
 .comments-panel .slide-over { animation: mm-fade-in var(--dur-fade) var(--ease-standard); }
 .comments-panel .rail { animation: none; }
 @keyframes mm-toolbar-in {
@@ -1298,6 +1307,7 @@ input[type='checkbox'] {
   .sel-toolbar,
   .sel-toolbar.closing,
   .rail,
+  .rail.leaving,
   .comments-panel .slide-over,
   .rail-card,
   .rail-card.active {

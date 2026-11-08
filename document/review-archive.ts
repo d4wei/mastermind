@@ -64,6 +64,34 @@ export function parseResolvedThreads(source: string): { entries: ResolvedThread[
   return { entries, diagnostics }
 }
 
+const lineBreakAfter = (source: string, at: number) => source.startsWith('\r\n', at) ? 2 : source[at] === '\n' ? 1 : 0
+const lineBreakBefore = (source: string, at: number) =>
+  at >= 2 && source.startsWith('\r\n', at - 2) ? 2 : source[at - 1] === '\n' ? 1 : 0
+
+/**
+ * Removes one resolved-discussion record and the line breaks `resolveThreadEdits` added around it,
+ * so the remaining records and text read as if it had never been resolved. A captured record that
+ * no longer parses identically at its range yields no edits.
+ */
+export function deleteResolvedThreadEdits(source: string, entry: Pick<ResolvedThread, 'range' | 'context' | 'thread'>): TextEdit[] {
+  const current = parseResolvedThreads(source).entries.find(({ range }) =>
+    range.start === entry.range.start && range.end === entry.range.end)
+  if (!current || current.context !== entry.context || current.thread !== entry.thread) return []
+  let { start: from, end: to } = current.range
+  const before = lineBreakBefore(source, from)
+  const blankBefore = before && lineBreakBefore(source, from - before)
+  const after = lineBreakAfter(source, to)
+  if (after) {
+    // The record's own line ending goes with it; so does the blank line that set it apart.
+    to += after
+    if (blankBefore) from -= before
+  } else if (to === source.length && before) {
+    // Resolution adds no final line break to a file without one, only the separation before it.
+    from -= before + blankBefore
+  }
+  return [{ from, to, insert: '' }]
+}
+
 function currentThread(source: string, thread: ReviewThread): ReviewThread | null {
   const current = group(scanMarkdown(source), source)
     .find((item): item is ReviewThread => item.type === 'thread' && item.start === thread.start && item.end === thread.end)

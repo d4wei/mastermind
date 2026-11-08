@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
+/** The exit duration when the `--dur-fast` token cannot be read, as before theme CSS loads. */
+export const EXIT_MS_FALLBACK = 120
+
 export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }

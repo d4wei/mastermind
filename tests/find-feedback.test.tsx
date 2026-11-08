@@ -215,3 +215,21 @@ it('retains each document query, case setting, and open state without carrying a
   expect(host.querySelector('[aria-label="Match case"]')!.getAttribute('aria-pressed')).toBe('true')
   expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
 })
+
+it('draws Previous as the centered Next chevron turned half a revolution', async () => {
+  const { readFileSync } = await import('node:fs')
+  act(() => requestFind())
+  const glyph = (label: string) => host.querySelector(`button[aria-label="${label}"] svg`)!
+  const previous = glyph('Previous result'), next = glyph('Next result')
+  expect(previous.innerHTML).toBe(next.innerHTML)
+  expect(next.getAttribute('class')).toBe('find-nav-icon')
+  expect(previous.getAttribute('class')).toBe('find-nav-icon find-previous-icon')
+  const style = document.createElement('style')
+  style.textContent = readFileSync('ui/find/find.css', 'utf8')
+  document.head.append(style)
+  try {
+    const lift = getComputedStyle(next).transform
+    expect(lift).toMatch(/^translateY\(.+\)$/)
+    expect(getComputedStyle(previous).transform).toBe(`rotate(180deg) ${lift}`)
+  } finally { style.remove() }
+})

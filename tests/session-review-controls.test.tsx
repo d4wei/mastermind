@@ -10,16 +10,18 @@ import { requestFind, useOverlay } from '../ui/app/overlayStore'
 import type { TextEdit } from '../document/types'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveThreadEdits, deleteCommentEdits } from '../document/review-archive'
+import { applyTextEdits } from '../document/edits'
 import { SessionView } from '../ui/app/SessionView'
 import { releaseDrafts, useDrafts } from '../ui/review/drafts'
 import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useTranslation } from '../ui/translate/translationStore'
 import { prepareTranslation } from '../document/translation'
 
-const rail = vi.hoisted(() => ({ request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void),
+const rail = vi.hoisted(() => ({ leaving: false, request: null as { spanIndex: number } | null, active: null as number | null, hovered: null as number | null, onHover: null as null | ((span: number | null) => void), onEdit: null as null | ((edits: TextEdit[]) => void),
   drafts: [] as readonly ReplyDraft[], onDraftsChange: null as null | ((drafts: ReplyDraft[]) => void) }))
-vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void; drafts: readonly ReplyDraft[]; onDraftsChange: (drafts: ReplyDraft[]) => void }) => {
+vi.mock('../ui/review/CommentRail', () => ({ CommentRail: (props: { leaving?: boolean; replyRequest?: { spanIndex: number } | null; onEdit: (edits: TextEdit[]) => void; activeSpan: number | null; hoveredSpan: number | null; onHover: (span: number | null) => void; drafts: readonly ReplyDraft[]; onDraftsChange: (drafts: ReplyDraft[]) => void }) => {
   rail.onEdit = props.onEdit
+  rail.leaving = !!props.leaving
   rail.drafts = props.drafts
   rail.onDraftsChange = props.onDraftsChange
   rail.active = props.activeSpan
@@ -112,6 +114,30 @@ it('keeps resolved discussions available while a conflict pauses edits', () => {
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
 })
 
+it.each([false, true])('deletes a resolved discussion through the review edit path, paused: %s', (paused) => {
+  const live = 'Text {>>@Alex: note<<}\n'
+  const thread = analyzeMarkdown(live).items.find((item) => item.type === 'thread')!
+  if (thread.type !== 'thread') throw new Error('Expected thread')
+  const source = applyTextEdits(live, resolveThreadEdits(live, thread))
+  render(source)
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (1)').click())
+  if (paused) act(() => useDoc.setState({ recovery: 'changed' }))
+  const trigger = host.querySelector<HTMLButtonElement>('.resolved-card [aria-label="More"]')!
+  act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+  const item = readerMenuItem('Delete discussion')
+  act(() => item.click())
+  if (paused) {
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    expect(useDoc.getState().source).toBe(source)
+    return
+  }
+  expect(useDoc.getState().source).toBe('Text \n')
+  expect(host.querySelector('[role="dialog"]')?.getAttribute('aria-label')).toBe('Resolved discussions (0)')
+  act(() => useDoc.getState().undo())
+  expect(useDoc.getState().source).toBe(source)
+})
+
 it('opens narrow-screen comments in a dismissible panel without reserving a side column', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
   render('{>>@Alex: a note<<}')
@@ -155,6 +181,45 @@ it('scrolls the article and wide comment rail together, with controls and panels
   act(() => readerMenuItem('Resolved (0)').click())
   expect(host.querySelector('[role="dialog"]')).not.toBeNull()
   expect(viewport.querySelector('[role="dialog"]')).toBeNull()
+})
+
+it('fades the wide rail out in place before the document recenters, and shows it again at once', () => {
+  render('Text {>>@Alex: note<<}')
+  const shell = () => host.querySelector('.doc-shell')!
+  const toggle = host.querySelector<HTMLButtonElement>('.topbar-comments')!
+  expect(rail.leaving).toBe(false)
+  act(() => toggle.click())
+  expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
+  expect(rail.leaving).toBe(true)
+  expect(shell().classList.contains('with-rail')).toBe(true)
+  act(() => vi.advanceTimersByTime(120))
+  expect(host.querySelector('[data-testid="rail"]')).toBeNull()
+  expect(shell().classList.contains('with-rail')).toBe(false)
+  act(() => toggle.click())
+  expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
+  expect(rail.leaving).toBe(false)
+  expect(shell().classList.contains('with-rail')).toBe(true)
+  // Showing again before the fade ends keeps the same rail and cancels its exit.
+  act(() => toggle.click())
+  act(() => vi.advanceTimersByTime(60))
+  act(() => toggle.click())
+  expect(rail.leaving).toBe(false)
+  act(() => vi.advanceTimersByTime(120))
+  expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
+})
+
+it.each(['reduced motion', 'Markdown mode'])('removes the wide rail at once for %s', (cause) => {
+  if (cause === 'reduced motion') {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('reduced-motion'),
+      addEventListener() {}, removeEventListener() {} }))
+  }
+  render('Text {>>@Alex: note<<}')
+  expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()
+  if (cause === 'reduced motion') act(() => host.querySelector<HTMLButtonElement>('.topbar-comments')!.click())
+  else act(() => useDoc.getState().setMode('source'))
+  expect(host.querySelector('[data-testid="rail"]')).toBeNull()
+  expect(host.querySelector('.doc-shell')?.classList.contains('with-rail')).toBe(false)
 })
 
 it('pairs passage and card hover without selecting a discussion', () => {
@@ -239,6 +304,7 @@ it('orphans a reply draft rather than move it to a lookalike added while the rai
   const cards = analyzeMarkdown(source).threads
   act(() => rail.onDraftsChange!([{ id: 1, thread: threadRef(cards[0]!, source, cards), text: 'my reply' }]))
   act(() => host.querySelector<HTMLButtonElement>('.topbar-comments')!.click())
+  act(() => vi.advanceTimersByTime(120))
   expect(host.querySelector('[data-testid="rail"]')).toBeNull()
   try {
     const at = source.indexOf('teh here')

@@ -206,10 +206,12 @@ action of adding one.
 
 Use **Resolve / 标为已解决** as the action and **Resolved discussions / 已解决的讨论** as the panel
 title. Archive describes storage; resolution means the discussion is finished. Resolution does not
-accept a proposed edit. Use **Delete comment / 删除评论** for removing one comment.
+accept a proposed edit. Use **Delete comment / 删除评论** for removing one comment and **Delete
+discussion / 删除讨论** for removing a resolved discussion from the document's resolved history.
 
 Example: “Resolve moves this discussion to the document's resolved history.”
 Example: “Delete comment removes this comment; undo restores it.”
+Example: “Delete discussion removes this resolved discussion from the file; undo restores it.”
 The existing Resolved shorthand can remain where space is limited.
 
 Use **discussion** instead of Original thread in the history panel; **quoted passage / 引用片段**
@@ -399,7 +401,7 @@ The remaining terms below retain their ordinary meanings in context.
 | Family | Retain |
 | --- | --- |
 | Basic actions | Save, Cancel, Close, Undo, Find, Refresh, Reload, Show, Hide, More, Dismiss |
-| Review | Review, Comment, Reply, Resolve, Delete comment, Accept, Reject, Highlight |
+| Review | Review, Comment, Reply, Resolve, Delete comment, Delete discussion, Accept, Reject, Highlight |
 | Edit kinds | Insertion, Deletion, Substitution/replacement, Suggested edit |
 | Navigation | File, Folder, Files, Recent, Outline, Filename, Selection |
 | Status | Loading, Saving, Saved, Unsaved changes, Missing file, Save failed |

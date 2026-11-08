@@ -34,6 +34,8 @@ import { Navigator, useIsNarrow, type SourceOutline } from './Navigator'
 import { readingSpace } from './reading-space'
 import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 import { isImeKey } from '../util/composition'
+import { EXIT_MS_FALLBACK, prefersReducedMotion, usePresence } from '../util/presence'
+import { cssMs } from '../util/css-tokens'
 
 // Defer the editor and optional panels to keep initial reading dependencies small.
 const SourceEditor = lazy(() => import('../modes/source/SourceEditor').then((m) => ({ default: m.SourceEditor })))
@@ -348,9 +350,16 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
     replyDrafts.some((draft) => !!draft.text.trim())
   const showRail = mode === 'reading' && railOpen && hasThreads
-  const inlineRail = showRail && !narrow && !showTranslated
-  const geometry = reading.space ? readingSpace(reading.space, inlineRail) : null
-  useReadingMovement(reading.element, geometry?.left, inlineRail)
+  const inlineSpace = mode === 'reading' && !narrow && !showTranslated
+  const inlineRail = showRail && inlineSpace
+  // Hiding inline comments fades the rail out at its anchors before the document recenters; leaving
+  // reading or the wide layout removes it at once, since its anchors are gone.
+  const railExitMs = useMemo(() => cssMs(getComputedStyle(document.documentElement), '--dur-fast') ?? EXIT_MS_FALLBACK, [])
+  const railPresence = usePresence(inlineRail, railExitMs)
+  const railLeaving = !inlineRail && railPresence.mounted && inlineSpace && hasThreads && !prefersReducedMotion()
+  const railPlaced = inlineRail || railLeaving
+  const geometry = reading.space ? readingSpace(reading.space, railPlaced) : null
+  useReadingMovement(reading.element, geometry?.left, railPlaced)
   const commentsAvailable = mode === 'reading' && hasThreads && !showTranslated
   useEffect(() => { publishCommentRail({ available: commentsAvailable, open: commentsAvailable && railOpen }) },
     [commentsAvailable, railOpen])
@@ -385,6 +394,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       drafts={replyDrafts}
       onDraftsChange={setReplyDrafts}
       onEdit={applyEdits}
+      leaving={railLeaving}
     />
   )
 
@@ -409,15 +419,15 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           docRef={showTranslated ? translatedRef : articleRef} analysis={analysis}
           onRevealComment={revealFindComment} onClose={restoreFindRail} />
       </Suspense>
-      {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} />}
+      {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} readOnly={readOnly} onEdit={applyEdits} />}
       <ConflictPanel />
       {translation.error && <Notice key={translation.error}>
         {t(translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}
       </Notice>}
       <DocumentScroll>
-        <div ref={reading.ref} className={`doc-shell${inlineRail ? ' with-rail' : ''}`}
+        <div ref={reading.ref} className={`doc-shell${railPlaced ? ' with-rail' : ''}`}
           style={geometry ? { marginLeft: geometry.left, width: geometry.width + geometry.extent,
-            gridTemplateColumns: `${geometry.width}px${inlineRail ? ` ${geometry.extent}px` : ''}` } : undefined}>
+            gridTemplateColumns: `${geometry.width}px${railPlaced ? ` ${geometry.extent}px` : ''}` } : undefined}>
           <div className="doc-column">
             {showTranslated && (
               <Suspense fallback={<div className="center-note loading-note">{t('loadingDocument')}</div>}>
@@ -464,7 +474,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
               </Suspense>
             )}
           </div>
-          {inlineRail && commentRail}
+          {railPlaced && commentRail}
         </div>
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (

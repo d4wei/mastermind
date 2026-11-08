@@ -4,12 +4,14 @@ Both `html` and `body` paint the active theme's background. The native host also
 under-page surface through the [theme appearance adapter](../theme/appearance.md).
 
 `TopBar` places standalone document controls at the top right. In the desktop app, `ToolbarTarget`
-portals them into the native file row so file pills use the remaining flex space. The Read/Markdown
-button shows the mode it opens. Translation and active-comment controls appear where applicable; the overflow menu
-contains Resolved and Settings. Resolved remains reachable without active comments. Radix supplies
-menu focus, keyboard navigation, and dismissal. The native host owns the file pills and full-path
-window title; the document controls do not repeat the filename. On macOS the file toolbar shares
-the native traffic-light area without a separate title strip. See the
+portals them into the native file row so file pills use the remaining flex space. From left they
+read: reading language, Find, comments, the Read/Markdown button, and the overflow menu. The
+language and comments controls appear only where applicable, so they sit left of the mode button,
+which keeps one place beside the overflow menu in both modes. The mode button shows the mode it
+opens; the overflow menu contains Resolved and Settings. Resolved remains reachable without active
+comments. Radix supplies menu focus, keyboard navigation, and dismissal. The native host owns the
+file pills and full-path window title; the document controls do not repeat the filename. On macOS
+the file toolbar shares the native traffic-light area without a separate title strip. See the
 [native adapter](../desktop/README.md) for dragging and file-closing behavior.
 
 The document and wide comment rail scroll together inside `.document-scroll`. The root viewport
@@ -53,7 +55,9 @@ tables temporarily hide this rail and the outline without changing their layout 
 comments share the overlay area.
 
 Changing inline comment visibility animates only horizontal displacement of the document column.
-The comment rail fades in independently at its measured anchors.
+The comment rail fades in independently at its measured anchors. Hiding it keeps the two-column
+layout while the rail fades out, then moves the document; leaving reading mode or the wide layout
+removes the rail at once.
 Text widths settle immediately. Resizing cancels the running movement rather than queuing another;
 reduced motion changes position immediately. The animation uses the shared duration and easing.
 The Web Animations duration converts CSS seconds or milliseconds explicitly; production CSS may
