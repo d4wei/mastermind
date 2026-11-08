@@ -21,7 +21,7 @@ driver_binary = Path(sys.argv[2]).resolve()
 edge_driver = Path(sys.argv[3]).resolve()
 base = 'http://127.0.0.1:4444'
 element_key = 'element-6066-11e4-a52e-4f735466cecf'
-recovery_panel = '.notification:has(.conflict-actions)'
+recovery_panel = '.notification:has(.notification-actions)'
 recovery_warning = '.recovery-warning[aria-label$="Needs attention"]'
 
 
@@ -354,17 +354,17 @@ def check(session, path, namespace, preferences):
     path.write_bytes(later_disk.encode())
     click(session, f'{recovery_panel} > .notification-dismiss')
     until('a dismissed conflict remains reachable from its warning',
-          lambda: present(session, recovery_warning) and not present(session, '.conflict-actions'))
+          lambda: present(session, recovery_warning) and not present(session, '.notification-actions'))
     click(session, recovery_warning)
     until('the warning reopens the conflict', lambda: conflict_shown('Unsaved local edit.', later_disk))
-    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-ghost', 'Use incoming')
+    click_labelled(session, f'{recovery_panel} .notification-actions .btn-ghost', 'Use incoming')
     until('Use incoming asks before discarding unsaved edits',
           lambda: 'discard your unsaved edits?' in text(session, recovery_panel) and
           conflict_shown('Unsaved local edit.', later_disk))
-    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-primary', 'Use incoming')
+    click_labelled(session, f'{recovery_panel} .notification-actions .btn-primary', 'Use incoming')
     until('confirmed Use incoming adopts the latest disk version without writing',
           lambda: 'Later external competing edit.' in editor(session) and
-          not present(session, '.conflict-actions') and
+          not present(session, '.notification-actions') and
           not present(session, '.native-file-attention') and
           attribute(session, '.cm-content', 'contenteditable') == 'true' and
           path.read_bytes() == later_disk.encode(), 20)
@@ -385,10 +385,10 @@ def check(session, path, namespace, preferences):
           property_value(session, '#root', 'inert') is False and
           'Failed quit edit.' in editor(session) and path.read_bytes() == later_disk.encode())
     path.chmod(0o666)
-    click_labelled(session, f'{recovery_panel} .conflict-actions .btn-ghost', 'Retry')
+    click_labelled(session, f'{recovery_panel} .notification-actions .btn-ghost', 'Retry')
     until('Retry after restoring access saves the retained text',
           lambda: path.read_bytes() == b'# reviewer\r\n\r\nFailed quit edit.\r\n' and
-          not present(session, '.conflict-actions'), 20)
+          not present(session, '.notification-actions'), 20)
     close_window(pid)
     until('title-bar close exits after save', lambda: not window_for(pid))
 
