@@ -439,9 +439,9 @@ export function mapSelection(range: Range, source: string, analysis: MappingAnal
 }
 
 /**
- * The inline code under `root` that one of `ranges` holds whole. Selection painting fills only
- * glyph boxes, so such code is drawn selected across its own box; code a range only partly holds
- * is left to the glyph fill, matching its `partial-code` exclusion.
+ * The inline code under `root` that one of `ranges` holds whole, which the selection band covers
+ * across its own box; code a range only partly holds keeps the glyph boxes alone, matching its
+ * `partial-code` exclusion.
  */
 export function wholeInlineCode(ranges: readonly Range[], root: Node): Set<HTMLElement> {
   const held = new Set<HTMLElement>()
@@ -462,4 +462,126 @@ export function wholeInlineCode(ranges: readonly Range[], root: Node): Set<HTMLE
     }
   }
   return held
+}
+
+/** A rectangle in some fixed coordinate space. */
+export interface Box { top: number; left: number; width: number; height: number }
+
+/**
+ * The boxes that show `ranges` selected under `root`, in viewport coordinates: each text node's
+ * glyph boxes, clipped to the range, and the border boxes of inline code held whole, so a chip's
+ * padding and border sit inside the band. Block elements a range holds whole are left out; their
+ * border boxes span lines the text does not fill.
+ */
+export function selectedBoxes(ranges: readonly Range[], root: Node): Box[] {
+  const boxes: Box[] = []
+  const add = (rects: Iterable<DOMRect> | undefined): void => {
+    for (const rect of rects ?? []) boxes.push({ top: rect.top, left: rect.left, width: rect.width, height: rect.height })
+  }
+  for (const range of ranges) {
+    if (range.collapsed) continue
+    const common = range.commonAncestorContainer
+    const walker = common.ownerDocument!.createTreeWalker(common, NodeFilter.SHOW_TEXT)
+    for (let node: Node | null = common.nodeType === Node.TEXT_NODE ? common : walker.nextNode(); node;
+      node = node === common ? null : walker.nextNode()) {
+      if (!range.intersectsNode(node)) continue
+      const text = node as Text
+      const part = text.ownerDocument.createRange()
+      part.selectNodeContents(text)
+      if (text === range.startContainer) part.setStart(text, range.startOffset)
+      if (text === range.endContainer) part.setEnd(text, range.endOffset)
+      // A DOM without layout, such as the test environment's, has no range rects and paints no band.
+      add(part.getClientRects?.())
+    }
+  }
+  for (const code of wholeInlineCode(ranges, root)) add(code.getClientRects())
+  return boxes
+}
+
+/** Boxes whose vertical spans overlap past this share of the shorter one sit on one line. */
+const SAME_LINE = 0.5
+/** Boxes on one line this close horizontally, in CSS pixels, join; the slack absorbs subpixel rounding. */
+const ADJACENT_PX = 1
+
+/**
+ * Merges selected boxes into one rectangle per line: boxes on a line join where they touch or
+ * overlap, and every rectangle on a line takes the line's whole vertical extent, the union of its
+ * boxes, so the band keeps one height across a line whatever inline content sits in it.
+ */
+export function bandLines(boxes: readonly Box[]): Box[] {
+  const lines: { top: number; bottom: number; boxes: Box[] }[] = []
+  const sorted = boxes.filter((box) => box.width > 0 && box.height > 0).sort((a, b) => a.top - b.top || a.left - b.left)
+  for (const box of sorted) {
+    const bottom = box.top + box.height
+    const line = lines.find((candidate) =>
+      Math.min(candidate.bottom, bottom) - Math.max(candidate.top, box.top) >
+        SAME_LINE * Math.min(candidate.bottom - candidate.top, box.height))
+    if (!line) { lines.push({ top: box.top, bottom, boxes: [box] }); continue }
+    line.top = Math.min(line.top, box.top)
+    line.bottom = Math.max(line.bottom, bottom)
+    line.boxes.push(box)
+  }
+  return lines.flatMap(({ top, bottom, boxes: members }) => {
+    const spans: { left: number; right: number }[] = []
+    for (const box of members.sort((a, b) => a.left - b.left)) {
+      const last = spans.at(-1)
+      if (last && box.left <= last.right + ADJACENT_PX) last.right = Math.max(last.right, box.left + box.width)
+      else spans.push({ left: box.left, right: box.left + box.width })
+    }
+    return spans.map(({ left, right }) => ({ top, left, width: right - left, height: bottom - top }))
+  })
+}
+
+/** The class of the layer that paints selected text in the reading root. */
+export const SELECTION_BAND_CLASS = 'sel-band'
+
+/** A vertical stretch of the viewport, in viewport coordinates. */
+export interface Span { top: number; bottom: number }
+
+/**
+ * Narrows `ranges` to the parts in elements under `root` that reach into `span`, so a selection of
+ * a long document measures only what can be seen. Elements in normal flow stack downward, so the
+ * ones in the span are found by bisection; an element taller than the span whose content is all
+ * elements is narrowed in turn. `partial` says whether any selected element was left out.
+ */
+export function rangesInSpan(ranges: readonly Range[], root: Element, span: Span): { ranges: Range[]; partial: boolean } {
+  const within: Range[] = []
+  let partial = false
+  const elementsOnly = (element: Element): boolean => element.childElementCount > 0 && Array.from(element.childNodes)
+    .every((node) => node.nodeType === Node.ELEMENT_NODE || !node.textContent?.trim())
+  const around = (element: Element): Range => {
+    const range = element.ownerDocument.createRange()
+    range.selectNode(element)
+    return range
+  }
+  const visit = (parent: Element, range: Range): void => {
+    const kids = Array.from(parent.children).filter((child) => !child.classList.contains(SELECTION_BAND_CLASS))
+    let lo = 0
+    let hi = kids.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (kids[mid]!.getBoundingClientRect().bottom < span.top) lo = mid + 1
+      else hi = mid
+    }
+    let end = lo
+    while (end < kids.length && kids[end]!.getBoundingClientRect().top <= span.bottom) end++
+    if (lo === end) { partial = true; return }
+    if (lo > 0 && range.compareBoundaryPoints(Range.START_TO_START, around(kids[lo]!)) < 0) partial = true
+    if (end < kids.length && range.compareBoundaryPoints(Range.END_TO_END, around(kids[end - 1]!)) > 0) partial = true
+    for (const child of kids.slice(lo, end)) {
+      if (!range.intersectsNode(child)) continue
+      if (elementsOnly(child) && child.getBoundingClientRect().height > span.bottom - span.top) { visit(child, range); continue }
+      const part = child.ownerDocument.createRange()
+      part.selectNodeContents(child)
+      if (child.contains(range.startContainer)) part.setStart(range.startContainer, range.startOffset)
+      if (child.contains(range.endContainer)) part.setEnd(range.endContainer, range.endOffset)
+      within.push(part)
+    }
+  }
+  for (const range of ranges) {
+    const common = range.commonAncestorContainer
+    if (common instanceof Element && root.contains(common) && elementsOnly(common)) visit(common, range)
+    else within.push(range)
+  }
+  return { ranges: within, partial }
 }

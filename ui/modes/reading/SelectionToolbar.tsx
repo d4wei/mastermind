@@ -9,25 +9,25 @@ import { useT, type MsgKey } from '../../i18n'
 import { ChatIcon, PencilIcon } from '../../icons'
 import { announce } from '../../app/Notifications'
 import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
-import { clearHighlight, paintHighlight } from '../../util/highlights'
 import { useCompositionGuard } from '../../util/composition'
 import { rootMs } from '../../util/css-tokens'
-import { mapSelection, wholeInlineCode, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
+import { bandLines, mapSelection, rangesInSpan, selectedBoxes, SELECTION_BAND_CLASS, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict, type VerifyScope } from './marks'
 import { analyzeMarkdown } from '../../../document/markdown/analyze'
 
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
-/** The CSS highlight that keeps a composer's target looking selected; see `::highlight(selection-target)`. */
-export const SELECTION_TARGET_HIGHLIGHT = 'selection-target'
+/** Tables announce a change to their layout, such as expanding, with this window event. */
+const TABLE_LAYOUT_EVENT = 'mastermind-table-layout'
 /**
- * Mark inline code the selected band holds whole, in the document selection or in a composer's
- * target highlight; each paints its glyphs differently, so each has its own fill in `app.css`.
+ * How far past each viewport edge the band is measured, in viewport heights; a longer selection is
+ * re-measured as the document scrolls.
  */
-export const SELECTED_CODE_CLASS = { selection: 'in-selection', target: 'in-selection-target' } as const
+const BAND_REACH = 1
 /** One notice explains the latest trimmed selection; a later trim replaces it. */
 export const SELECTION_TRIM_NOTICE = 'selection-trim'
+export { SELECTION_BAND_CLASS }
 
 interface Props {
   readOnly?: boolean
@@ -86,6 +86,98 @@ const rectOf = (range: Range): Active['rect'] => {
 
 function sameRange(a: Range, b: Range): boolean {
   return a.compareBoundaryPoints(Range.START_TO_START, b) === 0 && a.compareBoundaryPoints(Range.END_TO_END, b) === 0
+}
+
+/** The part of the document selection inside `root`, or none when it is collapsed or elsewhere. */
+function selectionWithin(root: HTMLElement): Range[] {
+  const sel = root.ownerDocument.getSelection()
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return []
+  const range = sel.getRangeAt(0)
+  if (!range.intersectsNode(root)) return []
+  const within = range.cloneRange()
+  if (!root.contains(range.startContainer)) within.setStart(root, 0)
+  if (!root.contains(range.endContainer)) within.setEnd(root, root.childNodes.length)
+  return [within]
+}
+
+/**
+ * Paints the selection in the reading root as a layer of rectangles, one per line in the root's own
+ * coordinates, so scrolling moves it with the text; reflow re-measures it, as does scrolling while
+ * the selection reaches past the lines measured. The browser's
+ * selection fill is transparent inside the root, so this layer is its one painter: unlike that fill
+ * or highlight painting, the band covers inline code's padding and border at the line's full height
+ * and leaves the code's own look beneath it. It paints `target` while a composer holds one, and
+ * otherwise follows the document selection, measured at most once per frame. Only lines near the
+ * viewport are measured, which keeps a selection of a whole long document cheap.
+ */
+function useSelectionBand(containerRef: RefObject<HTMLElement | null>, target: readonly Range[] | null): void {
+  useLayoutEffect(() => {
+    const root = containerRef.current
+    if (!root) return
+    const doc = root.ownerDocument
+    let layer: HTMLElement | null = null
+    /** Whether the last measure left selected text out for being far from the viewport. */
+    let partial = false
+    const measure = (): void => {
+      const selected = target
+        ? target.filter((range) => !range.collapsed && range.commonAncestorContainer.isConnected)
+        : selectionWithin(root)
+      const reach = window.innerHeight * BAND_REACH
+      const near = rangesInSpan(selected, root, { top: -reach, bottom: window.innerHeight + reach })
+      partial = near.partial
+      const lines = bandLines(selectedBoxes(near.ranges, root))
+      if (!lines.length) { layer?.remove(); layer = null; return }
+      if (!layer) {
+        layer = doc.createElement('div')
+        layer.className = SELECTION_BAND_CLASS
+        layer.setAttribute('aria-hidden', 'true')
+      }
+      if (layer.parentNode !== root) root.append(layer)
+      const origin = root.getBoundingClientRect()
+      const left = origin.left + root.clientLeft
+      const top = origin.top + root.clientTop
+      while (layer.childElementCount > lines.length) layer.lastElementChild!.remove()
+      while (layer.childElementCount < lines.length) layer.append(doc.createElement('div'))
+      lines.forEach((line, index) => {
+        const { style } = layer!.children[index] as HTMLElement
+        style.top = `${line.top - top}px`
+        style.left = `${line.left - left}px`
+        style.width = `${line.width}px`
+        style.height = `${line.height}px`
+      })
+    }
+    let frame = 0
+    const follow = (): void => {
+      if (frame) return
+      frame = requestAnimationFrame(() => { frame = 0; measure() })
+    }
+    const scrolled = (): void => { if (partial) follow() }
+    const scroller = documentViewport().target
+    measure()
+    if (!target) doc.addEventListener('selectionchange', follow)
+    scroller.addEventListener('scroll', scrolled, { capture: true, passive: true })
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(root)
+    const fonts = doc.fonts as FontFaceSet | undefined
+    fonts?.addEventListener?.('loadingdone', measure)
+    window.addEventListener('resize', measure)
+    window.addEventListener(TABLE_LAYOUT_EVENT, measure)
+    window.addEventListener(READING_LAYOUT_EVENT, measure)
+    // Scrollers inside the root, such as a wide table's, move text the root's coordinates do not.
+    root.addEventListener('scroll', measure, { capture: true, passive: true })
+    return () => {
+      if (frame) cancelAnimationFrame(frame)
+      doc.removeEventListener('selectionchange', follow)
+      scroller.removeEventListener('scroll', scrolled, true)
+      observer?.disconnect()
+      fonts?.removeEventListener?.('loadingdone', measure)
+      window.removeEventListener('resize', measure)
+      window.removeEventListener(TABLE_LAYOUT_EVENT, measure)
+      window.removeEventListener(READING_LAYOUT_EVENT, measure)
+      root.removeEventListener('scroll', measure, true)
+      layer?.remove()
+    }
+  }, [containerRef, target])
 }
 
 export function SelectionToolbar({ containerRef, source, analysis, authorTag, onEdit, readOnly = false }: Props) {
@@ -268,13 +360,13 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       window.addEventListener('keydown', onKey)
       scrollTarget.addEventListener('scroll', onScroll, { passive: true, capture: true })
       window.addEventListener(READING_LAYOUT_EVENT, onScroll)
-      window.addEventListener('mastermind-table-layout', onScroll)
+      window.addEventListener(TABLE_LAYOUT_EVENT, onScroll)
     }
     return () => {
       window.removeEventListener('keydown', onKey)
       scrollTarget.removeEventListener('scroll', onScroll, true)
       window.removeEventListener(READING_LAYOUT_EVENT, onScroll)
-      window.removeEventListener('mastermind-table-layout', onScroll)
+      window.removeEventListener(TABLE_LAYOUT_EVENT, onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [!!active])
@@ -301,47 +393,10 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     observer?.observe(toolbar)
     return () => observer?.disconnect()
   }, [present.mounted, composing])
-  // Focus moving into a composer stops the browser painting the document selection, so its
-  // fragments keep a selection-colored highlight until the composer closes; the reading DOM stays
-  // untouched.
-  useLayoutEffect(() => {
-    if (!active || !composing) return
-    const ranges = active.fragments.filter((range) => !range.collapsed && range.commonAncestorContainer.isConnected)
-    if (!ranges.length) return
-    paintHighlight(SELECTION_TARGET_HIGHLIGHT, ranges)
-    return () => clearHighlight(SELECTION_TARGET_HIGHLIGHT)
-    // A new capture replaces `fragments`; scrolling only moves `rect`, which needs no repaint.
-  }, [composing, active?.fragments])
-  // Selection painting fills glyphs only, so inline code's padding would break the selected band;
-  // code the band holds whole is marked to fill its padding. The band is the composer's target
-  // while one is open, and otherwise the live document selection, followed on every change.
-  useLayoutEffect(() => {
-    const root = containerRef.current
-    if (!root) return
-    const target = composing && active
-    const className = target ? SELECTED_CODE_CLASS.target : SELECTED_CODE_CLASS.selection
-    let marked = new Set<HTMLElement>()
-    const mark = (ranges: readonly Range[]): void => {
-      const next = wholeInlineCode(ranges, root)
-      for (const code of marked) if (!next.has(code)) code.classList.remove(className)
-      for (const code of next) code.classList.add(className)
-      marked = next
-    }
-    if (target) {
-      mark(target.fragments.filter((range) => range.commonAncestorContainer.isConnected))
-      return () => mark([])
-    }
-    const follow = (): void => {
-      const sel = window.getSelection()
-      mark(sel && sel.rangeCount ? [sel.getRangeAt(0)] : [])
-    }
-    follow()
-    document.addEventListener('selectionchange', follow)
-    return () => {
-      document.removeEventListener('selectionchange', follow)
-      mark([])
-    }
-  }, [containerRef, composing, active?.fragments])
+  // Focus moving into a composer stops the document selection, so its fragments keep the band
+  // until the composer closes; the reading text stays untouched. A new capture replaces
+  // `fragments`; scrolling only moves `rect`, which needs no re-measure.
+  useSelectionBand(containerRef, composing && active ? active.fragments : null)
   // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
   const findOpen = useOverlay((s) => s.open === 'find')
   const [, relayout] = useReducer((n: number) => n + 1, 0)

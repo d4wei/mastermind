@@ -116,18 +116,29 @@ draft verdict until the text, selection, or source changes. A stale draft is che
 analysis of its own captured source, made once. Stale drafts and paused editing keep their own
 messages.
 
-Focus entering a composer stops the browser painting the document selection, so while a composer
-is open its fragments carry the `selection-target` CSS Custom Highlight in the selection color;
-closing, submitting, or dismissing the composer removes it. Painting leaves the reading DOM's
-text and structure untouched and is skipped where the Highlight API is absent.
+The browser's selection fill covers glyphs only across, so inline code's padding and border would
+break the selected band; inside the reading article that fill is transparent, and the toolbar
+paints every selected state itself as a band in the selection color. Outside the article, as in the
+rail and panels, the browser's selection stays. The band is a decorative layer appended to the
+article, holding one rectangle per line in the article's coordinates, so scrolling moves it with
+the text. It follows the document selection, measured at most once per animation frame and only
+for the part inside the article; while a composer is open, which takes focus and with it the
+document selection, it paints the composer's fragments until the composer closes, submits, or is
+dismissed.
 
-Both the browser selection and the highlight fill glyphs only, so inline code's padding would
-break the selected band. `wholeInlineCode` finds the code a range holds from its first character
-to its last, and the toolbar marks it with a class whose fill covers the padding the glyph fill
-leaves bare: `in-selection` for the live document selection, followed on every selection change,
-and `in-selection-target` for a composer's target. Code only partly held stays unmarked, matching
-its `partial-code` exclusion; a settled, trimmed selection never holds any. Review marks keep their
-own fill under a selection: a settled selection never holds one, since each is excluded.
+`selectedBoxes` takes each text node's glyph boxes clipped to the selection and the border boxes
+of inline code held whole (`wholeInlineCode`: from its first character to its last), never the box
+of a block held whole; `bandLines` merges the boxes on a line where they touch and gives every
+rectangle on that line the line's full vertical extent. The band therefore has one height per line
+and covers code chips, their padding, and spaces alike, while the chips keep their own look beneath
+its translucent fill; Find's match fills show through it. `rangesInSpan` limits the measure to
+blocks within a viewport height of the viewport, found by bisection, so a selection of a whole long
+document stays cheap; while selected text lies beyond that reach, document scrolling re-measures
+too. The layer also re-measures when the article resizes, a table reports a layout change, the
+reading space changes, fonts finish loading, the window resizes, or a scroller inside the article
+scrolls. It is hidden from assistive technology and takes no pointer events, and the reading DOM's
+text and structure stay untouched. Review marks keep their own fill under the band: a settled
+selection never holds one, since each is excluded.
 
 ## Tests
 
@@ -141,5 +152,7 @@ notification per trim, a trim deferred while dragging and resumed after a swallo
 check marks, decoded text, wrappers, code, and container continuations in detail;
 `tests/selection-marks.test.ts` checks edit verification in both scopes, and
 `tests/composer-verdict-scope.test.tsx` checks that composers submit only past the full check.
-`tests/selection-band.test.tsx` checks which inline code the selected band marks and that marks
-follow the selection and the composer.
+`tests/selection-band.test.tsx` checks that the live selection and a composer's target are painted
+as one merged band per line over unmarked code, that the band ignores selections outside the
+article, re-measures on a table layout change, and clears with the selection or the composer, and
+the band geometry, including the narrowing to the viewport.

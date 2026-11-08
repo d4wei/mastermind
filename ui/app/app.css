@@ -478,8 +478,16 @@ button:disabled {
   padding: calc(var(--space-unit) * 1.5) calc(var(--space-unit) * 2);
 }
 .sel-composer textarea::placeholder { color: var(--color-invert-text-muted); }
-/* A composer's target keeps the document selection's color while focus is in the composer. */
-::highlight(selection-target) { background-color: var(--color-selection); }
+/* Selected text in the reading root is painted by a layer of one rectangle per line, laid over the
+   text so inline code keeps its own look beneath the tint; the browser's own fill, which covers
+   glyphs only, stays transparent there. The layer sits above an expanded table and below the rail
+   and bars. */
+.md-root:not(.trans-block-body) ::selection { background: transparent; }
+.md-root { position: relative; }
+.sel-band { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.sel-band > div { position: absolute; background: var(--color-selection); }
+/* The layer is appended last; the block before it keeps the last block's flush bottom. */
+.md-root:not(.trans-block-body) > :has(+ .sel-band:last-child) { margin-bottom: 0; }
 
 .sel-composer textarea::selection {
   background: var(--color-invert-text);
@@ -567,26 +575,6 @@ button:disabled {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xs);
   padding: 0.08em 0.35em;
-}
-
-/* Selection painting fills glyphs only, leaving inline code's padding as a gap in the selected band.
-   Code the band holds whole lays the selection fill over the padding the glyph fill leaves bare,
-   so the fill is never doubled. The document selection fills the full line height, leaving only
-   the side padding; a composer's target highlight fills the glyph boxes, leaving all of it. */
-/* The band is square, so a held chip drops its rounding: the corners outside its radius would
-   otherwise show the page through the band. */
-.md-inline-code:is(.in-selection, .in-selection-target) { border-radius: 0; }
-.md-inline-code.in-selection {
-  background:
-    linear-gradient(var(--color-bg-elevated), var(--color-bg-elevated)) center / 100% 1000% no-repeat content-box padding-box,
-    linear-gradient(var(--color-selection), var(--color-selection)) padding-box,
-    var(--color-bg-elevated);
-}
-.md-inline-code.in-selection-target {
-  background:
-    linear-gradient(var(--color-bg-elevated), var(--color-bg-elevated)) content-box,
-    linear-gradient(var(--color-selection), var(--color-selection)) padding-box,
-    var(--color-bg-elevated);
 }
 
 /* Code inside emphasized text keeps that emphasis rather than the code weight. */

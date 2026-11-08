@@ -7,7 +7,7 @@
 import { act, useMemo, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { inputValue, stubHighlights as stubHighlightRegistry } from './helpers/dom'
+import { inputValue } from './helpers/dom'
 import { renderMarkdown } from './helpers/markdown'
 import { DRIVES, selectRendered } from './helpers/selection'
 import { applyTextEdits } from '../document/edits'
@@ -18,7 +18,7 @@ import { analyzeMarkdown } from '../document/markdown/analyze'
 import { mapSelection, type ExclusionReason, type SelRange } from '../ui/modes/reading/selection'
 import { changeVerdict, commentVerdict } from '../ui/modes/reading/marks'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
-import { SELECTION_TARGET_HIGHLIGHT, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { SELECTION_BAND_CLASS, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
 import { useConfig } from '../ui/app/configStore'
 import { useOverlay } from '../ui/app/overlayStore'
 import { Notifications, useAnnouncements } from '../ui/app/Notifications'
@@ -400,11 +400,12 @@ describe('the selection toolbar', () => {
   })
 
   it('trims a selection split by an existing mark to its first markable part', async () => {
-    const registry = stubHighlights()
+    stubRangeRects()
     const announced = countAnnouncements()
     await show('Alpha {++beta++} gamma.', 'Alpha beta gamma')
     expect(window.getSelection()!.toString()).toBe('Alpha ')
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    // The band follows the trimmed selection, not the one the reader made.
+    expect(painted()).toEqual(['Alpha '.length])
     expect(buttons()).toEqual(['Suggest change', 'Comment'])
     expect(notices()).toEqual(['Selection trimmed to its first markable part. ' +
       'Text that already has a suggestion or discussion cannot be marked again.'])
@@ -412,7 +413,7 @@ describe('the selection toolbar', () => {
     expect(announced()).toBe(1)
     press('Suggest change')
     expect(Array.from(host.querySelectorAll('textarea'), (field) => field.value)).toEqual(['Alpha '])
-    expect(painted(registry)).toEqual(['Alpha '])
+    expect(painted()).toEqual(['Alpha '.length])
     press('Cancel')
     press('Comment')
     act(() => inputValue(host.querySelector('textarea')!, 'Why?'))
@@ -623,48 +624,55 @@ describe('the selection toolbar', () => {
     expect(note()).toBeUndefined()
   })
 
-  function stubHighlights(): Map<string, Set<Range>> {
-    cleanups.push(() => vi.unstubAllGlobals())
-    return stubHighlightRegistry()
+  /** Gives each range one rect on one line, as wide as its text in fixed-width characters. */
+  function stubRangeRects(): void {
+    Object.defineProperty(Range.prototype, 'getClientRects', { configurable: true, value(this: Range) {
+      return [{ top: 0, left: 0, width: this.toString().length * CHAR_PX, height: 16 }]
+    } })
+    cleanups.push(() => Reflect.deleteProperty(Range.prototype, 'getClientRects'))
   }
-  const painted = (registry: Map<string, Set<Range>>) =>
-    Array.from(registry.get(SELECTION_TARGET_HIGHLIGHT) ?? [], (range) => range.toString())
+  const CHAR_PX = 10
+  const banded = (): boolean => host.querySelector(`.${SELECTION_BAND_CLASS}`) !== null
+  /** The band's width on each line, in characters. */
+  const painted = (): number[] => Array.from(host.querySelectorAll<HTMLElement>(`.${SELECTION_BAND_CLASS} > div`),
+    (line) => parseFloat(line.style.width) / CHAR_PX)
 
   it('keeps the target looking selected while a composer is open and clears it when the composer closes', async () => {
-    const registry = stubHighlights()
+    stubRangeRects()
     await show('Alpha bravo charlie.', 'bravo')
-    expect(painted(registry)).toEqual([])
+    expect(painted()).toEqual(['bravo'.length])
     press('Comment')
-    expect(painted(registry)).toEqual(['bravo'])
-    // The document selection collapsing as focus enters the composer leaves the highlight in place.
+    expect(painted()).toEqual(['bravo'.length])
+    // The document selection collapsing as focus enters the composer leaves the band in place.
     act(() => { window.getSelection()!.removeAllRanges(); document.dispatchEvent(new Event('selectionchange')) })
     await act(async () => vi.advanceTimersByTimeAsync(120))
-    expect(painted(registry)).toEqual(['bravo'])
+    expect(painted()).toEqual(['bravo'.length])
     press('Cancel')
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    expect(banded()).toBe(false)
   })
 
-  it('clears the target highlight when a suggestion is submitted or the selection is dismissed', async () => {
-    const registry = stubHighlights()
+  it('clears the target band when a suggestion is submitted or the selection is dismissed', async () => {
+    stubRangeRects()
     await show('Alpha bravo charlie.', 'bravo')
     press('Suggest change')
-    expect(painted(registry)).toEqual(['bravo'])
+    expect(painted()).toEqual(['bravo'.length])
     act(() => inputValue(host.querySelector('textarea')!, 'delta'))
     press('Suggest change')
     expect(edit).toHaveBeenCalledTimes(1)
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    expect(banded()).toBe(false)
     await show('Alpha bravo charlie.', 'charlie')
     press('Comment')
-    expect(painted(registry)).toEqual(['charlie'])
+    expect(painted()).toEqual(['charlie'.length])
     act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
-    expect(registry.has(SELECTION_TARGET_HIGHLIGHT)).toBe(false)
+    expect(banded()).toBe(false)
   })
 
-  it('opens the composer without painting where the Highlight API is absent', async () => {
-    expect(globalThis.CSS?.highlights).toBeUndefined()
+  it('opens the composer without a band where the DOM has no layout', async () => {
+    expect(Range.prototype.getClientRects).toBeUndefined()
     await show('Alpha bravo charlie.', 'bravo')
     press('Comment')
     expect(host.querySelector('.sel-composer textarea')).not.toBeNull()
+    expect(banded()).toBe(false)
   })
 
   it('acts on the latest of rapid reselections', async () => {
