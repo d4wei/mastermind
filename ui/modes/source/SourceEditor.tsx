@@ -1,6 +1,6 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { markdown } from '@codemirror/lang-markdown'
-import { Compartment, EditorState, RangeSetBuilder } from '@codemirror/state'
+import { commonmarkLanguage, markdownKeymap, pasteURLAsLink } from '@codemirror/lang-markdown'
+import { Compartment, EditorState, Prec, RangeSetBuilder, StateEffect } from '@codemirror/state'
 import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from '@codemirror/view'
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { scanMarkdown } from '../../../document/markdown/scan'
@@ -17,8 +17,10 @@ const CRITIC_CLASS: Record<string, string> = {
   comment: 'cm-critic cm-critic-comment',
 }
 
-function computeDecorations(view: EditorView): DecorationSet {
-  const text = view.state.doc.toString()
+/** Idle time after the last edit before the whole document is rescanned. */
+export const CRITIC_RESCAN_DELAY_MS = 250
+
+function scanDecorations(text: string): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>()
   try {
     for (const span of scanMarkdown(text)) {
@@ -30,14 +32,34 @@ function computeDecorations(view: EditorView): DecorationSet {
   return builder.finish()
 }
 
-const criticHighlighter = ViewPlugin.fromClass(
+const rescanned = StateEffect.define<DecorationSet>()
+
+/**
+ * `scanMarkdown` parses the whole document, so edits only map the current marks through the change
+ * and the authoritative scan runs once typing pauses. Mapped marks keep their color meanwhile; a
+ * mark that an edit creates or breaks is corrected by that rescan.
+ */
+export const criticHighlighter = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = computeDecorations(view)
+    private timer: ReturnType<typeof setTimeout> | undefined
+    constructor(private readonly view: EditorView) {
+      this.decorations = scanDecorations(view.state.doc.toString())
     }
     update(update: ViewUpdate) {
-      if (update.docChanged) this.decorations = computeDecorations(update.view)
+      for (const transaction of update.transactions) {
+        for (const effect of transaction.effects) if (effect.is(rescanned)) this.decorations = effect.value
+      }
+      if (!update.docChanged) return
+      this.decorations = this.decorations.map(update.changes)
+      clearTimeout(this.timer)
+      this.timer = setTimeout(() => {
+        this.timer = undefined
+        this.view.dispatch({ effects: rescanned.of(scanDecorations(this.view.state.doc.toString())) })
+      }, CRITIC_RESCAN_DELAY_MS)
+    }
+    destroy() {
+      clearTimeout(this.timer)
     }
   },
   { decorations: (v) => v.decorations },
@@ -91,7 +113,12 @@ export function SourceEditor({ onOutline }: { onOutline: Dispatch<SetStateAction
             history(),
             editing.of(editingState(editingLocked(useDoc.getState()))),
             keymap.of([...defaultKeymap, ...historyKeymap]),
-            markdown(),
+            // `markdown()` would also bundle the HTML, CSS, and JavaScript grammars for nested HTML
+            // parsing and tag completion; nothing here highlights or completes, so only the parser,
+            // list-continuing keymap, and URL-paste links are installed.
+            commonmarkLanguage,
+            Prec.high(keymap.of(markdownKeymap)),
+            pasteURLAsLink,
             EditorView.lineWrapping,
             criticHighlighter,
             sourceTheme,

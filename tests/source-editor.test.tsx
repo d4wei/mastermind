@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { undo, redo, undoDepth } from '@codemirror/commands'
-import { EditorView } from '@codemirror/view'
+import { EditorView, runScopeHandlers } from '@codemirror/view'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -8,7 +8,13 @@ import { installHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
 import type { SourceOutline } from '../ui/app/Navigator'
 import { useDoc } from '../ui/documents/store'
-import { SourceEditor } from '../ui/modes/source/SourceEditor'
+import { scanMarkdown } from '../document/markdown/scan'
+import { CRITIC_RESCAN_DELAY_MS, criticHighlighter, SourceEditor } from '../ui/modes/source/SourceEditor'
+
+vi.mock('../document/markdown/scan', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../document/markdown/scan')>()
+  return { ...actual, scanMarkdown: vi.fn(actual.scanMarkdown) }
+})
 
 const getFile = vi.fn()
 const getSession = vi.fn()
@@ -244,4 +250,48 @@ it('searches virtualized source with literal case-aware queries and restores sel
   expect(view.state.selection.main.to).toBe(3)
   expect(searchPanelOpen(view.state)).toBe(false)
   expect(undoDepth(view.state)).toBe(historyBefore)
+})
+
+it('maps critic marks through typing and rescans the whole document only once idle', async () => {
+  disk.set(a, 'one {++added++} two {>>note<\n\n```\n{--code--}\n```\n')
+  await act(async () => { useDoc.getState().notifyDiskChange(); await vi.advanceTimersByTimeAsync(0) })
+  const view = editor()
+  const marks = () => {
+    const found: { from: number; to: number; class: string }[] = []
+    view.plugin(criticHighlighter)!.decorations.between(0, view.state.doc.length, (from, to, value) => {
+      found.push({ from, to, class: value.spec.class as string })
+    })
+    return found
+  }
+  const coldScan = async () => {
+    const { scanMarkdown: actual } = await vi.importActual<typeof import('../document/markdown/scan')>('../document/markdown/scan')
+    return actual(view.state.doc.toString())
+  }
+  const ranges = (spans: { start: number; end: number }[]) => spans.map(({ start, end }) => [start, end])
+  const markRanges = () => marks().map(({ from, to }) => [from, to])
+  expect(markRanges()).toEqual(ranges(await coldScan()))
+  expect(marks()).toHaveLength(1)
+  const scans = vi.mocked(scanMarkdown).mock.calls.length
+
+  act(() => view.dispatch({ changes: { from: 0, insert: 'x' } }))
+  act(() => view.dispatch({ changes: { from: view.state.doc.toString().indexOf('note<') + 5, insert: '<}' } }))
+  expect(vi.mocked(scanMarkdown).mock.calls.length).toBe(scans)
+  expect(marks()).toEqual([{ from: 5, to: 16, class: 'cm-critic cm-critic-ins' }])
+  expect(host.querySelector('.cm-critic-ins')?.textContent).toBe('{++added++}')
+
+  await act(async () => { await vi.advanceTimersByTimeAsync(CRITIC_RESCAN_DELAY_MS - 1) })
+  expect(vi.mocked(scanMarkdown).mock.calls.length).toBe(scans)
+  await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+  expect(vi.mocked(scanMarkdown).mock.calls.length).toBe(scans + 1)
+  const cold = await coldScan()
+  expect(cold.map(({ kind }) => kind)).toEqual(['ins', 'comment'])
+  expect(markRanges()).toEqual(ranges(cold))
+  expect(host.querySelector('.cm-critic-comment')?.textContent).toBe('{>>note<<}')
+})
+
+it('continues a Markdown list on Enter', () => {
+  const view = editor()
+  act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: '- item' }, selection: { anchor: 6 } }))
+  act(() => { expect(runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Enter' }), 'editor')).toBe(true) })
+  expect(useDoc.getState().source).toBe('- item\n- ')
 })
