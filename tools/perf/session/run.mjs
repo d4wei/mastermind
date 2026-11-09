@@ -46,7 +46,8 @@ const fixtureScript = ['mid', 'large']
   .map((n) => `window.FIXTURE_${n.toUpperCase()}=${JSON.stringify(readFileSync(ensureFixture(`${n}.md`), 'utf8'))};`).join('\n')
 writeFileSync(join(outDir, 'fixtures.js'), fixtureScript)
 const theme = (file) => pathToFileURL(join(repo, 'themes', file)).href
-writeFileSync(join(outDir, 'bench.html'), `<!doctype html><html><head><meta charset="utf-8">
+// The theme's tokens apply only under [data-theme], which ui/desktop/main.tsx sets on the app's root.
+writeFileSync(join(outDir, 'bench.html'), `<!doctype html><html data-theme="grid"><head><meta charset="utf-8">
 <link rel="stylesheet" href="${theme('grid/tokens.css')}">
 <link rel="stylesheet" href="${theme('common.css')}">
 <link rel="stylesheet" href="${theme('fonts/faces.css')}">

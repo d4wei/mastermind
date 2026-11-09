@@ -40,7 +40,8 @@ selecting a thread, reply keystrokes until the deferred verdict lands, Escape, s
 Find keystrokes, a review edit and its undo, mode switches and a Markdown-mode keystroke. Times are
 wall-clock ms; "profiler actual" is React's render time. The full result is written to
 `results/session-<commit>.json`; the commit gains `+dirty` when `ui/` or `document/` has
-uncommitted changes. Takes about 15 s.
+uncommitted changes. Takes about 15 s. Runs before the page carried the theme attribute measured
+an unstyled page, so the 2026-11-07 audit in `baselines.json` compares only with itself.
 
 Needs Node 22 or later (for the global `WebSocket`) and Google Chrome. It looks for Chrome at
 `CHROME_PATH`, then the standard macOS and Linux locations; set `CHROME_PATH` to any Chrome or
