@@ -1,9 +1,14 @@
+---
+status: living
+updated: 2026-11-08
+---
+
 # Product terminology
 
-This is the authoritative English and Simplified Chinese vocabulary for mastermind, adopted
-2026-10-10. Use it in product copy, onboarding, documentation, and new or revised implementation.
-It defines names and their meanings; feature contracts remain with their owning modules.
-Implementation may still contain earlier labels and identifiers until adoption is complete.
+This is the authoritative English and Simplified Chinese vocabulary for mastermind. Use it in
+product copy, onboarding, documentation, and new or revised implementation. It defines names and
+their meanings; feature contracts remain with their owning modules. Message keys and identifiers
+may keep earlier names where their local meaning is clear.
 
 Public labels describe what a reader sees or does. Technical names distinguish the precise operation
 or data being discussed. Names must stand on their own without the development conversation.
@@ -28,9 +33,6 @@ or data being discussed. Names must stand on their own without the development c
 | Typeface | Font preset | 字体预设 |
 | Code color | Code color scheme | 代码配色 |
 | Content width | Text width | 正文宽度 |
-| Smart open | Open selected files | 打开所选文件 |
-| Ablation | Removal and refactoring | 移除与重构 |
-| Wrapper, in product descriptions | Desktop app | 桌面应用 |
 
 The definitions below preserve distinctions across features. Project language is a communication
 policy; it is not a document's detected language.
@@ -44,7 +46,7 @@ Evidence: [preferences][preferences], [settings][settings], [translation format]
 
 Use **Reading language / 阅读语言** for the document menu. Its choices are **Original / 原文**
 and the native names of available translations. Regional variants remain distinguishable.
-This is a per-document session choice, not a saved preference or a translation request.
+This is a choice for one open document, not a saved preference or a translation request.
 The agent prepares requested languages; the app offers only versions that pass freshness checks.
 
 ### Interface language
@@ -69,8 +71,8 @@ not a global personal setting.
 
 ### Repository communication policy
 
-The settled role concerns communication and bookkeeping across a repository; storage and discovery
-are not implemented. It does not declare every file to be written in that language.
+The role concerns communication and bookkeeping across a repository; the app has no such setting.
+It does not declare every file to be written in that language.
 Use **Project language / 项目语言** with the explanation “Language for project communication and
 records.” Use **repository language policy** in technical contracts so its scope remains explicit.
 The scope remains one repository. Storage, discovery, and defaults remain governed by
@@ -131,7 +133,7 @@ These names belong in implementation and agent documentation, not ordinary readi
 | Earlier terms | Canonical technical term | Meaning |
 | --- | --- | --- |
 | Block | Translation block | A segmented source unit; lists split into items |
-| Literal/context block | Context block | Included as context, not offered for translation |
+| Literal block | Context block (`literal` in the data) | Included as context, not translated |
 | Block ID | Translation block ID | Position-based ID within one preparation |
 | Projection, narrative | Translation input | Ordered content used to prepare and validate |
 | Source hash, fingerprint | Translation fingerprint | Hash of that input, not raw file bytes |
@@ -156,9 +158,10 @@ Evidence: [author defaults][preferences] and [public protocol][protocol].
 This Settings field supplies the name shown beside comments and written into their `@name:`
 signatures in Markdown. It does not name a comment or require an account.
 
-Use **Display name / 显示名称** in Settings, the customary label for the name shown on your comments. During onboarding ask **What should we call you? / 怎么称呼你？**
-Use the helper **This name appears beside your comments. / 这个名字会显示在你的评论旁。**
-A person may enter a name or nickname; the wording does not request a legal name or unique username.
+Use **Display name / 显示名称** in Settings, the customary label for the name shown on your comments.
+During onboarding ask **What should we call you? / 怎么称呼你？** Use the helper **This name appears
+beside your comments. / 这个名字会显示在你的评论旁。** A person may enter a name or nickname; the wording does not
+request a legal name or unique username.
 
 Example: “Display name: Alex.” A comment is attributed to Alex and stored with `@Alex:`.
 Keep **author tag** in protocol documentation and `authorTag` in code: there it names actual syntax.
@@ -217,13 +220,10 @@ The existing Resolved shorthand can remain where space is limited.
 Use **discussion** instead of Original thread in the history panel; **quoted passage / 引用片段**
 instead of the vague Context label. Context can remain in the serialized record, whose exact
 meaning is defined in [the archive contract][archive].
-A selected or resolved card whose quoted passage is longer than the card shows offers the
-**Show more / 展开** disclosure, which reads **Show less / 收起** once open; its chevron points down
-to open and up to close.
-
-A selection that only partly maps is trimmed to what can be marked, and a notification says
-**Selection trimmed. / 已缩小选区。**, or **Selection trimmed to its first markable part. /
-已将选区缩小为第一处可标记的内容。** when later parts were dropped, followed by the reasons.
+Use **Show more / 展开** and **Show less / 收起** for a card's quoted-passage disclosure. Use
+**Selection trimmed. / 已缩小选区。** and **Selection trimmed to its first markable part. /
+已将选区缩小为第一处可标记的内容。** for the notices that a selection was cut down to what can be
+marked.
 
 Technical distinctions to keep:
 
@@ -263,10 +263,10 @@ its lifetime, and **app session** for app lifetime.
 Use **document buffer** for unsaved in-memory text, and **review state** for the broader state.
 
 Example: “This document is no longer open. Open the file again.”
-Use **Restore open files / 恢复已打开的文件** for reopening the open documents and the active one at
-launch, and **review-state restoration** for the broader, still deferred scope. Restoring open files
-does not decide which buffers, positions, or panels persist; the local persisted work buffers entry
-in [DIRECTION.md][direction] carries that open question.
+Describe reopening the open documents and the active one at launch as **restoring open files /
+恢复已打开的文件**, a behavior with no control, and use **review-state restoration** for the broader
+scope. Restoring open files does not decide which buffers, positions, or panels persist; the local
+persisted work buffers entry in [DIRECTION.md][direction] carries that open question.
 
 Blank-draft creation is retired; do not introduce an untitled-document workflow through
 terminology changes.
@@ -350,9 +350,6 @@ Decisions, Open questions, To-do, and Risks heading families. Keep **frontmatter
 use **document metadata / 文档元数据** when introducing its purpose to a reader. Do not call raw
 frontmatter Properties as if a typed property editor already exists.
 
-Review badges should spell out localized categories rather than `3c 2e 1h`.
-Example: “3 comments, 2 suggested edits, 1 highlight.” / “3 条评论、2 条修改建议、1 处高亮。”
-
 ## 13. Workflow and design-document vocabulary
 
 Use **removal and refactoring / 移除与重构** for work that removes features and restructures code.
@@ -432,15 +429,16 @@ skills, and tests. Preserve saved personal preferences through an explicit migra
 compatibility choice; approval of vocabulary does not authorize silently losing settings.
 
 Serialized translation keys require an explicit format/version choice because readers reject unknown
-fields. Until that choice is made, retain the existing wire names and document their canonical
-meanings beside the format. Keep existing in-document review markers stable. Public terminology does
-not require renaming every `version`, `source`, or other identifier whose local meaning is clear.
+fields, so the wire names stay (`sourceHash` carries the translation fingerprint) and their
+canonical meanings are documented beside the format. Keep existing in-document review markers
+stable. Public terminology does not require renaming every `version`, `source`, or other identifier
+whose local meaning is clear.
 
 This reference governs naming across features. Keep feature behavior and storage contracts beside
 the implementation, and keep unresolved product choices in [DIRECTION.md][direction].
 
 [preferences]: ../desktop/src/setup.md
-[settings]: ../ui/settings/SettingsPanel.tsx
+[settings]: ../ui/settings/controls.md
 [translation]: ../document/translation.md
 [decisions]: ../DECISIONS.md
 [direction]: ../DIRECTION.md
@@ -453,8 +451,8 @@ the implementation, and keep unresolved product choices in [DIRECTION.md][direct
 [archive]: ../document/review-archive.md
 [store]: ../ui/documents/store.md
 [files]: ../desktop/src/files.md
-[sessions]: ../desktop/src/admission.rs
-[fonts]: ../ui/theme/fontRegistry.ts
+[sessions]: ../desktop/src/opening.md
+[fonts]: ../ui/theme/fonts.md
 [colors]: ../ui/theme/codeThemes.ts
 [themes]: ../themes/README.md
 [syntax-highlighting]: https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide

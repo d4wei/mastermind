@@ -1,7 +1,7 @@
 ---
 status: living
-updated: 2026-10-29
-exit: Ship the selection contract, move it beside the implementation, and delete this design.
+updated: 2026-11-08
+exit: Ship or drop the quoted-comment fallback, move its contract beside the code, delete this.
 ---
 
 # Reliable review selections
@@ -12,19 +12,9 @@ The selection toolbar must distinguish an unsupported target from an interaction
 Positional source provenance, formatting-aware fragment planning, selection coverage with exclusion
 reasons, and structural verification of review edits have shipped; their contract lives in
 [selection mapping](../ui/modes/reading/selection.md) and
-[review boundaries](../document/markdown/scan.md). This design keeps the remaining work.
-
-## Remaining findings
-
-- **Multi-fragment comments:** only the first fragment anchors the comment. The composer now says
-  so; a quoted-passage fallback would let one comment cover the whole selection.
-- **Opaque blocks and generated text:** code blocks, raw HTML, frontmatter, and display labels are
-  explained but cannot receive any comment. The current protocol cannot encode active inline marks
-  inside them, and they have no quoted alternative yet.
-- **Existing discussions:** a selection inside an existing discussion is explained, but the toolbar
-  does not yet offer to open that discussion for a reply.
-- **Native boundaries:** the fixture matrix runs in jsdom. Native WebKit selection boundaries, fast
-  drags, and keyboard selection still need checking against it.
+[review boundaries](../document/markdown/scan.md). What remains open, and its exit, is the
+reliable review selections entry in [DIRECTION.md](../DIRECTION.md); this design proposes the
+fallback for selections that cannot carry a mark.
 
 ## Quoted comments
 

@@ -10,8 +10,8 @@ mastermind-launch-check setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
 ```
 
 The Windows command uses `mastermind-launch-console.exe` with the same arguments. Only `authorTag`
-and `uiLang` are accepted. Name and Interface language cannot be null. Unknown fields, an empty
-suggestion, and invalid values reject the whole request before mutation. Valid fields report
+and `uiLang` are accepted. Display name and Interface language cannot be null. Unknown fields, an
+empty suggestion, and invalid values reject the whole request before mutation. Valid fields report
 `accepted` or `ignored` in `setup_results`. Saved fields, protected fields, and completed setup
 ignore agent suggestions. Suggestions never write preferences and disappear when the host exits.
 When saved preferences cannot be read or validated, a suggestion fails with the stable code
@@ -41,13 +41,13 @@ change completion. Reads do not persist merged defaults. Commands share the setu
 existing blocking-work gate; no filesystem work or Git lookup runs on the event loop. Preference
 byte bounds and the atomic writer remain in [`preferences.rs`](preferences.rs).
 
-Name is trimmed and an initial @ removed, matching Settings. Its allowed characters and UTF-16
-length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces and
-Chinese names remain valid. Interface language accepts the existing supported codes. The initial
-Name uses global Git configuration only, with bounded subprocess time and output; unusable or
-unavailable results use `reviewer`. On macOS, Git runs only when it resolves outside `/usr/bin` or
-`xcode-select -p` reports a developer directory, because `/usr/bin/git` otherwise opens the Command
-Line Tools installer. Git defaults replace forbidden author characters and stop at the
+Display name is trimmed and an initial @ removed, matching Settings. Its allowed characters and
+UTF-16 length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces
+and Chinese names remain valid. Interface language accepts the existing supported codes. The initial
+Display name uses global Git configuration only, with bounded subprocess time and output; unusable
+or unavailable results use `reviewer`. On macOS, Git runs only when it resolves outside `/usr/bin`
+or `xcode-select -p` reports a developer directory, because `/usr/bin/git` otherwise opens the
+Command Line Tools installer. Git defaults replace forbidden author characters and stop at the
 author length bound. A repository-local identity is never consulted.
 
 `MM_LAUNCH_CHECK_PREFERENCES` is a trusted test-harness override naming an absolute preference

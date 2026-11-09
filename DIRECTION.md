@@ -127,13 +127,17 @@ verified only from the client side, by process ID rather than the pipe object's 
 host, fail loudly otherwise, and check the pipe object's owner SID; verified on Windows through
 `tools/desktop/check-access.ps1`.
 
-## 2026-10-25 — Reliable review selections (updated 2026-10-29)
+## 2026-10-25 — Reliable review selections (updated 2026-11-08)
 
 **Gap.** Positional source mapping, formatting-aware fragments, and explained exclusions shipped
 (`af58e6f`); the contract lives in `ui/modes/reading/selection.md`. Still open: the in-file
-representation of a quoted-passage comment for selections that cannot carry a mark, native WebKit
-verification of the fixture matrix, and marks directly against underscore emphasis, which the
-masking sentinels' flanking class refuses rather than silently breaking. The remaining design is in
+representation of a quoted-passage comment for selections that cannot carry a mark, which would
+also let one comment cover every fragment of a multi-fragment selection instead of anchoring to the
+first, and reach opaque blocks (code, raw HTML, frontmatter) that no inline mark can enter; a
+selection inside an existing discussion, which the toolbar explains but does not yet offer to open
+for a reply; native WebKit verification of the fixture matrix, including fast drags and keyboard
+selection; and marks directly against underscore emphasis, which the masking sentinels' flanking
+class refuses rather than silently breaking. The fallback's design is in
 [selection review](docs/selection-review.md).
 
 **Exit:** settle the quoted-comment representation or drop it, verify the matrix in the native

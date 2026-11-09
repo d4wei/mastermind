@@ -1,6 +1,6 @@
 ---
 status: historical
-updated: 2026-10-22
+updated: 2026-11-08
 ---
 # Project origins
 
@@ -13,7 +13,7 @@ Current constraints live in [DECISIONS.md](../DECISIONS.md), and the application
 ## What upstream got right
 
 The retained design commitments come from the original [product brief][upstream-product] and
-[design guide][upstream-design]. The current [product overview](product.md) and
+[design guide][upstream-design]. The current [README](../README.md) and
 [theme contract](../themes/README.md) describe this application.
 
 [upstream-product]: https://github.com/Jingquank/Mastermind/blob/3687c91/PRODUCT.md

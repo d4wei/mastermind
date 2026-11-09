@@ -12,6 +12,8 @@ exit: <the condition on which this design graduates and is deleted>
 ---
 ```
 
+- Give a reference that never graduates, such as the terminology or the source map, the same
+  frontmatter without `exit`.
 - Move `updated` on every substantive edit.
 - When the work ships, move its durable contract into the code and colocated docs, then delete the
   design.

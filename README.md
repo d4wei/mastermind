@@ -10,7 +10,8 @@ or sync: the file on disk is the whole channel.
 
 mastermind is maintained by [Da Wei](https://github.com/d4wei) and based on Kevin Ding's
 [Mastermind](https://github.com/Jingquank/Mastermind) v0.2.1 at `3687c91`, under the
-[MIT license](LICENSE).
+[MIT license](LICENSE); [project origins](docs/fork-rationale.md) records the design rationale it
+inherits.
 
 ## How a review goes
 
@@ -59,8 +60,8 @@ node bin/mastermind.js open -- plan.md
 ```
 
 The macOS build creates `desktop/target/release/bundle/macos/mastermind.app`. The first launch asks
-for your display name and Interface language; files opened during setup stay open afterward. Builds are not
-signed or notarized.
+for your Display name and Interface language; files opened during setup stay open afterward. Builds
+are not signed or notarized.
 
 ## Reading and reviewing
 

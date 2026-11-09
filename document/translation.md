@@ -1,19 +1,19 @@
 # Prepared document translation
 
-`prepareTranslation` projects the current source into an ordered narrative. Active review comments
-are removed; highlight wrappers disappear while their quoted source remains. Recognized resolved
-archive records and diagnostic archive ranges are omitted. Suggestions remain literal CriticMarkup.
-Code, frontmatter, ordinary HTML, and other literal context blocks remain in the fingerprint but
-are not offered for translation. Existing Markdown segmentation supplies paragraphs, headings,
-and individual list items.
+`prepareTranslation` projects the current source into an ordered translation input. Active review
+comments are removed; highlight wrappers disappear while their quoted source remains. Recognized
+resolved archive records and diagnostic archive ranges are omitted. Suggestions remain literal
+CriticMarkup. Code, frontmatter, ordinary HTML, and other literal context blocks remain in the
+fingerprint but are not offered for translation. Existing Markdown segmentation supplies paragraphs,
+headings, and individual list items.
 
 A projection has one SHA-256 fingerprint over its complete ordered block data. Block IDs are
 ordinals within that projection, so identical paragraphs remain distinct. IDs do not authorize reuse
-from another fingerprint: every preparation supplies the entire narrative for fresh translation.
+from another fingerprint: every preparation supplies the entire input for fresh translation.
 This module does not read or reuse a translation cache. Segmentation carries raw source slices and
 offsets; the complete projection supplies the only translation fingerprint.
 
-CRLF and LF inputs share a narrative fingerprint. Each projected block also has source offsets
+CRLF and LF inputs share a translation fingerprint. Each projected block also has source offsets
 referring to the current original source, including its original line endings. Offset mapping
 includes annotation delimiters at block boundaries, so feedback stays outside removed wrappers.
 An adjacent archive is a separate boundary; point feedback stays before that archive. Adding or
@@ -21,18 +21,18 @@ resolving comments can move source offsets without invalidating the fingerprint.
 included in the fingerprint. Translated characters are not aligned with source characters.
 
 `PreparedTranslation` is a versioned full-document artifact with source and target language codes,
-the narrative fingerprint, and one `{id,text}` entry for each translatable block. Literal blocks are
-supplied by the current source instead. `matchPreparedTranslation` accepts unknown input and rejects
-wrong fields/types, missing or duplicate IDs, a different fingerprint, empty translations, and
-changed active CriticMarkup suggestion structure. Suggestion text may translate; mark kinds and
-order must remain, and so must the ordered literal delimiter tokens outside opaque source that pair
-with no active mark, so prose that mentions a delimiter stays translatable. Suggestion discovery and
-literal exclusions reuse the same plain Markdown tree for each exact block string; projected
-narrative and original source keep separate trees. Each translation must retain one block of the
-original outer kind, including Markdown heading/list syntax. Hidden HTML, fenced code, and
-incompatible block splitting are rejected; ordinary inline formatting remains allowed. The helper
-returns sanitized artifact data only after checking every block. Callers also check artifact
-languages against the requested roles.
+the translation fingerprint as `sourceHash`, and one `{id,text}` entry for each translatable block.
+Literal blocks are supplied by the current source instead. `matchPreparedTranslation` accepts
+unknown input and rejects wrong fields/types, missing or duplicate IDs, a different fingerprint,
+empty translations, and changed active CriticMarkup suggestion structure. Suggestion text may
+translate; mark kinds and order must remain, and so must the ordered literal delimiter tokens
+outside opaque source that pair with no active mark, so prose that mentions a delimiter stays
+translatable. Suggestion discovery and literal exclusions reuse the same plain Markdown tree for
+each exact block string; projected input and original source keep separate trees. Each
+translation must retain one block of the original outer kind, including Markdown heading/list
+syntax. Hidden HTML, fenced code, and incompatible block splitting are rejected; ordinary inline
+formatting remains allowed. The helper returns sanitized artifact data only after checking every
+block. Callers also check artifact languages against the requested roles.
 
 ## Comments on translated selections
 
