@@ -87,12 +87,16 @@ it('reports the active document, mode, and comment rail to the native menu', asy
   expect(lastState()).toMatchObject({ documentActive: false })
 })
 
-it('sets the menu language from the interface language', async () => {
+it('sets the menu language and the root language from the interface language', async () => {
   await mount()
   expect(mocks.invoke).toHaveBeenCalledWith('set_menu_language', { lang: 'en' })
+  expect(document.documentElement.lang).toBe('en')
   expect(mocks.invoke).not.toHaveBeenCalledWith('set_menu_language', { lang: 'zh-CN' })
-  act(() => useConfig.setState({ config: { uiLang: 'zh-CN' } as ClientConfig }))
-  expect(mocks.invoke).toHaveBeenCalledWith('set_menu_language', { lang: 'zh-CN' })
+  for (const uiLang of ['zh-CN', 'ja', 'fr'] as const) {
+    act(() => useConfig.setState({ config: { uiLang } as ClientConfig }))
+    expect(mocks.invoke).toHaveBeenCalledWith('set_menu_language', { lang: uiLang })
+    expect(document.documentElement.lang).toBe(uiLang)
+  }
 })
 
 it('switches the mode from the View items', async () => {

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usableAuthorName } from '../../document/author'
 import { ToggleGroup } from 'radix-ui'
 import { SlideOver } from '../app/SlideOver'
-import { useT, type MsgKey } from '../i18n'
+import { UI_LANGUAGE_CODES, UI_LANGUAGES, useT, type MsgKey } from '../i18n'
 import { FONT_PRESETS, displayStack } from '../theme/fonts'
 import { CODE_THEMES, type CodeTheme, type CodeThemeId } from '../theme/codeThemes'
 import type { ThemeInfo } from '../../themes/types'
@@ -135,7 +135,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <span>{t('uiLanguage')}</span>
             {/* Interface languages are bundled; translation targets accept arbitrary language codes. */}
             <div className="settings-theme-row">
-              {(['en', 'zh-CN'] as const).map((code) => (
+              {UI_LANGUAGE_CODES.map((code) => (
                 <button
                   key={code}
                   type="button"
@@ -143,7 +143,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   aria-pressed={config.uiLang === code}
                   onClick={() => patch({ uiLang: code })}
                 >
-                  {code === 'en' ? 'English' : '简体中文'}
+                  {UI_LANGUAGES[code]}
                 </button>
               ))}
             </div>

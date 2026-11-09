@@ -66,6 +66,10 @@ it.each([
     reading: ['Font preset', 'Font size', 'Line height', 'Text width'] },
   { language: 'zh-CN', sections: ['通用', '外观', '阅读', '代码'],
     reading: ['字体预设', '字号', '行高', '正文宽度'] },
+  { language: 'ja', sections: ['一般', '外観', '閲覧', 'コード'],
+    reading: ['フォントプリセット', 'フォントサイズ', '行の高さ', '本文の幅'] },
+  { language: 'fr', sections: ['Général', 'Apparence', 'Lecture', 'Code'],
+    reading: ['Préréglage de police', 'Taille de police', 'Interligne', 'Largeur du texte'] },
 ] as const)('groups settings by scope in $language', ({ language, sections, reading }) => {
   useConfig.setState({ config: { ...config, uiLang: language } })
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
@@ -81,6 +85,12 @@ it.each([
   { uiLang: 'zh-CN', name: '显示名称', hint: '这个名字会显示在你的评论旁。',
     font: '字体预设', sans: '无衬线', color: '代码配色', width: '正文宽度',
     language: '译文语言', interfaceLanguage: '界面语言', soft: '柔和' },
+  { uiLang: 'ja', name: '表示名', hint: 'この名前がコメントの横に表示されます。',
+    font: 'フォントプリセット', sans: 'サンセリフ', color: 'コードの配色', width: '本文の幅',
+    language: '翻訳言語', interfaceLanguage: '表示言語', soft: 'ソフト' },
+  { uiLang: 'fr', name: 'Nom affiché', hint: 'Ce nom apparaît à côté de vos commentaires.',
+    font: 'Préréglage de police', sans: 'Sans serif', color: 'Couleurs du code', width: 'Largeur du texte',
+    language: 'Langue de traduction', interfaceLanguage: 'Langue de l’interface', soft: 'Douces' },
 ] as const)('uses canonical settings labels in $uiLang without changing preference keys', (labels) => {
   useConfig.setState({ config: { ...config, uiLang: labels.uiLang } })
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
@@ -110,6 +120,8 @@ it.each([
 it.each([
   { uiLang: 'en', presets: ['Serif', 'Sans', 'Hyperlegible'], code: ['Code color scheme'] },
   { uiLang: 'zh-CN', presets: ['衬线', '无衬线', '易读'], code: ['代码配色'] },
+  { uiLang: 'ja', presets: ['セリフ', 'サンセリフ', '高可読性'], code: ['コードの配色'] },
+  { uiLang: 'fr', presets: ['Serif', 'Sans serif', 'Hyperlisible'], code: ['Couleurs du code'] },
 ] as const)('offers the three font presets and no separate code font in $uiLang', ({ uiLang, presets, code }) => {
   useConfig.setState({ config: { ...config, uiLang } })
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
@@ -118,6 +130,20 @@ it.each([
   expect(Array.from(presetRow.querySelectorAll('button'), (chip) => chip.textContent)).toEqual(presets)
   expect(presetRow.querySelector('[aria-pressed="true"]')?.textContent).toBe(presets[0])
   expect(Array.from(codeSection!.querySelectorAll('.settings-row > span'), (row) => row.textContent)).toEqual(code)
+})
+
+it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('offers every interface language by its native name in %s', (uiLang) => {
+  useConfig.setState({ config: { ...config, uiLang } })
+  act(() => root.render(<SettingsPanel onClose={() => {}} />))
+  const general = host.querySelectorAll('section')[0]!
+  const chips = Array.from(general.querySelectorAll<HTMLButtonElement>('.theme-chip'))
+  expect(chips.map((chip) => chip.textContent)).toEqual(['English', '简体中文', '日本語', 'Français'])
+  expect(general.querySelector('[aria-pressed="true"]')?.textContent)
+    .toBe({ en: 'English', 'zh-CN': '简体中文', ja: '日本語', fr: 'Français' }[uiLang])
+  act(() => chips[2]!.click())
+  expect(update).toHaveBeenLastCalledWith({ uiLang: 'ja' })
+  act(() => chips[3]!.click())
+  expect(update).toHaveBeenLastCalledWith({ uiLang: 'fr' })
 })
 
 it.each(['Alex: Admin', 'Alex{Chen', 'Alex@Chen', 'a'.repeat(65)])(

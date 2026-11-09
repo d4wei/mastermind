@@ -115,10 +115,15 @@ describe('native reviewer boundary', () => {
   })
 
   it('falls back per field when hand-edited preferences have unusable values', async () => {
-    const saved = { lineHeight: '1.6', fontSize: null, contentWidth: -1, uiLang: 'fr', authorTag: 'a:b',
+    const saved = { lineHeight: '1.6', fontSize: null, contentWidth: -1, uiLang: 'de', authorTag: 'a:b',
       theme: 'nacht', fontPreset: 7, version: 9, unknown: true }
     const host = createNativeHost({ invoke: vi.fn().mockResolvedValue(saved), listen: vi.fn() }, [])
     expect(await host.config()).toEqual({ ...DEFAULT_CONFIG, theme: 'nacht' })
+  })
+
+  it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('reads the stored interface language %s', async (uiLang) => {
+    const host = createNativeHost({ invoke: vi.fn().mockResolvedValue({ uiLang }), listen: vi.fn() }, [])
+    expect((await host.config()).uiLang).toBe(uiLang)
   })
 
   it.each([' Reader', '@Reader', ' @ Reader '])('reads the hand-edited author name %j normalized', async (authorTag) => {

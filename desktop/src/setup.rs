@@ -1,3 +1,4 @@
+use crate::menu::Language;
 use crate::preferences::{read_preferences_file, write_preferences_file};
 use mastermind_launch_check::protocol::{Response, SetupRequest, VERSION};
 use serde::Serialize;
@@ -53,7 +54,7 @@ fn validate(fields: &Map<String, Value>, complete: bool) -> Result<Map<String, V
             "authorTag" => value
                 .as_str()
                 .is_some_and(|name| usable_name(&normalize_name(name))),
-            "uiLang" => matches!(value.as_str(), Some("en" | "zh-CN")),
+            "uiLang" => value.as_str().and_then(Language::from_code).is_some(),
             _ => false,
         };
         if !valid {
@@ -325,7 +326,7 @@ impl Setup {
     }
 
     pub fn snapshot(&self, ui_default: Option<&str>) -> Result<Snapshot, String> {
-        if ui_default.is_some_and(|language| !matches!(language, "en" | "zh-CN")) {
+        if ui_default.is_some_and(|language| Language::from_code(language).is_none()) {
             return Err("invalid_ui_language_default".into());
         }
         let mut state = self.transient.lock().unwrap();
@@ -624,8 +625,36 @@ mod tests {
         }
         assert!(setup.confirm(json!({"authorTag":"Reader"})).is_err());
         assert!(setup.protect(vec!["unknown".into()]).is_err());
-        assert!(setup.snapshot(Some("fr")).is_err());
+        assert!(setup.snapshot(Some("de")).is_err());
         assert!(!setup.path.exists());
+    }
+
+    #[test]
+    fn every_interface_language_is_accepted_and_others_are_not() {
+        let fixture = Fixture::new();
+        let setup = fixture.setup();
+        for code in ["en", "zh-CN", "ja", "fr"] {
+            let snapshot = setup.snapshot(Some(code)).unwrap();
+            assert_eq!(snapshot.values["uiLang"], code);
+            assert!(validate(json!({"uiLang":code}).as_object().unwrap(), false).is_ok());
+        }
+        for code in ["de", "ja-JP", "zh", ""] {
+            assert!(setup.snapshot(Some(code)).is_err(), "{code}");
+            assert!(
+                setup
+                    .suggest(suggestions(json!({"uiLang":code})))
+                    .error
+                    .is_some()
+            );
+        }
+        let result = setup.suggest(suggestions(json!({"uiLang":"ja"})));
+        assert_eq!(result.setup_results.unwrap()["uiLang"], "accepted");
+        assert_eq!(setup.snapshot(None).unwrap().values["uiLang"], "ja");
+        setup
+            .confirm(json!({"authorTag":"Lecteur","uiLang":"fr"}))
+            .unwrap();
+        let raw = setup.read_preferences().unwrap().unwrap();
+        assert_eq!(raw["uiLang"], "fr");
     }
 
     #[test]

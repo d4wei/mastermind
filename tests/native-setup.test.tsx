@@ -41,7 +41,8 @@ function editName(value: string) {
 const submit = () => host.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
 
 it.each([
-  [['zh-Hans-CN'], 'zh-CN'], [['de-DE', 'en-US'], 'en'], [['fr'], 'en'], [[], 'en'],
+  [['zh-Hans-CN'], 'zh-CN'], [['de-DE', 'en-US'], 'en'], [['ja-JP'], 'ja'], [['fr-CA', 'en'], 'fr'],
+  [['de', 'fr'], 'fr'], [['en-GB', 'ja'], 'en'], [['de', 'jav'], 'en'], [[], 'en'],
 ] as const)('uses a supported system interface default for %s', (languages, expected) => {
   expect(systemInterfaceLanguage(languages)).toBe(expected)
 })
@@ -59,6 +60,23 @@ it('previews language without persisting and confirms all choices before advanci
   })
   expect(mocks.load).toHaveBeenCalledOnce()
   expect(mocks.confirmed).toHaveBeenCalledOnce()
+})
+
+it('offers every interface language by its native name and previews each one', async () => {
+  const preview = vi.fn()
+  await act(async () => root.render(<NativeSetup snapshot={snapshot()} onConfirmed={mocks.confirmed}
+    onLanguagePreview={preview} />))
+  const options = Array.from(host.querySelectorAll<HTMLButtonElement>('[name="uiLang"]'))
+  expect(options.map((option) => [option.value, option.textContent])).toEqual([
+    ['en', 'English'], ['zh-CN', '简体中文'], ['ja', '日本語'], ['fr', 'Français'],
+  ])
+  for (const [code, prompt] of [['ja', 'なんとお呼びすればよいですか？'], ['fr', 'Comment devons-nous vous appeler\u202f?']]) {
+    await act(async () => host.querySelector<HTMLButtonElement>(`[name="uiLang"][value="${code}"]`)!.click())
+    expect(host.textContent).toContain(prompt)
+    expect(preview).toHaveBeenLastCalledWith(code)
+  }
+  await act(async () => submit())
+  expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: { authorTag: 'Alex', uiLang: 'fr' } })
 })
 
 it('requires a usable Name and does not protect a field merely on focus', async () => {
@@ -168,12 +186,12 @@ it('renders saved setup choices without translation preferences', async () => {
   expect(mocks.invoke).toHaveBeenCalledWith('confirm_setup', { values: saved.values })
 })
 
-it.each(['en', 'zh-CN'] as const)('explains an unusable Name in %s and clears feedback after correction', async (uiLang) => {
+it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('explains an unusable Name in %s and clears feedback after correction', async (uiLang) => {
   await mount(snapshot({ authorTag: 'Alex: Admin', uiLang }))
   const input = host.querySelector<HTMLInputElement>('[name="authorTag"]')!
   expect(input.getAttribute('aria-invalid')).toBe('true')
   expect(host.querySelector('.native-setup-name-error')!.textContent).toContain(
-    uiLang === 'en' ? 'Use up to 64' : '不超过 64')
+    { en: 'Use up to 64', 'zh-CN': '不超过 64', ja: '64 文字以内', fr: '64 caractères au maximum' }[uiLang])
   await act(async () => submit())
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
   await act(async () => editName(' @ 李 明 '))

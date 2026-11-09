@@ -121,8 +121,10 @@ export function NativeReviewer() {
   const language = setupRequired !== false ? previewLanguage : undefined
   const t = useT(language)
   const configuredLanguage = useConfig((s) => s.config?.uiLang)
-  // The menu speaks the interface's language, including an unconfirmed setup preview.
+  // The menu and the document root speak the interface's language, including an unconfirmed setup
+  // preview; the root's `lang` steers screen readers and CJK glyph selection.
   const menuLanguage = language ?? configuredLanguage ?? 'en'
+  useLayoutEffect(() => { document.documentElement.lang = menuLanguage }, [menuLanguage])
   useEffect(() => {
     void nativeBridge.invoke('set_menu_language', { lang: menuLanguage }).catch((error) => setError(String(error)))
   }, [menuLanguage])

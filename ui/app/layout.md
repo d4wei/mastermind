@@ -102,7 +102,7 @@ every notice.
 Find controls wrap to fit narrow widths. Long source/code lines can still scroll within their own
 content areas.
 
-Regression tests cover both interface languages, overflow access, narrow comments, outline
+Regression tests cover every interface language, overflow access, narrow comments, outline
 expansion and progress, and scroll clearance. The manual checklist lives in
 `tests/manual/review-interactions.md`.
 

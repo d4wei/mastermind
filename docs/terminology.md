@@ -8,7 +8,9 @@ updated: 2026-11-08
 This is the authoritative English and Simplified Chinese vocabulary for mastermind. Use it in
 product copy, onboarding, documentation, and new or revised implementation. It defines names and
 their meanings; feature contracts remain with their owning modules. Message keys and identifiers
-may keep earlier names where their local meaning is clear.
+may keep earlier names where their local meaning is clear. The Japanese and French interface labels
+live in `ui/i18n/index.ts` and `desktop/src/menu.rs`, keyed by the same message keys, and translate
+the canonical English here; this document stays an English and Simplified Chinese reference.
 
 Public labels describe what a reader sees or does. Technical names distinguish the precise operation
 or data being discussed. Names must stand on their own without the development conversation.

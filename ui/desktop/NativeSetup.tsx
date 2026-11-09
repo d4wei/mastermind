@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { usableAuthorName } from '../../document/author'
 import { useConfig } from '../app/configStore'
-import { useT } from '../i18n'
+import { UI_LANGUAGE_CODES, UI_LANGUAGES, useT, type UiLang } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
 import { nativeBridge } from './bridge'
 
 interface SetupValues {
   authorTag: string
-  uiLang: 'en' | 'zh-CN'
+  uiLang: UiLang
 }
 type SetupField = keyof SetupValues
 export interface SetupSnapshot {
@@ -18,10 +18,16 @@ export interface SetupSnapshot {
   protected: Record<SetupField, boolean>
 }
 
-export function systemInterfaceLanguage(languages: readonly string[]): SetupValues['uiLang'] {
+/** Every Chinese variant reads the bundled Simplified Chinese; other languages match by prefix. */
+const SYSTEM_LANGUAGE_PREFIXES: ReadonlyArray<readonly [RegExp, UiLang]> = [
+  [/^zh(?:-|$)/i, 'zh-CN'], [/^ja(?:-|$)/i, 'ja'], [/^fr(?:-|$)/i, 'fr'], [/^en(?:-|$)/i, 'en'],
+]
+
+/** The first system language the interface speaks, else English. */
+export function systemInterfaceLanguage(languages: readonly string[]): UiLang {
   for (const language of languages) {
-    if (/^zh(?:-|$)/i.test(language)) return 'zh-CN'
-    if (/^en(?:-|$)/i.test(language)) return 'en'
+    const match = SYSTEM_LANGUAGE_PREFIXES.find(([prefix]) => prefix.test(language))
+    if (match) return match[1]
   }
   return 'en'
 }
@@ -123,12 +129,12 @@ export function NativeSetup({ snapshot, onConfirmed, onLanguagePreview, onConfir
         <div className="native-setup-field" role="group" aria-label={t('uiLanguage')}>
           <span>{t('uiLanguage')}</span>
           <div className="native-setup-options">
-            {(['en', 'zh-CN'] as const).map((uiLang) => <button key={uiLang} type="button"
+            {UI_LANGUAGE_CODES.map((uiLang) => <button key={uiLang} type="button"
               className="btn-ghost" name="uiLang" value={uiLang} aria-pressed={values.uiLang === uiLang}
               onClick={() => {
                 protect('uiLang')
                 setValues((current) => ({ ...current, uiLang }))
-              }}>{uiLang === 'en' ? 'English' : '简体中文'}</button>)}
+              }}>{UI_LANGUAGES[uiLang]}</button>)}
           </div>
         </div>
         <button className="btn-primary" type="submit" disabled={!name}>

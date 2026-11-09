@@ -6,6 +6,7 @@ use tauri::menu::{
 };
 use tauri::{AppHandle, Emitter, Manager, Wry};
 
+/// The interface languages, with the codes the renderer's `uiLang` uses.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 pub enum Language {
     #[default]
@@ -13,6 +14,36 @@ pub enum Language {
     English,
     #[serde(rename = "zh-CN")]
     Chinese,
+    #[serde(rename = "ja")]
+    Japanese,
+    #[serde(rename = "fr")]
+    French,
+}
+
+impl Language {
+    /// Every language in declaration order, which is also the order of each label's texts.
+    pub const ALL: [Language; 4] = [
+        Language::English,
+        Language::Chinese,
+        Language::Japanese,
+        Language::French,
+    ];
+
+    /// The interface code, as serde reads it.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::Chinese => "zh-CN",
+            Language::Japanese => "ja",
+            Language::French => "fr",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Language> {
+        Language::ALL
+            .into_iter()
+            .find(|language| language.code() == code)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,151 +78,234 @@ enum Kind {
 
 struct Label {
     id: &'static str,
-    en: &'static str,
-    zh: &'static str,
+    /// One text per language, in [`Language::ALL`] order.
+    texts: [&'static str; Language::ALL.len()],
     kind: Kind,
 }
 
 impl Label {
     fn text(&self, language: Language) -> &'static str {
-        match language {
-            Language::English => self.en,
-            Language::Chinese => self.zh,
-        }
+        self.texts[language as usize]
     }
 }
 
-const fn label(id: &'static str, en: &'static str, zh: &'static str, kind: Kind) -> Label {
-    Label { id, en, zh, kind }
+const fn label(id: &'static str, texts: [&'static str; Language::ALL.len()], kind: Kind) -> Label {
+    Label { id, texts, kind }
 }
 
-/// Every labelled menu entry. Chinese labels follow `docs/terminology.md`.
+/// Every labelled menu entry, its texts in English, Simplified Chinese, Japanese, and French.
+/// English and Chinese follow `docs/terminology.md`; the others translate its English, and
+/// predefined items take the platform's own wording in each language.
 const LABELS: &[Label] = &[
-    label("application", "mastermind", "mastermind", Kind::Submenu),
+    label(
+        "application",
+        ["mastermind", "mastermind", "mastermind", "mastermind"],
+        Kind::Submenu,
+    ),
     label(
         "about",
-        "About mastermind",
-        "关于 mastermind",
+        [
+            "About mastermind",
+            "关于 mastermind",
+            "mastermind について",
+            "À propos de mastermind",
+        ],
         Kind::Predefined(Predefined::About),
     ),
     label(
         "settings",
-        "Settings…",
-        "设置…",
+        ["Settings…", "设置…", "設定…", "Réglages…"],
         Kind::Action(Some("CmdOrCtrl+,")),
     ),
     label(
         "services",
-        "Services",
-        "服务",
+        ["Services", "服务", "サービス", "Services"],
         Kind::Predefined(Predefined::Services),
     ),
     label(
         "hide",
-        "Hide mastermind",
-        "隐藏 mastermind",
+        [
+            "Hide mastermind",
+            "隐藏 mastermind",
+            "mastermind を隠す",
+            "Masquer mastermind",
+        ],
         Kind::Predefined(Predefined::Hide),
     ),
     label(
         "hide-others",
-        "Hide Others",
-        "隐藏其他",
+        [
+            "Hide Others",
+            "隐藏其他",
+            "ほかを隠す",
+            "Masquer les autres",
+        ],
         Kind::Predefined(Predefined::HideOthers),
     ),
     label(
         "show-all",
-        "Show All",
-        "全部显示",
+        ["Show All", "全部显示", "すべてを表示", "Tout afficher"],
         Kind::Predefined(Predefined::ShowAll),
     ),
     label(
         "quit",
-        "Quit mastermind",
-        "退出 mastermind",
+        [
+            "Quit mastermind",
+            "退出 mastermind",
+            "mastermind を終了",
+            "Quitter mastermind",
+        ],
         Kind::Predefined(Predefined::Quit),
     ),
     label(
         "quit-reviewer",
-        "Quit mastermind",
-        "退出 mastermind",
+        [
+            "Quit mastermind",
+            "退出 mastermind",
+            "mastermind を終了",
+            "Quitter mastermind",
+        ],
         Kind::Action(Some("CmdOrCtrl+Q")),
     ),
-    label("file", "File", "文件", Kind::Submenu),
+    label(
+        "file",
+        ["File", "文件", "ファイル", "Fichier"],
+        Kind::Submenu,
+    ),
     label(
         "open-files",
-        "Open Markdown files…",
-        "打开 Markdown 文件…",
+        [
+            "Open Markdown files…",
+            "打开 Markdown 文件…",
+            "Markdown ファイルを開く…",
+            "Ouvrir des fichiers Markdown…",
+        ],
         Kind::Action(Some("CmdOrCtrl+O")),
     ),
     label(
         "close-file",
-        "Close File",
-        "关闭文件",
+        [
+            "Close File",
+            "关闭文件",
+            "ファイルを閉じる",
+            "Fermer le fichier",
+        ],
         Kind::Action(Some("CmdOrCtrl+W")),
     ),
     label(
         "save-copy",
-        "Save As…",
-        "另存为…",
+        ["Save As…", "另存为…", "別名で保存…", "Enregistrer sous…"],
         Kind::Action(Some("CmdOrCtrl+Shift+S")),
     ),
     label(
         "close-window",
-        "Close Window",
-        "关闭窗口",
+        [
+            "Close Window",
+            "关闭窗口",
+            "ウインドウを閉じる",
+            "Fermer la fenêtre",
+        ],
         Kind::Action(Some("CmdOrCtrl+Shift+W")),
     ),
-    label("edit", "Edit", "编辑", Kind::Submenu),
-    label("undo", "Undo", "撤销", Kind::Predefined(Predefined::Undo)),
-    label("redo", "Redo", "重做", Kind::Predefined(Predefined::Redo)),
-    label("cut", "Cut", "剪切", Kind::Predefined(Predefined::Cut)),
-    label("copy", "Copy", "复制", Kind::Predefined(Predefined::Copy)),
+    label("edit", ["Edit", "编辑", "編集", "Édition"], Kind::Submenu),
+    label(
+        "undo",
+        ["Undo", "撤销", "取り消す", "Annuler"],
+        Kind::Predefined(Predefined::Undo),
+    ),
+    label(
+        "redo",
+        ["Redo", "重做", "やり直す", "Rétablir"],
+        Kind::Predefined(Predefined::Redo),
+    ),
+    label(
+        "cut",
+        ["Cut", "剪切", "カット", "Couper"],
+        Kind::Predefined(Predefined::Cut),
+    ),
+    label(
+        "copy",
+        ["Copy", "复制", "コピー", "Copier"],
+        Kind::Predefined(Predefined::Copy),
+    ),
     label(
         "paste",
-        "Paste",
-        "粘贴",
+        ["Paste", "粘贴", "ペースト", "Coller"],
         Kind::Predefined(Predefined::Paste),
     ),
     label(
         "select-all",
-        "Select All",
-        "全选",
+        ["Select All", "全选", "すべてを選択", "Tout sélectionner"],
         Kind::Predefined(Predefined::SelectAll),
     ),
     label(
         "find-document",
-        "Find…",
-        "查找…",
+        ["Find…", "查找…", "検索…", "Rechercher…"],
         Kind::Action(Some("CmdOrCtrl+F")),
     ),
-    label("view", "View", "查看", Kind::Submenu),
-    label("view-read", "Read", "阅读", Kind::Check),
-    label("view-markdown", "Markdown", "Markdown", Kind::Check),
-    label("toggle-comments", "Comments", "评论", Kind::Check),
+    label(
+        "view",
+        ["View", "查看", "表示", "Présentation"],
+        Kind::Submenu,
+    ),
+    label(
+        "view-read",
+        ["Read", "阅读", "閲覧", "Lecture"],
+        Kind::Check,
+    ),
+    label(
+        "view-markdown",
+        ["Markdown", "Markdown", "Markdown", "Markdown"],
+        Kind::Check,
+    ),
+    label(
+        "toggle-comments",
+        ["Comments", "评论", "コメント", "Commentaires"],
+        Kind::Check,
+    ),
     label(
         "resolved",
-        "Resolved discussions",
-        "已解决的讨论",
+        [
+            "Resolved discussions",
+            "已解决的讨论",
+            "解決済みのディスカッション",
+            "Discussions résolues",
+        ],
         Kind::Action(None),
     ),
     label(
         "fullscreen",
-        "Enter Full Screen",
-        "进入全屏幕",
+        [
+            "Enter Full Screen",
+            "进入全屏幕",
+            "フルスクリーンにする",
+            "Activer le mode plein écran",
+        ],
         Kind::Predefined(Predefined::Fullscreen),
     ),
-    label("window", "Window", "窗口", Kind::Submenu),
+    label(
+        "window",
+        ["Window", "窗口", "ウインドウ", "Fenêtre"],
+        Kind::Submenu,
+    ),
     label(
         "minimize",
-        "Minimize",
-        "最小化",
+        ["Minimize", "最小化", "しまう", "Placer dans le Dock"],
         Kind::Predefined(Predefined::Minimize),
     ),
-    label("zoom", "Zoom", "缩放", Kind::Predefined(Predefined::Zoom)),
+    label(
+        "zoom",
+        ["Zoom", "缩放", "拡大／縮小", "Réduire/agrandir"],
+        Kind::Predefined(Predefined::Zoom),
+    ),
     label(
         "bring-all-to-front",
-        "Bring All to Front",
-        "前置全部窗口",
+        [
+            "Bring All to Front",
+            "前置全部窗口",
+            "すべてを手前に移動",
+            "Tout ramener au premier plan",
+        ],
         Kind::Predefined(Predefined::BringAllToFront),
     ),
 ];
@@ -558,13 +672,14 @@ mod tests {
     }
 
     #[test]
-    fn every_label_has_both_languages_and_a_unique_id() {
+    fn every_label_has_every_language_and_a_unique_id() {
         let mut ids = HashSet::new();
         for label in LABELS {
             assert!(ids.insert(label.id), "{} repeats", label.id);
-            for language in [Language::English, Language::Chinese] {
+            for language in Language::ALL {
                 let text = label.text(language);
                 assert!(!text.trim().is_empty(), "{} lacks {language:?}", label.id);
+                assert_eq!(text, text.trim(), "{} pads {language:?}", label.id);
             }
         }
         assert_eq!(find_label("close-file").text(Language::Chinese), "关闭文件");
@@ -573,6 +688,22 @@ mod tests {
             find_label("resolved").text(Language::Chinese),
             "已解决的讨论"
         );
+    }
+
+    #[test]
+    fn labels_relabel_in_japanese_and_french() {
+        let texts = |id| {
+            let label = find_label(id);
+            (label.text(Language::Japanese), label.text(Language::French))
+        };
+        assert_eq!(
+            texts("close-file"),
+            ("ファイルを閉じる", "Fermer le fichier")
+        );
+        assert_eq!(texts("save-copy"), ("別名で保存…", "Enregistrer sous…"));
+        assert_eq!(texts("quit"), ("mastermind を終了", "Quitter mastermind"));
+        assert_eq!(texts("minimize"), ("しまう", "Placer dans le Dock"));
+        assert_eq!(texts("undo"), ("取り消す", "Annuler"));
     }
 
     #[test]
@@ -713,7 +844,16 @@ mod tests {
         let parse = |code: &str| serde_json::from_value::<Language>(serde_json::json!(code));
         assert_eq!(parse("en").unwrap(), Language::English);
         assert_eq!(parse("zh-CN").unwrap(), Language::Chinese);
-        assert!(parse("fr").is_err());
+        assert_eq!(parse("ja").unwrap(), Language::Japanese);
+        assert_eq!(parse("fr").unwrap(), Language::French);
+        assert!(parse("de").is_err());
+        assert!(parse("zh").is_err());
+        for (index, language) in Language::ALL.into_iter().enumerate() {
+            assert_eq!(language as usize, index, "{language:?} is out of order");
+            assert_eq!(parse(language.code()).unwrap(), language);
+            assert_eq!(Language::from_code(language.code()), Some(language));
+        }
+        assert_eq!(Language::from_code("de"), None);
         assert_eq!(
             serde_json::from_value::<Mode>(serde_json::json!("source")).unwrap(),
             Mode::Source

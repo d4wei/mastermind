@@ -15,9 +15,9 @@ let files: OpenDocument[]
 let select = vi.fn<(id: string) => void>()
 let close = vi.fn<(id: string) => void>()
 let blocked: boolean
-let chinese: boolean
+let language: 'zh-CN' | 'ja' | 'fr' | undefined
 beforeEach(() => {
-  width = 400; pillWidths = []; blocked = false; chinese = false
+  width = 400; pillWidths = []; blocked = false; language = undefined
   files = Array.from({ length: 12 }, (_,i) => ({ id: String(i), path: `/folder-${i}/review.md` }))
   select = vi.fn(); close = vi.fn()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -33,7 +33,7 @@ afterEach(() => { act(() => root.unmount()); host.remove(); useClosePrompt.setSt
 function Harness() {
   const [list, setList] = useState(files)
   const [active, setActive] = useState('0')
-  return <FileTabs files={list} activeId={active} language={chinese ? 'zh-CN' : undefined} needsAttention={(id) => id === '4'}
+  return <FileTabs files={list} activeId={active} language={language} needsAttention={(id) => id === '4'}
     onAttention={() => {}} onSelect={(id) => { select(id); setActive(id) }} onClose={async (file) => {
       close(file.id)
       if (blocked) return false
@@ -101,10 +101,21 @@ it('replaces Find on opening the list and closes the list on a Find request', as
   expect(menu()).toBeNull()
 })
 it('labels the list and close controls in Chinese', async () => {
-  chinese = true
+  language = 'zh-CN'
   await mount(); await open()
   expect(menu().getAttribute('aria-label')).toBe('打开的文件')
   expect(rows()[0]!.querySelector('.native-file-close')!.getAttribute('aria-label')).toBe('关闭 folder-0/review.md')
+})
+
+it.each([
+  ['ja', 'folder-0/review.md を閉じる', '/folder-0/review.md を閉じる'],
+  ['fr', 'Fermer folder-0/review.md', 'Fermer /folder-0/review.md'],
+] as const)('places the file name where %s puts it in the close control', async (code, label, title) => {
+  language = code
+  await mount(); await open()
+  const control = rows()[0]!.querySelector('.native-file-close')!
+  expect(control.getAttribute('aria-label')).toBe(label)
+  expect(control.getAttribute('title')).toBe(title)
 })
 
 it('fits short labels by their measured widths and recomputes when they grow', async () => {

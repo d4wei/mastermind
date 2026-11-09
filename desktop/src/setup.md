@@ -43,7 +43,8 @@ byte bounds and the atomic writer remain in [`preferences.rs`](preferences.rs).
 
 Display name is trimmed and an initial @ removed, matching Settings. Its allowed characters and
 UTF-16 length follow the existing CriticMarkup author parser in `document/critic/scanner.ts`; spaces
-and Chinese names remain valid. Interface language accepts the existing supported codes. The initial
+and Chinese names remain valid. Interface language accepts the codes `Language::ALL` lists in
+[`menu.rs`](menu.rs). The initial
 Display name uses global Git configuration only, with bounded subprocess time and output; unusable
 or unavailable results use `reviewer`. On macOS, Git runs only when it resolves outside `/usr/bin`
 or `xcode-select -p` reports a developer directory, because `/usr/bin/git` otherwise opens the

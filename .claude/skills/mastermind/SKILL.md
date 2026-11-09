@@ -163,8 +163,8 @@ When the person asks you to prefill their setup, suggest known values with a sep
 node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
 ```
 
-Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions never overwrite saved
-choices; people confirm them in the app.
+Supported fields are `authorTag` and `uiLang` (`en`, `zh-CN`, `ja`, or `fr`). Suggestions never
+overwrite saved choices; people confirm them in the app.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
 file and open it. Keep the sample marks valid; an optional translation follows the preparation flow

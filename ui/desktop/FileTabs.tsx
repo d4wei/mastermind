@@ -5,14 +5,14 @@ import { fileLabels } from './file-labels'
 import { fileWindow } from './file-window'
 import { useClosePrompt } from './CloseDialog'
 import { useOverlay, useOverlayControl } from '../app/overlayStore'
-import { useT } from '../i18n'
+import { useT, type UiLang } from '../i18n'
 
 export interface OpenDocument { language?: string; id: string; path: string }
 interface FileTabsProps {
   files: OpenDocument[]
   activeId: string | null
   /** Interface language before setup saves one; otherwise the configured language applies. */
-  language?: 'en' | 'zh-CN'
+  language?: UiLang
   needsAttention: (id: string) => boolean
   onSelect: (id: string) => void
   onAttention: (id: string) => void
@@ -115,8 +115,8 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
       aria-label={`${labels[index]} · ${t('needsAttention')}`}
       onClick={measuring ? undefined : () => { select(file.id); onAttention(file.id) }}><AlertIcon /></Control>}
     <Control type={measuring ? undefined : "button"} className="native-file-close btn-icon" onClick={measuring ? undefined : () => { void close(file, menu) }}
-      aria-label={`${t('close')} ${labels[index]}`}
-      title={`${t('close')} ${file.path}`}><CrossIcon /></Control>
+      aria-label={t('closeNamed').replace('{name}', () => labels[index]!)}
+      title={t('closeNamed').replace('{name}', () => file.path)}><CrossIcon /></Control>
   </div>
   }
   const move = (event: KeyboardEvent) => {

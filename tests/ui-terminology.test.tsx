@@ -45,6 +45,8 @@ afterEach(() => {
 it.each([
   { lang: 'en', copy: 'Save As…', incoming: 'Use incoming' },
   { lang: 'zh-CN', copy: '另存为…', incoming: '采用外部版本' },
+  { lang: 'ja', copy: '別名で保存…', incoming: 'ディスク上の版を採用' },
+  { lang: 'fr', copy: 'Enregistrer sous…', incoming: 'Utiliser la version du disque' },
 ] as const)('names the recovery actions in $lang', (labels) => {
   installHost(fakeHost({ saveCopy: async () => null }))
   useConfig.setState({ config: { ...config, uiLang: labels.lang } })
@@ -57,7 +59,8 @@ it.each([
   installHost(null)
 })
 
-it.each(['en', 'zh-CN'] as const)('names Save As and keeps Resolve for discussions in %s recovery copy', (uiLang) => {
+const SAVE_AS = { en: 'Save As…', 'zh-CN': '另存为…', ja: '別名で保存…', fr: 'Enregistrer sous…' } as const
+it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('names Save As and keeps Resolve for discussions in %s recovery copy', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const keys = ['closeSaveBody', 'conflictCopyFailed', 'conflictReadFailed', 'conflictSaveFailed', 'conflictNotice'] as const
   function Copy() {
@@ -66,11 +69,11 @@ it.each(['en', 'zh-CN'] as const)('names Save As and keeps Resolve for discussio
   }
   act(() => root.render(<Copy />))
   const lines = Array.from(host.querySelectorAll('p'), (line) => line.textContent!)
-  expect(lines.slice(0, 4).every((line) => line.includes(uiLang === 'en' ? 'Save As…' : '另存为…'))).toBe(true)
+  expect(lines.slice(0, 4).every((line) => line.includes(SAVE_AS[uiLang]))).toBe(true)
   expect(host.textContent).not.toMatch(/save a copy|另存副本|保存副本|resolve|解决/i)
 })
 
-it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLang) => {
+it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('keeps Markdown mode accessible in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const setMode = vi.fn()
   useDoc.setState({ mode: 'reading', setMode })
@@ -81,11 +84,11 @@ it.each(['en', 'zh-CN'] as const)('keeps Markdown mode accessible in %s', (uiLan
   expect(setMode).toHaveBeenCalledWith('source')
 })
 
-it.each(['en', 'zh-CN'] as const)('keeps settings in the overflow menu in %s', (uiLang) => {
+it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('keeps settings in the overflow menu in %s', (uiLang) => {
   useConfig.setState({ config: { ...config, uiLang } })
   const onToggle = vi.fn()
   act(() => root.render(<TopBar {...bar} settings={{ open: true, onToggle }} />))
-  const label = uiLang === 'en' ? 'Settings' : '设置'
+  const label = { en: 'Settings', 'zh-CN': '设置', ja: '設定', fr: 'Réglages' }[uiLang]
   openReaderMenu(host)
   const button = readerMenuItem(label)
   act(() => button.click())

@@ -1,15 +1,17 @@
 # Native menu
 
-`menu.rs` owns the application menu bar: its layout per platform, its English and Chinese labels,
-which items are enabled or checked, and where each activation goes. The renderer owns what an
-action does to a document.
+`menu.rs` owns the application menu bar: its layout per platform, its labels in every interface
+language, which items are enabled or checked, and where each activation goes. The renderer owns what
+an action does to a document.
 
 ## Labels and language
 
-One label table names every entry, submenu titles and predefined items included, in English and
-Simplified Chinese per [the terminology](../../docs/terminology.md). The menu starts in English.
-`set_menu_language({ lang })` takes the interface language code (`en` or `zh-CN`) and resets every
-entry's text; the renderer sends it when its configuration loads, when the Interface language
+One label table names every entry, submenu titles and predefined items included, in every interface
+language: English (`en`), Simplified Chinese (`zh-CN`), Japanese (`ja`), and French (`fr`). English
+and Chinese follow [the terminology](../../docs/terminology.md); Japanese and French translate its
+English, and predefined items use the platform's own wording. The menu starts in English.
+`set_menu_language({ lang })` takes one of those codes, which `Language::ALL` lists, and resets
+every entry's text; the renderer sends it when its configuration loads, when the Interface language
 changes, and while setup previews a language.
 
 Predefined items keep the key bindings the pinned muda fixes for them. Its Close Window item binds

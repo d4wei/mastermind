@@ -26,6 +26,23 @@ entry that has already resolved.
 
 * * *
 
+## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms
+
+**Gap.** The bundled CJK faces are Noto Serif SC and Noto Sans SC, and they cover the kanji the
+Japanese interface labels use, so the browser never reaches a Japanese face and characters whose
+regional forms differ (直, 令, 骨 and the like) show their Chinese shapes. The document root's
+`lang` now follows the interface language, which steers screen readers and hyphenation but not
+font choice while the SC face has the glyph; it also says nothing about the document's own
+language, which the app does not detect, so a Chinese document under a Japanese interface is
+announced as Japanese. Bundling Noto JP adds tens of megabytes; a `:lang(ja)` stack that prefers
+system Japanese faces (Hiragino, Yu Gothic, Noto Sans CJK JP) costs nothing but would also restyle
+a Chinese document shown under a Japanese interface unless the stack keys on the document's
+language rather than the interface's.
+
+**Exit:** a per-document language (frontmatter, detection, or the prepared translation's code)
+drives both the root `lang` and the CJK stack, or Japanese glyph forms are accepted for the
+interface and recorded as such.
+
 ## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 
 **Bet.** Even with the micromark truncation patched (`document/markdown/processor.md`), a whole

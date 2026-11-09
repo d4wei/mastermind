@@ -1,3 +1,5 @@
+import type { UiLang } from '../i18n/languages'
+
 export interface MastermindConfig {
   version: 1
   theme: string
@@ -11,7 +13,7 @@ export interface MastermindConfig {
   fontPreset: string
   /** id of the chosen code-color scheme; `none` = uncolored (see ui/theme/codeThemes.ts) */
   codeTheme: string
-  uiLang: 'en' | 'zh-CN'
+  uiLang: UiLang
 }
 
 export type ClientConfig = MastermindConfig
