@@ -160,3 +160,24 @@ it('reuses indexed runs until searchable content changes, even before the observ
     expect(index.runs().map((run) => run.text)).toEqual(['Review this again.'])
   } finally { index.disconnect() }
 })
+
+it('keeps the root runs across a change elsewhere in scope, while still reporting it for a repaint', async () => {
+  const scope = document.createElement('div')
+  const root = document.createElement('article'); root.innerHTML = '<p>Review this</p>'
+  const rail = document.createElement('div'); rail.className = 'rail'
+  scope.append(root, rail)
+  let changes = 0
+  const index = new ReadingIndex(root, scope, () => changes++)
+  try {
+    const runs = index.runs()
+    // A rail card mounting, as the rail's window moves.
+    rail.innerHTML = '<div class="rail-card"><div class="rail-body">Review the rail</div></div>'
+    await Promise.resolve()
+    expect(changes).toBe(1)
+    expect(index.runs()).toBe(runs)
+    rail.firstElementChild!.remove()
+    expect(index.runs()).toBe(runs)
+    root.querySelector('p')!.append(' again')
+    expect(index.runs()).not.toBe(runs)
+  } finally { index.disconnect() }
+})

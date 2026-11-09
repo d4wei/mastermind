@@ -1,6 +1,7 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useDraftGuard } from './drafts'
+import { flushSync } from 'react-dom'
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { useT } from '../i18n'
@@ -70,7 +71,10 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const t = useT()
   const railRef = useRef<HTMLDivElement | null>(null)
   const [placed, setPlaced] = useState<ReadonlySet<string>>(() => new Set())
-  const [placement] = useState(() => new RailPlacement(CARD_GAP, (keys) => setPlaced(new Set(keys))))
+  // The cards near the viewport, or null for every card; none until placement first reports.
+  const [near, setNear] = useState<ReadonlySet<string> | null>(() => new Set())
+  const [placement] = useState(() => new RailPlacement(CARD_GAP, (keys) => setPlaced(new Set(keys)),
+    (keys, urgent) => { if (urgent) flushSync(() => setNear(keys)); else setNear(keys) }))
   const attachRail = useCallback((element: HTMLDivElement | null) => {
     railRef.current = element
     placement.setRail(element)
@@ -123,6 +127,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     return () => placement.disconnect()
   }, [placement])
   useLayoutEffect(() => placement.update(docRef.current, cards, activeSpan), [placement, docRef, cards, activeSpan])
+  useLayoutEffect(() => placement.afterRender())
   useEffect(() => {
     for (const key of cardRefs.current.keys()) if (!cards.some((card) => card.key === key)) cardRefs.current.delete(key)
   }, [cards])
@@ -271,10 +276,16 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
 
   const orphaned = drafts.filter((draft) => draft.text.trim() && !placedDrafts.cardOf.has(draft.id))
   if (!cards.length && !orphaned.length) return null
+  // Besides the cards near the viewport, the rail keeps mounted every card a reader is working in,
+  // and the focused card's neighbors in source order, so Tab and Shift+Tab reach the adjacent discussion.
+  const focusedIndex = focusedSpan == null ? -1 : cards.findIndex((card) => card.spanIndex === focusedSpan)
+  const mounted = (card: ThreadCard, index: number) => near === null || near.has(card.key) ||
+    card.spanIndex === activeSpan || card === composerCard || replyFor === card.key || draftText(card) !== '' ||
+    (focusedIndex >= 0 && Math.abs(index - focusedIndex) <= 1)
   return <div ref={attachRail} className={`rail${leaving ? ' leaving' : ''}`} inert={tableExpanded || leaving}
     aria-hidden={tableExpanded || leaving || undefined} data-table-hidden={tableExpanded}>
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
-    {cards.map((card) => {
+    {cards.filter(mounted).map((card) => {
       const composer = card === composerCard
       return <RailCard key={card.key} card={card} attach={cardRef(card.key)} actions={actions} readOnly={readOnly}
         selected={activeSpan === card.spanIndex} placed={placed.has(card.key)}

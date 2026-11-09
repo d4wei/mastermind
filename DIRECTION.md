@@ -44,34 +44,24 @@ properties and the state-change event (no scroll anchoring, so a manual compensa
 at 15 MiB Chrome spends about 700 ms per frame managing 98k skipped elements even while idle, so
 per-block skipping does not scale, and whether skipping larger chunks does is unmeasured (and those
 runs measured an unstyled page: the harness left the theme attribute unset, so their spacing and
-widths were not the app's). The comment rail is the other whole-document reader, and the one whose
-cost grows with marks rather than bytes: it mounts and measures every card, and on the 15 MiB
-fixture with a comment per paragraph (87k threads) it never finished its first placement in two
-hours. A windowed rail that mounts only the cards near the viewport, the selected one and any being
-written, remembers measured heights and estimates the rest, placed that rail 81 s after mount,
-halved rail mount, edit cost and DOM size at 600 KB, and kept every card and the article still while
-scrolling; its estimates were exact on the uniform fixtures and within one body line on the real
-one, and the visible costs are keyboard order (Shift+Tab from a card reaches the window's first
-card, not the previous discussion), Find matches painting only in mounted cards, and a scrollbar
-that settles as cards are measured. Edits stay dominated by re-analysis in every variant (0.6 s at
-600 KB, 28 s of a 71 s edit at 15 MiB, the rest React re-rendering the article). The JavaScriptCore
-blow-up seen earlier (25 s at 8 MiB against 6 s in Node) did not reproduce on an idle machine: it
-was memory pressure (a parse holds 3–4 GB at 8–15 MiB, and the runs were made at load 29–36), and
-the mild superlinearity both engines shared was a quadratic sibling lookup in
-`mdast-util-find-and-replace`, now patched (`document/markdown/processor.md`); after it the parse is
-near-linear in both engines (jsc 9.2 s, Node 7.4 s at 15 MiB), with the next quadratic in
-mdast-util-from-markdown's list handling and nothing measured inside WKWebView, whose memory limits
-may bind before time does. Neither parser has an active upstream: markdown-rs has been quiet for
-over a year with the panics and the quadratic profile already reported, and micromark is barely
-maintained, so fixes to either live in a local patch or fork, as micromark's already does. A size
-threshold above which the reading view yields to the source view is a candidate policy, not a
-ruling.
+widths were not the app's). The comment rail was the other whole-document reader, mounting and
+measuring every card; it is now windowed (`DECISIONS.md`, 2026-11-09), so rail cost no longer grows
+with marks. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 28 s of a 71 s
+edit at 15 MiB, the rest React re-rendering the article). The JavaScriptCore blow-up seen earlier
+(25 s at 8 MiB against 6 s in Node) did not reproduce on an idle machine: it was memory pressure (a
+parse holds 3–4 GB at 8–15 MiB, and the runs were made at load 29–36), and the mild superlinearity
+both engines shared was a quadratic sibling lookup in `mdast-util-find-and-replace`, now patched
+(`document/markdown/processor.md`); after it the parse is near-linear in both engines (jsc 9.2 s,
+Node 7.4 s at 15 MiB), with the next quadratic in mdast-util-from-markdown's list handling and
+nothing measured inside WKWebView, whose memory limits may bind before time does. Neither parser has
+an active upstream: markdown-rs has been quiet for over a year with the panics and the quadratic
+profile already reported, and micromark is barely maintained, so fixes to either live in a local
+patch or fork, as micromark's already does. A size threshold above which the reading view yields to
+the source view is a candidate policy, not a ruling.
 
 **Exit:** the parse moved off the main thread, or re-parsed per changed block; the parse's memory
-footprint measured inside WKWebView; `content-visibility` on the article left alone; the windowed
-rail built into `ui/review/rail-layout.ts` and `CommentRail.tsx` with its contract in
-`comment-rail.md`, or dropped with the keyboard-order cost named as the reason; then a ruling on
-the size policy, if one is still needed.
+footprint measured inside WKWebView; `content-visibility` on the article left alone; then a ruling
+on the size policy, if one is still needed.
 
 ## 2026-11-07 — Restoring remembered files reads every one before the first reply
 

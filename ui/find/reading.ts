@@ -107,8 +107,10 @@ export function readingMatches(root: HTMLElement, query: string, caseSensitive: 
 }
 
 /**
- * Holds one root's runs until the DOM changes. Mutations are taken synchronously when runs are
- * requested, so a commit that has not yet notified the observer still invalidates them.
+ * Holds one root's runs until the DOM inside it changes, and reports every searchable change in
+ * `scope`: one outside the root, such as rail cards mounting as the document scrolls, repaints
+ * Find without walking the root again. Mutations are taken synchronously when runs are requested,
+ * so a commit that has not yet notified the observer still invalidates them.
  */
 export class ReadingIndex {
   private cached: TextRun[] | null = null
@@ -130,8 +132,9 @@ export class ReadingIndex {
   }
 
   private absorb(records: MutationRecord[]): boolean {
-    if (!records.some(({ target }) => !(target instanceof Element ? target : target.parentElement)?.closest(unsearched))) return false
-    this.cached = null
+    const searched = records.filter(({ target }) => !(target instanceof Element ? target : target.parentElement)?.closest(unsearched))
+    if (!searched.length) return false
+    if (searched.some(({ target }) => this.root.contains(target))) this.cached = null
     return true
   }
 }

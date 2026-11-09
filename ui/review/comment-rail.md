@@ -22,24 +22,56 @@ below, and the passage's turns from down to up as it grows in place.
 `rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
 space above crowded anchors; earlier cards stay within the document surface. When there is not
 room for every preceding card above the anchor, the selected card moves down only far enough to
-retain order and separation. Measurements include actual card heights, including a resized reply
-composer. Narrow comment panels use ordinary vertical flow instead of positioned cards.
+retain order and separation. Every card is placed, whether or not it is mounted: a mounted card by
+its measured height, including a resized reply composer; an unmounted one by the height it was last
+measured at, or by an estimate if it has never rendered. Narrow comment panels use ordinary vertical
+flow instead of positioned cards.
 
-Each card is a memoized `RailCard` that receives only its own selection, emphasis, placement,
-composer, and draft state, with the rail's actions in one object that lives as long as the rail,
-so hover, focus, selection, or typing renders only the cards whose state changed. The document view
-keeps its analysis and rendering context stable across those changes, so it does not render at all;
+In the wide rail, only the cards whose placed box meets the viewport, plus one and a half viewports
+above and below, are mounted. The rail also keeps mounted the selected card (which is how a
+navigation that reveals a card, such as Find into a comment, clicking an anchor, or selecting a
+discussion, brings it in), the card with keyboard focus, the card with an open or requested
+composer, and every card holding a draft. Everything else is unmounted, and the rail keeps its full
+placed height, so the scroll extent stays right. The narrow panel flows in its own scroller and
+mounts every card. Scrolling recomputes the window once per frame and renders entering cards before
+that frame paints; a card mounts at its placed `top` and is measured and re-placed before paint.
+
+A remembered height is dropped when the card's content (its messages, their authors and bodies, or
+its passage) changes, when the card gains or loses the selection, or when the rail's width changes;
+font and interface-language changes are not detected, so remembered heights can be stale until the
+card next mounts and is measured. An estimate is computed from content: chrome, the passage at its
+two-line clamp, the opening message's wrapped lines, and the reply count. Its geometry is read once
+from the first rendered single-message card, and it is scaled by the ratio of measured to estimated
+height over the unselected cards measured so far. An estimate that is off moves cards below it once
+the card mounts and is measured, which shows mainly while scrolling up through an unvisited part of
+a crowded rail; the article itself never moves.
+
+Tab order follows the DOM, so an unmounted card would be skipped. The rail therefore keeps the
+focused card's neighbors in source order mounted as well: when focus reaches the first or last
+mounted card, the adjacent discussion beyond it mounts, and the next Tab or Shift+Tab lands on it.
+Find counts comment results from the analysis, so its counter covers every card, but it paints a
+comment match only while its card is mounted; revealing a result in an unmounted card selects the
+discussion, which mounts the card, and the match then paints and scrolls into view. Cards mounting
+as the window moves repaint Find without discarding the article's indexed text
+(`ReadingIndex` in `ui/find/reading.ts`).
+
+Each mounted card is a memoized `RailCard` that receives only its own selection, emphasis,
+placement, composer, and draft state, with the rail's actions in one object that lives as long as
+the rail, so hover, focus, selection, or typing renders only the cards whose state changed, and a
+window change renders only the cards entering it. The document view keeps its analysis and
+rendering context stable across those changes, so it does not render at all;
 `tests/session-render-scope.test.tsx` checks both.
 
 Hover and keyboard focus emphasize the matching passage and card without selecting, expanding,
 or repositioning either. They are separate sources, and either one emphasizes: the pointer leaving
 a card or passage ends only hover, and focus leaving a card ends only focus, so a focused card stays
 lit while the pointer crosses other cards and passages, and pressing another card's body keeps its
-passage lit until the click selects it. Dragging to select text does not open a reply. Navigation reveals an
-offscreen counterpart without moving one that is already visible. Wide cards share document
-scrolling; narrow panels scroll their own content. The rail fades in without animating cards from
-provisional positions; hiding wide comments fades it out in place, inert, before the document
-recenters. Narrow panels use the same fade-in. Motion honors reduced-motion preferences.
+passage lit until the click selects it. Dragging to select text does not open a reply. Navigation
+reveals an offscreen counterpart, mounting a card first, without moving one that is already
+visible. Wide cards share document scrolling; narrow panels scroll their own content. The rail
+fades in without animating cards from provisional positions; hiding wide comments fades it out in
+place, inert, before the document recenters. Narrow panels use the same fade-in. Motion honors
+reduced-motion preferences.
 
 Sections that appear inside a card, live or resolved, ease open and closed through `Collapsible`:
 the reply composer and its alert, the replies, and the passage's Show more row. Its grid row moves
@@ -55,10 +87,11 @@ by animating `max-height` from the height on screen to the next clamp's measured
 shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
 re-places cards synchronously from its size observer, so neighbors follow an easing card in the
 same frame, and a card not yet placed stays unseen rather than at the rail's top. One observer
-watches the document and every card for the rail's lifetime (`RailPlacement` in `rail-layout.ts`); an
-observation re-reads only the cards it reports, and anchor offsets only when the document resized,
-and writes positions to the cards without rendering them. A new selection or set of cards measures
-everything once. Shrinking sections
+watches the document and every mounted card for the rail's lifetime (`RailPlacement` in
+`rail-layout.ts`); an observation re-reads only the cards it reports, and anchor offsets only when
+the document resized, and writes positions to the cards without rendering them. Anchor offsets are
+read for every card, mounted or not. A new selection or set of cards measures every mounted card
+once, and a commit that mounts cards measures those before paint. Shrinking sections
 mark the size they settle to (`settling.ts`), and earlier cards make room for a selection only by
 the heights they keep: a card collapsing above a new selection never rises for height it is losing,
 while the selection starts below its current bottom and rises as it closes. Placement changes that

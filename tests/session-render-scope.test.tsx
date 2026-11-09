@@ -8,6 +8,7 @@ import { useDoc } from '../ui/documents/store'
 import { useOverlay } from '../ui/app/overlayStore'
 import { SessionView } from '../ui/app/SessionView'
 import { inputValue } from './helpers/dom'
+import { scrollDocument, stubDocumentLayout, type DocumentLayout } from './helpers/layout'
 
 const counts = vi.hoisted(() => ({ document: 0, analyses: 0, messages: new Map<number, number>() }))
 vi.mock('../ui/review/ThreadMessage', async (importOriginal) => {
@@ -43,12 +44,17 @@ const SOURCE = [
 let host: HTMLDivElement
 let root: Root
 const initial = useDoc.getState()
+/** Each discussion's anchor sits 1,000 px below the one before it. */
+let layout: DocumentLayout
+let restoreLayout: () => void
 
 beforeEach(() => {
   installHost(fakeHost())
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+  layout = { viewport: 10_000, cardHeight: () => 50, anchorTop: (anchor) => 1000 * Math.max(0, anchors().indexOf(anchor)) }
+  restoreLayout = stubDocumentLayout(layout)
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -59,7 +65,8 @@ beforeEach(() => {
 })
 afterEach(() => {
   act(() => root.unmount()); host.remove(); useDoc.setState(initial)
-  vi.unstubAllGlobals(); installHost(null)
+  restoreLayout()
+  vi.restoreAllMocks(); vi.unstubAllGlobals(); installHost(null)
 })
 
 const anchors = () => [...host.querySelectorAll<HTMLElement>('article .critic-anchor')]
@@ -118,4 +125,23 @@ it('mounts Find on its first shortcut and opens it', async () => {
   }
   expect(host.ownerDocument.querySelector('.find-bar')).not.toBeNull()
   expect(useOverlay.getState().open).toBe('find')
+})
+
+it('renders only the cards entering a window change, never the ones that stay or the document', async () => {
+  const scroller = host.querySelector<HTMLElement>('.document-scroll')!
+  const openers = () => [...host.querySelectorAll<HTMLElement>('.rail-card [data-find-comment]')]
+    .map((message) => Number(message.dataset.findComment))
+  const [first, second, third] = openers()
+  expect(openers()).toHaveLength(3)
+  rendered()
+  // A 400 px viewport with its margins reaches the second anchor at 1,000 px, not the third.
+  layout.viewport = 400
+  await act(() => scrollDocument(scroller, 0))
+  expect(openers()).toEqual([first, second])
+  expect(rendered()).toEqual({ document: 0, cards: [] })
+  await act(() => scrollDocument(scroller, 2000))
+  // A draft an earlier test left on the second card may keep it mounted.
+  expect(openers()).toContain(third)
+  expect(openers()).not.toContain(first)
+  expect(rendered()).toEqual({ document: 0, cards: [third] })
 })

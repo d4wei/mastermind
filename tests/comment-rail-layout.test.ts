@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { placeCommentCards } from '../ui/review/rail-layout'
+import { CardHeightEstimator, placeCommentCards } from '../ui/review/rail-layout'
 
 it('gives a selected crowded discussion its anchor while retaining readable neighbors', () => {
   const cards = [300, 340, 380].map((anchorTop) => ({ anchorTop, height: 100 }))
@@ -45,4 +45,27 @@ it('still reclaims the room a collapsing card keeps, at once rather than past it
   const tops = placeCommentCards([{ anchorTop: 100, height: 400, settledHeight: 200 }, { anchorTop: 250, height: 60 }], 1, 8)
   expect(tops).toEqual([42, 450])
   expect(placeCommentCards([{ anchorTop: 100, height: 200 }, { anchorTop: 250, height: 60 }], 1, 8)).toEqual([42, 250])
+})
+
+const discussion = (body: string, replies = 0, anchorText = 'a passage') => ({ key: body, spanIndex: 0, anchorText,
+  thread: { comments: [{ author: 'a', body }, ...Array.from({ length: replies }, () => ({ author: 'b', body: 'reply' }))] } })
+
+it('estimates unrendered cards from their content, scaled by how measured cards compared', () => {
+  const estimator = new CardHeightEstimator()
+  const short = discussion('short'), long = discussion('word '.repeat(60)), replied = discussion('short', 2)
+  const paragraphs = discussion('short\n\nshort')
+  expect(estimator.estimate(long)).toBeGreaterThan(estimator.estimate(short))
+  expect(estimator.estimate(replied)).toBeGreaterThan(estimator.estimate(short))
+  expect(estimator.estimate(paragraphs)).toBeGreaterThan(estimator.estimate(short))
+  expect(estimator.estimate(discussion('short', 0, ''))).toBeLessThan(estimator.estimate(short))
+  const raw = estimator.estimate(long)
+  // A card measured at twice its estimate doubles every estimate.
+  estimator.learn(short, 2 * estimator.estimate(short))
+  expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+  // The ratio follows the running totals, and ignores drift under 2%.
+  const other = discussion('other')
+  estimator.learn(other, 1.005 * estimator.estimate(other))
+  expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+  estimator.reset()
+  expect(estimator.estimate(long)).toBeCloseTo(raw)
 })

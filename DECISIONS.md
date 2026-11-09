@@ -29,6 +29,19 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-09 — The wide comment rail mounts only the cards near the viewport
+
+**Measured.** The rail places every card but mounts only those within one and a half viewports of
+the visible range, plus the selected, focused, composing and drafting cards and the focused card's
+neighbors; unmounted cards keep their last measured height or a content estimate. The former rail
+mounted and measured every card, and on a 15 MiB document with 87k comments never finished its
+first placement, where the windowed rail places in 81 s and halves rail mount, edit cost and DOM
+size at 600 KB with 3.4k comments. Any reader of rail cards in the DOM must therefore handle an
+unmounted card; `ui/review/comment-rail.md` holds the contract.
+
+**Beat:** windowing the article, which breaks every whole-document reader, and `content-visibility`
+on blocks, which Chrome cannot manage at 98k skipped elements.
+
 ## 2026-11-07 — A known version is confirmed by its file stamp only once it has settled
 
 **Ruled.** A read that names the renderer's current version answers "unchanged" without content
