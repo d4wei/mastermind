@@ -29,11 +29,11 @@ afterEach(() => {
 const quote = () => host.querySelector<HTMLElement>('.rail-card-anchor')!
 const toggle = () => host.querySelector<HTMLButtonElement>('.rail-quote-footer button')
 
-it('clamps to its line count, keeps the full text in the title, and offers no toggle when it fits', () => {
+it('clamps to its line count, carries no tooltip, and offers no toggle when it fits', () => {
   size.scroll = 30; size.client = 30
   act(() => root.render(<QuotedPassage text="A short passage" lines={6} expandable />))
   expect(quote().style.getPropertyValue('--quote-lines')).toBe('6')
-  expect(quote().title).toBe('A short passage')
+  expect(quote().hasAttribute('title')).toBe(false)
   expect(quote().textContent).toBe('A short passage')
   expect(toggle()).toBeNull()
 })

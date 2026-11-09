@@ -15,7 +15,7 @@ interface typography independently of the reading font preset.
 selected card or a resolved one, ending in an ellipsis. An unselected card only clamps. On a
 selected or resolved card, a passage that overflows its clamp, measured again whenever the card
 resizes and once a clamp change finishes easing, offers Show more, which reveals it whole inside the card and then reads Show less; a new
-clamp starts collapsed. The full passage stays in the title. That disclosure and the reply count
+clamp starts collapsed. That disclosure and the reply count
 share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
 below, and the passage's turns from down to up as it grows in place.
 

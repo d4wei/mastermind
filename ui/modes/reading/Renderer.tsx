@@ -124,7 +124,6 @@ function renderCritic(node: { type: string }, key: number, ctx: PresentedCtx): R
           className={`critic ${ctx.commentMarkers?.has(n.data.spanIndex) ? 'critic-comment-marker' : 'critic-comment-reference'}`}
           data-keeps-discussion={ctx.commentMarkers?.has(n.data.spanIndex) ? '' : undefined}
           data-span-index={n.data.spanIndex}
-          title={n.data.content}
           role="button"
           tabIndex={0}
           aria-label={n.data.content}

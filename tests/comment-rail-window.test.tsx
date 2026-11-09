@@ -96,7 +96,7 @@ const ANALYSIS = analyzeMarkdown(SOURCE)
 const marks = () => [...document.querySelectorAll<HTMLElement>('article [data-span-index]')]
 const scroller = () => host.querySelector<HTMLElement>('.document-scroll')!
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
-function passageOf(card: HTMLElement): string { return card.querySelector('.rail-card-anchor')?.getAttribute('title') ?? '' }
+function passageOf(card: HTMLElement): string { return card.querySelector('.rail-card-anchor')?.textContent ?? '' }
 /** The passages of the mounted cards, in DOM order. */
 const mounted = () => cards().map(passageOf)
 const cardFor = (passage: string) => cards().find((card) => passageOf(card) === passage)

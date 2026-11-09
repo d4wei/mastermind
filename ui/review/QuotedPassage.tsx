@@ -123,7 +123,7 @@ export function QuotedPassage({ text, lines, expandable, as: Tag = 'div', 'aria-
   const expanded = expandable && expansion.expanded
   const { drawn, overflows } = useClampTransition(ref, text, { lines, expanded }, expandable)
   return <>
-    <Tag ref={ref as never} id={id} className={`rail-card-anchor${drawn.expanded ? ' expanded' : ''}`} title={text}
+    <Tag ref={ref as never} id={id} className={`rail-card-anchor${drawn.expanded ? ' expanded' : ''}`}
       aria-label={label} style={{ '--quote-lines': drawn.lines } as CSSProperties}>{text}</Tag>
     <Collapsible open={expandable && (overflows || expanded)} className="rail-quote-reveal">
       <div className="rail-actions rail-footer rail-quote-footer">
