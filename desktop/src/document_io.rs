@@ -288,6 +288,14 @@ impl DocumentRead {
             unchanged: true,
         }
     }
+
+    /// `snapshot`, or only its version when `known` already names it.
+    fn of(snapshot: Snapshot, known: Option<&str>) -> Self {
+        match known {
+            Some(known) if known == snapshot.version => Self::unchanged(snapshot.version),
+            _ => Self::Changed(snapshot),
+        }
+    }
 }
 
 /// Reads an admitted document. A caller that passes the version it holds receives only that
@@ -303,12 +311,7 @@ fn read_registered_document(
         let index = admitted_id(&docs, id)?;
         let document = docs.get_mut(index).unwrap();
         if let Some(snapshot) = document.snapshot.take() {
-            return Ok(match known {
-                Some(known) if known == snapshot.version => {
-                    DocumentRead::unchanged(snapshot.version)
-                }
-                _ => DocumentRead::Changed(snapshot),
-            });
+            return Ok(DocumentRead::of(snapshot, known));
         }
         (
             PathBuf::from(&document.path),
@@ -334,10 +337,7 @@ fn read_registered_document(
             document.settled_version = snapshot.settled.then(|| snapshot.version.clone());
         }
     }
-    Ok(match known {
-        Some(known) if known == snapshot.version => DocumentRead::unchanged(snapshot.version),
-        _ => DocumentRead::Changed(snapshot),
-    })
+    Ok(DocumentRead::of(snapshot, known))
 }
 
 #[tauri::command]

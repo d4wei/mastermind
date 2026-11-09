@@ -69,6 +69,16 @@ pub enum Saved {
     Unreadable,
 }
 
+impl Saved {
+    /// The usable inventory, if the file held one.
+    pub fn files(&self) -> Option<&OpenFiles> {
+        match self {
+            Saved::Read(files) => Some(files),
+            Saved::Unusable | Saved::Unreadable => None,
+        }
+    }
+}
+
 fn read(path: &Path) -> Saved {
     let bytes = match crate::preferences::read_bounded(path, MAX_INVENTORY_BYTES) {
         Ok(Some(bytes)) => bytes,
@@ -157,10 +167,7 @@ impl Remember {
     /// calls it before anything is recorded.
     pub fn load(&self) -> Saved {
         let saved = read(&self.shared.path);
-        self.shared.state.lock().unwrap().written = match &saved {
-            Saved::Read(files) => Some(files.clone()),
-            Saved::Unusable | Saved::Unreadable => None,
-        };
+        self.shared.state.lock().unwrap().written = saved.files().cloned();
         saved
     }
 

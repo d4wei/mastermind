@@ -2,7 +2,7 @@
 // of the constants below, so every audit measures the same bytes; baselines.json records the SHA-256
 // of each fixture it was measured against, and running this file compares them.
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -35,24 +35,27 @@ function reviewDocument(rnd, threads, suggestions, targetBytes) {
     return `{~~${sentence(3).slice(0, -1)}~>${sentence(3).slice(0, -1)}~~}`
   }
   const out = ['---', 'title: Perf fixture', 'tags: [review, perf]', '---', '', '# Performance fixture', '']
+  // The joined length, kept as lines are added, so the size check does not rejoin the output.
+  let length = out.join('\n').length
+  const push = (...lines) => { for (const line of lines) { length += line.length + 1; out.push(line) } }
   let t = 0, s = 0, section = 0
-  while (out.join('\n').length < targetBytes || t < threads || s < suggestions) {
+  while (length < targetBytes || t < threads || s < suggestions) {
     section++
-    out.push(`## Section ${section}`, '')
+    push(`## Section ${section}`, '')
     for (let p = 0; p < 4; p++) {
       let para = sentence(20) + ' **' + sentence(4) + '** and `inline code` with a [link](https://example.com/' + section + '). ' + sentence(18)
       if (t < threads && rnd() < 0.8) { para += ' ' + thread(t, t % 3 === 0 ? 0 : 1 + (t % 4)); t++ }
       if (s < suggestions && rnd() < 0.6) { para += ' ' + suggestion(s) + ' ' + sentence(8); s++ }
-      out.push(para, '')
+      push(para, '')
     }
-    if (section % 2 === 0) out.push(cjk + (t < threads ? thread(t++, 1) : '') + cjk, '')
+    if (section % 2 === 0) push(cjk + (t < threads ? thread(t++, 1) : '') + cjk, '')
     if (section % 3 === 0) {
-      out.push('| Name | Value | Notes |', '|---|---:|---|')
-      for (let r = 0; r < 8; r++) out.push(`| row ${r} | ${r * 17} | ${sentence(6)}${r === 2 && s < suggestions ? ' ' + suggestion(s++) : ''} |`)
-      out.push('')
+      push('| Name | Value | Notes |', '|---|---:|---|')
+      for (let r = 0; r < 8; r++) push(`| row ${r} | ${r * 17} | ${sentence(6)}${r === 2 && s < suggestions ? ' ' + suggestion(s++) : ''} |`)
+      push('')
     }
-    if (section % 4 === 0) out.push('```ts', 'export function f(x: number): number {', '  // {++not a mark++}', '  return x * 2 + ' + section, '}', '```', '')
-    if (section % 5 === 0) out.push('- item one ' + sentence(6), '- [ ] task ' + sentence(5), '- item three', '', '> ' + sentence(12), '> ' + sentence(8), '')
+    if (section % 4 === 0) push('```ts', 'export function f(x: number): number {', '  // {++not a mark++}', '  return x * 2 + ' + section, '}', '```', '')
+    if (section % 5 === 0) push('- item one ' + sentence(6), '- [ ] task ' + sentence(5), '- item three', '', '> ' + sentence(12), '> ' + sentence(8), '')
   }
   return out.join('\n') + '\n'
 }
@@ -100,13 +103,6 @@ export function ensureFixture(name) {
     mkdirSync(FIXTURE_DIR, { recursive: true })
     writeFileSync(path, FIXTURES[name]())
   }
-  return path
-}
-
-/** Copies a fixture to `<stem>_<n>.md` so the host sees a distinct, not-yet-open file. */
-export function fixtureCopy(name, n) {
-  const path = join(FIXTURE_DIR, name.replace(/\.md$/, `_${n}.md`))
-  if (!existsSync(path)) copyFileSync(ensureFixture(name), path)
   return path
 }
 

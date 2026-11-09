@@ -17,12 +17,12 @@ export function loadMetadataParser(): Promise<void> {
 }
 
 /** Property rows for simple metadata, null for literal display, undefined until the parser loads. */
-export function metadataProperties(source: string): MetadataProperty[] | null | undefined {
+export function metadataProperties(source: string, yaml = parser): MetadataProperty[] | null | undefined {
   // Large metadata stays literal rather than adding YAML parsing to the rendering path.
   if (source.length > MAX_PROPERTY_SOURCE_LENGTH) return null
-  if (parser === undefined) return undefined
-  if (parser === null) return null
-  const { isMap, isScalar, parseDocument } = parser
+  if (yaml === undefined) return undefined
+  if (yaml === null) return null
+  const { isMap, isScalar, parseDocument } = yaml
   try {
     const doc = parseDocument(source, { version: '1.2', intAsBigInt: true })
     if (doc.errors.length || doc.warnings.length || doc.directives?.yaml.explicit ||
@@ -75,13 +75,14 @@ function PropertyList({ properties }: { properties: MetadataProperty[] }) {
 }
 
 export function Frontmatter({ source }: { source: string }) {
-  const [, setParserReady] = useState(parser !== undefined)
-  const properties = useMemo(() => metadataProperties(source), [source, parser])
+  // The loaded parser, as this view saw it; the load completing sets it.
+  const [yaml, setYaml] = useState(parser)
+  const properties = useMemo(() => metadataProperties(source, yaml), [source, yaml])
   const pending = properties === undefined
   useEffect(() => {
     if (!pending) return
     let current = true
-    void loadMetadataParser().then(() => { if (current) setParserReady(true) })
+    void loadMetadataParser().then(() => { if (current) setYaml(parser) })
     return () => { current = false }
   }, [pending])
   const raw = <pre className="md-code"><code>{source}</code></pre>

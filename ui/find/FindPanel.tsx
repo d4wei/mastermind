@@ -129,12 +129,8 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
     }
     return reading.current
   }, [])
-  useLayoutEffect(() => {
-    if (open && mode !== 'source') return
-    reading.current?.disconnect()
-    reading.current = null
-  }, [open, mode])
-  useEffect(() => () => { reading.current?.disconnect(); reading.current = null }, [])
+  // The index lives while Find searches displayed text; closing, a mode change and unmount release it.
+  useLayoutEffect(() => () => { reading.current?.disconnect(); reading.current = null }, [open, mode])
 
   const comments = useMemo(() => mode === 'reading' && analysis ? analysis.threads.flatMap((card) =>
     card.thread.comments.map((comment, index) => ({ text: commentSearchText(comment.body), comment: card.messages[index], anchor: card.spanIndex }))) : [],
@@ -150,6 +146,13 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   }, [query, deferred])
   const searched = deferred ? settledQuery : query
 
+  const search = useMemo(() => open && mode !== 'source' && searched ? new TextSearch(searched, caseSensitive) : null,
+    [open, mode, searched, caseSensitive])
+  // Comment matches follow the query and the analysis alone; cards mounting as the rail scrolls
+  // change only where they paint.
+  const commentMatches = useMemo((): Result[] => search ? comments.flatMap(({ text, comment, anchor }) =>
+    search.matches(text).map((match) => ({ ...match, comment, anchor }))) : [], [search, comments])
+
   const [results, setResults] = useState<Result[]>([])
   const latestResults = useRef(results)
   useLayoutEffect(() => {
@@ -157,13 +160,18 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
     if (!open || !searched) { publish([]); return }
     if (mode === 'source') { publish(adapter ? adapter.matches(searched, caseSensitive) : []); return }
     const root = docRef.current
-    const search = new TextSearch(searched, caseSensitive)
-    const body: Result[] = root ? runMatches(readingIndex(root).runs(), search) : []
-    for (const { text, comment, anchor } of comments) {
-      for (const match of search.matches(text)) body.push({ ...match, comment, anchor })
+    if (!root) {
+      // The view is still loading; its arrival searches again.
+      publish(commentMatches)
+      const scope = document.querySelector('.app-content')
+      if (!scope) return
+      const observer = new MutationObserver(() => { observer.disconnect(); setRevision((value) => value + 1) })
+      observer.observe(scope, { childList: true, subtree: true })
+      return () => observer.disconnect()
     }
-    publish(body)
-  }, [open, searched, caseSensitive, mode, adapter, docRef, readingIndex, comments, source, revision])
+    const body: Result[] = runMatches(readingIndex(root).runs(), search ?? new TextSearch(searched, caseSensitive))
+    publish(body.concat(commentMatches))
+  }, [open, searched, caseSensitive, mode, adapter, docRef, readingIndex, search, commentMatches, source, revision])
 
   // Search effects update the editor only after React has committed its view.
   useLayoutEffect(() => {
@@ -234,12 +242,17 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
   useLayoutEffect(() => {
     if (!open) { clearMatches(); return }
     if (results !== latestResults.current) return
-    const rangeFor = commentRanges()
+    // Comment bodies are found once per pass, and only once a reading result needs one.
+    let bodies: ((result: Result) => Range | null) | undefined
+    const rangeFor = (result: Result) => (bodies ??= commentRanges())(result)
     let selected = currentIndex
     if (chooseFromPosition.current && results.length) {
       const top = document.querySelector('.document-scroll')?.getBoundingClientRect().top ?? 0
+      // A comment whose card is not mounted has no range; its passage stands in for it.
+      const boxOf = (result: Result) => (rangeFor(result) ?? (result.anchor === undefined ? null
+        : document.querySelector(`[data-span-index="${result.anchor}"]`)))?.getBoundingClientRect()
       const found = results.findIndex((result) => mode === 'source' ? result.from >= (adapter?.start() ?? 0) :
-        (rangeFor(result)?.getBoundingClientRect().bottom ?? -1) >= top)
+        (boxOf(result)?.bottom ?? -1) >= top)
       selected = Math.max(0, found)
       chooseFromPosition.current = false
       if (selected !== index) setIndex(selected)

@@ -18,7 +18,7 @@ export type NotificationTier = 'persistent' | 'transient'
 export const NOTICE_DISMISS_FALLBACK_MS = 6000
 
 /** A transient notice's exit fade when the theme's `--dur-base` token cannot be read. */
-export const NOTICE_EXIT_FALLBACK_MS = 180
+const NOTICE_EXIT_FALLBACK_MS = 180
 
 /**
  * Where notices portal: persistent ones into the stack, transient ones into the stack's polite live

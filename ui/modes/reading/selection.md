@@ -134,10 +134,10 @@ and covers code chips, their padding, and spaces alike, while the chips keep the
 its translucent fill; Find's match fills show through it. `rangesInSpan` limits the measure to
 blocks within a viewport height of the viewport, found by bisection, so a selection of a whole long
 document stays cheap; while selected text lies beyond that reach, document scrolling re-measures
-too. The layer also re-measures when the article resizes, a table reports a layout change, the
-reading space changes, fonts finish loading, the window resizes, or a scroller inside the article
-scrolls. It is hidden from assistive technology and takes no pointer events, and the reading DOM's
-text and structure stay untouched. Review marks keep their own fill under the band: a settled
+too. The layer also re-measures, once per frame, when the article resizes, a table reports a layout
+change, the reading space changes, fonts finish loading, the window resizes, or a scroller inside
+the article scrolls. It is hidden from assistive technology and takes no pointer events, and the
+reading DOM's text and structure stay untouched. Review marks keep their own fill under the band: a settled
 selection never holds one, since each is excluded.
 
 ## Tests

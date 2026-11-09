@@ -1,5 +1,6 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { commentBodyFits, replyEdits } from '../modes/reading/marks'
+import { useStandingRefusal } from '../modes/reading/standing-refusal'
 import { useDraftGuard } from './drafts'
 import { flushSync } from 'react-dom'
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
@@ -129,7 +130,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   useLayoutEffect(() => placement.update(docRef.current, cards, activeSpan), [placement, docRef, cards, activeSpan])
   useLayoutEffect(() => placement.afterRender())
   useEffect(() => {
-    for (const key of cardRefs.current.keys()) if (!cards.some((card) => card.key === key)) cardRefs.current.delete(key)
+    const live = new Set(cards.map((card) => card.key))
+    for (const key of cardRefs.current.keys()) if (!live.has(key)) cardRefs.current.delete(key)
   }, [cards])
 
   useEffect(() => {
@@ -222,16 +224,15 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   const composerVerified = useMemo(() => composerEnd === undefined || readOnly || !composerText.trim() ? null
     : replyEdits(source, composerEnd, authorTag, composerText, analysis, 'block'),
   [composerEnd, composerText, readOnly, source, authorTag, analysis])
-  const [refusedReply, setRefusedReply] = useState<{ key: string; text: string; source: string } | null>(null)
-  const canReply = !!composerVerified && !(refusedReply?.key === composerCard?.key &&
-    refusedReply?.text === composerText && refusedReply?.source === source)
+  const reply = useStandingRefusal(composerVerified, [composerCard?.key, composerText, source])
+  const canReply = !!reply.value
   // A body whose own lines break the mark says so.
   const bodyInvalid = !readOnly && !!composerText.trim() && !canReply && !commentBodyFits(authorTag, composerText)
   const submitReply = (card: ThreadCard) => {
     const text = draftText(card)
     if (readOnly || !text.trim()) return
     const edits = replyEdits(source, card.thread.end, authorTag, text, analysis)
-    if (!edits) { setRefusedReply({ key: card.key, text, source }); return }
+    if (!edits) { reply.refuse(null, [card.key, text, source]); return }
     if (!edit(edits, card)) return
     setReplyFor(null)
   }
@@ -245,17 +246,9 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     focusSpan: (spanIndex) => onFocusSpan?.(spanIndex) }
   const handlers = useRef(latest)
   useLayoutEffect(() => { handlers.current = latest })
-  const [actions] = useState<CardActions>(() => ({
-    activate: (spanIndex) => handlers.current.activate(spanIndex),
-    collapse: (keepFocus) => handlers.current.collapse(keepFocus),
-    resolve: (card) => handlers.current.resolve(card),
-    deleteMessage: (card, messageIndex) => handlers.current.deleteMessage(card, messageIndex),
-    setDraft: (card, text) => handlers.current.setDraft(card, text),
-    submit: (card) => handlers.current.submit(card),
-    cancel: (card) => handlers.current.cancel(card),
-    hover: (spanIndex) => handlers.current.hover(spanIndex),
-    focusSpan: (spanIndex) => handlers.current.focusSpan(spanIndex),
-  }))
+  // Each action forwards to the latest handler of its name.
+  const [actions] = useState(() => Object.fromEntries((Object.keys(latest) as (keyof CardActions)[]).map((name) =>
+    [name, (...args: unknown[]) => (handlers.current[name] as (...args: unknown[]) => void)(...args)])) as unknown as CardActions)
 
   useDraftGuard('replies', t('reply'), drafts.some((draft) => !!draft.text.trim()), () => {
     const card = cards.find((item) => draftText(item).trim())

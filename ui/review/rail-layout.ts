@@ -1,4 +1,5 @@
-import { settledHeight } from './settling'
+import { commentSearchText } from './CommentBody'
+import { margins, settledHeight } from './settling'
 
 interface RailMeasurement {
   anchorTop: number
@@ -81,9 +82,9 @@ function contentOf(card: PlacedCard): string {
   return `${card.thread.comments.length}:${card.anchorText?.length ?? 0}:${length}`
 }
 
-/** The lengths of a comment body's paragraphs, as its display joins wrapped lines. */
+/** The lengths of a comment body's paragraphs as `CommentBody` displays them. */
 function paragraphLengths(body: string): number[] {
-  return body.replace(/\r\n?/g, '\n').split(/\n[ \t]*\n+/).map((paragraph) => paragraph.replace(/[ \t]*\n[ \t]*/g, ' ').length)
+  return commentSearchText(body).split('\n\n').map((paragraph) => paragraph.length)
 }
 
 /** The card layout an estimate reads: line heights and characters per line, in pixels and characters. */
@@ -120,7 +121,7 @@ function measureGeometry(element: HTMLElement): CardGeometry | null {
     context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
     return context.measureText(SAMPLE_TEXT).width / SAMPLE_TEXT.length
   }
-  const passageMargins = (parseFloat(passageStyle.marginTop) || 0) + (parseFloat(passageStyle.marginBottom) || 0)
+  const passageMargins = margins(passage)
   // Wrapping breaks at words, so a line holds somewhat fewer characters than its width allows.
   const geometry: CardGeometry = {
     chrome: element.getBoundingClientRect().height - passage.getBoundingClientRect().height - passageMargins -
@@ -221,7 +222,6 @@ export class RailPlacement {
   private readonly estimator = new CardHeightEstimator()
   private cards: readonly PlacedCard[] = []
   private index = new Map<string, number>()
-  private selected: number | null = null
   private selectedKey: string | null = null
   private doc: HTMLElement | null = null
   private rail: HTMLElement | null = null
@@ -231,6 +231,8 @@ export class RailPlacement {
   private anchors = new Map<number, Element>()
   private anchorsFor: readonly PlacedCard[] | null = null
   private anchorTops = new Map<number, number>()
+  /** The rail's top within the scroller's content, read with the anchors. */
+  private railOffset = 0
   private docHeight = 0
   private height = 0
   private width = 0
@@ -279,6 +281,9 @@ export class RailPlacement {
       if (this.elements.get(key) !== element) return
       this.elements.delete(key)
       this.unmeasured.delete(key)
+      // A card unmounting mid-collapse is remembered at the height it was settling to.
+      const size = this.sizes.get(key)
+      if (size && size.settledHeight < size.height) this.sizes.set(key, { height: size.settledHeight, settledHeight: size.settledHeight })
     }
   }
 
@@ -329,7 +334,6 @@ export class RailPlacement {
       for (const key of [this.selectedKey, selectedKey]) if (key !== null && !this.elements.has(key)) this.sizes.delete(key)
       this.selectedKey = selectedKey
     }
-    this.selected = selected
     if (!doc || !this.rail) return
     this.checkWidth()
     this.elements.forEach((element, key) => this.record(key, measureCard(element)))
@@ -415,6 +419,10 @@ export class RailPlacement {
 
   private measureAnchors(): void {
     const railTop = this.rail!.getBoundingClientRect().top
+    // The rail's offset within the scroller's content moves only with the document, so the window
+    // reads it here rather than forcing a layout after each placement.
+    const scroller = this.scroller
+    if (scroller) this.railOffset = railTop - scroller.getBoundingClientRect().top + scroller.scrollTop
     this.anchorTops = new Map(this.cards.map((card) => {
       const anchor = this.anchors.get(card.spanIndex)
       return [card.spanIndex, anchor ? Math.max(0, anchor.getBoundingClientRect().top - railTop) : 0]
@@ -428,7 +436,8 @@ export class RailPlacement {
       return { anchorTop: this.anchorTops.get(card.spanIndex) ?? 0,
         height: size?.height ?? this.estimator.estimate(card), settledHeight: size?.settledHeight }
     })
-    const tops = placeCommentCards(measurements, this.cards.findIndex((card) => card.spanIndex === this.selected), this.gap)
+    const selected = this.selectedKey === null ? -1 : this.index.get(this.selectedKey) ?? -1
+    const tops = placeCommentCards(measurements, selected, this.gap)
     this.tops = tops
     this.heights = measurements.map((measurement) => measurement.height)
     this.elements.forEach((element, key) => {
@@ -470,10 +479,9 @@ export class RailPlacement {
   private updateWindow(urgent: boolean): void {
     const scroller = this.scroller
     if (!scroller || !this.rail) return
-    const railTop = this.rail.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
     const margin = scroller.clientHeight * WINDOW_MARGIN
-    const from = scroller.scrollTop - railTop - margin
-    const to = scroller.scrollTop - railTop + scroller.clientHeight + margin
+    const from = scroller.scrollTop - this.railOffset - margin
+    const to = scroller.scrollTop - this.railOffset + scroller.clientHeight + margin
     // Placement keeps source order without overlap, so tops and bottoms both ascend.
     let first = 0, end = this.tops.length
     while (first < end) {

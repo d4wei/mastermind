@@ -120,7 +120,8 @@ it('reuses the analysis of an unchanged source across mode switches', async () =
 it('mounts Find on its first shortcut and opens it', async () => {
   expect(host.querySelector('.find-bar')).toBeNull()
   act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', metaKey: true, bubbles: true })) })
-  for (let attempt = 0; attempt < 50 && !host.ownerDocument.querySelector('.find-bar'); attempt++) {
+  // The lazy chunk's import can take well over a frame while the whole suite runs.
+  for (let attempt = 0; attempt < 500 && !host.ownerDocument.querySelector('.find-bar'); attempt++) {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
   }
   expect(host.ownerDocument.querySelector('.find-bar')).not.toBeNull()

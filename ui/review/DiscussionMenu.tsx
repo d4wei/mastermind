@@ -17,7 +17,7 @@ export function DiscussionMenu({ label, disabled, onSelect }: Props) {
       aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
     <DropdownMenu.Portal>
       <DropdownMenu.Content data-keeps-discussion="" className="reader-menu" align="end" sideOffset={4}>
-        <DropdownMenu.Item className="reader-menu-item" disabled={disabled} onSelect={() => { if (!disabled) onSelect() }}>
+        <DropdownMenu.Item className="reader-menu-item" disabled={disabled} onSelect={onSelect}>
           <TrashIcon />{label}
         </DropdownMenu.Item>
       </DropdownMenu.Content>

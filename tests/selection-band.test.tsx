@@ -8,7 +8,9 @@ import { rangeBetween } from './helpers/dom'
 import { selectRendered } from './helpers/selection'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
-import { SELECTION_BAND_CLASS, SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { SelectionToolbar } from '../ui/modes/reading/SelectionToolbar'
+import { SELECTION_BAND_CLASS } from '../ui/modes/reading/selection'
+import { TABLE_LAYOUT_EVENT } from '../ui/modes/reading/TableViewport'
 import { bandLines, rangesInSpan, selectedBoxes, wholeInlineCode } from '../ui/modes/reading/selection'
 import { Notifications, useAnnouncements } from '../ui/app/Notifications'
 
@@ -172,7 +174,10 @@ describe('the selected band across inline code', () => {
     openComment()
     expect(band()[0]!.top).toBe(99)
     lineTop = 140
-    act(() => { window.dispatchEvent(new Event('mastermind-table-layout')) })
+    act(() => { window.dispatchEvent(new Event(TABLE_LAYOUT_EVENT)) })
+    // Layout changes measure once a frame, like the selection itself.
+    expect(band()[0]!.top).toBe(99)
+    await frame()
     expect(band()[0]!.top).toBe(139)
     lineTop = 100
   })

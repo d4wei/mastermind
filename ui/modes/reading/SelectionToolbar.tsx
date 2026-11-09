@@ -14,12 +14,12 @@ import { rootMs } from '../../util/css-tokens'
 import { bandLines, mapSelection, rangesInSpan, selectedBoxes, SELECTION_BAND_CLASS, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict, type VerifyScope } from './marks'
+import { useStandingRefusal } from './standing-refusal'
+import { TABLE_LAYOUT_EVENT } from './TableViewport'
 import { analyzeMarkdown } from '../../../document/markdown/analyze'
 
 /** The toolbar's size before it is measured, and where layout reports none. */
 const FALLBACK_SIZE = { width: 260, height: 44 }
-/** Tables announce a change to their layout, such as expanding, with this window event. */
-const TABLE_LAYOUT_EVENT = 'mastermind-table-layout'
 /**
  * How far past each viewport edge the band is measured, in viewport heights; a longer selection is
  * re-measured as the document scrolls.
@@ -27,7 +27,6 @@ const TABLE_LAYOUT_EVENT = 'mastermind-table-layout'
 const BAND_REACH = 1
 /** One notice explains the latest trimmed selection; a later trim replaces it. */
 export const SELECTION_TRIM_NOTICE = 'selection-trim'
-export { SELECTION_BAND_CLASS }
 
 interface Props {
   readOnly?: boolean
@@ -132,10 +131,11 @@ function useSelectionBand(containerRef: RefObject<HTMLElement | null>, target: r
         layer.className = SELECTION_BAND_CLASS
         layer.setAttribute('aria-hidden', 'true')
       }
-      if (layer.parentNode !== root) root.append(layer)
+      // Read before the layer is appended, so its first paint forces no second layout.
       const origin = root.getBoundingClientRect()
       const left = origin.left + root.clientLeft
       const top = origin.top + root.clientTop
+      if (layer.parentNode !== root) root.append(layer)
       while (layer.childElementCount > lines.length) layer.lastElementChild!.remove()
       while (layer.childElementCount < lines.length) layer.append(doc.createElement('div'))
       lines.forEach((line, index) => {
@@ -156,25 +156,26 @@ function useSelectionBand(containerRef: RefObject<HTMLElement | null>, target: r
     measure()
     if (!target) doc.addEventListener('selectionchange', follow)
     scroller.addEventListener('scroll', scrolled, { capture: true, passive: true })
-    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    // Layout changes, which can arrive several times a frame while a table eases, measure once a frame.
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(follow)
     observer?.observe(root)
     const fonts = doc.fonts as FontFaceSet | undefined
-    fonts?.addEventListener?.('loadingdone', measure)
-    window.addEventListener('resize', measure)
-    window.addEventListener(TABLE_LAYOUT_EVENT, measure)
-    window.addEventListener(READING_LAYOUT_EVENT, measure)
+    fonts?.addEventListener?.('loadingdone', follow)
+    window.addEventListener('resize', follow)
+    window.addEventListener(TABLE_LAYOUT_EVENT, follow)
+    window.addEventListener(READING_LAYOUT_EVENT, follow)
     // Scrollers inside the root, such as a wide table's, move text the root's coordinates do not.
-    root.addEventListener('scroll', measure, { capture: true, passive: true })
+    root.addEventListener('scroll', follow, { capture: true, passive: true })
     return () => {
       if (frame) cancelAnimationFrame(frame)
       doc.removeEventListener('selectionchange', follow)
       scroller.removeEventListener('scroll', scrolled, true)
       observer?.disconnect()
-      fonts?.removeEventListener?.('loadingdone', measure)
-      window.removeEventListener('resize', measure)
-      window.removeEventListener(TABLE_LAYOUT_EVENT, measure)
-      window.removeEventListener(READING_LAYOUT_EVENT, measure)
-      root.removeEventListener('scroll', measure, true)
+      fonts?.removeEventListener?.('loadingdone', follow)
+      window.removeEventListener('resize', follow)
+      window.removeEventListener(TABLE_LAYOUT_EVENT, follow)
+      window.removeEventListener(READING_LAYOUT_EVENT, follow)
+      root.removeEventListener('scroll', follow, true)
       layer?.remove()
     }
   }, [containerRef, target])
@@ -209,9 +210,6 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
    * with the next pointer event that reports no button held.
    */
   const held = useRef({ pointer: false, shift: false, awaiting: false })
-  /** A submission's refusal, shown in place of the draft verdict while its inputs stand. */
-  const [submitted, setSubmitted] = useState<{ verdict: MarkVerdict; source: string; ranges: SelRange[];
-    composing: 'comment' | 'change' | null; comment: string; replacements: string[] } | null>(null)
   /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
   const reread = useRef(false)
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -422,9 +420,8 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const deferredReplacements = useDeferredValue(replacements)
   const draftVerdict = useMemo(() => verify(deferredComment, deferredReplacements, 'block'),
     [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, viewAnalysis, authorTag])
-  const verdict = submitted && submitted.source === source && submitted.ranges === view?.ranges &&
-    submitted.composing === composing && submitted.comment === deferredComment &&
-    submitted.replacements === deferredReplacements ? submitted.verdict : draftVerdict
+  const submission = useStandingRefusal(draftVerdict, [source, view?.ranges, composing, deferredComment, deferredReplacements])
+  const verdict = submission.value
   if (!present.mounted || !view) return null
 
   const begin = (kind: 'comment' | 'change'): void => {
@@ -452,7 +449,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const submit = (): void => {
     const final = current ? verify(comment, replacements, 'document') : null
     if (final && 'edits' in final && final.edits.length) finish(final.edits)
-    else if (final && 'refused' in final) setSubmitted({ verdict: final, source, ranges: view.ranges, composing, comment, replacements })
+    else if (final && 'refused' in final) submission.refuse(final, [source, view.ranges, composing, comment, replacements])
   }
   const refusal = 'refused' in verdict ? verdict.refused === 'formatting' ? 'markChangesFormatting'
     : composing === 'change' ? 'changeInvalid'

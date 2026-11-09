@@ -242,3 +242,18 @@ it('calibrates estimates by measured cards and remembers heights after unmountin
   documentResized()
   expect(topOf(w(20))).not.toBeCloseTo(top(20))
 })
+
+it('remembers a card that unmounts mid-collapse at the height it is settling to', async () => {
+  layout.anchorTop = () => 0
+  act(() => root.render(<Harness />))
+  heights.set(w(0), 300)
+  // A section of the first card is closing to nothing: the 20 px it measures are leaving.
+  cardFor(w(0))!.querySelector('.rail-body')!.setAttribute('data-settles-to', '0')
+  resized(cardFor(w(0))!)
+  const top = (first: number, i: number) => first + GAP + (i - 1) * (100 + GAP)
+  expect(topOf(w(20))).toBeCloseTo(top(300, 20))
+  await act(() => scrollDocument(scroller(), 3000))
+  expect(mounted()).not.toContain(w(0))
+  documentResized()
+  expect(topOf(w(20))).toBeCloseTo(top(280, 20))
+})

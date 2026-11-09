@@ -108,7 +108,7 @@ pub async fn close_document(
 }
 
 /// Tells the renderer to read the inventory now instead of at its next fallback poll.
-pub const INVENTORY_EVENT: &str = "inventory-changed";
+const INVENTORY_EVENT: &str = "inventory-changed";
 
 pub fn inventory_changed(app: &tauri::AppHandle) {
     let _ = app.emit(INVENTORY_EVENT, ());

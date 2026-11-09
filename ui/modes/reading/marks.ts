@@ -1,4 +1,4 @@
-import type { Root } from 'mdast'
+import type { Root, RootContent } from 'mdast'
 import { applyTextEdits, shiftAt } from '../../../document/edits'
 import { analyzeMarkdown, type Analysis } from '../../../document/markdown/analyze'
 import { scanMarkdown } from '../../../document/markdown/scan'
@@ -141,15 +141,28 @@ function blockWindow(source: string, plain: Root, edits: readonly TextEdit[]): R
   let start = Infinity
   let end = -Infinity
   for (const edit of edits) {
-    const block = plain.children.find(({ position }) =>
-      position?.start.offset !== undefined && position.end.offset !== undefined &&
-      position.start.offset <= edit.from && edit.to <= position.end.offset)
+    const block = blockAt(plain, edit.from, edit.to)
     if (!block) return null
     start = Math.min(start, block.position!.start.offset!)
     end = Math.max(end, block.position!.end.offset!)
   }
   const lineStart = source.lastIndexOf('\n', start - 1) + 1
   return { start: Math.max(0, lineStart - 1), end }
+}
+
+/** The top-level block holding `from` to `to`, found by bisection on the ascending block starts. */
+function blockAt(plain: Root, from: number, to: number): RootContent | undefined {
+  const blocks = plain.children
+  let lo = 0
+  let hi = blocks.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if ((blocks[mid]!.position?.start.offset ?? Infinity) <= from) lo = mid + 1
+    else hi = mid
+  }
+  const block = blocks[lo - 1]
+  const end = block?.position?.end.offset
+  return end !== undefined && to <= end ? block : undefined
 }
 
 function threadCount(spans: readonly CriticSpan[], text: string): number {

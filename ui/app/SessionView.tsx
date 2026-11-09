@@ -195,6 +195,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [status, source, mode, showTranslated])
   const cachedPlain = analyzed.current?.source === source ? analyzed.current.analysis.plain : null
   const plainParse = usePlainParse(sessionId, source, status === 'ready' && !analysis, cachedPlain)
+  /** A plain parse of exactly the current source, when the view holds one. */
+  const currentPlain = cachedPlain ?? (plainParse?.source === source ? plainParse.tree : undefined)
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : plainParse ? extractOutline(plainParse.tree) : []),
@@ -586,7 +588,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           onRevealComment={revealFindComment} onClose={restoreFindRail} />
         <AfterMount run={findReady} />
       </Suspense>}
-      {panel === 'resolved' && <ResolvedThreads source={source} onClose={closePanel} readOnly={readOnly} onEdit={applyEdits} />}
+      {panel === 'resolved' && <ResolvedThreads source={source} plain={currentPlain} onClose={closePanel} readOnly={readOnly} onEdit={applyEdits} />}
       <ConflictPanel />
       {translation.error && <Notice key={translation.error} tier="transient">
         {t(translation.error === 'stale' ? 'preparedStale' : 'preparedUnavailable')}

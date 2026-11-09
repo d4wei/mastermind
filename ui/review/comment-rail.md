@@ -38,7 +38,8 @@ that frame paints; a card mounts at its placed `top` and is measured and re-plac
 
 A remembered height is dropped when the card's content (its messages, their authors and bodies, or
 its passage) changes, when the card gains or loses the selection, or when the rail's width changes;
-font and interface-language changes are not detected, so remembered heights can be stale until the
+a card that unmounts while a section is still closing is remembered at the height it settles to.
+Font and interface-language changes are not detected, so remembered heights can be stale until the
 card next mounts and is measured. An estimate is computed from content: chrome, the passage at its
 two-line clamp, the opening message's wrapped lines, and the reply count. Its geometry is read once
 from the first rendered single-message card, and it is scaled by the ratio of measured to estimated
@@ -51,9 +52,11 @@ focused card's neighbors in source order mounted as well: when focus reaches the
 mounted card, the adjacent discussion beyond it mounts, and the next Tab or Shift+Tab lands on it.
 Find counts comment results from the analysis, so its counter covers every card, but it paints a
 comment match only while its card is mounted; revealing a result in an unmounted card selects the
-discussion, which mounts the card, and the match then paints and scrolls into view. Cards mounting
-as the window moves repaint Find without discarding the article's indexed text
-(`ReadingIndex` in `ui/find/reading.ts`).
+discussion, which mounts the card, and the match then paints and scrolls into view. When a typed
+query chooses the first result at or after the reading position, an unmounted card's comment
+counts by its passage's position. Cards mounting as the window moves repaint Find without
+discarding the article's indexed text or searching the comments again (`ReadingIndex` in
+`ui/find/reading.ts`).
 
 Each mounted card is a memoized `RailCard` that receives only its own selection, emphasis,
 placement, composer, and draft state, with the rail's actions in one object that lives as long as
@@ -136,7 +139,9 @@ already open. Actions stop stale activation after a source splice.
 
 The history panel lists each archived discussion as a card laid out like a live one, reusing the
 rail's message classes: author, the quoted passage with its left rule and six-line clamp, the
-opening comment, then the shared reply-count disclosure. A record whose thread no longer parses as
+opening comment, then the shared reply-count disclosure. The panel reads the records from the
+view's plain parse of the current source when it holds one, and parses the source itself once per
+source otherwise. A record whose thread no longer parses as
 comments shows its stored text instead; unrecognized records show their diagnostic and raw text. Cards
 offer no jump to the passage, since resolution removes its anchor. A card is keyed by its quoted
 passage and discussion, with its offset only beside an identical record, so deleting a record

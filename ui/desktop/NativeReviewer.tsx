@@ -1,5 +1,6 @@
 import { useTranslation } from '../translate/translationStore'
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { App } from '../app/App'
 import { navigate, useRoute } from '../app/route'
 import { useDoc } from '../documents/store'
@@ -57,8 +58,8 @@ export function NativeReviewer() {
   const setupConfirmation = useRef<Promise<boolean> | null>(null)
   const documentStatus = useDoc((state) => state.status)
   const documentMode = useDoc((state) => state.mode)
-  // A string, so only a change in which files need attention re-renders the reviewer.
-  const attention = useDoc((state) => files.filter((file) => state.needsAttention(file.id)).map((file) => file.id).join('\n'))
+  // Only a change in which files need attention re-renders the reviewer.
+  const attention = useDoc(useShallow((state) => files.filter((file) => state.needsAttention(file.id)).map((file) => file.id)))
   // The route selects the file immediately; the store's document lags it while loading or after a failed load.
   const route = useRoute()
   const id = route.kind === 'doc' ? route.sessionId : null
@@ -306,7 +307,7 @@ export function NativeReviewer() {
         {atHome && <><span className="native-open-label">{openLabel}</span>
           <span className="native-open-shortcut" aria-hidden="true">{navigator.platform.startsWith('Mac') ? '⌘O' : 'Ctrl+O'}</span></>}</button>
       <FileTabs files={files} activeId={id} language={language}
-        needsAttention={(fileId) => attention.split('\n').includes(fileId)}
+        needsAttention={(fileId) => attention.includes(fileId)}
         onSelect={(fileId) => navigate(`/d/${fileId}`)}
         onAttention={(fileId) => { if (id === fileId) useDoc.getState().openConflict() }} onClose={closeFile} />
       <div className="native-document-controls" ref={setToolbarTarget} />

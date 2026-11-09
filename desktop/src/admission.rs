@@ -104,10 +104,7 @@ impl Restoration {
 
     fn read(&self) -> Reads {
         let saved = self.remember.load();
-        let files = match &saved {
-            Saved::Read(files) => files.files.as_slice(),
-            Saved::Unusable | Saved::Unreadable => &[],
-        };
+        let files = saved.files().map_or(&[][..], |files| files.files.as_slice());
         let reads = if files.is_empty() {
             vec![]
         } else {
@@ -173,10 +170,9 @@ impl Documents {
         let Some((saved, reads)) = self.restoration.take().and_then(|r| r.take()) else {
             return;
         };
-        let (files, remembered_active) = match &saved {
-            Saved::Read(saved) => (saved.files.as_slice(), saved.active.as_ref()),
-            Saved::Unusable | Saved::Unreadable => (&[][..], None),
-        };
+        let (files, remembered_active) = saved
+            .files()
+            .map_or((&[][..], None), |saved| (saved.files.as_slice(), saved.active.as_ref()));
         let (mut first, mut active) = (None, None);
         for (path, read) in files.iter().zip(reads) {
             match read {

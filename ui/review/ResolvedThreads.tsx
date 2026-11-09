@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { Root } from 'mdast'
 import { deleteResolvedThreadEdits, parseResolvedThreads } from '../../document/review-archive'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
 import type { TextEdit } from '../../document/types'
@@ -13,6 +14,8 @@ import './ResolvedThreads.css'
 
 interface Props {
   source: string
+  /** The plain parse of exactly `source`, when the view holds one, so the panel parses nothing itself. */
+  plain?: Root
   onClose: () => void
   /** Paused editing keeps history readable and its delete action disabled. */
   readOnly?: boolean
@@ -26,13 +29,15 @@ interface Props {
  */
 function recordKeys(entries: readonly { context: string; thread: string; range: { start: number } }[]): string[] {
   const identities = entries.map((entry) => `${entry.context}\u0000${entry.thread}`)
-  return identities.map((identity, index) => identities.indexOf(identity) === identities.lastIndexOf(identity)
+  const counts = new Map<string, number>()
+  for (const identity of identities) counts.set(identity, (counts.get(identity) ?? 0) + 1)
+  return identities.map((identity, index) => counts.get(identity) === 1
     ? identity : `${identity}\u0000${entries[index]!.range.start}`)
 }
 
-export function ResolvedThreads({ source, onClose, readOnly = false, onEdit }: Props) {
+export function ResolvedThreads({ source, plain, onClose, readOnly = false, onEdit }: Props) {
   const t = useT()
-  const archive = parseResolvedThreads(source)
+  const archive = useMemo(() => parseResolvedThreads(source, plain), [source, plain])
   const keys = recordKeys(archive.entries)
   return (
     <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} ignoreSelector=".reader-menu" returnFocus=".topbar-overflow">
@@ -44,7 +49,7 @@ export function ResolvedThreads({ source, onClose, readOnly = false, onEdit }: P
         </div>}
         {archive.entries.map((entry, index) => <ResolvedDiscussion key={keys[index]} context={entry.context} thread={entry.thread}
           onDelete={onEdit && !readOnly ? () => {
-            const edits = deleteResolvedThreadEdits(source, entry)
+            const edits = deleteResolvedThreadEdits(source, entry, plain)
             if (edits.length) onEdit(edits)
           } : undefined} />)}
         {archive.diagnostics.map((diagnostic) => (

@@ -215,6 +215,14 @@ function textNodes(root: Node): Text[] {
   return nodes
 }
 
+/**
+ * Whether `range` holds `texts` from the first's start to the last's end. Text points, not element
+ * boundaries, so a range from the first character counts.
+ */
+function holdsWhole(range: Range, texts: readonly Text[]): boolean {
+  return texts.length > 0 && range.isPointInRange(texts[0]!, 0) && range.isPointInRange(texts.at(-1)!, texts.at(-1)!.length)
+}
+
 function positioned(element: Element): { start: number; end: number } | null {
   const start = Number((element as HTMLElement).dataset.ps)
   const end = Number((element as HTMLElement).dataset.pe)
@@ -251,8 +259,7 @@ function readItems(range: Range, index: SelectableIndex, spans: readonly CriticS
     if (!at || !entry || entry.end !== at.end) throw new Outdated()
     const texts = textNodes(element)
     const selected = texts.map((text) => range.intersectsNode(text) ? text.data.slice(...selectedText(range, text)) : '').join('')
-    const complete = texts.length === 0 || (range.isPointInRange(texts[0]!, 0) &&
-      range.isPointInRange(texts.at(-1)!, texts.at(-1)!.length))
+    const complete = texts.length === 0 || holdsWhole(range, texts)
     if (entry.inMark || overlapsSpan(entry.start, entry.end, spans)) {
       // An image shows no text, so its alternative text stands for it.
       if (texts.length) exclude(selected, 'existing-mark')
@@ -452,13 +459,7 @@ export function wholeInlineCode(ranges: readonly Range[], root: Node): Set<HTMLE
     if (!scope) continue
     const candidates = [scope.closest<HTMLElement>('[data-atom="code"]'), ...scope.querySelectorAll<HTMLElement>('[data-atom="code"]')]
     for (const code of candidates) {
-      if (!code || !root.contains(code)) continue
-      // Text points, not element boundaries, so a range from the code's first character counts.
-      const walker = code.ownerDocument.createTreeWalker(code, NodeFilter.SHOW_TEXT)
-      const first = walker.nextNode() as Text | null
-      let last = first
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) last = node as Text
-      if (first && last && range.comparePoint(first, 0) === 0 && range.comparePoint(last, last.length) === 0) held.add(code)
+      if (code && root.contains(code) && holdsWhole(range, textNodes(code))) held.add(code)
     }
   }
   return held
@@ -486,10 +487,10 @@ export function selectedBoxes(ranges: readonly Range[], root: Node): Box[] {
       node = node === common ? null : walker.nextNode()) {
       if (!range.intersectsNode(node)) continue
       const text = node as Text
+      const [from, to] = selectedText(range, text)
       const part = text.ownerDocument.createRange()
-      part.selectNodeContents(text)
-      if (text === range.startContainer) part.setStart(text, range.startOffset)
-      if (text === range.endContainer) part.setEnd(text, range.endOffset)
+      part.setStart(text, from)
+      part.setEnd(text, to)
       // A DOM without layout, such as the test environment's, has no range rects and paints no band.
       add(part.getClientRects?.())
     }
@@ -547,28 +548,36 @@ export interface Span { top: number; bottom: number }
 export function rangesInSpan(ranges: readonly Range[], root: Element, span: Span): { ranges: Range[]; partial: boolean } {
   const within: Range[] = []
   let partial = false
-  const elementsOnly = (element: Element): boolean => element.childElementCount > 0 && Array.from(element.childNodes)
-    .every((node) => node.nodeType === Node.ELEMENT_NODE || !node.textContent?.trim())
+  const elementsOnly = (element: Element): boolean => {
+    if (!element.childElementCount) return false
+    for (let node = element.firstChild; node; node = node.nextSibling) {
+      if (node.nodeType !== Node.ELEMENT_NODE && node.textContent?.trim()) return false
+    }
+    return true
+  }
   const around = (element: Element): Range => {
     const range = element.ownerDocument.createRange()
     range.selectNode(element)
     return range
   }
   const visit = (parent: Element, range: Range): void => {
-    const kids = Array.from(parent.children).filter((child) => !child.classList.contains(SELECTION_BAND_CLASS))
+    // The band's own layer, when present, is the root's last child and is never selected content.
+    const kids = parent.children
+    const count = kids.length && kids[kids.length - 1]!.classList.contains(SELECTION_BAND_CLASS) ? kids.length - 1 : kids.length
     let lo = 0
-    let hi = kids.length
+    let hi = count
     while (lo < hi) {
       const mid = (lo + hi) >> 1
       if (kids[mid]!.getBoundingClientRect().bottom < span.top) lo = mid + 1
       else hi = mid
     }
     let end = lo
-    while (end < kids.length && kids[end]!.getBoundingClientRect().top <= span.bottom) end++
+    while (end < count && kids[end]!.getBoundingClientRect().top <= span.bottom) end++
     if (lo === end) { partial = true; return }
     if (lo > 0 && range.compareBoundaryPoints(Range.START_TO_START, around(kids[lo]!)) < 0) partial = true
-    if (end < kids.length && range.compareBoundaryPoints(Range.END_TO_END, around(kids[end - 1]!)) > 0) partial = true
-    for (const child of kids.slice(lo, end)) {
+    if (end < count && range.compareBoundaryPoints(Range.END_TO_END, around(kids[end - 1]!)) > 0) partial = true
+    for (let i = lo; i < end; i++) {
+      const child = kids[i]!
       if (!range.intersectsNode(child)) continue
       if (elementsOnly(child) && child.getBoundingClientRect().height > span.bottom - span.top) { visit(child, range); continue }
       const part = child.ownerDocument.createRange()

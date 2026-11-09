@@ -10,7 +10,8 @@ import { prefersReducedMotion } from '../../util/presence'
 import { isImeKey } from '../../util/composition'
 import { cssMs, cssPx } from '../../util/css-tokens'
 
-const TABLE_LAYOUT_EVENT = 'mastermind-table-layout'
+/** Dispatched on `window` after a table batch or an expansion frame changes a table's layout. */
+export const TABLE_LAYOUT_EVENT = 'mastermind-table-layout'
 
 interface Geometry { left: number; width: number }
 

@@ -5,7 +5,8 @@
  */
 export const SETTLES_TO = 'data-settles-to'
 
-function margins(element: HTMLElement): number {
+/** The sum of `element`'s vertical margins. */
+export function margins(element: HTMLElement): number {
   const style = getComputedStyle(element)
   return (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
 }
