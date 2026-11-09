@@ -49,7 +49,8 @@ reproduce on an idle machine: it was memory pressure (a parse holds 3–4 GB at 
 runs were made at load 29–36), and the mild superlinearity both engines shared was a quadratic
 sibling lookup in `mdast-util-find-and-replace`, now patched (`document/markdown/processor.md`);
 after it the parse is near-linear in both engines (jsc 9.2 s, Node 7.4 s at 15 MiB), with the next
-quadratic in mdast-util-from-markdown's list handling and nothing measured inside WKWebView, whose
+quadratic, mdast-util-from-markdown's list handling, removed by its 2.1.0 (`document/markdown/processor.md`),
+and nothing measured inside WKWebView, whose
 memory limits may bind before time does. Neither parser has an active upstream:
 markdown-rs has been quiet for over a year with the panics and the quadratic profile already
 reported, and micromark is barely maintained, so fixes to either live in a local patch or fork, as

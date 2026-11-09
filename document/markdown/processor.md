@@ -28,3 +28,23 @@ resumes each lookup at the index last found in the same `children` and changes n
 that the parser reproduces trees recorded from the unpatched package. Upstream 3.0.4 removes the
 lookup by taking indexes from `unist-util-visit-parents` 6.1, but 3.0.3 also merges adjacent text
 nodes, which changes the trees; adopting it needs its own review of the reading tree.
+
+## List item events
+
+`mdast-util-from-markdown` adds `listItem` enter and exit events before it builds the tree. Up to
+2.0.3 its `prepareList` spliced the two events into the whole micromark event array for every list
+item, shifting every later event, so compiling grew quadratically with the number of list items,
+in V8 and JavaScriptCore alike. 2.1.0 builds the event array in one pass and prepares each list
+while it is the array's tail, merging the list's item events in once, so the project pins 2.1.0
+through the lockfile instead of patching 2.0.3. 2.1.0 also creates every node with a
+`position: undefined` key and adds `beforeEnter` and `afterExit` extension hooks; `enter` sets
+`position` on every node it opens, so the trees serialize as before.
+
+`tests/from-markdown-list-events.test.ts` checks the installed version and that its compiler no
+longer splices item events, and that the parser reproduces trees recorded from 2.0.3 for
+list-heavy sources and a list of thousands of items. Recheck the list preparation and those trees
+when the package changes version.
+
+On 2026-11-08 in Node, 2.1.0 left `npm run perf:document` within run-to-run noise on `mid.md`
+and `large.md`, and cut `parseMarkdown` on `large.md` repeated to 4 MiB from 2.6 s to 2.3 s and
+at 8 MiB from 7.0 s to 4.9 s (`analyzeMarkdown`: 5.9 s to 4.9 s, and 13.7 s to 10.5 s).
