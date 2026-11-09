@@ -14,8 +14,9 @@ writes a plan here; you mark it up; it reads the same file back.
 ## How to review
 
 - **Comment on a passage** — select some text and choose *Comment*. The passage
-  is highlighted and your note rides along. {==This sentence carries a comment.==}{>>@alice: Is this example clear?<<}
-  {>>@codex: Yes; this reply stays beside the question.<<}
+  is highlighted and your note rides along.
+  {==This sentence carries a comment.==}{>>@alice: Is this example clear?<<}{>>@codex: Yes; this
+  reply stays beside the question.<<}
 - **Suggest a deletion** — select text, choose *Suggest change*, and clear the
   replacement. It stays visible but {--struck through--}, so you can see what's queued
   for the agent. Changed your mind? Click the struck-through text to undo it.

@@ -22,10 +22,11 @@ mastermind is maintained by [Da Wei](https://github.com/d4wei) and based on Kevi
 
 2. You read in mastermind. Select text to comment or to suggest a change; accept or reject the
    agent's proposed edits. Edits save continuously.
-3. Ask the agent to continue. It rereads the file, answers each discussion with a signed reply, and
-   resolves what is settled. Resolved history stays in the file, hidden from reading. It closes the
-   files it opened, leaving open any where you still have unfinished work. Opening an open file or
-   closing a closed one changes nothing, so the agent can repeat either safely.
+3. Ask the agent to continue. It rereads the file, applies your suggested edits, acts on your
+   comments, and answers each question with a signed reply beside it. Discussions you resolve stay
+   in the file, hidden from reading. It closes the files it opened, leaving open any where you still
+   have unfinished work. Opening an open file or closing a closed one changes nothing, so the agent
+   can repeat either safely.
 
 The [bundled skill](.claude/skills/mastermind/SKILL.md) teaches an agent the whole loop, and
 [agent setup](assets/agent/README.md) shows how to install it. The

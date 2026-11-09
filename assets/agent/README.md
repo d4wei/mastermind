@@ -8,7 +8,8 @@ immediately; there is no hand-back signal, generated completion summary, or tran
 
 Make [the mastermind skill](../../.claude/skills/mastermind/SKILL.md) and its `reference/` directory
 available through your harness's normal skill installation mechanism. The `master` alias is
-optional. The skill and its reference files contain the complete review instructions.
+optional. The skill and its reference files contain the complete instructions: opening and closing
+documents, addressing feedback, readying a draft, preparing translations, and prefilling setup.
 
 For a project that uses mastermind to review plans, an instruction can be as small as:
 
@@ -17,31 +18,13 @@ Write plans to Markdown files and open them with the mastermind skill for review
 to address feedback, reread the current file and follow the skill's public review protocol.
 ```
 
-## Open and prepare
+## What the skill assumes
 
-`node /path/to/mastermind/bin/mastermind.js open -- FILE...` opens the original without waiting
-for translation. Build the source checkout with `npm run desktop:build` first. A bare skill request
-lets the session agent choose which files need review; explicit paths take precedence. Pass the
-chosen paths together; each receives an admission result. People configure appearance, their name,
-and Interface language in Settings. Reading language is chosen from the available versions of each
-document; people do not need to operate the CLI. When the person hands documents back, the agent
-rereads them and closes the ones it opened with `close -- FILE...`; a file with unfinished work in
-the reader stays open and reports `blocked`.
-
-The preparing agent supplies complete, fresh translations when wanted. Explicit requests override
-its discretion, including several target languages or no translation. It reads the whole document
-and uses its existing context. `translate-blocks` emits the preparation inputs with explicit source
-and target languages; `--save` validates and replaces the complete prepared artifact. The commands
-and public protocol are maintained with the bundled skill:
-
-- [Preparation instructions](../../.claude/skills/mastermind/SKILL.md)
-- [Review protocol](../../.claude/skills/mastermind/reference/review-protocol.md)
+The source checkout is built with `npm run desktop:build`, and its dependencies are installed with
+`npm ci` before a translation is prepared. People configure appearance, Display name, and Interface
+language in Settings and choose a Reading language per document; they do not operate the CLI.
 
 A translation artifact is a disposable reading aid. Feedback, including quoted passages selected
 from translations, belongs in the original Markdown file. Clean buffers reload external changes;
 dirty buffers retain both versions and pause saving for an explicit recovery choice. The file-write
 limits are documented in the source checkout at `desktop/src/files.md`.
-
-Use `open --language CODE -- FILE...` to suggest an initial reading version for the admitted files.
-The hint applies only to a valid prepared artifact and cannot override a reader's existing choice.
-Missing translations leave Original available and never delay opening.

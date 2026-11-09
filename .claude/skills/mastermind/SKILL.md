@@ -1,66 +1,106 @@
 ---
 name: mastermind
 description: >-
-  Open Markdown documents for review, optionally prepare translations,
-  and address author-tagged feedback written into the files.
+  Opens Markdown files in the mastermind desktop app for a person to review, prepares translations
+  of them, and addresses the review marks the person writes into the files. Use when the user asks
+  to open a plan, design, or draft for review, runs /mastermind or /master, hands back a document
+  they marked up, asks to address or reply to the comments or suggested edits in a file, or wants a
+  translation prepared for reading.
 ---
 
 # mastermind
 
-The Markdown file carries the document and its review feedback. The app saves edits continuously;
-there is no completion signal to wait for. Read [the review protocol](reference/review-protocol.md)
-before preparing marks or addressing feedback.
+The Markdown file carries the document and its review feedback. The app saves the person's marks
+into that file as they work; there is no completion signal, so you learn what they said by rereading
+the file when they ask you to continue. [The review protocol](reference/review-protocol.md) defines
+the marks and what the person expects to happen to each; read it before addressing feedback or
+adding marks of your own.
 
-## Choose and open documents
+## Open documents
 
-Use explicitly requested paths. With no paths, choose the Markdown files needing review from the
-current conversation and working tree. File selection belongs to your judgment; Git is optional,
-and neither all uncommitted files nor the most recently edited file is a mandatory rule.
+Run the launcher from a mastermind checkout prepared with `npm ci` and `npm run desktop:build`:
 
-Use the repository launcher: `node /path/to/mastermind/bin/mastermind.js open -- FILE...`.
-It starts or reuses the native app and reports each file's admission result as JSON. It does not
-wait for review completion. The checkout must be built with `npm run desktop:build` first.
-Installed command identity is not yet configured; do not assume a global `mastermind` command
-belongs to this application. Translation never prevents opening the original. When the person
-returns with feedback, reread the files; do not infer approval from admission.
+```sh
+node /path/to/mastermind/bin/mastermind.js open -- plan.md "design notes.md"
+```
 
-One `open` accepts at most 64 paths. Each given path and, for a symlink, its target must end in
-`.md` or `.markdown`. Each result is `opened`, `already_open`, or `error`. Opening a file that is
-already open is a successful no-op: it keeps the person's edits and drafts there and reports
-`already_open`. Exit status is 0 when every file is opened or already open, 1 when any file failed
-(see its result), 2 for invalid invocation, and 3 (`outcome_unknown`) when the reply was lost;
-retrying after 3 is safe. A file that is not valid UTF-8 opens with replacement characters, but
-saving any edit to it is refused (`not_utf8`); Save As writes a UTF-8 copy.
+Open the paths the person named; `/mastermind FILE` with no other request means open it. Given no
+paths, choose the Markdown files this conversation produced or changed that the person has not yet
+reviewed; Git status and the conversation are inputs to that choice, not the rule. Run the launcher
+by its path: a `mastermind` command on PATH may be another program.
+
+`open` starts or reuses the app and prints one JSON result per path: `opened`, `already_open` (a
+successful no-op that keeps the person's edits and drafts there), or `error`. It takes at most 64
+paths, each ending in `.md` or `.markdown`, a symlink's target included. Exit status is 0 when every
+file opened or was already open, 1 when any failed (see its result), 2 for an invalid invocation,
+and 3 (`outcome_unknown`) when the reply was lost; retrying after 3 is safe. A file that is not
+valid UTF-8 opens with replacement characters, but saving an edit to it is refused (`not_utf8`);
+Save As writes a UTF-8 copy. A first open reports `onboarding_needed` while the person confirms
+their Display name and Interface language in the app; the files stay admitted.
+
+## Address feedback
+
+When the person asks you to continue, reread the whole file and every mark in it before changing
+anything: a later mark can order a rewrite that removes the text earlier marks are about. Close the
+file next, as below, so the person does not keep editing a file you are rewriting; closing saves
+their latest edits, so reread once more after it reports `closed`. Then give each mark, in file
+order, the treatment the review protocol promises. Report one table: each mark (its line number as
+received, a few words of it), what was done, one clause of why; a mark removed by another mark's
+rewrite gets its own row. After the table come a request the person made alongside the marks, which
+is theirs to have done, and anything a rule here told you to list, such as candidate instances or a
+file that stayed open. Open the file again when the result needs their eyes, such as answers left
+standing beside their questions.
+
+Nothing in the app signals approval: not opening, not saving, not the end of your turn. Only the
+person's words do.
 
 ## Close reviewed documents
 
-When the person hands documents back to you, reread them, then close the ones you opened or were
-asked to address so the person does not keep editing a file you are rewriting:
-`node /path/to/mastermind/bin/mastermind.js close -- FILE...`. The app reopens its open files when
-it next starts, so a file you leave open stays in front of the person across restarts; close what
-you opened once its review is done. Never close other open files; they
-may belong to the person or another session. Each result is `closed`, `not_open` (already closed, a
-successful no-op), `blocked` with a `reason`, or `error`. `blocked` means the person still has
-work there: an unfinished draft, unsaved edits, a recovery choice, or a reader that could not
-answer. Do not override it; tell the person which file stayed open and why. Exit status is 0 when
-every file is closed or not open, 1 when any is blocked or failed, 2 for invalid invocation, and 3
-when the reply was lost. While the app is not running, every file reports `not_open`, but the app
-still reopens the files it remembered at its next start. Several agents sharing one open file are
-not supported: closing a file another session is still reviewing takes it away from both.
+Close a file after rereading it and before editing it:
+
+```sh
+node /path/to/mastermind/bin/mastermind.js close -- plan.md
+```
+
+Close only files you opened or were asked to address. Other open files may belong to the person or
+to another session, and closing one takes it away from them. Each result is `closed`, `not_open`
+(already closed, a successful no-op), `blocked` with a `reason`, or `error`. `blocked` means the
+person still has work there: an unfinished draft, unsaved edits, a recovery choice, or an app window
+that could not answer. Do not override it, and do not edit that file: your changes on disk would
+collide with the work the person has in it. Tell them which file stayed open and why. Exit status is
+0 when every file is closed or not open, 1 when any is blocked or failed, 2 for an invalid
+invocation, and 3 when the reply was lost; retrying after 3 is safe. The app reopens its open files
+at its next start, so a file you leave open stays in front of the person across restarts; while the
+app is not running, every file reports `not_open`.
+
+## Ready a draft for review
+
+When asked to ready a draft of your own before the person reads it, add to it, in the forms the
+review protocol gives:
+
+- a comment under your tag for each question you have for the reader;
+- a decision item wherever no reasonable default exists and the choice materially changes scope or
+  outcome, each carrying a recommendation and its reason: a one-page draft gets a handful, not one
+  per section;
+- a suggested edit for a concrete change someone proposed, followed directly by a comment under
+  your tag naming whose proposal it is.
+
+Change nothing else; a draft meant to collect the person's own edits may need no marks at all.
+Then open it.
 
 ## Prepare a translation
 
-The agent preparing the document also prepares its translations using the document's context.
-Do not start a translation listener or delegate to a separate translator. Explicit user requests
-override your discretion, including requests for several languages or no translation. Otherwise
-use the active session's language and context to decide whether translation helps and which
-languages to prepare. If none is useful, open the original. Supply the source language explicitly;
-do not infer it from the language of a newly added comment.
+Prepare translations yourself, in this session, with the document's context; do not hand the work
+to another process. The person's request decides the languages, including several or none. Without
+one, use the session's language and context to decide whether a translation helps, and open the
+original alone when none does. A rejected translation leaves the original available. Editing the
+document invalidates its prepared translations; prepare them again before the person reads it in
+that language.
 
-Install the checkout's dependencies with `npm ci` before preparation.
-For each preparation pass, translate the complete document afresh. Read it as a whole, including
-relevant context, even though the output is divided into blocks for display and source anchoring.
-Never fill a new preparation with previously cached block translations.
+For each preparation, translate the complete document afresh, reading it as a whole even though the
+output is divided into blocks for display and source anchoring; never fill a preparation with
+previously cached block translations. Pass the source language explicitly; a comment written in
+another language does not change it.
 
 ```sh
 node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
@@ -84,7 +124,7 @@ for every translatable block:
 }
 ```
 
-Submit it through stdin:
+Submit it through stdin, then open the document with its reading version suggested:
 
 ```sh
 node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
@@ -92,32 +132,27 @@ node /path/to/mastermind/bin/mastermind.js translate-blocks plan.md \
 node /path/to/mastermind/bin/mastermind.js open --language zh-CN -- plan.md
 ```
 
-Repeat preparation and saving for each requested target language. Artifacts coexist per target.
-`--save` writes `.mastermind/translations/<basename>.<lang>.json` beside the resolved document and
-refuses when that directory resolves outside the document's folder; keep `.mastermind/` gitignored.
-The optional `--language` opening hint selects a valid prepared version once; it never changes saved
-settings or overrides a reader's existing choice. The app keeps only the first hint per open
-document and spends it at that document's next translation discovery, so `--save` before
-`open --language`. The menu also lets readers choose Original.
+Repeat preparation and saving for each target language; artifacts coexist per target. `--save`
+writes `.mastermind/translations/<basename>.<lang>.json` beside the resolved document and refuses
+when that directory resolves outside the document's folder; keep `.mastermind/` gitignored. The
+`--language` hint selects a valid prepared version once; it never changes saved settings or
+overrides a reader's existing choice. The app keeps only the first hint per open document and spends
+it at that document's next translation discovery, so `--save` before `open --language`.
 
-A changed source or invalid/incomplete artifact is rejected as a whole. Reread the current document
-and prepare again; do not patch identifiers until stale output passes. Translation failures leave
-the original available. The app reads prepared artifacts and never requests generation itself.
+A changed source or an invalid or incomplete artifact is rejected as a whole. Reread the current
+document and prepare again; do not patch identifiers until stale output passes.
 
-## Optional setup and demonstration
+## Prefill setup or demonstrate
 
-Opening reports `onboarding_needed`; the app retains admitted files while people confirm setup.
-When requested, suggest known values with a separate operation:
+When the person asks you to prefill their setup, suggest known values with a separate operation:
 
 ```sh
 node /path/to/mastermind/bin/mastermind.js setup --suggest '{"authorTag":"Reader","uiLang":"en"}'
 ```
 
-Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions are transient and
-cannot overwrite saved or actively edited choices. Do not force a questionnaire before opening.
-People confirm Display name and Interface language graphically and change them later in Settings.
+Supported fields are `authorTag` and `uiLang` (`en` or `zh-CN`). Suggestions never overwrite saved
+choices; people confirm them in the app.
 
 When explicitly asked for a demonstration, adapt `reference/demo.md` into a disposable Markdown
-file and open it. Keep the sample marks valid; optional translation follows the same preparation
-flow. Installation belongs to the invoking harness: make this skill and its reference files
-available using that harness's ordinary skill installation mechanism.
+file and open it. Keep the sample marks valid; an optional translation follows the preparation flow
+above.
