@@ -508,7 +508,6 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
             {...ime.inputProps}
             rows={3}
             placeholder={t('commentPlaceholder')}
-            title={t('commentHint')}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             onKeyDown={composerKey}

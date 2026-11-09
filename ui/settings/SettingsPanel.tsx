@@ -118,7 +118,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               autoCapitalize="off"
               maxLength={64}
               aria-invalid={invalidName}
-              title={t('authorTagHint')}
               onBlur={(e) => {
                 setInvalidName(usableAuthorName(e.target.value) === null)
                 pendingName.current = e.target.value
@@ -129,6 +128,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                 setInvalidName(usableAuthorName(event.target.value) === null)
               }}
             />
+            <small>{t('authorTagHint')}</small>
             {invalidName && <small role="alert">{t('authorTagInvalid')}</small>}
           </label>
           <div className="settings-row">

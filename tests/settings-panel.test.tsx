@@ -96,7 +96,8 @@ it.each([
   act(() => root.render(<SettingsPanel onClose={() => {}} />))
   const input = host.querySelector<HTMLInputElement>('input.settings-input')!
   expect(input.labels?.[0]?.querySelector('span')?.textContent).toBe(labels.name)
-  expect(input.title).toBe(labels.hint)
+  expect(input.title).toBe('')
+  expect(input.labels?.[0]?.querySelector('small')?.textContent).toBe(labels.hint)
   act(() => {
     input.value = '李 明'
     input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
