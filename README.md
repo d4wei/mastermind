@@ -22,8 +22,10 @@ mastermind is maintained by [Da Wei](https://github.com/d4wei) and based on Kevi
 
 2. You read in mastermind. Select text to comment or to suggest a change; accept or reject the
    agent's proposed edits. Edits save continuously.
-3. Ask the agent to continue. It rereads the file, answers each discussion with a signed reply, and
-   resolves what is settled. Resolved history stays in the file, hidden from reading. It closes the
+3. Ask the agent to continue. It rereads the file, lists its marks with
+   `node bin/mastermind.js marks plan.md` (the app's own parser, which also names any mark the
+   viewer would leave as literal text), answers each discussion with a signed reply, and resolves
+   what is settled. Resolved history stays in the file, hidden from reading. It closes the
    files it opened, leaving open any where you still have unfinished work. Opening an open file or
    closing a closed one changes nothing, so the agent can repeat either safely.
 

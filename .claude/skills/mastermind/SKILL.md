@@ -48,6 +48,26 @@ when the reply was lost. While the app is not running, every file reports `not_o
 still reopens the files it remembered at its next start. Several agents sharing one open file are
 not supported: closing a file another session is still reviewing takes it away from both.
 
+## Inventory review marks
+
+`node /path/to/mastermind/bin/mastermind.js marks [--json] FILE...` lists each file's review marks
+as the app's own parser reads them, one line per mark in file order: `L<line>:<col>`, kind, author
+tag or `@?`, and text, with ` on "anchor"` and ` #n` naming a comment's anchor and discussion.
+`--json` prints the same inventory structured. It needs `npm ci`, not a native build. Exit status
+is 0 on a clean parse; 1 when a delimiter would show as literal text, naming each on stderr as
+`file:L<line>:<col>: message`; and 2 for invalid invocation. The viewer drops such marks silently,
+so fix every one before handing a file back.
+
+Address feedback:
+
+1. Reread the files, then run `marks` on them. Use its output as the source of the line numbers in
+   your report; the discussion numbers group a thread's replies.
+2. Address the marks under [the review protocol](reference/review-protocol.md).
+3. Run `marks` again. It must exit 0; repair each reported delimiter and rerun until it does.
+
+Ready a draft: after adding marks to a document for review, run `marks` on it to confirm each one
+parses and lands in the discussion you meant before opening it.
+
 ## Prepare a translation
 
 The agent preparing the document also prepares its translations using the document's context.

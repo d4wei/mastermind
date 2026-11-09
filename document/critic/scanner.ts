@@ -1,6 +1,6 @@
 import type { CommentEntry, CriticKind, CriticSpan, Range, ReviewItem, ThreadCard, ThreadItem } from './types'
 
-const OPENERS: ReadonlyArray<readonly [string, CriticKind]> = [
+export const OPENERS: ReadonlyArray<readonly [string, CriticKind]> = [
   ['{++', 'ins'],
   ['{--', 'del'],
   ['{~~', 'sub'],
@@ -8,7 +8,7 @@ const OPENERS: ReadonlyArray<readonly [string, CriticKind]> = [
   ['{>>', 'comment'],
 ]
 
-const CLOSERS: Record<CriticKind, string> = {
+export const CLOSERS: Record<CriticKind, string> = {
   ins: '++}',
   del: '--}',
   sub: '~~}',
@@ -32,7 +32,8 @@ function makeExcludeLookup(exclude: readonly Range[]): (pos: number) => Range | 
   }
 }
 
-function escapedAt(text: string, bracePos: number): boolean {
+/** Whether the brace at `bracePos` follows an odd run of backslashes, which defeats an opener. */
+export function escapedAt(text: string, bracePos: number): boolean {
   let backslashes = 0
   while (bracePos - 1 - backslashes >= 0 && text[bracePos - 1 - backslashes] === '\\') backslashes++
   return backslashes % 2 === 1

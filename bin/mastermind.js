@@ -7,14 +7,18 @@ import path from 'node:path'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
-if (!['open', 'close', 'setup', 'translate-blocks'].includes(args[0])) {
-  console.error('Usage: mastermind open [--language CODE] -- FILE... | mastermind close -- FILE... | mastermind setup --suggest JSON | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save]')
+if (!['open', 'close', 'setup', 'translate-blocks', 'marks'].includes(args[0])) {
+  console.error('Usage: mastermind open [--language CODE] -- FILE... | mastermind close -- FILE... | mastermind setup --suggest JSON | mastermind translate-blocks FILE --source-lang CODE --target-lang CODE [--save] | mastermind marks [--json] FILE...')
   process.exit(2)
 }
 let command
 let forwarded
 let env = process.env
-if (args[0] === 'translate-blocks') {
+const scripts = {
+  'translate-blocks': path.join(root, 'tools', 'translation', 'translation-cli.ts'),
+  marks: path.join(root, 'tools', 'marks', 'marks-cli.ts'),
+}
+if (args[0] in scripts) {
   // Resolved against the repo, not the cwd: agents invoke this wrapper from arbitrary directories.
   let tsx
   try {
@@ -24,7 +28,7 @@ if (args[0] === 'translate-blocks') {
     process.exit(1)
   }
   command = process.execPath
-  forwarded = ['--import', pathToFileURL(tsx).href, path.join(root, 'tools', 'translation', 'translation-cli.ts'), ...args.slice(1)]
+  forwarded = ['--import', pathToFileURL(tsx).href, scripts[args[0]], ...args.slice(1)]
 } else {
   const name = process.platform === 'win32' ? 'mastermind-launch-console.exe' : 'mastermind-launch-check'
   const candidates = process.platform === 'darwin'
