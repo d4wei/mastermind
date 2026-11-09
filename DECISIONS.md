@@ -29,6 +29,20 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-08 — Installing from the repository is the distribution
+
+**Ruled.** The README's clone, `npm ci`, and `npm run desktop:build` path is how mastermind is
+installed; no release artifact, installer, or published package exists. The agent tooling
+(`translate-blocks`, `marks`) runs from the checkout through tsx, so a checkout is needed however
+the native app arrives, and every published artifact would fix the still-provisional bundle,
+executable, and configuration identity in users' machines before the identity ruling. The Rust and
+Tauri prerequisites are the accepted cost; the exit to prebuilt releases is recorded in
+[DIRECTION.md](DIRECTION.md).
+
+**Beat:** unsigned prebuilt binaries from CI, which skip the Rust toolchain but publish a
+provisional identity; and a signed installer with a packaged CLI, which needs the identity ruling,
+developer accounts, and a release pipeline before any outside user has asked.
+
 ## 2026-11-08 — The wide comment rail mounts only the cards near the viewport
 
 **Measured.** The rail places every card but mounts only those within one and a half viewports of

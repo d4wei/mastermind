@@ -200,17 +200,23 @@ a ruling; no repository storage, discovery, or precedence mechanism has been sel
 
 **Exit:** a ruling and implementation for repository settings, or that mechanism is dropped.
 
-## 2026-10-10 — Package and CLI identity (updated 2026-10-13)
+## 2026-10-10 — Package and CLI identity (updated 2026-11-08)
 
 **Open question.** The npm project is private and retains the inherited name `mastermind-md`.
 The native app identifier and executable names remain provisional. Select public command, package,
-and settings
-identity before distributing or installing alongside
-[Mastermind](https://github.com/Jingquank/Mastermind).
-The repository launcher does not install a global command.
+and settings identity before distributing or installing alongside
+[Mastermind](https://github.com/Jingquank/Mastermind). The repository launcher does not install a
+global command, and installing from the repository is the distribution (`DECISIONS.md`,
+2026-11-08). Prebuilt releases wait on this ruling and on a reason to spare users the Rust
+toolchain: an outside user asking for a build, or the repository front page and outreach starting.
+When that comes, the cheapest form is unsigned tagged GitHub Releases (the macOS app, the NSIS
+installer and the deb that CI already builds) with a checksummed fetch step that places the binary
+where `bin/mastermind.js` looks, and a Gatekeeper caveat in the README; a signed installer with a
+packaged CLI is a later step, taken only if release users hit the signing warnings or want
+distribution without a checkout.
 
 **Exit:** a distribution-identity ruling applied to packaging, launcher installation, and native
-settings storage.
+settings storage, followed by the first tagged release when one of the triggers above fires.
 
 ## 2026-10-10 — Markdown wrapping stays manual
 
