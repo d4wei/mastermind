@@ -52,12 +52,13 @@ edit at 15 MiB, the rest React re-rendering the article). The JavaScriptCore blo
 parse holds 3–4 GB at 8–15 MiB, and the runs were made at load 29–36), and the mild superlinearity
 both engines shared was a quadratic sibling lookup in `mdast-util-find-and-replace`, now patched
 (`document/markdown/processor.md`); after it the parse is near-linear in both engines (jsc 9.2 s,
-Node 7.4 s at 15 MiB), with the next quadratic in mdast-util-from-markdown's list handling and
-nothing measured inside WKWebView, whose memory limits may bind before time does. Neither parser has
-an active upstream: markdown-rs has been quiet for over a year with the panics and the quadratic
-profile already reported, and micromark is barely maintained, so fixes to either live in a local
-patch or fork, as micromark's already does. A size threshold above which the reading view yields to
-the source view is a candidate policy, not a ruling.
+Node 7.4 s at 15 MiB), with the next quadratic, mdast-util-from-markdown's list handling, removed by
+its 2.1.0 (`document/markdown/processor.md`), and nothing measured inside WKWebView, whose memory
+limits may bind before time does. Neither parser has an active upstream: markdown-rs has been quiet
+for over a year with the panics and the quadratic profile already reported, and micromark is barely
+maintained, so fixes to either live in a local patch or fork, as micromark's already does. A size
+threshold above which the reading view yields to the source view is a candidate policy, not a
+ruling.
 
 **Exit:** the parse moved off the main thread, or re-parsed per changed block; the parse's memory
 footprint measured inside WKWebView; `content-visibility` on the article left alone; then a ruling
