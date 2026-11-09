@@ -29,7 +29,7 @@ Use this entry shape:
 
 * * *
 
-## 2026-11-09 — The wide comment rail mounts only the cards near the viewport
+## 2026-11-08 — The wide comment rail mounts only the cards near the viewport
 
 **Measured.** The rail places every card but mounts only those within one and a half viewports of
 the visible range, plus the selected, focused, composing and drafting cards and the focused card's

@@ -26,7 +26,7 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-09)
+## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 
 **Bet.** Even with the micromark truncation patched (`document/markdown/processor.md`), a whole
 document parse costs about 0.5 µs per byte and runs on the renderer's main thread, so a 4 MB file
@@ -45,7 +45,7 @@ at 15 MiB Chrome spends about 700 ms per frame managing 98k skipped elements eve
 per-block skipping does not scale, and whether skipping larger chunks does is unmeasured (and those
 runs measured an unstyled page: the harness left the theme attribute unset, so their spacing and
 widths were not the app's). The comment rail was the other whole-document reader, mounting and
-measuring every card; it is now windowed (`DECISIONS.md`, 2026-11-09), so rail cost no longer grows
+measuring every card; it is now windowed (`DECISIONS.md`, 2026-11-08), so rail cost no longer grows
 with marks. Edits stay dominated by re-analysis in every variant (0.6 s at 600 KB, 28 s of a 71 s
 edit at 15 MiB, the rest React re-rendering the article). The JavaScriptCore blow-up seen earlier
 (25 s at 8 MiB against 6 s in Node) did not reproduce on an idle machine: it was memory pressure (a
