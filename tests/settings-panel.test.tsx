@@ -152,7 +152,7 @@ it.each(['Escape', 'an outside click'])('keeps a typed comment Name when %s clos
   act(() => { setValue.call(input, 'Bea'); input.dispatchEvent(new Event('input', { bubbles: true })) })
   act(() => {
     if (how === 'Escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
-    else document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    else document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   })
   expect(host.querySelector('input')).toBeNull()
   expect(update).toHaveBeenCalledOnce()

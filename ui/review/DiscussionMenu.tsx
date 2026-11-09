@@ -16,7 +16,7 @@ export function DiscussionMenu({ label, disabled, onSelect }: Props) {
     <DropdownMenu.Trigger asChild><button type="button" className="btn-ghost btn-icon rail-icon"
       aria-label={t('moreActions')} title={t('moreActions')}><MoreIcon /></button></DropdownMenu.Trigger>
     <DropdownMenu.Portal>
-      <DropdownMenu.Content data-keeps-discussion="" className="reader-menu" align="end" sideOffset={4}>
+      <DropdownMenu.Content className="reader-menu" align="end" sideOffset={4}>
         <DropdownMenu.Item className="reader-menu-item" disabled={disabled} onSelect={onSelect}>
           <TrashIcon />{label}
         </DropdownMenu.Item>

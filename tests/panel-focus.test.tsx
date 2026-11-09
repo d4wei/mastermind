@@ -59,6 +59,25 @@ it('does not dismiss the panel while Escape belongs to composition', () => {
   expect(close).toHaveBeenCalledOnce()
 })
 
+it('closes on a press outside, even one stopped, but not on its own controls or another floating layer', () => {
+  act(() => root.render(<SlideOver title="Comments" onClose={close} returnFocus=".test-trigger" inside=".test-trigger">
+    <p>Discussion</p>
+  </SlideOver>))
+  const press = (target: Element) => act(() => { target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })) })
+  const menu = document.createElement('div')
+  menu.setAttribute('data-radix-popper-content-wrapper', '')
+  const notice = document.createElement('div')
+  notice.setAttribute('data-layer', '')
+  const page = document.createElement('p')
+  page.addEventListener('pointerdown', (event) => event.stopPropagation())
+  document.body.append(menu, notice, page)
+  for (const kept of [host.querySelector('p')!, trigger, menu, notice]) press(kept)
+  expect(close).not.toHaveBeenCalled()
+  press(page)
+  expect(close).toHaveBeenCalledOnce()
+  menu.remove(); notice.remove(); page.remove()
+})
+
 it('hands focus from the overflow menu into its panel without restoring the trigger over it', () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   function Harness() {

@@ -36,6 +36,7 @@ import { Navigator, useIsNarrow, type SourceOutline } from './Navigator'
 import { readingSpace } from './reading-space'
 import { useReadingSpace, useReadingMovement } from './useReadingSpace'
 import { isImeKey } from '../util/composition'
+import { modalOpen, useOutsidePress } from '../util/outside-press'
 import { EXIT_MS_FALLBACK, prefersReducedMotion, usePresence } from '../util/presence'
 import { rootMs } from '../util/css-tokens'
 import { LoadingState, StateNote } from './LoadingState'
@@ -142,12 +143,10 @@ function isTypingTarget(e: KeyboardEvent): boolean {
 }
 
 /**
- * Marks a surface where a click leaves the selected discussion selected; see the deselection
- * effect. Each discussion surface and each floating layer carries it where it is defined.
+ * Marks a surface in the document or rail where a click leaves the selected discussion selected:
+ * cards, discussion passages, and deletion marks. Floating layers keep it without the mark.
  */
 const KEEPS_DISCUSSION = '[data-keeps-discussion]'
-/** Pointer travel, in pixels, beyond which a press and release is a drag rather than a click. */
-const DRAG_DISTANCE = 4
 
 export function SessionView({ sessionId }: { sessionId: string }) {
   const name = useDoc((s) => s.sessionId === sessionId ? s.meta?.displayName : undefined)
@@ -172,6 +171,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   // The outline locates headings in whichever article is mounted, so it observes both as state.
   const { ref: articleRef, element: articleElement, attach: articleContainer } = useObservedElement()
   const { ref: translatedRef, element: translatedElement, attach: translatedContainer } = useObservedElement()
+  const commentsPanel = useRef<HTMLDivElement>(null)
   const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
   const replyHandled = useCallback(() => setReplyRequest(null), [])
   const translation = useTranslation()
@@ -383,7 +383,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [])
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (document.getElementById('root')?.inert || document.querySelector('.close-dialog[open]')) return
+      if (modalOpen()) return
       // An open panel consumes Escape; its listener may run after this one, so check the DOM too.
       if (e.key === 'Escape' && !isImeKey(e) && !isTypingTarget(e) &&
         !e.defaultPrevented && !escapeOwner()) chooseActive(null)
@@ -446,39 +446,15 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     },
     [undoDeletion, activateThread],
   )
-  // A click anywhere but a surface marked `KEEPS_DISCUSSION` deselects the discussion, keeping its
-  // reply draft as Escape does. Cards and passages carry the mark and select through their own
-  // handlers; menus, tooltips, dialogs, panels, Find, notifications, and the selection toolbar carry
-  // it and leave the selection. The narrow comments panel holds the rail, so only its cards do.
-  useEffect(() => {
-    if (activeSpan === null) return
-    // The press that began the coming click. A press that ends without one (a context menu, a touch
-    // turned into a scroll) or a key that can click is forgotten, so it cannot measure a later click.
-    let pressed: { x: number; y: number } | null = null
-    const press = (event: PointerEvent): void => { pressed = { x: event.clientX, y: event.clientY } }
-    const forget = (): void => { pressed = null }
-    const click = (event: MouseEvent): void => {
-      const from = pressed
-      pressed = null
-      if (event.button !== 0) return
-      // A drag, such as selecting text, is not a click elsewhere.
-      if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > DRAG_DISTANCE) return
-      const target = event.composedPath()[0]
-      // A control the click removed, such as a menu item, was inside what it belonged to.
-      if (!(target instanceof Element) || !target.isConnected || target.closest(KEEPS_DISCUSSION)) return
-      if (target.closest('.md-root') && window.getSelection()?.isCollapsed === false) return
-      chooseActive(null)
-    }
-    const forgetting = ['pointercancel', 'contextmenu', 'keydown'] as const
-    document.addEventListener('pointerdown', press, true)
-    for (const type of forgetting) document.addEventListener(type, forget, true)
-    document.addEventListener('click', click)
-    return () => {
-      document.removeEventListener('pointerdown', press, true)
-      for (const type of forgetting) document.removeEventListener(type, forget, true)
-      document.removeEventListener('click', click)
-    }
-  }, [activeSpan, chooseActive])
+  // A click outside the discussion deselects it, keeping its reply draft as Escape does. Cards and
+  // passages select through their own handlers; floating layers own their clicks. The narrow comments
+  // panel hosts the rail, so a click on its empty space deselects as the wide rail's does. A click
+  // that ends a text selection in the document is the end of that selection, not a click elsewhere.
+  useOutsidePress(() => ({
+    host: commentsPanel.current,
+    inside: (target) => !!target.closest(KEEPS_DISCUSSION) ||
+      !!target.closest('.md-root') && window.getSelection()?.isCollapsed === false,
+  }), () => chooseActive(null), { on: 'click', enabled: activeSpan !== null })
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return
@@ -619,9 +595,9 @@ function DocumentView({ sessionId }: { sessionId: string }) {
         </div>
       </DocumentScroll>
       {showRail && analysis && !showTranslated && narrow && (
-        <div className="comments-panel" inert={tableExpanded} aria-hidden={tableExpanded}
+        <div ref={commentsPanel} className="comments-panel" inert={tableExpanded} aria-hidden={tableExpanded}
           data-table-hidden={tableExpanded}>
-          <SlideOver title={t('comments')} onClose={closeRail} ignoreSelector=".topbar-comments, .find-bar" keepsDiscussion={false}
+          <SlideOver title={t('comments')} onClose={closeRail} inside=".topbar-comments"
             returnFocus=".topbar-comments" focusOnOpen={!findOpenedRail.current}>
             {commentRail}
           </SlideOver>

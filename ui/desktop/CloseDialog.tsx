@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { create } from 'zustand'
 import { useT } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
+import { LAYER } from '../util/outside-press'
 import './CloseDialog.css'
 
 type CloseChoice = 'save' | 'discard' | 'cancel'
@@ -27,7 +28,7 @@ export function CloseDialog() {
     dialog.current?.showModal()
     dialog.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus()
   }, [prompt])
-  return createPortal(<dialog ref={dialog} data-keeps-discussion="" className="close-dialog" aria-labelledby="close-title"
+  return createPortal(<dialog ref={dialog} {...LAYER} className="close-dialog" aria-labelledby="close-title"
     onCancel={(event) => { event.preventDefault(); choose('cancel') }}
     onKeyDown={(event) => { if (ime.isComposing(event.nativeEvent)) event.stopPropagation() }}>
     {prompt && <>

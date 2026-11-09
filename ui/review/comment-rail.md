@@ -111,11 +111,12 @@ to one message; Resolve archives the complete discussion through the existing so
 
 Escape collapses selection, as does a click anywhere but the selected card and the discussion
 passages: the empty rail, margins, top bar, outline, or another card's controls. Another card's
-background selects that card instead. A surface keeps the selection by carrying
-`data-keeps-discussion` where it is defined: cards, discussion passages, deletion marks, menus,
-tooltips, dialogs, slide-over panels other than the narrow comments panel, Find, notifications, and
-the selection toolbar; an unmarked surface deselects. A drag and a click that ends a text selection
-in the document keep it too. Escape that closes a panel, popover, or menu
+background selects that card instead. Cards, discussion passages, and deletion marks keep the
+selection by carrying `data-keeps-discussion` where they are defined; floating layers, such as
+menus, tooltips, dialogs, slide-over panels, Find, notifications, and the selection toolbar, keep it
+without a mark, under the [outside-press rule](../util/outside-press.md). The narrow comments panel
+hosts the rail, so a click on its empty space deselects. A drag and a click that ends a text
+selection in the document keep it too. Escape that closes a panel, popover, or menu
 does not collapse it. Reply drafts stay with their discussions, including when switching or collapsing
 cards. Each analysis builds its thread cards once (`threadCards` beside `group`), carrying every
 member's span index; `thread-identity.ts` identifies a discussion by its anchor text and opening

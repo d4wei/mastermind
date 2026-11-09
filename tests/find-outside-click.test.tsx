@@ -115,6 +115,12 @@ it.each([
     const item = document.createElement('div'); wrapper.append(item); document.body.append(wrapper)
     return item
   }],
+  ['in another floating layer, such as a notification', () => {
+    const stack = document.createElement('div')
+    stack.className = 'notification-stack'; stack.setAttribute('data-layer', '')
+    const dismiss = document.createElement('button'); stack.append(dismiss); host.append(stack)
+    return dismiss
+  }],
   ['while the close dialog is up', () => {
     const dialog = document.createElement('dialog')
     dialog.className = 'close-dialog'; dialog.setAttribute('open', ''); document.body.append(dialog)

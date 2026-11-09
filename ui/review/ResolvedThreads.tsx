@@ -40,7 +40,7 @@ export function ResolvedThreads({ source, plain, onClose, readOnly = false, onEd
   const archive = useMemo(() => parseResolvedThreads(source, plain), [source, plain])
   const keys = recordKeys(archive.entries)
   return (
-    <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} ignoreSelector=".reader-menu" returnFocus=".topbar-overflow">
+    <SlideOver title={`${t('resolvedDiscussions')} (${archive.entries.length})`} onClose={onClose} returnFocus=".topbar-overflow">
       <div className="resolved-threads">
         {archive.entries.length === 0 && archive.diagnostics.length === 0 && <div className="resolved-empty">
           <HistoryIcon />

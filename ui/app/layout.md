@@ -86,7 +86,10 @@ that hold a draft are not overlays and never close for one: menus stack above th
 reply composers. The selection toolbar stays below the document controls and clear of Find,
 opening below its selection when there is no room above. Find floats above an expanded table, and
 the narrow comments panel moves below Find rather than closing it. On narrow layouts, opening settings or resolved history closes
-comments. Settings-save feedback belongs to application
+comments. A press outside a panel, Find, or the outline's heading list dismisses it unless it lands
+in another floating layer, such as a menu, tooltip, notification, or panel, which owns its presses;
+the comments control toggles the narrow comments panel itself. The rule lives in
+[outside presses](../util/outside-press.md). Settings-save feedback belongs to application
 preferences and can appear without an active document.
 
 Settings, history, and Find share `--panel-width` and fit within the viewport width; panels scroll

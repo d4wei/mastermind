@@ -1,6 +1,7 @@
 import { useTableExpansion } from '../modes/reading/TableExpansion'
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { useT } from '../i18n'
+import { useOutsidePress } from '../util/outside-press'
 import { documentViewport, readingLine, scrollToOffset } from '../util/scroll'
 import type { OutlineItem } from '../modes/reading/outline'
 
@@ -57,6 +58,7 @@ export function Navigator({ outline: items, docEl, source: sourceOutline }: Navi
   const [activeOffset, setActiveOffset] = useState<number | null>(null)
   const container = useRef<HTMLElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  useOutsidePress(() => ({ element: container.current }), () => setOpen(false), { enabled: open })
   const tickWindow = useRef<HTMLSpanElement>(null)
   const track = useRef<HTMLSpanElement>(null)
   const [visibleRows, setVisibleRows] = useState(Infinity)
@@ -139,9 +141,6 @@ export function Navigator({ outline: items, docEl, source: sourceOutline }: Navi
 
   useEffect(() => {
     if (!open) return
-    const outside = (event: PointerEvent): void => {
-      if (!container.current?.contains(event.target as Node)) setOpen(false)
-    }
     const escape = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented || container.current?.closest('[inert]')) return
       // Document-level Escape handlers skip a prevented Escape.
@@ -149,10 +148,8 @@ export function Navigator({ outline: items, docEl, source: sourceOutline }: Navi
       if (container.current?.contains(document.activeElement)) trigger.current?.focus()
       setOpen(false)
     }
-    window.addEventListener('pointerdown', outside)
     window.addEventListener('keydown', escape)
     return () => {
-      window.removeEventListener('pointerdown', outside)
       window.removeEventListener('keydown', escape)
     }
   }, [open])

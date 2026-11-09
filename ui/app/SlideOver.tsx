@@ -2,24 +2,23 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { useT } from '../i18n'
 import { CrossIcon } from '../icons'
 import { isImeKey } from '../util/composition'
+import { LAYER, useOutsidePress } from '../util/outside-press'
 
 interface Props {
   title: string
   onClose: () => void
-  /** Outside controls, such as the invoking button, that must not dismiss this panel. */
-  ignoreSelector?: string
+  /** Controls outside the panel whose presses are its own, such as the button that toggles it. */
+  inside?: string
   /** Receives focus on close when the element focused before opening is unavailable. */
   returnFocus: string
   focusOnOpen?: boolean
-  /** Whether a click inside leaves the selected discussion selected; false for a panel holding the rail. */
-  keepsDiscussion?: boolean
   children: ReactNode
 }
 
-export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOnOpen = true, keepsDiscussion = true,
-  children }: Props) {
+export function SlideOver({ title, onClose, inside, returnFocus, focusOnOpen = true, children }: Props) {
   const t = useT()
   const panelRef = useRef<HTMLDivElement | null>(null)
+  useOutsidePress(() => ({ element: panelRef.current, inside }), onClose)
 
   useEffect(() => {
     const panel = panelRef.current
@@ -43,31 +42,18 @@ export function SlideOver({ title, onClose, ignoreSelector, returnFocus, focusOn
         onClose()
       }
     }
-    const onPointerDown = (e: MouseEvent): void => {
-      const target = e.target as HTMLElement
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(target) &&
-        !(ignoreSelector && target.closest(ignoreSelector))
-      ) {
-        onClose()
-      }
-    }
     window.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onPointerDown)
     return () => {
       window.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onPointerDown)
       cancelAnimationFrame(frame)
       if (panel?.contains(document.activeElement) || document.activeElement === document.body) {
         restoreTarget?.focus({ preventScroll: true })
       }
     }
-  }, [onClose, ignoreSelector, returnFocus, focusOnOpen])
+  }, [onClose, returnFocus, focusOnOpen])
 
   return (
-    <div className="slide-over" role="dialog" aria-label={title} ref={panelRef}
-      data-keeps-discussion={keepsDiscussion ? '' : undefined}>
+    <div className="slide-over" role="dialog" aria-label={title} ref={panelRef} {...LAYER}>
       <div className="slide-over-head">
         <span className="slide-over-title">{title}</span>
         <button type="button" className="btn-ghost btn-icon slide-over-close" onClick={onClose} aria-label={t('close')}>

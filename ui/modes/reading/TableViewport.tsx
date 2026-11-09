@@ -312,7 +312,7 @@ export function TableViewport({ children, contentKey, source }: { children: Reac
           aria-label={label} aria-expanded={expanded} onClick={() => change.current(!isExpanded.current)}>
           {expanded ? <CollapseIcon /> : <ExpandIcon />}
         </button>
-      </Tooltip.Trigger><Tooltip.Portal><Tooltip.Content data-keeps-discussion="" className="tooltip" side="top" sideOffset={4}>
+      </Tooltip.Trigger><Tooltip.Portal><Tooltip.Content className="tooltip" side="top" sideOffset={4}>
         {label}<Tooltip.Arrow className="tooltip-arrow" />
       </Tooltip.Content></Tooltip.Portal></Tooltip.Root>}
       <div className="md-table-scroll" ref={scroller} role="region" aria-label={t('table')} tabIndex={0}>

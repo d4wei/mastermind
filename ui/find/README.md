@@ -38,8 +38,9 @@ Shift-Enter navigate; Command-G / Ctrl-G and their Shift variants do the same. E
 highlight nor scroll. Escape closes Find unless an unrelated text input or active IME composition
 owns it. A pointer press anywhere outside the panel also closes it, including a press on a match in
 the document; it returns focus as the close control does and leaves the press's own selection or
-action intact. Presses on the toolbar Find button, inside portaled menu or popover content, or
-while the close dialog or an inert root is up leave it open. Search never writes a file, submits a draft, or moves focus into a reply field; revealing
+action intact. Presses on the toolbar Find button, in another floating layer such as portaled menu
+or popover content, or while the close dialog or an inert root is up leave it open; the rule is
+shared with the other dismissible surfaces in [outside presses](../util/outside-press.md). Search never writes a file, submits a draft, or moves focus into a reply field; revealing
 a comment selects its discussion, whose reply field then shows unfocused.
 
 A result inside a collapsed reply opens its thread. If Find opened the comments panel, closing Find

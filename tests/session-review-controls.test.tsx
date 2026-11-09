@@ -281,11 +281,11 @@ it('deselects on a click anywhere but a surface marked as keeping the discussion
     return holder.querySelector<HTMLElement>('[data-target]')!
   }
   const marked = add('<div data-keeps-discussion><div><textarea data-target></textarea></div></div>')
-  const narrowRail = add('<div class="comments-panel"><div class="slide-over" role="dialog"><div class="rail" data-target></div></div></div>')
+  const layer = add('<div data-layer><button data-target></button></div>')
   select()
   openReaderMenu(host)
   const menu = document.querySelector<HTMLElement>('[role="menu"]')!
-  for (const kept of [marked, menu, passage]) {
+  for (const kept of [marked, layer, menu, passage]) {
     clickOn(kept)
     expect(rail.active).toBe(0)
   }
@@ -297,11 +297,34 @@ it('deselects on a click anywhere but a surface marked as keeping the discussion
   clickOn(host.querySelector('.critic-del')!)
   expect(rail.active).toBe(0)
   for (const elsewhere of [host.querySelector('.topbar')!, host.querySelector('[data-testid="rail"]')!,
-    host.querySelector('.doc-shell')!, narrowRail]) {
+    host.querySelector('.doc-shell')!]) {
     select()
     clickOn(elsewhere)
     expect(rail.active).toBeNull()
   }
+})
+
+it('deselects on a click on the narrow comments panel, which hosts the rail, but not on another panel', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true, addEventListener() {}, removeEventListener() {} }))
+  render('Before {==passage==}{>>@Alex: note<<} after.')
+  const passage = host.querySelector<HTMLElement>('.critic-anchor')!
+  const clickOn = (element: Element) =>
+    act(() => { element.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 })) })
+  act(() => host.querySelector<HTMLButtonElement>('.topbar-comments')!.click())
+  act(() => passage.click())
+  expect(rail.active).toBe(0)
+  const panel = host.querySelector<HTMLElement>('.comments-panel .slide-over')!
+  clickOn(panel.querySelector('.slide-over-title')!)
+  expect(rail.active).toBeNull()
+  expect(host.querySelector('.comments-panel')).not.toBeNull()
+  act(() => passage.click())
+  openReaderMenu(host)
+  act(() => readerMenuItem('Resolved (0)').click())
+  const resolved = host.querySelector<HTMLElement>('.slide-over[aria-label^="Resolved"]')!
+  act(() => passage.click())
+  expect(rail.active).toBe(0)
+  clickOn(resolved.querySelector('.slide-over-title')!)
+  expect(rail.active).toBe(0)
 })
 
 it('keeps the selected discussion through a drag or a text selection that ends in a click', () => {

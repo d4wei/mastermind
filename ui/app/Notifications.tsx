@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { AlertIcon, CrossIcon } from '../icons'
 import { useT } from '../i18n'
 import { rootMs } from '../util/css-tokens'
+import { LAYER } from '../util/outside-press'
 import { usePresence } from '../util/presence'
 import './Notifications.css'
 
@@ -58,7 +59,7 @@ export function Notifications({ children }: { children: ReactNode }) {
     {children}
     {announcements.map(({ id, text, serial }) => <Notification key={id} tier="transient" restart={serial}
       onExpire={() => withdraw(id, serial)}>{text}</Notification>)}
-    <div ref={setStack} className="notification-stack" data-keeps-discussion="">
+    <div ref={setStack} className="notification-stack" {...LAYER}>
       <div ref={setTransients} className="notification-transients" role="status" aria-live="polite" />
     </div>
   </NotificationTarget.Provider>

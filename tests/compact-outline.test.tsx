@@ -75,6 +75,20 @@ it('keeps keyboard heading activation and dismissal on focus leaving the outline
   act(() => outside.focus())
   expect(host.querySelector('.nav-outline')).toBeNull()
 })
+it('dismisses the heading list on a press outside the outline, but not inside it or in a menu', () => {
+  act(() => root.render(<Navigator {...props} />))
+  act(() => host.querySelector<HTMLButtonElement>('.outline-progress')!.click())
+  const press = (target: Element) => act(() => { target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })) })
+  const menu = document.createElement('div')
+  menu.setAttribute('data-radix-popper-content-wrapper', '')
+  const page = document.createElement('p')
+  host.append(menu, page)
+  press(host.querySelector('.nav-outline button')!)
+  press(menu)
+  expect(host.querySelector('.nav-outline')).not.toBeNull()
+  press(page)
+  expect(host.querySelector('.nav-outline')).toBeNull()
+})
 it('tracks the active heading as the document scrolls', () => {
   const article = document.createElement('article')
   article.innerHTML = '<h1 data-ps="0">First</h1><h2 data-ps="12">Second</h2>'

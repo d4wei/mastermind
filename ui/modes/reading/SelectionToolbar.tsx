@@ -11,6 +11,7 @@ import { announce } from '../../app/Notifications'
 import { EXIT_MS_FALLBACK, usePresence } from '../../util/presence'
 import { useCompositionGuard } from '../../util/composition'
 import { rootMs } from '../../util/css-tokens'
+import { LAYER } from '../../util/outside-press'
 import { bandLines, mapSelection, rangesInSpan, selectedBoxes, SELECTION_BAND_CLASS, type ExcludedSegment, type ExclusionReason, type SelectedFragment, type SelRange } from './selection'
 import { documentViewport, readingLine } from '../../util/scroll'
 import { commentBodyFits, commentVerdict, changeVerdict, type MarkVerdict, type VerifyScope } from './marks'
@@ -479,7 +480,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     : Math.max(ceiling, Math.min(view.rect.bottom + 8, window.innerHeight - toolbarSize.height - 8))
 
   return (
-    <div ref={toolbarRef} data-keeps-discussion=""
+    <div ref={toolbarRef} {...LAYER}
       className={`sel-toolbar${present.exiting ? ' closing' : ''}`}
       style={{ top, left }}
       onMouseDown={(e) => {
