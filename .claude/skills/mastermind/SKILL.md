@@ -43,13 +43,15 @@ their Display name and Interface language in the app; the files stay admitted.
 When the person asks you to continue, reread the whole file and every mark in it before changing
 anything: a later mark can order a rewrite that removes the text earlier marks are about. Close the
 file next, as below, so the person does not keep editing a file you are rewriting; closing saves
-their latest edits, so reread once more after it reports `closed`. Then give each mark, in file
-order, the treatment the review protocol promises. Report one table: each mark (its line number as
-received, a few words of it), what was done, one clause of why; a mark removed by another mark's
-rewrite gets its own row. After the table come a request the person made alongside the marks, which
-is theirs to have done, and anything a rule here told you to list, such as candidate instances or a
-file that stayed open. Open the file again when the result needs their eyes, such as answers left
-standing beside their questions.
+their latest edits, so reread once more after it reports `closed`, and run `marks` on it (below) for
+the inventory you will work from. Then give each mark, in file order, the treatment the review
+protocol promises, and run `marks` again when done: it must exit 0, so repair each delimiter it
+reports. Report one table: each mark (its line number from the first inventory, a few words of it),
+what was done, one clause of why; a mark removed by another mark's rewrite gets its own row. After
+the table come a request the person made alongside the marks, which is theirs to have done, and
+anything a rule here told you to list, such as candidate instances or a file that stayed open. Open
+the file again when the result needs their eyes, such as answers left standing beside their
+questions.
 
 Nothing in the app signals approval: not opening, not saving, not the end of your turn. Only the
 person's words do.
@@ -73,6 +75,16 @@ invocation, and 3 when the reply was lost; retrying after 3 is safe. The app reo
 at its next start, so a file you leave open stays in front of the person across restarts; while the
 app is not running, every file reports `not_open`.
 
+## Inventory review marks
+
+`node /path/to/mastermind/bin/mastermind.js marks [--json] FILE...` lists each file's review marks
+as the app's own parser reads them, one line per mark in file order: `L<line>:<col>`, kind, author
+tag or `@?`, and text, with ` on "anchor"` and ` #n` naming a comment's anchor and discussion.
+`--json` prints the same inventory structured. It needs `npm ci`, not a native build. Exit status
+is 0 on a clean parse; 1 when a delimiter would show as literal text, naming each on stderr as
+`file:L<line>:<col>: message`; and 2 for invalid invocation. The viewer drops such marks silently,
+so fix every one before handing a file back.
+
 ## Ready a draft for review
 
 When asked to ready a draft of your own before the person reads it, add to it, in the forms the
@@ -86,7 +98,8 @@ review protocol gives:
   your tag naming whose proposal it is.
 
 Change nothing else; a draft meant to collect the person's own edits may need no marks at all.
-Then open it.
+Then run `marks` on it to confirm each mark parses and lands in the discussion you meant, and open
+it.
 
 ## Prepare a translation
 
