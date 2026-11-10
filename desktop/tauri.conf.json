@@ -15,7 +15,13 @@
     "withGlobalTauri": true,
     "windows": [],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:",
+      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' asset: http://asset.localhost; img-src 'self' data: blob:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPCACHE/font-packs/*/*.woff2"
+        ]
+      },
       "capabilities": [
         {
           "identifier": "reviewer",

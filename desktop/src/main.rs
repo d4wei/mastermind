@@ -6,6 +6,7 @@ mod closing;
 mod document_io;
 mod endpoint;
 mod files;
+mod font_packs;
 mod launcher;
 mod lifecycle;
 mod menu;
@@ -97,6 +98,7 @@ fn main() {
             document_io::save_document_copy,
             document_io::watch_document,
             document_io::list_translations,
+            font_packs::font_pack,
             setup::setup_snapshot,
             setup::protect_setup_fields,
             setup::confirm_setup,
@@ -114,6 +116,10 @@ fn main() {
             let restoration = docs.lock().unwrap().remember(remember.clone());
             app.manage(remember);
             let setup = Arc::new(setup::Setup::new(preferences));
+            // The asset protocol's scope in tauri.conf.json names this same directory.
+            app.manage(Arc::new(font_packs::Packs::new(
+                app.path().app_cache_dir()?.join("font-packs"),
+            )));
             app.manage(setup.clone());
             let invalidations = app.handle().clone();
             let watch = document_io::FileWatch::new(document_io::coalesce(

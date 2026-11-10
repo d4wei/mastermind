@@ -4,9 +4,10 @@
 and runs launcher and graphical admissions; they serialize on the document registry anyway. The
 blocking-work gate runs every other native command: registry commands, document reads and writes,
 Save As, translation reads, preferences, watcher registration, and initial setup. Its capacity is
-an implementation constant. Callers await a permit before submitting a blocking worker; each
-worker owns its permit until its closure finishes or unwinds, and a caller cancelled while still
-waiting holds nothing.
+an implementation constant. Callers await a permit before submitting a blocking worker; each worker
+owns its permit until its closure finishes or unwinds, and a caller cancelled while still waiting
+holds nothing. A [font pack](font_packs.md) download waits on the network instead, so it runs on its
+own blocking thread outside both lanes.
 
 Cancelling an awaiting command or expiring the launcher response deadline does not release
 capacity held by a running operation. Tokio cannot abort a blocking operation after it starts. A
