@@ -115,7 +115,7 @@ describe('language-tagged blocks', () => {
     const sheet = postcss.parse(readFileSync(path.resolve('ui/app/app.css'), 'utf8'))
     const families: string[] = []
     sheet.walkRules((rule) => {
-      if (rule.selector.replace(/\s+/g, ' ') !== ':where(.md-root [lang], .trans-view [lang])') return
+      if (rule.selector.replace(/\s+/g, ' ') !== ':where(.md-root [lang])') return
       rule.walkDecls('font-family', (decl) => { families.push(decl.value) })
     })
     expect(families).toEqual(['var(--font-body)'])

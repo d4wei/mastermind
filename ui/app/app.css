@@ -566,8 +566,9 @@ button:disabled {
   font-weight: var(--weight-body);
 }
 /* A block naming its own language reads the stack again: an inherited family is already computed
-   from its parent's. Zero specificity, so headings and code keep the families they declare. */
-:where(.md-root [lang], .trans-view [lang]) { font-family: var(--font-body); }
+   from its parent's. Zero specificity, so headings and code keep the families they declare. A
+   translated block needs no such rule: its body is itself a `.md-root`. */
+:where(.md-root [lang]) { font-family: var(--font-body); }
 
 /* Body-relative sizes keep the hierarchy stable when text size changes. */
 .md-root :is(h1, h2, h3, h4, h5, h6) {

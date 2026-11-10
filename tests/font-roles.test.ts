@@ -6,8 +6,9 @@ import { afterEach, expect, it } from 'vitest'
 
 // Reading presets set the document faces; interface chrome keeps the system face whatever the preset.
 const READING_FACES = /var\(--font-(body|display)\)/
-/** Selectors whose elements render document text: the Markdown body and quotations of it. */
-const DOCUMENT_TEXT = /^(\.md-root\b|\.trans-view \.md-callout\b|\.translated-comment-quote$)/
+/** Selectors whose elements render document text: the Markdown body, its blocks that name their
+ *  own language, and quotations of it. */
+const DOCUMENT_TEXT = /^(\.md-root\b|:where\(\.md-root \[lang\]\)$|\.trans-view \.md-callout\b|\.translated-comment-quote$)/
 
 const uiRoot = path.resolve('ui')
 const sheets = readdirSync(uiRoot, { recursive: true }).map(String).filter((name) => name.endsWith('.css'))
