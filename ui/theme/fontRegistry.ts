@@ -1,12 +1,33 @@
 import type { MsgKey } from '../i18n'
 
-/** CJK faces after the Latin face: the bundled Noto face, then system faces if its slice cannot load. */
+/**
+ * CJK faces after the Latin face, by style and language: the Noto face for the language, then
+ * system faces if it is not bundled or its slice cannot load. `zh` (Simplified) is the default; the
+ * [contract](fonts.md) names which languages are bundled and which `:lang()` selects each.
+ */
 export const CJK_STACKS = {
-  serif: ['Noto Serif SC', 'Songti SC', 'SimSun'],
-  sans: ['Noto Sans SC', 'PingFang SC', 'Microsoft YaHei'],
+  serif: {
+    zh: ['Noto Serif SC', 'Songti SC', 'SimSun'],
+    ja: ['Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho'],
+    'zh-TW': ['Noto Serif TC', 'Songti TC', 'PMingLiU'],
+    'zh-HK': ['Noto Serif HK', 'Songti TC', 'PMingLiU'],
+    ko: ['Noto Serif KR', 'AppleMyungjo', 'Batang'],
+  },
+  sans: {
+    zh: ['Noto Sans SC', 'PingFang SC', 'Microsoft YaHei'],
+    ja: ['Noto Sans JP', 'Hiragino Sans', 'Yu Gothic'],
+    'zh-TW': ['Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei'],
+    'zh-HK': ['Noto Sans HK', 'PingFang HK', 'Microsoft JhengHei'],
+    ko: ['Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic'],
+  },
 } as const
 
 export type CjkStyle = keyof typeof CJK_STACKS
+export type CjkLanguage = keyof typeof CJK_STACKS.serif
+
+export const CJK_LANGUAGES = Object.keys(CJK_STACKS.serif) as CjkLanguage[]
+/** The stack of `--font-display`, `--font-body`, and `--font-mono`, and of text with no CJK language. */
+export const DEFAULT_CJK_LANGUAGE: CjkLanguage = 'zh'
 
 /** A complete reading choice: every face the document needs. The [contract](fonts.md) explains. */
 export interface FontPreset {

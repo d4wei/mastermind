@@ -3,6 +3,7 @@ import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Analysis } from '../document/markdown/analyze'
+import { NO_LANGUAGES } from '../document/markdown/language'
 import { createReactHost, removeReactHost } from './helpers/dom'
 
 const analyses = vi.hoisted(() => [] as { source: string; result: Analysis }[])
@@ -36,7 +37,7 @@ it('renders translated blocks without stripping positions from shared trees or r
   const artifact = { version: 1 as const, sourceHash: prepared.sourceHash, sourceLang: 'en', targetLang: 'zh-CN',
     blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id,
       text: block.kind === 'heading' ? '# 标题' : '正文。' })) }
-  const view = () => <TranslatedView source={source} artifact={artifact} containerRef={null} />
+  const view = () => <TranslatedView source={source} artifact={artifact} languages={NO_LANGUAGES} containerRef={null} />
   await act(async () => root.render(view()))
   await vi.waitFor(async () => {
     await act(async () => {})

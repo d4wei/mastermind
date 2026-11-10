@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
-import { FONT_FACES_HREF, bodyStack, displayStack, monoStack, fontPresetById } from './fonts'
+import { FONT_FACES_HREF, fontFamilyTokens, fontPresetById } from './fonts'
 import { prefersReducedMotion } from '../util/presence'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
 
@@ -93,14 +93,12 @@ export function ThemeEffects() {
     root.setProperty('--content-max-width', `${config.contentWidth / 16}rem`)
 
     const preset = fontPresetById(config.fontPreset)
-    root.setProperty('--font-display', displayStack(preset))
-    root.setProperty('--font-body', bodyStack(preset))
+    for (const [name, value] of Object.entries(fontFamilyTokens(preset))) root.setProperty(name, value)
     // Light themes keep the base weight from `themes/common.css`.
     if (theme?.appearance === 'dark') root.setProperty('--weight-body', String(preset.darkBodyWeight))
     else root.removeProperty('--weight-body')
     root.setProperty('--weight-bold', String(preset.displayWeight))
     root.setProperty('--ls-heading', preset.displayTracking)
-    root.setProperty('--font-mono', monoStack(preset))
     root.setProperty('--weight-code', String(preset.codeWeight))
 
     // `none` clears the --code-* tokens; the renderer also skips tokenizing for it.

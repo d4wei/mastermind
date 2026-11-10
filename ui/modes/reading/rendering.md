@@ -10,6 +10,20 @@ translated view applies to source headings.
 Each table sits inside a labeled, keyboard-focusable horizontal scroll region. The table retains
 its header/cell semantics and source positions; overflow does not widen the reading column.
 
+## Language
+
+`SessionView.tsx` resolves the [document language](../../../document/markdown/language.md) once per
+plain parse: the analysis's own in reading mode, the plain stand-in otherwise. A valid prepared
+translation's `sourceLang` is the supplied language. The reading article carries the document's
+language as `lang`, and the renderer puts `lang` on each top-level block or top-level list item
+whose own language differs, looked up by its source start in `RenderCtx.blockLanguages`; the
+document view renders again only when that map changes, as for any other context. With no
+resolved language the article carries no `lang` and inherits the interface language. The
+translated view's root carries the original's language too; a translated block carries the
+prepared translation's target language when it differs, and a block shown from the original keeps
+its own. The attribute changes faces only, through the `:lang()` rules the
+[font contract](../../theme/fonts.md) describes.
+
 ## Table viewports
 
 `TableViewport` sizes one table against the window's available content width and freezes that

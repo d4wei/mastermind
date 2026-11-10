@@ -87,8 +87,14 @@ const editingState = (paused: boolean) => [EditorState.readOnly.of(paused), Edit
 
 const retainedStates = documentMap<{ state: EditorState; revision: number }>()
 
-/** `onOutline` receives the mounted view's heading geometry and navigation, and null on unmount. */
-export function SourceEditor({ onOutline }: { onOutline: Dispatch<SetStateAction<SourceOutline | null>> }) {
+/**
+ * `onOutline` receives the mounted view's heading geometry and navigation, and null on unmount.
+ * `lang` is the document's language; the editor carries it on its root and nothing per line.
+ */
+export function SourceEditor({ lang, onOutline }: {
+  lang?: string
+  onOutline: Dispatch<SetStateAction<SourceOutline | null>>
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
   const reportOutline = useRef(onOutline)
   reportOutline.current = onOutline
@@ -172,5 +178,5 @@ export function SourceEditor({ onOutline }: { onOutline: Dispatch<SetStateAction
     }
   }, [sessionId, externalVersion])
 
-  return <div ref={hostRef} className="source-host" />
+  return <div ref={hostRef} className="source-host" lang={lang} />
 }

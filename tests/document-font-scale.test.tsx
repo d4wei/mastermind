@@ -8,7 +8,7 @@ import { useConfig } from '../ui/app/configStore'
 import { installHost } from '../ui/app/host'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { ThemeEffects } from '../ui/theme/ThemeProvider'
-import { FONT_FACES_HREF, fontPresetById, monoStack } from '../ui/theme/fonts'
+import { FONT_FACES_HREF, fontFamilyTokens, fontPresetById, monoStack } from '../ui/theme/fonts'
 import { fakeHost } from './helpers/host'
 import { declarations } from './helpers/themes'
 
@@ -91,6 +91,8 @@ it('loads the bundled faces once and applies the chosen preset, code face includ
   expect(document.head.querySelectorAll(`link[href="${FONT_FACES_HREF}"]`)).toHaveLength(1)
   expect(style.getPropertyValue('--font-body')).toContain("'Atkinson Hyperlegible Next', 'Noto Sans SC'")
   expect(style.getPropertyValue('--font-mono')).toBe(monoStack(preset))
+  for (const [name, value] of Object.entries(fontFamilyTokens(preset))) expect(style.getPropertyValue(name), name).toBe(value)
+  expect(style.getPropertyValue('--font-body-ja')).toContain("'Atkinson Hyperlegible Next', 'Noto Sans JP'")
   expect(style.getPropertyValue('--weight-code')).toBe(String(preset.codeWeight))
   expect(style.getPropertyValue('--weight-bold')).toBe(String(preset.displayWeight))
   act(() => root.unmount())

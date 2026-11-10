@@ -295,3 +295,16 @@ it('continues a Markdown list on Enter', () => {
   act(() => { expect(runScopeHandlers(view, new KeyboardEvent('keydown', { key: 'Enter' }), 'editor')).toBe(true) })
   expect(useDoc.getState().source).toBe('- item\n- ')
 })
+
+it('carries the document language on its root and nothing per line, without recreating the view', () => {
+  const outline = () => {}
+  act(() => root.render(<SourceEditor lang="ja" onOutline={outline} />))
+  const view = editor()
+  expect(host.querySelector('.source-host')!.getAttribute('lang')).toBe('ja')
+  act(() => root.render(<SourceEditor lang="zh-CN" onOutline={outline} />))
+  expect(host.querySelector('.source-host')!.getAttribute('lang')).toBe('zh-CN')
+  expect(editor()).toBe(view)
+  expect(host.querySelectorAll('.source-host [lang]')).toHaveLength(0)
+  act(() => root.render(<SourceEditor onOutline={outline} />))
+  expect(host.querySelector('.source-host')!.hasAttribute('lang')).toBe(false)
+})

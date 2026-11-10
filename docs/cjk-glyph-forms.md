@@ -13,6 +13,16 @@ sets the document root's `lang`, which is the wrong signal for a document's body
 read under a Japanese interface must keep Chinese forms. This design gives every block of rendered
 text a language and lets the font stack follow it.
 
+**Shipped so far.** Noto Sans JP and Noto Serif JP are bundled beside the SC pair. Every document
+and block now resolves a language from frontmatter, a prepared translation's `sourceLang`, and
+script detection, and the views carry it as `lang`, contract in the
+[document language](../document/markdown/language.md) and the
+[reading presentation](../ui/modes/reading/rendering.md). `CJK_STACKS` is style × language and the
+document stylesheet swaps per-language tokens by `:lang()`, contract in the
+[font presets](../ui/theme/fonts.md). Still to come: the `open --document-language` hint and the
+fetched packs for Traditional Chinese, Hong Kong and Korean faces, which fall through to system
+faces meanwhile.
+
 ## What is customary
 
 HTML tags language on any element with `lang`, and CSS picks faces by it with `:lang()`; the

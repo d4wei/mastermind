@@ -74,7 +74,7 @@ function PropertyList({ properties }: { properties: MetadataProperty[] }) {
   </dl>
 }
 
-export function Frontmatter({ source }: { source: string }) {
+export function Frontmatter({ source, lang }: { source: string; lang?: string }) {
   // The loaded parser, as this view saw it; the load completing sets it.
   const [yaml, setYaml] = useState(parser)
   const properties = useMemo(() => metadataProperties(source, yaml), [source, yaml])
@@ -88,10 +88,10 @@ export function Frontmatter({ source }: { source: string }) {
   const raw = <pre className="md-code"><code>{source}</code></pre>
   if (pending) {
     const rows = placeholderRows(source)
-    return <div className="md-frontmatter md-frontmatter-pending" aria-hidden="true">
+    return <div className="md-frontmatter md-frontmatter-pending" lang={lang} aria-hidden="true">
       {rows ? <PropertyList properties={rows} /> : raw}
     </div>
   }
-  if (!properties) return <div className="md-frontmatter">{raw}</div>
-  return <div className="md-frontmatter"><PropertyList properties={properties} /></div>
+  if (!properties) return <div className="md-frontmatter" lang={lang}>{raw}</div>
+  return <div className="md-frontmatter" lang={lang}><PropertyList properties={properties} /></div>
 }
