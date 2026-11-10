@@ -13,6 +13,7 @@ import { SessionView } from '../ui/app/SessionView'
 import { useDoc } from '../ui/documents/store'
 import { useTranslation } from '../ui/translate/translationStore'
 import { fakeHost } from './helpers/host'
+import { setDocumentLanguageHints, useDocumentLanguageHints } from '../ui/documents/language-hints'
 
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
 vi.mock('../ui/modes/source/SourceEditor', () => ({
@@ -74,6 +75,7 @@ describe('the document view', () => {
   })
   afterEach(() => {
     act(() => root.unmount()); host.remove(); useDoc.setState(initial); useTranslation.getState().release('A')
+    useDocumentLanguageHints.setState({ hints: {} })
     vi.unstubAllGlobals(); installHost(null)
   })
   async function open(source: string) {
@@ -119,6 +121,22 @@ describe('the document view', () => {
     // The supplied language speaks for the document; the kana block is still tagged for itself.
     expect(article().getAttribute('lang')).toBe('zh-CN')
     expect(tagged(article())).toEqual(['p ja: 漢字の文書。'])
+  })
+
+  it('takes the open hint before script detection and before a disagreeing source language', async () => {
+    const source = '漢字の文書。\n\n中文漢字。\n'
+    const artifact = await prepare(source, 'zh-CN', 'en')
+    installHost(fakeHost({ translations: async () => [artifact] }))
+    setDocumentLanguageHints([{ id: 'A', document_language: 'zh-TW' }, { id: 'B', document_language: null }])
+    await open(source)
+    await act(async () => useTranslation.getState().synchronize())
+    expect(article().getAttribute('lang')).toBe('zh-TW')
+    // Frontmatter still wins over the hint.
+    await act(async () => useDoc.setState({ source: '---\nlang: ko\n---\n\n中文。\n' }))
+    expect(article().getAttribute('lang')).toBe('ko')
+    // Closing the document drops its hint, and the prepared translation's language speaks again.
+    await act(async () => { setDocumentLanguageHints([]); useDoc.setState({ source }) })
+    expect(article().getAttribute('lang')).toBe('zh-CN')
   })
 
   it('tags translated blocks with the target language and keeps the original\'s on literal blocks', async () => {

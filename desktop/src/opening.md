@@ -44,6 +44,10 @@ subscribes with `close_requests_ready`, and page navigation or a lost web conten
 unsubscribes it and fails waiting requests. The [launch protocol](protocol.md#closing) owns the
 results.
 
+Each document carries the transient hints of the `open` calls that named it, the reading language
+and the document language, as the [launch protocol](protocol.md) describes; inventory snapshots
+report both, and closing releases them.
+
 The renderer reports the person's selection with `select_document` and the activation revision it
 observed; a selection older than the latest activation is ignored. The registry uses it only to
 remember the active document, without advancing the revision. The open set and active document

@@ -38,6 +38,10 @@ valid UTF-8 opens with replacement characters, but saving an edit to it is refus
 Save As writes a UTF-8 copy. A first open reports `onboarding_needed` while the person confirms
 their Display name and Interface language in the app; the files stay admitted.
 
+When you know a document's language and its file has no frontmatter `lang`, pass it with
+`--document-language CODE` (a BCP 47 tag such as `zh-TW` or `ko`) so its characters take that
+language's glyph forms; the hint is stored nowhere and leaves the file untouched.
+
 ## Address feedback
 
 When the person asks you to continue, reread the whole file and every mark in it before changing

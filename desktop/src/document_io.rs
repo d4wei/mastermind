@@ -536,6 +536,7 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -580,6 +581,7 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -614,6 +616,7 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![
                 original.to_str().unwrap().into(),
@@ -802,6 +805,7 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -814,6 +818,7 @@ mod tests {
         assert_eq!((docs.len(), docs.active_id), (1, Some(1)));
         let reopened = docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![original.to_str().unwrap().into()],
         });
@@ -872,6 +877,7 @@ mod tests {
         assert_eq!(
             docs.admit(Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: vec![path.to_str().unwrap().into()]
             })
@@ -915,6 +921,7 @@ mod tests {
         let mut docs = Documents::default();
         docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![path.to_str().unwrap().into()],
         });

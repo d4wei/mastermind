@@ -1,10 +1,10 @@
 # Native launcher protocol
 
-The repository launcher forwards `open [--language CODE] -- FILE...`, `close -- FILE...`, and
-`setup --suggest JSON_OBJECT` to the native app. Opening resolves relative paths against the
-invoking process's directory, starts or reuses one local host, and reports admission without
-waiting for onboarding or review completion. The Windows console companion preserves command
-output without attaching a console to the GUI. A launcher started with
+The repository launcher forwards `open [--language CODE] [--document-language CODE] -- FILE...`,
+`close -- FILE...`, and `setup --suggest JSON_OBJECT` to the native app. Opening resolves relative
+paths against the invoking process's directory, starts or reuses one local host, and reports
+admission without waiting for onboarding or review completion. The Windows console companion
+preserves command output without attaching a console to the GUI. A launcher started with
 `MM_LAUNCH_CHECK_ATTACH_ONLY` set, as the repository launcher does for a debug build, never starts
 a host: without one it replies `host_not_running`.
 
@@ -33,6 +33,16 @@ requested paths; one the host restored reports `already_open`. Documents stay op
 person or an agent closes them.
 
 The optional initial reading-language hint follows [translation discovery](translations.md).
+
+`--document-language CODE` names the language the documents in that call are written in, for
+rendering only. It travels as the request's `document_language`; the launcher refuses a code that
+is not a well-formed BCP 47 tag (`protocol::language_tag`) as an invalid invocation, and the host
+refuses one with `invalid_document_language`. The hint reaches every document the call opens or
+finds already open, replacing an earlier hint for that document; a call without one leaves it. The
+registry keeps it only while the document stays open and the inventory snapshot exposes it as
+`document_language`; it is never written to the document, its translations, or the remembered
+documents, so a relaunch forgets it. The [document language](../../document/markdown/language.md)
+places it after frontmatter `lang` and before script detection.
 
 ## Closing
 

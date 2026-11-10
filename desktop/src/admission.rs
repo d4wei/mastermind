@@ -36,7 +36,10 @@ pub struct Document {
     /// The file admission read; later reads and writes refuse a file that does not continue it.
     /// Only test fixtures register a document without one.
     pub identity: Option<crate::files::Identity>,
+    /// The reading-language hint: the first one any `open` gave, as `translations.md` says.
     pub language: Option<String>,
+    /// The document-language hint: the latest one any `open` naming the document gave.
+    pub document_language: Option<String>,
     /// The last version a read found `settled`; a read that knows it checks the stamp alone.
     pub settled_version: Option<String>,
 }
@@ -271,6 +274,7 @@ impl Documents {
                     .map(|snapshot| snapshot.version.clone()),
                 snapshot,
                 language: None,
+                document_language: None,
             },
         );
         id
@@ -292,6 +296,13 @@ impl Documents {
             .is_some_and(|code| !mastermind_launch_check::protocol::language_code(code))
         {
             return Response::error("invalid_language");
+        }
+        if request
+            .document_language
+            .as_ref()
+            .is_some_and(|code| !mastermind_launch_check::protocol::language_tag(code))
+        {
+            return Response::error("invalid_document_language");
         }
         if request.paths.is_empty()
             || request.paths.len() > MAX_FILES
@@ -317,6 +328,11 @@ impl Documents {
                     let document = self.entries.get_mut(&id).unwrap();
                     if document.language.is_none() {
                         document.language.clone_from(&request.language);
+                    }
+                    if request.document_language.is_some() {
+                        document
+                            .document_language
+                            .clone_from(&request.document_language);
                     }
                     FileResult {
                         path,
@@ -880,6 +896,7 @@ mod tests {
         fn request(&self, names: &[&str]) -> Request {
             Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: names
                     .iter()
@@ -908,6 +925,59 @@ mod tests {
         assert_eq!(docs.get(0).unwrap().language.as_deref(), Some("fr"));
         docs.close(0, None, docs.activation_revision);
         assert_eq!(docs.len(), 0);
+    }
+
+    #[test]
+    fn document_language_hints_reach_new_and_already_open_documents() {
+        let fixture = Fixture::new();
+        for name in ["a.md", "b.md"] {
+            fs::write(fixture.0.join(name), name).unwrap();
+        }
+        let mut docs = Documents::default();
+        let mut request = fixture.request(&["a.md"]);
+        request.document_language = Some("zh-TW".into());
+        docs.admit(request);
+        assert_eq!(
+            docs.get(0).unwrap().document_language.as_deref(),
+            Some("zh-TW")
+        );
+        // A later hint names the document again and replaces the earlier one; a call without one
+        // leaves it.
+        let mut request = fixture.request(&["a.md", "b.md"]);
+        request.document_language = Some("ko".into());
+        let response = docs.admit(request);
+        assert_eq!(
+            response
+                .results
+                .iter()
+                .map(|result| result.status.as_str())
+                .collect::<Vec<_>>(),
+            ["already_open", "opened"]
+        );
+        assert_eq!(
+            docs.get(0).unwrap().document_language.as_deref(),
+            Some("ko")
+        );
+        assert_eq!(
+            docs.get(1).unwrap().document_language.as_deref(),
+            Some("ko")
+        );
+        docs.admit(fixture.request(&["a.md"]));
+        assert_eq!(
+            docs.get(0).unwrap().document_language.as_deref(),
+            Some("ko")
+        );
+        assert!(docs.get(0).unwrap().language.is_none());
+        let mut malformed = fixture.request(&["a.md"]);
+        malformed.document_language = Some("zh_TW".into());
+        assert_eq!(
+            docs.admit(malformed).error.as_deref(),
+            Some("invalid_document_language")
+        );
+        assert_eq!(
+            docs.get(0).unwrap().document_language.as_deref(),
+            Some("ko")
+        );
     }
 
     #[test]
@@ -1089,6 +1159,7 @@ mod tests {
             fixture.request(&vec!["a.md"; MAX_FILES + 1]),
             Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: vec!["relative".into()],
             },
@@ -1117,6 +1188,7 @@ mod tests {
         );
         let request = Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec!["relative".into()],
         };

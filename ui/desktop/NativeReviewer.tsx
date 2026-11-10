@@ -1,4 +1,5 @@
 import { useTranslation } from '../translate/translationStore'
+import { setDocumentLanguageHints } from '../documents/language-hints'
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { App } from '../app/App'
@@ -155,6 +156,7 @@ export function NativeReviewer() {
             if (disposed) return
           }
           for (const file of snapshot.files) if (file.language) useTranslation.getState().hint(file.id, file.language)
+          setDocumentLanguageHints(snapshot.files)
           setFiles(unlessEqual(snapshot.files))
           setOpeningErrors(unlessEqual(snapshot.opening_errors))
           if (snapshot.restore_failures.length > 0) {

@@ -18,8 +18,10 @@ match, not a YAML parser.
 of:
 
 1. the frontmatter's `lang`, when it is a well-formed BCP 47 tag;
-2. the supplied language, when well-formed: what the agent or a prepared translation's
-   `sourceLang` says;
+2. the supplied language, when well-formed: what the agent says. `agentLanguage` takes the
+   `open --document-language` hint, then a prepared translation's `sourceLang`; both come from an
+   agent, and the hint, which names the document's language and nothing else, wins when they
+   disagree;
 3. the script most of its CJK blocks are in: `ja` when blocks with kana are at least as many as
    blocks with hangul and as blocks with Han alone, else `ko` when hangul blocks are at least as
    many as Han-only ones, else `zh-CN` when the document has Han. Japanese and Korean prose carries

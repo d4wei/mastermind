@@ -9,7 +9,8 @@ import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
 import { analyzeMarkdown, type Analysis } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
-import { NO_LANGUAGES, resolveLanguages, scanScripts } from '../../document/markdown/language'
+import { agentLanguage, NO_LANGUAGES, resolveLanguages, scanScripts } from '../../document/markdown/language'
+import { useDocumentLanguageHint } from '../documents/language-hints'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
@@ -204,9 +205,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const scannedTree = analysis ? analysis.plain : plainParse?.tree
   const scripts = useMemo(() => scannedTree && scannedSource !== undefined ? scanScripts(scannedSource, scannedTree) : null,
     [scannedSource, scannedTree])
-  // A prepared translation names the language it was translated from.
-  const suppliedLanguage = translation.sessionId === sessionId
-    ? (translation.artifact ?? translation.available[0])?.sourceLang : undefined
+  // What the agent says: the open hint, else the language a prepared translation was made from.
+  const languageHint = useDocumentLanguageHint(sessionId)
+  const suppliedLanguage = agentLanguage(languageHint, translation.sessionId === sessionId
+    ? (translation.artifact ?? translation.available[0])?.sourceLang : undefined)
   const languages = useMemo(() => scripts ? resolveLanguages(scripts, suppliedLanguage) : NO_LANGUAGES,
     [scripts, suppliedLanguage])
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.

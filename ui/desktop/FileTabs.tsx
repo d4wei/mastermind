@@ -7,7 +7,13 @@ import { useClosePrompt } from './CloseDialog'
 import { useOverlay, useOverlayControl } from '../app/overlayStore'
 import { useT, type UiLang } from '../i18n'
 
-export interface OpenDocument { language?: string; id: string; path: string }
+export interface OpenDocument {
+  language?: string
+  /** The `open --document-language` hint, which names the language the document is written in. */
+  document_language?: string | null
+  id: string
+  path: string
+}
 interface FileTabsProps {
   files: OpenDocument[]
   activeId: string | null

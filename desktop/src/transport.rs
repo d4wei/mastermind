@@ -222,6 +222,7 @@ mod tests {
         let path = format!("/{}", "p".repeat(699));
         let request = serde_json::to_vec(&Operation::Open(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![path.clone(); MAX_FILES],
         }))
@@ -293,6 +294,7 @@ mod tests {
         let response = dispatch(
             Operation::Open(Request {
                 language: None,
+                document_language: None,
                 version: VERSION + 1,
                 paths: vec![],
             }),
@@ -337,6 +339,7 @@ mod tests {
         let request = || {
             Operation::Open(Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: vec![path.to_str().unwrap().into()],
             })
@@ -369,6 +372,7 @@ mod tests {
         let open = || {
             Operation::Open(Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: vec![dir.join("missing.md").to_str().unwrap().into()],
             })
@@ -441,6 +445,7 @@ mod tests {
         .join();
         let request = Operation::Open(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec![dir.join("document.md").to_str().unwrap().into()],
         });
