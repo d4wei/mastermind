@@ -2,6 +2,22 @@
   --font-display: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
   --font-body: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
   --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+  /* The same stacks per CJK language; document content takes them through `:lang()` in ui/app/app.css. */
+  --font-display-zh: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-body-zh: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-mono-zh: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
+  --font-display-ja: 'Source Serif 4', 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --font-body-ja: 'Source Serif 4', 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --font-mono-ja: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', monospace;
+  --font-display-zh-tw: 'Source Serif 4', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  --font-body-zh-tw: 'Source Serif 4', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
+  --font-mono-zh-tw: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', monospace;
+  --font-display-zh-hk: 'Source Serif 4', 'Noto Serif HK', 'Songti TC', 'PMingLiU', serif;
+  --font-body-zh-hk: 'Source Serif 4', 'Noto Serif HK', 'Songti TC', 'PMingLiU', serif;
+  --font-mono-zh-hk: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans HK', 'PingFang HK', 'Microsoft JhengHei', monospace;
+  --font-display-ko: 'Source Serif 4', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
+  --font-body-ko: 'Source Serif 4', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
+  --font-mono-ko: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', monospace;
   --font-size-body: 1rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.8125rem;

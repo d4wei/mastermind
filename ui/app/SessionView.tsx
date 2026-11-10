@@ -9,6 +9,7 @@ import { APP_NAME, DEFAULT_AUTHOR_TAG, escapeOwner } from './constants'
 import { rejectEdit } from '../../document/critic/resolve'
 import { analyzeMarkdown, type Analysis } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
+import { NO_LANGUAGES, resolveLanguages, scanScripts } from '../../document/markdown/language'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
@@ -197,6 +198,17 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const plainParse = usePlainParse(sessionId, source, status === 'ready' && !analysis, cachedPlain)
   /** A plain parse of exactly the current source, when the view holds one. */
   const currentPlain = cachedPlain ?? (plainParse?.source === source ? plainParse.tree : undefined)
+  // Scripts are scanned once per plain parse: the analysis's own, or the latest stand-in, which may
+  // describe an earlier source but stays consistent with the tree it pairs with.
+  const scannedSource = analysis ? source : plainParse?.source
+  const scannedTree = analysis ? analysis.plain : plainParse?.tree
+  const scripts = useMemo(() => scannedTree && scannedSource !== undefined ? scanScripts(scannedSource, scannedTree) : null,
+    [scannedSource, scannedTree])
+  // A prepared translation names the language it was translated from.
+  const suppliedLanguage = translation.sessionId === sessionId
+    ? (translation.artifact ?? translation.available[0])?.sourceLang : undefined
+  const languages = useMemo(() => scripts ? resolveLanguages(scripts, suppliedLanguage) : NO_LANGUAGES,
+    [scripts, suppliedLanguage])
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : plainParse ? extractOutline(plainParse.tree) : []),
@@ -334,8 +346,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const deletionLabel = t('markDeletion')
   const undoDeletionLabel = t('undoDeletion')
   const renderCtx = useMemo(() => ({ source, onEdit: editTask, highlightCode,
-    markLabels: { deletion: deletionLabel, hint: undoDeletionLabel } }),
-  [source, editTask, highlightCode, deletionLabel, undoDeletionLabel])
+    markLabels: { deletion: deletionLabel, hint: undoDeletionLabel }, blockLanguages: languages.blocks }),
+  [source, editTask, highlightCode, deletionLabel, undoDeletionLabel, languages.blocks])
   const commentsLabel = t('comments')
   const printFootnotes = useMemo(() => commentFootnotes.length > 0 && (
     <section className="print-footnotes">
@@ -576,9 +588,10 @@ function DocumentView({ sessionId }: { sessionId: string }) {
           <div className="doc-column">
             <Suspense fallback={<LoadingState label={t('loadingDocument')} />}>
               {showTranslated && translation.artifact &&
-                <TranslatedView source={source} artifact={translation.artifact} containerRef={translatedContainer} />}
+                <TranslatedView source={source} artifact={translation.artifact} languages={languages}
+                  containerRef={translatedContainer} />}
               {mode === 'reading' && !showTranslated && analysis && (
-                <article className="md-root" ref={articleContainer} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
+                <article className="md-root" lang={languages.document} ref={articleContainer} onClick={onArticleClick} onKeyDown={onArticleKeyDown}
                   onPointerOver={(event) => {
                     const target = (event.target as HTMLElement).closest<HTMLElement>('.critic-anchor, .critic-comment-marker')
                     chooseHovered(target ? Number(target.dataset.spanIndex) : null)
@@ -588,7 +601,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
                   {printFootnotes}
                 </article>
               )}
-              {mode === 'source' && <SourceEditor key={`s${externalVersion}`} onOutline={setSourceOutline} />}
+              {mode === 'source' && <SourceEditor key={`s${externalVersion}`} lang={languages.document} onOutline={setSourceOutline} />}
             </Suspense>
           </div>
           {railPlaced && railMountable && commentRail}

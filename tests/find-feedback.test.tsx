@@ -6,6 +6,7 @@ import { FindPanel } from '../ui/find/FindPanel'
 import { stubHighlights } from './helpers/dom'
 import { openOverlay, requestFind, useOverlay } from '../ui/app/overlayStore'
 import { analyzeMarkdown } from '../document/markdown/analyze'
+import { NO_LANGUAGES } from '../document/markdown/language'
 import { useConfig } from '../ui/app/configStore'
 
 let host: HTMLDivElement
@@ -186,7 +187,7 @@ it('searches the asynchronously rendered translation and visible discussions, ex
   function TranslatedHarness() {
     const docRef = useRef<HTMLElement>(null)
     return <div className="app-content"><div className="document-scroll">
-      <TranslatedView source={original} artifact={artifact} containerRef={docRef} />
+      <TranslatedView source={original} artifact={artifact} languages={NO_LANGUAGES} containerRef={docRef} />
       </div><FindPanel sessionId={`translated-${serial}`} source={original} mode="translated" docRef={docRef}
         analysis={analyzeMarkdown(original)} onClose={close} onRevealComment={reveal} /></div>
   }

@@ -12,6 +12,9 @@ current. No callback tied to an old mount lives in the retained state. Cleanup r
 disposes its search binding, clears only its own outline report, and destroys the view; it never
 flushes stale content over an adopted buffer. Views and DOM nodes are not cached.
 
+The editor's host carries the document's language as `lang` and no line carries its own, as code
+editors customarily apply one font to the whole buffer.
+
 The editor's line separator is LF only, so its text equals the store's buffer: a lone CR or a CR
 before CRLF stays document text instead of being normalized by the first keystroke.
 

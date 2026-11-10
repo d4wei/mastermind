@@ -1,4 +1,4 @@
-import { CJK_STACKS, type FontPreset } from './fontRegistry'
+import { CJK_LANGUAGES, CJK_STACKS, DEFAULT_CJK_LANGUAGE, type CjkLanguage, type FontPreset } from './fontRegistry'
 
 export * from './fontRegistry'
 
@@ -14,17 +14,38 @@ function stack(families: readonly string[], fallback: string): string {
   return [...families.map((family) => `'${family}'`), fallback].join(', ')
 }
 
-function cjkStack(preset: FontPreset, family: string): string {
-  return stack([family, ...CJK_STACKS[preset.style]], preset.style === 'serif' ? 'serif' : 'sans-serif')
+function cjkStack(preset: FontPreset, family: string, language: CjkLanguage): string {
+  return stack([family, ...CJK_STACKS[preset.style][language]], preset.style === 'serif' ? 'serif' : 'sans-serif')
 }
 
-export function displayStack(preset: FontPreset): string {
-  return cjkStack(preset, preset.displayFamily)
+export function displayStack(preset: FontPreset, language: CjkLanguage = DEFAULT_CJK_LANGUAGE): string {
+  return cjkStack(preset, preset.displayFamily, language)
 }
-export function bodyStack(preset: FontPreset): string {
-  return cjkStack(preset, preset.bodyFamily)
+export function bodyStack(preset: FontPreset, language: CjkLanguage = DEFAULT_CJK_LANGUAGE): string {
+  return cjkStack(preset, preset.bodyFamily, language)
 }
 /** Code takes the sans CJK faces in every preset; CJK text in code keeps one even stroke. */
-export function monoStack(preset: FontPreset): string {
-  return [`'${preset.codeFamily}'`, ...SYSTEM_MONO, ...CJK_STACKS.sans.map((family) => `'${family}'`), 'monospace'].join(', ')
+export function monoStack(preset: FontPreset, language: CjkLanguage = DEFAULT_CJK_LANGUAGE): string {
+  return [`'${preset.codeFamily}'`, ...SYSTEM_MONO, ...CJK_STACKS.sans[language].map((family) => `'${family}'`),
+    'monospace'].join(', ')
+}
+
+/**
+ * Every font-family token a preset sets: the default-language `--font-display`, `--font-body`, and
+ * `--font-mono`, and one of each per CJK language (`--font-body-ja`, `--font-body-zh-tw`, …), which
+ * the document stylesheet's `:lang()` rules swap in.
+ */
+export function fontFamilyTokens(preset: FontPreset): Record<string, string> {
+  const tokens: Record<string, string> = {
+    '--font-display': displayStack(preset),
+    '--font-body': bodyStack(preset),
+    '--font-mono': monoStack(preset),
+  }
+  for (const language of CJK_LANGUAGES) {
+    const suffix = language.toLowerCase()
+    tokens[`--font-display-${suffix}`] = displayStack(preset, language)
+    tokens[`--font-body-${suffix}`] = bodyStack(preset, language)
+    tokens[`--font-mono-${suffix}`] = monoStack(preset, language)
+  }
+  return tokens
 }

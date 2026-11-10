@@ -531,10 +531,43 @@ button:disabled {
 
 /* ---------- markdown elements ---------- */
 
+/* Document content takes the faces of its language: each view root, and each element inside it that
+   names its own language, resets the stacks to the default and then to its `:lang()` row. A root
+   without `lang` matches the interface language it inherits. */
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]) {
+  --font-display: var(--font-display-zh);
+  --font-body: var(--font-body-zh);
+  --font-mono: var(--font-mono-zh);
+}
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ja) {
+  --font-display: var(--font-display-ja);
+  --font-body: var(--font-body-ja);
+  --font-mono: var(--font-mono-ja);
+}
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ko) {
+  --font-display: var(--font-display-ko);
+  --font-body: var(--font-body-ko);
+  --font-mono: var(--font-mono-ko);
+}
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):is(:lang(zh-TW), :lang(zh-Hant)) {
+  --font-display: var(--font-display-zh-tw);
+  --font-body: var(--font-body-zh-tw);
+  --font-mono: var(--font-mono-zh-tw);
+}
+/* After Traditional, so `zh-Hant-HK` takes the Hong Kong row where `:lang()` matches it. */
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(zh-HK) {
+  --font-display: var(--font-display-zh-hk);
+  --font-body: var(--font-body-zh-hk);
+  --font-mono: var(--font-mono-zh-hk);
+}
+
 .md-root {
   font-family: var(--font-body);
   font-weight: var(--weight-body);
 }
+/* A block naming its own language reads the stack again: an inherited family is already computed
+   from its parent's. Zero specificity, so headings and code keep the families they declare. */
+:where(.md-root [lang], .trans-view [lang]) { font-family: var(--font-body); }
 
 /* Body-relative sizes keep the hierarchy stable when text size changes. */
 .md-root :is(h1, h2, h3, h4, h5, h6) {

@@ -10,8 +10,9 @@ interface VendoredFamily {
 }
 
 /**
- * Every family the font presets in `ui/theme/fontRegistry.ts` name. Source Serif 4 takes the
- * optical-size sheets so headings get display optics; the others take their weight axis.
+ * Every family the font presets name, and the leading faces of the bundled CJK stacks in
+ * `ui/theme/fontRegistry.ts`. Source Serif 4 takes the optical-size sheets so headings get display
+ * optics; the others take their weight axis.
  */
 export const VENDORED_FAMILIES: VendoredFamily[] = [
   { family: 'Source Serif 4', pkg: '@fontsource-variable/source-serif-4', sheets: ['opsz.css', 'opsz-italic.css'] },
@@ -21,6 +22,8 @@ export const VENDORED_FAMILIES: VendoredFamily[] = [
   { family: 'Atkinson Hyperlegible Mono', pkg: '@fontsource-variable/atkinson-hyperlegible-mono', sheets: ['wght.css', 'wght-italic.css'] },
   { family: 'Noto Serif SC', pkg: '@fontsource-variable/noto-serif-sc', sheets: ['wght.css'] },
   { family: 'Noto Sans SC', pkg: '@fontsource-variable/noto-sans-sc', sheets: ['wght.css'] },
+  { family: 'Noto Serif JP', pkg: '@fontsource-variable/noto-serif-jp', sheets: ['wght.css'] },
+  { family: 'Noto Sans JP', pkg: '@fontsource-variable/noto-sans-jp', sheets: ['wght.css'] },
 ]
 
 /** The stylesheet the reviewer loads, relative to the vendored fonts directory. */

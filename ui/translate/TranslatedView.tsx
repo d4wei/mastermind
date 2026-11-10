@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type Ref } from 'react'
 import type { Node } from 'unist'
 import { prepareTranslation, type TranslationBlock, type PreparedTranslation } from '../../document/translation'
 import { analyzeMarkdown } from '../../document/markdown/analyze'
+import { wellFormedLanguage, type DocumentLanguages } from '../../document/markdown/language'
 import { useT } from '../i18n'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { calloutKind, calloutSections, type CalloutKind } from '../modes/reading/callouts'
@@ -19,6 +20,8 @@ function sourceHeading(block: TranslationBlock): { depth: number; kind: CalloutK
 interface Props {
   source: string
   artifact: PreparedTranslation
+  /** The original's languages; translated blocks take the artifact's target instead. */
+  languages: DocumentLanguages
   containerRef: Ref<HTMLElement>
 }
 
@@ -33,7 +36,7 @@ function withoutPositions<T extends Node>(node: T): T {
     : rest as T
 }
 
-function TransBlock({ block, translated }: { block: TranslationBlock; translated?: string }) {
+function TransBlock({ block, translated, lang }: { block: TranslationBlock; translated?: string; lang?: string }) {
   const highlightCode = (useConfig((state) => state.config?.codeTheme) ?? 'none') !== 'none'
   const shown = translated ?? block.text
   const analysis = useMemo(() => {
@@ -41,14 +44,14 @@ function TransBlock({ block, translated }: { block: TranslationBlock; translated
     return { ...result, tree: withoutPositions(result.tree) }
   }, [shown])
   // A heading block carries its source offset so outline navigation finds it as in the original.
-  return <div className="trans-block" data-ps={block.kind === 'heading' ? block.start : undefined}>
+  return <div className="trans-block" lang={lang} data-ps={block.kind === 'heading' ? block.start : undefined}>
     <div className="trans-block-body md-root" data-trans-block-id={block.translatable ? block.id : undefined}>
       <MarkdownView analysis={analysis} ctx={{ source: shown, highlightCode }} />
     </div>
   </div>
 }
 
-export function TranslatedView({ source, artifact, containerRef }: Props) {
+export function TranslatedView({ source, artifact, languages, containerRef }: Props) {
   const t = useT()
   const [prepared, setPrepared] = useState<{ source: string; blocks: TranslationBlock[] } | null>(null)
   useEffect(() => {
@@ -62,10 +65,16 @@ export function TranslatedView({ source, artifact, containerRef }: Props) {
     [source])
   if (!prepared || prepared.source !== source) return null
   const map = new Map(artifact.blocks.map((block) => [block.id, block.text]))
-  const renderBlock = (block: TranslationBlock) => <TransBlock key={block.id} block={block}
-    translated={block.translatable ? map.get(block.id) : undefined} />
+  const target = wellFormedLanguage(artifact.targetLang)
+  // A block shown from the original keeps its own language; a translated one takes the target's.
+  const renderBlock = (block: TranslationBlock) => {
+    const translated = block.translatable ? map.get(block.id) : undefined
+    const lang = translated === undefined ? languages.blocks.get(block.start)
+      : target !== languages.document ? target : undefined
+    return <TransBlock key={block.id} block={block} translated={translated} lang={lang} />
+  }
   return <>
-    <article className="trans-view" ref={containerRef}>
+    <article className="trans-view" lang={languages.document} ref={containerRef}>
       {calloutSections(prepared.blocks, (block) => sourceHeading(block)?.depth ?? null,
         (block) => sourceHeading(block)!.kind).map((section) => section.kind ?
         <section key={`${section.items[0]!.id}-${section.items[0]!.start}`} className={`md-callout md-callout--${section.kind}`}>

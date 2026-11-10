@@ -27,6 +27,9 @@ interface RenderCtx {
    *  mark becomes a tabbable button announcing that activating it removes the
    *  suggestion; absent (e.g. the translated view), the mark stays inert. */
   markLabels?: { deletion: string; hint: string }
+  /** Languages of the blocks that differ from the document's, by block source start; the
+   *  document's own language sits on the view's root, outside this tree. */
+  blockLanguages?: ReadonlyMap<number, string>
 }
 
 interface PresentedCtx extends RenderCtx {
@@ -145,6 +148,15 @@ function posAttrs(node: Positioned): Record<string, number> {
   return start !== undefined && end !== undefined ? { 'data-ps': start, 'data-pe': end } : {}
 }
 
+/** A block's own `lang`, keyed for top-level blocks and the items of top-level lists. A nested block
+ *  starts after its container's marker, so it never shares such a key; a list shares its first
+ *  item's, so lists never ask. */
+function langAttr(node: Positioned, ctx: PresentedCtx): { lang?: string } {
+  const start = node.position?.start?.offset
+  const lang = start === undefined ? undefined : ctx.blockLanguages?.get(start)
+  return lang ? { lang } : {}
+}
+
 function renderInline(nodes: readonly PhrasingContent[], ctx: PresentedCtx): ReactNode[] {
   return nodes.map((node, i) => renderPhrasing(node, i, ctx))
 }
@@ -254,7 +266,7 @@ function renderListItem(item: ListItem, key: number, ctx: PresentedCtx, tight: b
   })
 
   return (
-    <li key={key} className={isTask ? 'task-item' : undefined} {...posAttrs(item)}>
+    <li key={key} className={isTask ? 'task-item' : undefined} {...langAttr(item, ctx)} {...posAttrs(item)}>
       {checkbox}
       {children}
     </li>
@@ -279,29 +291,29 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
   switch (node.type) {
     case 'paragraph':
       return (
-        <p key={key} {...posAttrs(node)}>
+        <p key={key} {...langAttr(node, ctx)} {...posAttrs(node)}>
           {renderInline(node.children, ctx)}
         </p>
       )
     case 'heading':
       return createElement(
         `h${node.depth}`,
-        { key, ...posAttrs(node) },
+        { key, ...langAttr(node, ctx), ...posAttrs(node) },
         renderInline(node.children, ctx),
       )
     case 'blockquote':
       return (
-        <blockquote key={key} {...posAttrs(node)}>
+        <blockquote key={key} {...langAttr(node, ctx)} {...posAttrs(node)}>
           {node.children.map((child, i) => renderBlock(child, i, ctx))}
         </blockquote>
       )
     case 'list':
       return renderList(node, key, ctx)
     case 'yaml':
-      return <Frontmatter key={key} source={node.value} />
+      return <Frontmatter key={key} source={node.value} {...langAttr(node, ctx)} />
     case 'code':
       return (
-        <pre key={key} className="md-code" data-lang={node.lang ?? undefined} {...posAttrs(node)}>
+        <pre key={key} className="md-code" data-lang={node.lang ?? undefined} {...langAttr(node, ctx)} {...posAttrs(node)}>
           <code>{ctx.highlightCode ? codeChildren(node.value, node.lang ?? undefined) : node.value}</code>
         </pre>
       )
@@ -314,7 +326,7 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
       }
       return (
         <TableViewport key={key} contentKey={ctx.source.slice(node.position?.start.offset, node.position?.end.offset)}
-          source={ctx.source}><table {...posAttrs(node)}>
+          source={ctx.source}><table {...langAttr(node, ctx)} {...posAttrs(node)}>
           {head && (
             <thead>
               <tr>
@@ -345,13 +357,13 @@ function renderBlock(node: BlockContent | DefinitionContent | RootContent, key: 
     case 'html':
       // HTML comments carry hidden history; other raw HTML remains inert text.
       return node.value.trimStart().startsWith('<!--') ? null : (
-        <pre key={key} className="md-code md-html" {...posAttrs(node)}>
+        <pre key={key} className="md-code md-html" {...langAttr(node, ctx)} {...posAttrs(node)}>
           <code>{node.value}</code>
         </pre>
       )
     case 'footnoteDefinition':
       return (
-        <div key={key} className="md-footnote-def" {...posAttrs(node)}>
+        <div key={key} className="md-footnote-def" {...langAttr(node, ctx)} {...posAttrs(node)}>
           <sup data-generated="">[{node.identifier}]</sup>{' '}
           {node.children.map((child, i) => renderBlock(child, i, ctx))}
         </div>
