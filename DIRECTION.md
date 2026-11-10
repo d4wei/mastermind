@@ -26,19 +26,17 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms (updated 2026-11-10)
+## 2026-11-08 — Regional font packs are unchecked offline and off macOS (updated 2026-11-10)
 
-**Gap.** Characters whose regional forms differ (直, 令, 骨 and the like) take the shape of the
-face that draws them. Both phases of [CJK glyph forms](docs/cjk-glyph-forms.md) shipped: Noto JP
-is bundled beside Noto SC, documents and blocks resolve a language (frontmatter, the agent's
-`open --document-language` hint or a prepared translation's `sourceLang`, script detection) and
-carry it as `lang`, the stacks follow it, and the Traditional Chinese, Hong Kong and Korean faces
-arrive as fetched packs under the 2026-11-09 network ruling. The contract lives beside
-`ui/theme/fonts.md`. What remains is a check in the running app: 直令骨辺 in a Japanese and a
-Chinese document under each interface language, and a Traditional Chinese document before and
-after its pack arrives, online and offline.
+**Gap.** CJK text now takes the faces of its language (`ui/theme/fonts.md`,
+`document/markdown/language.md`, `desktop/src/font_packs.md`): on macOS a Japanese document draws
+in the bundled Noto JP, and Traditional Chinese and Korean documents fetched their packs and drew
+in them. Not yet seen: the offline notice and the retry when the network returns, a pack arriving
+while its document is on screen, a Chinese document under a Japanese interface, and pack loading
+through the asset protocol on Windows and Linux. The pack cache sits under the provisional app
+identifier, so the identity ruling below moves it.
 
-**Exit:** the check passes in the running app and the design file is deleted.
+**Exit:** those checks pass, or each failure is fixed or recorded.
 
 ## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 
