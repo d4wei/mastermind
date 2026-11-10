@@ -77,8 +77,10 @@ function revealRange(top: number, bottom: number): void {
   else if (bottom > visibleBottom) smoothScrollTo(viewport.scrollTop + bottom - visibleBottom)
 }
 
-export function revealElement(element: Element | null, headerOnly = false): void {
+/** `drawnOffset` is how far a running transform draws `element` below where it is laid out. */
+export function revealElement(element: Element | null, headerOnly = false, drawnOffset = 0): void {
   if (!element) return
   const rect = element.getBoundingClientRect()
-  revealRange(rect.top, headerOnly ? Math.min(rect.bottom, rect.top + 48) : rect.bottom)
+  const top = rect.top - drawnOffset, bottom = rect.bottom - drawnOffset
+  revealRange(top, headerOnly ? Math.min(bottom, top + 48) : bottom)
 }

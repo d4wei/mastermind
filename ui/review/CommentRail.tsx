@@ -151,7 +151,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       const target = element.querySelector('textarea') ?? element.querySelector('.rail-message-header') ?? element
       // Narrow panels own their scroll surface; wide cards share document scrolling.
       if (element.closest('.comments-panel')) target.scrollIntoView({ block: 'nearest' })
-      else revealElement(target)
+      // Reveal where the card is placed, not where its move still draws it.
+      else revealElement(target, false, placement.drawnOffset(card.key))
     })
     return () => cancelAnimationFrame(frame)
   }, [activeSpan, cards])

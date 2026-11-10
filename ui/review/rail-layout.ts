@@ -1,20 +1,64 @@
 import { commentSearchText } from './CommentBody'
+import { cssMs } from '../util/css-tokens'
 import { margins, settledHeight } from './settling'
 
+/** One card as placement sees it, in rail coordinates. */
 interface RailMeasurement {
+  /** The top of the card's passage. */
   anchorTop: number
+  /** The passage's height, from its first line's top to its last line's bottom. */
+  anchorHeight: number
   height: number
   /** The height once sections now collapsing have closed; defaults to `height`. */
   settledHeight?: number
 }
 
+/** A vertical span of the rail, in rail coordinates. */
+export interface RailSpan {
+  top: number
+  bottom: number
+}
+
+/** What the selected card aligns within besides its passage, in rail coordinates. */
+export interface RailSurface {
+  /** The bottom edge of the document's body. */
+  documentBottom: number
+  /** What the document scroller showed when the selection was made; null without a scroller. */
+  view: RailSpan | null
+}
+
+const clamp = (value: number, low: number, high: number) => Math.min(Math.max(value, low), high)
+
 /**
- * Keep document order; selected cards can reclaim space above crowded anchors. Earlier cards make
- * that room by their settled heights, so a card collapsing above the selection is never pushed up
- * by height it is about to lose; the selection and later cards start below its current bottom and
- * rise frame by frame as it closes.
+ * Where the selected card would sit if no other card constrained it. A card taller than its
+ * passage is centered on it, and one no taller starts at its top; near the document's end it rides
+ * up so less of it hangs below the body; a passage that was in view keeps its card in view, top
+ * first; and the card always ends up spanning its passage's lines, or lying within them. Every rule
+ * reads the card's current height, so a card easing open stays centered as it grows.
  */
-export function placeCommentCards(cards: readonly RailMeasurement[], selected: number, gap: number): number[] {
+function selectedTop(card: RailMeasurement, gap: number, surface: RailSurface): number {
+  const { anchorTop: passageTop, anchorHeight: passage, height } = card
+  const passageBottom = passageTop + passage
+  let top = passageTop - Math.max(0, (height - passage) / 2)
+  top = Math.min(top, surface.documentBottom - height)
+  const view = surface.view
+  if (view && passageBottom > view.top && passageTop < view.bottom) {
+    const highest = view.top + gap, lowest = view.bottom - gap - height
+    top = lowest >= highest ? clamp(top, highest, lowest) : Math.max(top, highest)
+  }
+  return height >= passage ? clamp(top, passageBottom - height, passageTop) : clamp(top, passageTop, passageBottom - height)
+}
+
+/**
+ * Keep document order. Unselected cards start at their passage's top, below the card before them;
+ * the selected card takes the place `selectedTop` gives it, and earlier cards make room above it.
+ * Order outranks that place: earlier cards must fit above the selection without leaving the
+ * document surface, and they make room by their settled heights, so a card collapsing above the
+ * selection is never pushed up by height it is about to lose; the selection and later cards start
+ * below its current bottom and rise frame by frame as it closes.
+ */
+export function placeCommentCards(cards: readonly RailMeasurement[], selected: number, gap: number,
+  surface: RailSurface): number[] {
   const tops: number[] = []
   let cursor = 0
   cards.forEach((card, index) => {
@@ -29,7 +73,7 @@ export function placeCommentCards(cards: readonly RailMeasurement[], selected: n
   let minimum = 0
   reserved.forEach((height, index) => { minimumTops[index] = minimum; minimum += height + gap })
   // Earlier cards must still fit above the selection without leaving the document surface.
-  tops[selected] = Math.max(cards[selected]!.anchorTop, minimumTops[selected]!)
+  tops[selected] = Math.max(selectedTop(cards[selected]!, gap, surface), minimumTops[selected]!)
   for (let i = selected - 1; i >= 0; i--) {
     tops[i] = Math.min(cards[i]!.anchorTop, tops[i + 1]! - reserved[i]! - gap)
     tops[i] = Math.max(minimumTops[i]!, tops[i]!)
@@ -68,6 +112,22 @@ function measureCard(element: HTMLElement, height = element.getBoundingClientRec
 /** The border-box height an observation reports, measured where the browser reports none. */
 function observedHeight(entry: ResizeObserverEntry): number {
   return entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height
+}
+
+/** The space below the last card where no styles apply to the rail, as in jsdom. */
+const END_SPACE_FALLBACK = 40
+
+/** How a re-placement moves cards on screen; null moves them at once. */
+interface Motion {
+  duration: number
+  easing: string
+}
+
+/** The vertical offset a running transform draws `element` at. */
+function drawnOffset(element: HTMLElement): number {
+  const match = /^matrix(3d)?\((.*)\)$/.exec(getComputedStyle(element).transform)
+  if (!match) return 0
+  return parseFloat(match[2]!.split(',')[match[1] ? 13 : 5]!) || 0
 }
 
 function setPixels(element: HTMLElement, property: 'top' | 'height' | 'paddingTop', value: number | null): void {
@@ -208,6 +268,11 @@ export class CardHeightEstimator {
  * resized, and anchor offsets only when the document resized, since anchors move only with it;
  * cards still settling also re-read their settled heights. `update` measures every mounted card and
  * anchor, for a new set of cards or a new selection; `afterRender` measures cards that just mounted.
+ *
+ * Only `update` animates: a mounted card it moves keeps its new `top` at once, so layout and the
+ * window stay exact, and a transform plays from where the card was drawn back to zero. Every other
+ * re-placement follows something already moving frame by frame, or corrects a card nobody has
+ * seen settle, so it moves at once.
  */
 export class RailPlacement {
   private observer: ResizeObserver | null = null
@@ -230,10 +295,17 @@ export class RailPlacement {
   /** The element each card's anchor span renders as, found once per set of cards and document. */
   private anchors = new Map<number, Element>()
   private anchorsFor: readonly PlacedCard[] | null = null
-  private anchorTops = new Map<number, number>()
+  /** Each anchor's passage, by span index. */
+  private passages = new Map<number, RailSpan>()
   /** The rail's top within the scroller's content, read with the anchors. */
   private railOffset = 0
-  private docHeight = 0
+  private docBottom = 0
+  /** What the scroller showed, in rail coordinates, when the current selection was made. */
+  private view: RailSpan | null = null
+  /** Read from the rail's bottom padding, which the document column's bottom padding shares. */
+  private endSpace = END_SPACE_FALLBACK
+  /** The move each card is still playing, if any. */
+  private readonly moves = new WeakMap<HTMLElement, Animation>()
   private height = 0
   private width = 0
   private placedKeys: readonly string[] = []
@@ -291,6 +363,12 @@ export class RailPlacement {
     return this.elements.get(key)
   }
 
+  /** How far a running move draws the card below its placed top. */
+  drawnOffset(key: string): number {
+    const element = this.elements.get(key)
+    return element && this.moves.has(element) ? drawnOffset(element) : 0
+  }
+
   /** Tracks the rail element, for a React ref callback; a rail outside a document scroller shows every card. */
   setRail(rail: HTMLElement | null): void {
     this.rail = rail
@@ -302,6 +380,11 @@ export class RailPlacement {
       if (listening) this.listen(true)
     }
     if (rail && !scroller) this.report(null, false)
+    if (rail) {
+      // A browser computes padding in pixels; any other reading means no styles applied.
+      const space = getComputedStyle(rail).paddingBottom
+      this.endSpace = space.endsWith('px') ? parseFloat(space) : END_SPACE_FALLBACK
+    }
     this.writeHeight()
   }
 
@@ -330,16 +413,24 @@ export class RailPlacement {
     if (cards !== this.cards) this.setCards(cards)
     // A selection changes the height of the card it leaves and the card it reaches.
     const selectedKey = selected === null ? null : cards.find((card) => card.spanIndex === selected)?.key ?? null
-    if (selectedKey !== this.selectedKey) {
+    const selecting = selectedKey !== this.selectedKey
+    if (selecting) {
       for (const key of [this.selectedKey, selectedKey]) if (key !== null && !this.elements.has(key)) this.sizes.delete(key)
       this.selectedKey = selectedKey
+      this.view = null
     }
     if (!doc || !this.rail) return
     this.checkWidth()
     this.elements.forEach((element, key) => this.record(key, measureCard(element)))
+    // Cards mounted in this commit were never drawn where placement last put them.
+    const mounting = new Set(this.unmeasured)
     this.unmeasured.clear()
     this.measureAnchors()
-    this.place()
+    if (selecting && selectedKey !== null && this.scroller) {
+      const top = this.scroller.scrollTop - this.railOffset
+      this.view = { top, bottom: top + this.scroller.clientHeight }
+    }
+    this.place(mounting)
     this.updateWindow(false)
   }
 
@@ -423,30 +514,41 @@ export class RailPlacement {
     // reads it here rather than forcing a layout after each placement.
     const scroller = this.scroller
     if (scroller) this.railOffset = railTop - scroller.getBoundingClientRect().top + scroller.scrollTop
-    this.anchorTops = new Map(this.cards.map((card) => {
+    this.passages = new Map(this.cards.map((card) => {
       const anchor = this.anchors.get(card.spanIndex)
-      return [card.spanIndex, anchor ? Math.max(0, anchor.getBoundingClientRect().top - railTop) : 0]
+      if (!anchor) return [card.spanIndex, { top: 0, bottom: 0 }]
+      const rect = anchor.getBoundingClientRect()
+      return [card.spanIndex, { top: Math.max(0, rect.top - railTop), bottom: Math.max(0, rect.bottom - railTop) }]
     }))
-    this.docHeight = this.doc!.scrollHeight
+    this.docBottom = this.doc!.getBoundingClientRect().bottom - railTop
   }
 
-  private place(): void {
+  /**
+   * Places every card and writes the mounted cards' tops. `moving` is null for a re-placement that
+   * moves cards at once; otherwise it lists the mounted cards that have no drawn position to move from.
+   */
+  private place(moving: ReadonlySet<string> | null = null): void {
     const measurements = this.cards.map((card) => {
       const size = this.sizes.get(card.key)
-      return { anchorTop: this.anchorTops.get(card.spanIndex) ?? 0,
+      const passage = this.passages.get(card.spanIndex) ?? { top: 0, bottom: 0 }
+      return { anchorTop: passage.top, anchorHeight: passage.bottom - passage.top,
         height: size?.height ?? this.estimator.estimate(card), settledHeight: size?.settledHeight }
     })
     const selected = this.selectedKey === null ? -1 : this.index.get(this.selectedKey) ?? -1
-    const tops = placeCommentCards(measurements, selected, this.gap)
+    const tops = placeCommentCards(measurements, selected, this.gap, { documentBottom: this.docBottom, view: this.view })
     this.tops = tops
     this.heights = measurements.map((measurement) => measurement.height)
+    const motion = moving && this.motion()
     this.elements.forEach((element, key) => {
       const index = this.index.get(key)
-      if (index !== undefined) setPixels(element, 'top', tops[index]!)
+      if (index === undefined) return
+      if (motion && !moving!.has(key)) this.move(element, tops[index]!, motion)
+      setPixels(element, 'top', tops[index]!)
     })
-    let bottom = this.docHeight
+    // Cards past the document's end leave the same space below them as the document column does.
+    let bottom = 0
     tops.forEach((top, i) => { bottom = Math.max(bottom, top + this.heights[i]!) })
-    this.height = bottom
+    this.height = Math.max(this.docBottom, bottom + (tops.length ? this.endSpace : 0))
     this.writeHeight()
     if (this.cards === this.placedFor) return
     this.placedFor = this.cards
@@ -455,6 +557,27 @@ export class RailPlacement {
       this.placedKeys = keys
       this.onPlaced(keys)
     }
+  }
+
+  /** The rail's move timing; null where moves are instant, as under reduced motion. */
+  private motion(): Motion | null {
+    if (!this.rail) return null
+    const style = getComputedStyle(this.rail)
+    const duration = cssMs(style, '--rail-card-move') ?? 0
+    return duration > 0 ? { duration, easing: style.getPropertyValue('--ease-standard').trim() || 'ease' } : null
+  }
+
+  /** Plays `element` from where it is drawn now to `top`, which the caller writes at once. */
+  private move(element: HTMLElement, top: number, motion: Motion): void {
+    const from = parseFloat(element.style.top)
+    if (typeof element.animate !== 'function' || !Number.isFinite(from) || Math.abs(from - top) < 0.5) return
+    const running = this.moves.get(element)
+    // An interrupted move starts from its current drawn position.
+    const drawn = from + (running ? drawnOffset(element) : 0)
+    running?.cancel()
+    const animation = element.animate([{ transform: `translateY(${drawn - top}px)` }, { transform: 'none' }], motion)
+    this.moves.set(element, animation)
+    animation.onfinish = () => { if (this.moves.get(element) === animation) this.moves.delete(element) }
   }
 
   /** The drafts block sits below the rail's full height while there are cards to clear. */

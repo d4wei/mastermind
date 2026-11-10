@@ -273,6 +273,8 @@ button:disabled {
 /* ---------- document column + rail ---------- */
 
 .doc-shell {
+  /* The space below the document's end, which the rail also leaves below its last card. */
+  --doc-end-space: calc(var(--space-unit) * 10);
   display: grid;
   grid-template-columns: minmax(0, var(--content-max-width));
   margin-inline: auto;
@@ -283,15 +285,19 @@ button:disabled {
 .doc-column {
   width: 100%;
   max-width: var(--content-max-width);
-  padding: calc(var(--space-unit) * 8) calc(var(--space-unit) * 4) calc(var(--space-unit) * 10);
+  padding: calc(var(--space-unit) * 8) calc(var(--space-unit) * 4) var(--doc-end-space);
   min-width: 0;
 }
 
 
 .rail {
+  /* How long a card takes to move when selection or the set of cards re-places it. */
+  --rail-card-move: var(--dur-base);
   grid-column: 2;
   position: relative;
   padding-top: calc(var(--space-unit) * 8);
+  /* Placement reads this padding and keeps it below the last card. */
+  padding-bottom: var(--doc-end-space);
   padding-left: var(--reading-gap);
   animation: mm-fade-in var(--dur-fade) var(--ease-standard);
 }
@@ -1314,6 +1320,7 @@ input[type='checkbox'] {
   .rail-card.active {
     animation: none;
   }
+  .rail { --rail-card-move: 0s; }
   .rail-card,
   .collapsible.rail-quote-reveal,
   .rail-disclosure svg,

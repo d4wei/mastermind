@@ -19,13 +19,21 @@ clamp starts collapsed. That disclosure and the reply count
 share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
 below, and the passage's turns from down to up as it grows in place.
 
-`rail-layout.ts` places cards in source order without overlap. The selected card reclaims available
-space above crowded anchors; earlier cards stay within the document surface. When there is not
-room for every preceding card above the anchor, the selected card moves down only far enough to
-retain order and separation. Every card is placed, whether or not it is mounted: a mounted card by
-its measured height, including a resized reply composer; an unmounted one by the height it was last
-measured at, or by an estimate if it has never rendered. Narrow comment panels use ordinary vertical
-flow instead of positioned cards.
+`rail-layout.ts` places cards in source order without overlap. An unselected card starts at its
+passage's top, below the card before it. The selected card is centered on a passage shorter than
+itself and starts at the top of one that is not; near the document's end it rides up, never below
+that place, so less of it hangs past the body; and when its passage was in view as the selection
+was made, it moves into that view, keeping its top in view when it is taller than the view. The
+view is read once per selection, so later resizes and scrolling do not move the card into it. Each
+of these yields to the card still spanning its passage's lines, or lying within them, and the card
+is placed by its current height, so one easing open grows from its middle. Order outranks all of
+it: earlier cards make room above the selection and stay within the document surface, and when
+there is not room for every preceding card, the selected card moves down only far enough to retain
+order and separation. When cards run past the document's end, the rail leaves the space the
+document column leaves below the body, read from the rail's bottom padding. Every card is placed,
+whether or not it is mounted: a mounted card by its measured height, including a resized reply
+composer; an unmounted one by the height it was last measured at, or by an estimate if it has never
+rendered. Narrow comment panels use ordinary vertical flow instead of positioned cards.
 
 In the wide rail, only the cards whose placed box meets the viewport, plus one and a half viewports
 above and below, are mounted. The rail also keeps mounted the selected card (which is how a
@@ -97,8 +105,17 @@ read for every card, mounted or not. A new selection or set of cards measures ev
 once, and a commit that mounts cards measures those before paint. Shrinking sections
 mark the size they settle to (`settling.ts`), and earlier cards make room for a selection only by
 the heights they keep: a card collapsing above a new selection never rises for height it is losing,
-while the selection starts below its current bottom and rises as it closes. Placement changes that
-selection itself causes, such as a selected card reclaiming space above it, remain immediate.
+while the selection starts below its current bottom and rises as it closes.
+
+Placement changes that a selection or a new set of cards causes move the mounted cards together, in
+one frame, over the rail's move duration: each card's `top` changes at once, so layout and the
+window stay exact, and a transform plays from where the card was drawn, an interrupted move
+included, back to zero. A card mounting in that commit has nowhere it was drawn and appears in
+place. Re-placements from the size observer, from anchors moving with the document, from cards
+mounting as the window moves, and from an estimate meeting its first measurement move at once:
+they follow motion that is already frame by frame, or correct a card nobody watched settle.
+Revealing a selected card reveals where it is placed, not where its move still draws it. Reduced
+motion sets the move duration to zero.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
 message has a native button that opens the discussion and reply composer; Resolve, More, and the

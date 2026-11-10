@@ -16,6 +16,8 @@ const SOURCE = Array.from({ length: 40 }, (_, i) => {
   return `Paragraph {==w${n}==}{>>@a: comment ${n}<<}`
 }).join('\n\n') + '\n'
 const GAP = 8
+/** The rail's space below its last card where no styles apply, as here. */
+const END_SPACE = 40
 
 let host: HTMLDivElement
 let root: Root
@@ -44,7 +46,7 @@ beforeEach(() => {
   heights = new Map()
   railWidth = 300
   // Anchors 500 px apart; a 1,000 px viewport with its margins reaches 2,500 px.
-  layout = { viewport: 1000, anchorTop: (anchor) => 500 * marks().indexOf(anchor),
+  layout = { viewport: 1000, documentHeight: 500 * 39 + 20, anchorTop: (anchor) => 500 * marks().indexOf(anchor),
     cardHeight: (card) => heights.get(passageOf(card)) ?? 100 }
   restoreLayout = stubDocumentLayout(layout)
   vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(function (this: Element) {
@@ -128,7 +130,8 @@ it('mounts only the cards near the viewport and keeps the rail its full height',
   // Anchors 0 to 2,500 px fall within the viewport and its margin.
   expect(mounted()).toEqual(range(0, 6))
   expect(cardFor(w(5))!.style.top).toBe('2500px')
-  expect(host.querySelector<HTMLElement>('.rail')!.style.height).toBe(`${500 * 39 + 100}px`)
+  // The last card passes the document's end, so the rail leaves space below it.
+  expect(host.querySelector<HTMLElement>('.rail')!.style.height).toBe(`${500 * 39 + 100 + END_SPACE}px`)
   await act(() => scrollDocument(scroller(), 10_000))
   // 8,500 to 12,500 px, counting the cards whose box reaches 8,500.
   expect(mounted()).toEqual(range(17, 26))
@@ -159,7 +162,8 @@ it('reveals a far card it mounts for a selection, as clicking its anchor does', 
   act(() => select(span(30)))
   await frames()
   const card = cardFor(w(30))!
-  expect(card.style.top).toBe('15000px')
+  // Centered on its 20 px passage at 15,000 px; the selection was made with the passage out of view.
+  expect(card.style.top).toBe('14960px')
   expect(inView(card)).toBe(true)
   // The window followed the reveal; the card stayed where it was revealed.
   expect(mounted()).toContain(w(29))
@@ -201,10 +205,11 @@ it('mounts the neighbor past the window edge when focus reaches the first or las
 it('calibrates estimates by measured cards and remembers heights after unmounting until they go stale', async () => {
   // Every anchor at the top: each card sits below the last, so later tops sum earlier heights.
   layout.anchorTop = () => 0
+  layout.documentHeight = 20
   act(() => root.render(<Harness />))
   // Unmounted cards of the same content are estimated at the 100 px their measured peers have.
   expect(cards().length).toBeLessThan(40)
-  expect(parseFloat(host.querySelector<HTMLElement>('.rail')!.style.height)).toBeCloseTo(40 * 100 + 39 * GAP)
+  expect(parseFloat(host.querySelector<HTMLElement>('.rail')!.style.height)).toBeCloseTo(40 * 100 + 39 * GAP + END_SPACE)
   heights.set(w(0), 300)
   resized(cardFor(w(0))!)
   const top = (i: number) => 300 + GAP + (i - 1) * (100 + GAP)
@@ -256,4 +261,103 @@ it('remembers a card that unmounts mid-collapse at the height it is settling to'
   expect(mounted()).not.toContain(w(0))
   documentResized()
   expect(topOf(w(20))).toBeCloseTo(top(280, 20))
+})
+
+it('keeps the document\'s height while the cards end above it, and leaves space below them once they pass it', () => {
+  layout.documentHeight = 30_000
+  act(() => root.render(<Harness />))
+  const rail = host.querySelector<HTMLElement>('.rail')!
+  expect(rail.style.height).toBe('30000px')
+  layout.documentHeight = 19_590
+  documentResized()
+  expect(rail.style.height).toBe(`${500 * 39 + 100 + END_SPACE}px`)
+})
+
+/** Each move a card started: the card, the transform it starts from, and its animation. */
+let moves: { card: string; from: string; animation: { cancel: () => void; onfinish: null } }[]
+/** Gives the rail a move duration, as the theme does, and records moves through a stubbed `animate`. */
+function enableMotion(duration = '180ms') {
+  const style = document.createElement('style')
+  style.textContent = `.rail { --rail-card-move: ${duration}; --ease-standard: linear; }`
+  document.head.append(style)
+  moves = []
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value(this: HTMLElement, keyframes: Keyframe[]) {
+    const animation = { cancel: vi.fn(), onfinish: null }
+    moves.push({ card: passageOf(this), from: String(keyframes[0]!.transform), animation })
+    return animation
+  } })
+  return () => { style.remove(); Reflect.deleteProperty(HTMLElement.prototype, 'animate') }
+}
+
+it('plays the moves a selection causes from where each card was drawn, together', () => {
+  const restore = enableMotion()
+  try {
+    act(() => root.render(<Harness />))
+    expect(moves).toEqual([])
+    // Taller than the view, the selected card keeps its top in view and rises; the next card clears it.
+    heights.set(w(1), 1200)
+    act(() => select(span(1)))
+    expect(topOf(w(1))).toBe(108)
+    expect(topOf(w(2))).toBe(1316)
+    expect(moves.map(({ card, from }) => [card, from])).toEqual([[w(1), 'translateY(392px)'], [w(2), 'translateY(-316px)']])
+    // Deselecting interrupts the selected card's move; the next starts from where it is drawn.
+    cardFor(w(1))!.style.transform = 'matrix(1, 0, 0, 1, 0, 30)'
+    const first = moves[0]!.animation
+    act(() => select(null))
+    expect(first.cancel).toHaveBeenCalled()
+    expect(topOf(w(1))).toBe(500)
+    expect(moves.slice(2).map(({ card, from }) => [card, from])).toEqual([[w(1), `translateY(${108 + 30 - 500}px)`],
+      [w(2), `translateY(${1316 - 1708}px)`], [w(3), `translateY(${1500 - 1816}px)`]])
+  } finally { restore() }
+})
+
+it('reveals a selected card where it is placed, not where its move still draws it', async () => {
+  const restore = enableMotion()
+  try {
+    act(() => root.render(<Harness />))
+    heights.set(w(5), 600)
+    act(() => select(span(5)))
+    // Centered on its passage at 2,500 px, it starts its move drawn where it was.
+    expect(topOf(w(5))).toBe(2210)
+    expect(moves.find(({ card }) => card === w(5))?.from).toBe('translateY(290px)')
+    cardFor(w(5))!.style.transform = 'matrix(1, 0, 0, 1, 0, 290)'
+    await frames()
+    // The composer's 20 px at its placed top end at the viewport's bottom.
+    expect(scroller().scrollTop).toBe(2210 + 20 - layout.viewport)
+  } finally { restore() }
+})
+
+it('moves cards at once when the size observer, the document, or a mounting card re-places them', async () => {
+  const restore = enableMotion()
+  try {
+    act(() => root.render(<Harness />))
+    heights.set(w(0), 600)
+    resized(cardFor(w(0))!)
+    expect(topOf(w(1))).toBe(608)
+    layout.anchorTop = (anchor) => 600 * marks().indexOf(anchor)
+    documentResized()
+    expect(topOf(w(2))).toBe(1200)
+    await act(() => scrollDocument(scroller(), 10_000))
+    // A far card mounting for its selection has nowhere it was drawn to move from.
+    act(() => select(span(5)))
+    expect(cardFor(w(5))).toBeDefined()
+    expect(moves).toEqual([])
+  } finally { restore() }
+})
+
+it('moves cards at once under reduced motion and where animations are unavailable', () => {
+  const restoreReduced = enableMotion('0s')
+  try {
+    act(() => root.render(<Harness />))
+    heights.set(w(1), 1200)
+    act(() => select(span(1)))
+    expect(topOf(w(2))).toBe(1316)
+    expect(moves).toEqual([])
+  } finally { restoreReduced() }
+  const restore = enableMotion()
+  Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+  try {
+    act(() => select(null))
+    expect(topOf(w(2))).toBe(1708)
+  } finally { restore() }
 })
