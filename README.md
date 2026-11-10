@@ -43,7 +43,8 @@ feedback format.
 - **Nothing reaches disk without you.** Agent suggestions render on screen until you accept them.
 - **No lock-in.** CriticMarkup is plain text. Any editor shows it, Git diffs it, and an agent reads
   it without a tool.
-- **Local only.** The desktop app talks to nothing beyond the machine it runs on.
+- **Local only.** Documents and review data never leave the machine. The app's one network use is
+  fetching pinned, hash-checked font packs for languages it does not bundle.
 
 ## Install from source
 
