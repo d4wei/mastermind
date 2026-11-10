@@ -12,6 +12,8 @@
   overflow: clip;
 }
 .collapsible.settled > .collapsible-content { overflow: visible; }
+/* Holds the content at its full height inside the moving row, margins included, for the rail to read. */
+.collapsible-body { display: flow-root; }
 
 @media (prefers-reduced-motion: reduce) {
   .collapsible { transition: none; }

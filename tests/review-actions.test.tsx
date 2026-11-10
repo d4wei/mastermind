@@ -19,7 +19,7 @@ let activate: ReturnType<typeof vi.fn<(spanIndex: number | null) => void>>
 let edit: ReturnType<typeof vi.fn<(edits: TextEdit[]) => boolean>>
 
 /** `request` asks for a focused reply and `select` only selects, as a passage click and navigation do. */
-function Harness({ request, select }: { request?: { spanIndex: number }; select?: number }) {
+function Harness({ request, select, reveal }: { request?: { spanIndex: number }; select?: number; reveal?: { message: number } }) {
   const [active, setActive] = useState<number | null>(null)
   useEffect(() => {
     const target = request?.spanIndex ?? select
@@ -41,7 +41,7 @@ function Harness({ request, select }: { request?: { spanIndex: number }; select?
     return true
   }
   return <><article ref={docRef} /><CommentRail source={source} analysis={analysis}
-    replyRequest={request} readOnly={store((state) => !!state.recovery)} docRef={docRef} authorTag="reviewer" activeSpan={active}
+    replyRequest={request} revealRequest={reveal} readOnly={store((state) => !!state.recovery)} docRef={docRef} authorTag="reviewer" activeSpan={active}
     onActivate={(index) => { activate(index); setActive(index) }} onEdit={onEdit} drafts={drafts} onDraftsChange={setDrafts} /></>
 }
 
@@ -236,27 +236,126 @@ it('reply textarea focus preserves activation and keyboard submission still edit
   expect(edit).toHaveBeenCalledTimes(1)
 })
 
-it('offers Show more only on the selected card, styled as the reply count with an upward-closing chevron', () => {
-  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => 100 })
+/** Makes every quoted passage overflow its clamp, or fit it. */
+function passagesOverflow(overflow: boolean): () => void {
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, get: () => overflow ? 100 : 20 })
   Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => 20 })
-  try {
-    render('{==a long quoted passage==}{>>@Da Wei: question<<}{>>@Sam: answer<<}')
-    expect(host.querySelector('.rail-card-anchor')!.getAttribute('style')).toContain('--quote-lines: 2')
-    expect(host.querySelector('.rail-quote-footer')).toBeNull()
-    openCard()
-    expect(host.querySelector('.rail-card-anchor')!.getAttribute('style')).toContain('--quote-lines: 6')
-    const [passage, replies] = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-card .rail-disclosure'))
-    expect(passage!.closest('.rail-quote-footer')).not.toBeNull()
-    expect(passage!.className).toBe(`${replies!.className} rail-disclosure-expand`)
-    act(() => passage!.click())
-    expect(host.querySelector('.rail-card-anchor')!.classList.contains('expanded')).toBe(true)
-    collapse()
-    expect(host.querySelector('.rail-quote-footer')).toBeNull()
-    expect(host.querySelector('.rail-card-anchor')!.classList.contains('expanded')).toBe(false)
-  } finally {
+  return () => {
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollHeight')
     Reflect.deleteProperty(HTMLElement.prototype, 'clientHeight')
   }
+}
+const passage = () => host.querySelector<HTMLElement>('.rail-card-anchor')!
+const QUOTED = '{==a long quoted passage==}{>>@Da Wei: question<<}{>>@Sam: answer<<}'
+
+it('clamps a live passage to two lines selected and unselected, with no Show more row', () => {
+  const restore = passagesOverflow(true)
+  try {
+    render(QUOTED)
+    expect(passage().getAttribute('style')).toContain('--quote-lines: 2')
+    openCard()
+    expect(passage().getAttribute('style')).toContain('--quote-lines: 2')
+    expect(host.querySelector('.rail-quote-footer')).toBeNull()
+    expect(Array.from(host.querySelectorAll('.rail-card button')).map((button) => button.textContent)).not.toContain('Show more')
+  } finally { restore() }
+})
+
+it('expands a selected card\'s truncated passage when pressed, and keeps it expanded until deselection', () => {
+  const restore = passagesOverflow(true)
+  try {
+    render(QUOTED)
+    // Unselected, the passage is no control: a click selects its discussion.
+    expect(passage().getAttribute('role')).toBeNull()
+    act(() => passage().click())
+    expect(activate).toHaveBeenLastCalledWith(0)
+    expect(passage().classList.contains('expanded')).toBe(false)
+    // Selected and truncated, it says it expands.
+    expect(passage().getAttribute('role')).toBe('button')
+    expect(passage().getAttribute('aria-expanded')).toBe('false')
+    expect(passage().getAttribute('aria-label')).toBe('Show more: a long quoted passage')
+    expect(passage().tabIndex).toBe(0)
+    const calls = activate.mock.calls.length
+    act(() => passage().click())
+    expect(passage().classList.contains('expanded')).toBe(true)
+    expect(passage().getAttribute('aria-expanded')).toBe('true')
+    expect(activate.mock.calls.length).toBe(calls)
+    // It offers no way back while the card stays selected.
+    act(() => passage().click())
+    expect(passage().classList.contains('expanded')).toBe(true)
+    collapse()
+    expect(passage().classList.contains('expanded')).toBe(false)
+    expect(passage().getAttribute('role')).toBeNull()
+    // Reselected, it starts clamped; Enter and Space expand it too.
+    openCard()
+    expect(passage().classList.contains('expanded')).toBe(false)
+    act(() => { passage().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })) })
+    expect(passage().classList.contains('expanded')).toBe(true)
+    collapse()
+    openCard()
+    act(() => { passage().dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })) })
+    expect(passage().classList.contains('expanded')).toBe(true)
+  } finally { restore() }
+})
+
+it('keeps a selected passage that fits its clamp a plain click target that opens the reply', () => {
+  const restore = passagesOverflow(false)
+  try {
+    render(QUOTED)
+    openCard()
+    expect(passage().getAttribute('role')).toBeNull()
+    expect(passage().hasAttribute('aria-expanded')).toBe(false)
+    ;(document.activeElement as HTMLElement).blur()
+    act(() => passage().click())
+    expect(passage().classList.contains('expanded')).toBe(false)
+    expect(document.activeElement).toBe(host.querySelector('.rail-reply textarea'))
+  } finally { restore() }
+})
+
+/** A discussion with `count` replies, numbered from 1. */
+const replied = (count: number) => '{==passage==}{>>@Da Wei: question<<}' +
+  Array.from({ length: count }, (_, i) => `{>>@Sam: answer ${i + 1}<<}`).join('') + '\n'
+const shownReplies = () => Array.from(host.querySelectorAll('.rail-comment-reply .rail-body')).map((body) => body.textContent)
+
+it('shows a selected card\'s three replies whole', () => {
+  render(replied(3))
+  expect(shownReplies()).toEqual([])
+  openCard()
+  expect(shownReplies()).toEqual(['answer 1', 'answer 2', 'answer 3'])
+  expect(host.textContent).not.toContain('earlier replies')
+})
+
+it('caps four or more replies to an earlier-replies row and the last two, until the row is activated', () => {
+  render(replied(5))
+  // Unselected, the card shows only its reply count.
+  expect(shownReplies()).toEqual([])
+  expect(host.querySelector('.rail-footer')!.textContent).toBe('5 replies')
+  openCard()
+  expect(shownReplies()).toEqual(['answer 4', 'answer 5'])
+  const row = Array.from(host.querySelectorAll<HTMLButtonElement>('.rail-disclosure')).find((button) => button.textContent === '3 earlier replies')!
+  expect(row.className).toBe(host.querySelector('.rail-disclosure')!.className)
+  expect(row.getAttribute('aria-expanded')).toBe('false')
+  act(() => row.focus())
+  act(() => row.click())
+  expect(shownReplies()).toEqual(['answer 1', 'answer 2', 'answer 3', 'answer 4', 'answer 5'])
+  expect(host.textContent).not.toContain('earlier replies')
+  expect(document.activeElement).toBe(host.querySelector('.rail-earlier-replies'))
+  // Deselection hides them again.
+  collapse()
+  openCard()
+  expect(shownReplies()).toEqual(['answer 4', 'answer 5'])
+})
+
+it('shows every reply when Find reveals one the selected card hides', () => {
+  const source = replied(4)
+  store.setState({ source, savedSource: source, status: 'ready' })
+  const [card] = analyzeMarkdown(source).threads
+  act(() => root.render(<Harness select={card!.spanIndex} />))
+  expect(shownReplies()).toEqual(['answer 3', 'answer 4'])
+  // A reply already shown asks for nothing more.
+  act(() => root.render(<Harness select={card!.spanIndex} reveal={{ message: card!.messages[3]! }} />))
+  expect(shownReplies()).toEqual(['answer 3', 'answer 4'])
+  act(() => root.render(<Harness select={card!.spanIndex} reveal={{ message: card!.messages[1]! }} />))
+  expect(shownReplies()).toEqual(['answer 1', 'answer 2', 'answer 3', 'answer 4'])
 })
 
 it('posts a reply on Enter, adds a line on Shift+Enter, and leaves Enter to the IME while composing', () => {

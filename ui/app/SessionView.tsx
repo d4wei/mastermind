@@ -178,6 +178,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const commentsPanel = useRef<HTMLDivElement>(null)
   const [replyRequest, setReplyRequest] = useState<{ spanIndex: number } | null>(null)
   const replyHandled = useCallback(() => setReplyRequest(null), [])
+  const [revealRequest, setRevealRequest] = useState<{ message: number } | null>(null)
+  const revealHandled = useCallback(() => setRevealRequest(null), [])
   const translation = useTranslation()
   // An unfinished translated comment keeps the artifact it captured after its translation goes stale.
   const translatedSelection = useDraftValue<{ artifact: PreparedTranslation } | null>(sessionId, 'translated:selection')
@@ -310,11 +312,12 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     return true
   }, [sessionId, collapseTable, rebaseActive, rebaseHovered, rebaseFocused, setReplyDrafts])
   const applyEdits = useCallback((edits: TextEdit[]) => applyReviewEdits(edits, source), [applyReviewEdits, source])
-  const revealFindComment = useCallback((spanIndex: number) => {
+  const revealFindComment = useCallback((spanIndex: number, message: number) => {
     collapseTable()
     if (!railOpen) findOpenedRail.current = true
     setRailOpen(true)
     chooseActive(spanIndex)
+    setRevealRequest({ message })
   }, [railOpen, collapseTable, chooseActive])
 
   useEffect(() => {
@@ -551,6 +554,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
       activeSpan={activeSpan}
       replyRequest={replyRequest}
       onReplyHandled={replyHandled}
+      revealRequest={revealRequest}
+      onRevealHandled={revealHandled}
       hoveredSpan={hoveredSpan}
       focusedSpan={focusedSpan}
       onHover={chooseHovered}

@@ -3,10 +3,11 @@ import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useStandingRefusal } from '../modes/reading/standing-refusal'
 import { useDraftGuard } from './drafts'
 import { flushSync } from 'react-dom'
-import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
+import { memo, useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
+import { DisclosureToggle } from './DisclosureToggle'
 import { ThreadMessage } from './ThreadMessage'
 import { QuotedPassage } from './QuotedPassage'
 import { Collapsible } from './Collapsible'
@@ -32,6 +33,9 @@ interface Props {
   activeSpan: number | null
   replyRequest?: { spanIndex: number } | null
   onReplyHandled?: () => void
+  /** A message Find is revealing; a selected card shows every reply when it is one of those it hides. */
+  revealRequest?: { message: number } | null
+  onRevealHandled?: () => void
   /** The discussion under the pointer; it and `focusedSpan` are emphasized without selecting. */
   hoveredSpan?: number | null
   /** The discussion whose card holds keyboard focus. */
@@ -49,6 +53,15 @@ interface Props {
 }
 
 const CARD_GAP = 8
+/** A selected card shows every reply up to this many; beyond it, only the last `LAST_REPLIES` until asked. */
+const ALL_REPLIES = 3
+const LAST_REPLIES = 2
+
+/** How many earlier replies a selected card hides behind its earlier-replies row. */
+function hiddenReplies(card: ThreadCard): number {
+  const replies = card.thread.comments.length - 1
+  return replies > ALL_REPLIES ? replies - LAST_REPLIES : 0
+}
 
 /** What a card asks of its rail; one object for the rail's lifetime, so cards need not re-render for it. */
 interface CardActions {
@@ -58,6 +71,8 @@ interface CardActions {
   resolve: (card: ThreadCard) => void
   deleteMessage: (card: ThreadCard, messageIndex: number) => void
   setDraft: (card: ThreadCard, text: string) => void
+  /** Shows the selected card's earlier replies until it is deselected. */
+  showAllReplies: (card: ThreadCard) => void
   submit: (card: ThreadCard) => void
   /** Discards the card's draft and collapses it. */
   cancel: (card: ThreadCard) => void
@@ -66,7 +81,8 @@ interface CardActions {
 }
 
 export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, hoveredSpan, focusedSpan, onHover,
-  onFocusSpan, onActivate, onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, readOnly = false, leaving = false }: Props) {
+  onFocusSpan, onActivate, onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, revealRequest, onRevealHandled,
+  readOnly = false, leaving = false }: Props) {
   const cards = analysis.threads
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
@@ -92,6 +108,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
+  /** The card showing its earlier replies; it counts only while that card stays selected. */
+  const [allRepliesFor, setAllRepliesFor] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   /** A requested composer that could not take focus yet, because it was still collapsing. */
   const pendingFocus = useRef<string | null>(null)
@@ -156,6 +174,19 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     })
     return () => cancelAnimationFrame(frame)
   }, [activeSpan, cards])
+
+  // Earlier replies hide again once their card is deselected.
+  useEffect(() => {
+    setAllRepliesFor((key) => key !== null && cards.find((card) => card.key === key)?.spanIndex === activeSpan ? key : null)
+  }, [activeSpan, cards])
+  // Declared after the reset above, so a reveal that selects a card in the same commit outlasts it.
+  useEffect(() => {
+    if (!revealRequest) return
+    const card = cards.find((item) => item.messages.includes(revealRequest.message))
+    const position = card ? card.messages.indexOf(revealRequest.message) : -1
+    if (card && position >= 1 && position <= hiddenReplies(card)) setAllRepliesFor(card.key)
+    onRevealHandled?.()
+  }, [revealRequest, onRevealHandled, cards])
 
   const focusReply = useCallback((key: string) => {
     if (readOnly) return
@@ -243,6 +274,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   }
 
   const latest: CardActions = { activate, collapse, resolve: resolveThread, deleteMessage, setDraft: setDraftText,
+    showAllReplies: (card) => { if (card.spanIndex === activeSpan) setAllRepliesFor(card.key) },
     submit: submitReply, cancel, hover: (spanIndex) => onHover?.(spanIndex),
     focusSpan: (spanIndex) => onFocusSpan?.(spanIndex) }
   const handlers = useRef(latest)
@@ -281,8 +313,9 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     {resolveError && <div className="rail-resolution-error" role="alert">{t('resolveFailed')}: {resolveError}</div>}
     {cards.filter(mounted).map((card) => {
       const composer = card === composerCard
+      const selected = activeSpan === card.spanIndex
       return <RailCard key={card.key} card={card} attach={cardRef(card.key)} actions={actions} readOnly={readOnly}
-        selected={activeSpan === card.spanIndex} placed={placed.has(card.key)}
+        selected={selected} allReplies={selected && allRepliesFor === card.key} placed={placed.has(card.key)}
         paired={hoveredSpan === card.spanIndex || focusedSpan === card.spanIndex}
         composes={composes(card)} requested={replyFor === card.key} draft={draftText(card)}
         canReply={composer && canReply} bodyInvalid={composer && bodyInvalid} />
@@ -306,6 +339,8 @@ interface CardProps {
   actions: CardActions
   readOnly: boolean
   selected: boolean
+  /** The selected card shows the earlier replies it otherwise hides behind a row. */
+  allReplies: boolean
   /** Hovered or focused: emphasized with its passage, without selecting. */
   paired: boolean
   /** Placement has positioned the card; until then it stays unseen. */
@@ -324,11 +359,21 @@ interface CardProps {
  * One discussion card. It renders only when its own props change, so hover, focus, or a draft on
  * another card leaves it untouched; its labels follow the interface language through `useT`.
  */
-const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selected, paired, placed, composes,
-  requested, draft, canReply, bodyInvalid }: CardProps) {
+const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selected, allReplies, paired, placed,
+  composes, requested, draft, canReply, bodyInvalid }: CardProps) {
   const t = useT()
   const ime = useCompositionGuard()
+  const earlierId = useId()
+  const earlierRef = useRef<HTMLDivElement>(null)
+  /** The earlier-replies row was activated; focus moves from the row, which closes, to the replies it reveals. */
+  const focusEarlier = useRef(false)
+  useLayoutEffect(() => {
+    if (!allReplies || !focusEarlier.current) return
+    focusEarlier.current = false
+    earlierRef.current?.focus({ preventScroll: true })
+  }, [allReplies])
   const replies = card.thread.comments.length - 1
+  const earlier = hiddenReplies(card)
   // A message reads author, then (opening message only) the quoted passage, then the comment, as
   // a resolved discussion does; the reply count follows the opening message.
   const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
@@ -338,7 +383,8 @@ const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selec
         onClick={() => actions.activate(card.spanIndex)}>
         <span className="rail-author">{comment.author ?? t('comment')}</span>
       </button> : <span className="rail-author">{comment.author ?? t('comment')}</span>}
-      quote={messageIndex === 0 && card.anchorText ? <QuotedPassage text={card.anchorText} lines={selected ? 6 : 2} expandable={selected} /> : undefined}
+      quote={messageIndex === 0 && card.anchorText
+        ? <QuotedPassage text={card.anchorText} lines={2} expandable={selected} expansion="press" /> : undefined}
       actions={<>
         {messageIndex === 0 && <button type="button" className="btn-ghost btn-icon rail-icon" aria-label={t('resolve')}
           title={t('resolve')} disabled={readOnly} onClick={() => actions.resolve(card)}><CheckIcon /></button>}
@@ -363,7 +409,20 @@ const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selec
     {message(card.thread.comments[0]!, 0)}
     {replies > 0 && <RepliesDisclosure count={replies} expanded={selected}
       onToggle={() => selected ? actions.collapse(true) : actions.activate(card.spanIndex)}>
-      {card.thread.comments.slice(1).map((comment, reply) => message(comment, reply + 1))}
+      {earlier > 0 && <>
+        <Collapsible open={!allReplies}><div className="rail-actions rail-footer">
+          <DisclosureToggle expanded={false} onToggle={() => {
+            focusEarlier.current = true
+            actions.showAllReplies(card)
+          }}>{t('earlierReplies').replace('{count}', String(earlier))}</DisclosureToggle>
+        </div></Collapsible>
+        <Collapsible open={allReplies} id={earlierId}>
+          <div ref={earlierRef} tabIndex={-1} className="rail-earlier-replies">
+            {card.thread.comments.slice(1, 1 + earlier).map((comment, reply) => message(comment, reply + 1))}
+          </div>
+        </Collapsible>
+      </>}
+      {card.thread.comments.slice(1 + earlier).map((comment, reply) => message(comment, reply + 1 + earlier))}
     </RepliesDisclosure>}
     <Collapsible open={composes}><div className="rail-reply">
       {readOnly && <p role="status">{t('editingPaused')}</p>}

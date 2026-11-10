@@ -18,6 +18,18 @@ it('subtracts what outermost shrinking sections are still to lose, margins inclu
   expect(settledHeight(document.getElementById('card')!, 400)).toBe(400 - 30 - 80 - 24)
 })
 
+it('adds what an outermost opening section is still to gain, up to its content\'s full height', () => {
+  document.body.innerHTML = `<div id="card">
+    <div id="replies" data-settles-to="open"><div id="content" data-settles-content=""></div></div>
+    <div id="composer" data-settles-to="0"></div>
+  </div>`
+  const heights: Record<string, number> = { replies: 30, content: 120, composer: 50 }
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { height: heights[this.id] ?? 0 } as DOMRect
+  })
+  expect(settledHeight(document.getElementById('card')!, 400)).toBe(400 + 90 - 50)
+})
+
 it('marks a shrink by its target height plus the element\'s margins', () => {
   document.body.innerHTML = '<div id="quote" style="margin: 8px 0 6px"></div>'
   expect(settledMarginBox(document.getElementById('quote')!, 46)).toBe(60)

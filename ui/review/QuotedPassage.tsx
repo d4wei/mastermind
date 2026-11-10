@@ -1,4 +1,5 @@
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent,
+  type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useT } from '../i18n'
 import { prefersReducedMotion } from '../util/presence'
@@ -10,8 +11,14 @@ interface Props {
   text: string
   /** Lines shown before the passage clamps with an ellipsis. */
   lines: number
-  /** Whether an overflowing passage offers its disclosure; an unselected live card only clamps. */
+  /** Whether an overflowing passage can expand; while false it only clamps, and an expansion ends. */
   expandable: boolean
+  /**
+   * How an overflowing passage expands: `disclosure` offers Show more and Show less beneath it;
+   * `press` makes the passage itself a control that expands it once, with no way back but
+   * `expandable` turning false.
+   */
+  expansion?: 'disclosure' | 'press'
   /** A resolved card quotes its passage as a blockquote; a live card's passage is a plain line. */
   as?: 'div' | 'blockquote'
   'aria-label'?: string
@@ -109,29 +116,52 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
 
 /**
  * A discussion's quoted passage, clamped to `lines`. An expandable passage that overflows its clamp
- * offers the Show more disclosure, which reveals it whole inside the card; a new clamp or passage
- * starts collapsed. Clamp changes ease the passage's height. The full text stays in the title, and
- * the clamp is visual, so assistive technology reads it all.
+ * can be revealed whole inside the card, through the Show more disclosure or by pressing the passage
+ * itself; a new clamp or passage, or the passage ceasing to be expandable, starts it clamped again.
+ * Clamp changes ease the passage's height, so an expansion grows downward. The clamp is visual, so
+ * assistive technology reads the whole text.
  */
-export function QuotedPassage({ text, lines, expandable, as: Tag = 'div', 'aria-label': label }: Props) {
+export function QuotedPassage({ text, lines, expandable, expansion: mode = 'disclosure', as: Tag = 'div',
+  'aria-label': label }: Props) {
   const t = useT()
   const id = useId()
   const ref = useRef<HTMLElement>(null)
-  // A new clamp or passage starts collapsed; React discards the render that resets it.
+  // A new clamp or passage starts collapsed, as does one no longer expandable; React discards the render that resets it.
   const [expansion, setExpansion] = useState({ text, lines, expanded: false })
-  if (expansion.text !== text || expansion.lines !== lines) setExpansion({ text, lines, expanded: false })
+  if (expansion.text !== text || expansion.lines !== lines || (!expandable && expansion.expanded)) {
+    setExpansion({ text, lines, expanded: false })
+  }
   const expanded = expandable && expansion.expanded
   const { drawn, overflows } = useClampTransition(ref, text, { lines, expanded }, expandable)
+  const setExpanded = (next: boolean) => setExpansion({ text, lines, expanded: next })
+  // A pressable passage stays a control once expanded, out of the tab order, so focus stays on it.
+  const pressable = mode === 'press' && expandable && (overflows || expanded)
+  const press = pressable && !expanded ? {
+    onClick: (event: MouseEvent) => {
+      // Dragging to select the passage's text does not expand it.
+      if (window.getSelection()?.isCollapsed === false) return
+      event.stopPropagation()
+      setExpanded(true)
+    },
+    onKeyDown: (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return
+      event.preventDefault()
+      event.stopPropagation()
+      setExpanded(true)
+    },
+  } : {}
   return <>
     <Tag ref={ref as never} id={id} className={`rail-card-anchor${drawn.expanded ? ' expanded' : ''}`}
-      aria-label={label} style={{ '--quote-lines': drawn.lines } as CSSProperties}>{text}</Tag>
-    <Collapsible open={expandable && (overflows || expanded)} className="rail-quote-reveal">
+      style={{ '--quote-lines': drawn.lines } as CSSProperties}
+      {...pressable ? { role: 'button', tabIndex: expanded ? -1 : 0, 'aria-expanded': expanded,
+        'aria-label': expanded ? label : `${t('quoteShowMore')}: ${text}` } : { 'aria-label': label }}
+      {...press}>{text}</Tag>
+    {mode === 'disclosure' && <Collapsible open={expandable && (overflows || expanded)} className="rail-quote-reveal">
       <div className="rail-actions rail-footer rail-quote-footer">
-        <DisclosureToggle kind="expand" expanded={expanded} controls={id}
-          onToggle={() => setExpansion({ text, lines, expanded: !expanded })}>
+        <DisclosureToggle kind="expand" expanded={expanded} controls={id} onToggle={() => setExpanded(!expanded)}>
           {t(expanded ? 'quoteShowLess' : 'quoteShowMore')}
         </DisclosureToggle>
       </div>
-    </Collapsible>
+    </Collapsible>}
   </>
 }

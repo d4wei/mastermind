@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, useMemo, useRef, useState, type RefObject } from 'react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Root } from 'react-dom/client'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { CommentRail } from '../ui/review/CommentRail'
@@ -18,6 +18,8 @@ const SOURCE = Array.from({ length: 40 }, (_, i) => {
 const GAP = 8
 /** The rail's space below its last card where no styles apply, as here. */
 const END_SPACE = 40
+/** How far below a card's top its opening message's body starts. */
+const BODY = 40
 
 let host: HTMLDivElement
 let root: Root
@@ -47,7 +49,9 @@ beforeEach(() => {
   railWidth = 300
   // Anchors 500 px apart; a 1,000 px viewport with its margins reaches 2,500 px.
   layout = { viewport: 1000, documentHeight: 500 * 39 + 20, anchorTop: (anchor) => 500 * marks().indexOf(anchor),
-    cardHeight: (card) => heights.get(passageOf(card)) ?? 100 }
+    cardHeight: (card) => heights.get(passageOf(card)) ?? 100, bodyOffset: () => BODY,
+    // A card's height stands for its sections' too, so they add nothing to it as they open or close.
+    innerHeight: (element) => element.matches('.collapsible, [data-settles-content]') ? 0 : undefined }
   restoreLayout = stubDocumentLayout(layout)
   vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(function (this: Element) {
     return this.classList.contains('rail') ? railWidth : 0
@@ -124,18 +128,19 @@ const inView = (element: HTMLElement) => {
   return top >= 0 && top < layout.viewport
 }
 const topOf = (passage: string) => parseFloat(cardFor(passage)!.style.top)
+const railHeight = () => parseFloat(host.querySelector<HTMLElement>('.rail')!.style.height)
 
 it('mounts only the cards near the viewport and keeps the rail its full height', async () => {
   act(() => root.render(<Harness />))
-  // Anchors 0 to 2,500 px fall within the viewport and its margin.
+  // Cards up to 2,500 px fall within the viewport and its margin; each body meets its passage.
   expect(mounted()).toEqual(range(0, 6))
-  expect(cardFor(w(5))!.style.top).toBe('2500px')
+  expect(cardFor(w(5))!.style.top).toBe(`${2500 - BODY}px`)
   // The last card passes the document's end, so the rail leaves space below it.
-  expect(host.querySelector<HTMLElement>('.rail')!.style.height).toBe(`${500 * 39 + 100 + END_SPACE}px`)
+  expect(railHeight()).toBeCloseTo(500 * 39 - BODY + 100 + END_SPACE)
   await act(() => scrollDocument(scroller(), 10_000))
   // 8,500 to 12,500 px, counting the cards whose box reaches 8,500.
   expect(mounted()).toEqual(range(17, 26))
-  expect(cardFor(w(20))!.style.top).toBe('10000px')
+  expect(cardFor(w(20))!.style.top).toBe(`${10_000 - BODY}px`)
 })
 
 it('keeps the selected, focused, and drafting cards mounted wherever they are', async () => {
@@ -162,8 +167,8 @@ it('reveals a far card it mounts for a selection, as clicking its anchor does', 
   act(() => select(span(30)))
   await frames()
   const card = cardFor(w(30))!
-  // Centered on its 20 px passage at 15,000 px; the selection was made with the passage out of view.
-  expect(card.style.top).toBe('14960px')
+  // Its body meets its passage at 15,000 px.
+  expect(card.style.top).toBe(`${15_000 - BODY}px`)
   expect(inView(card)).toBe(true)
   // The window followed the reveal; the card stayed where it was revealed.
   expect(mounted()).toContain(w(29))
@@ -209,7 +214,7 @@ it('calibrates estimates by measured cards and remembers heights after unmountin
   act(() => root.render(<Harness />))
   // Unmounted cards of the same content are estimated at the 100 px their measured peers have.
   expect(cards().length).toBeLessThan(40)
-  expect(parseFloat(host.querySelector<HTMLElement>('.rail')!.style.height)).toBeCloseTo(40 * 100 + 39 * GAP + END_SPACE)
+  expect(railHeight()).toBeCloseTo(40 * 100 + 39 * GAP + END_SPACE)
   heights.set(w(0), 300)
   resized(cardFor(w(0))!)
   const top = (i: number) => 300 + GAP + (i - 1) * (100 + GAP)
@@ -270,94 +275,212 @@ it('keeps the document\'s height while the cards end above it, and leaves space 
   expect(rail.style.height).toBe('30000px')
   layout.documentHeight = 19_590
   documentResized()
-  expect(rail.style.height).toBe(`${500 * 39 + 100 + END_SPACE}px`)
+  expect(railHeight()).toBeCloseTo(500 * 39 - BODY + 100 + END_SPACE)
+})
+
+describe('the pivot', () => {
+  /** Anchors 100 px apart from 1,000 px: each 100 px card crowds the next. */
+  const crowd = () => { layout.anchorTop = (anchor) => 1000 + 100 * marks().indexOf(anchor) }
+
+  it('aligns the selected card in a crowd and keeps it there after deselection', () => {
+    crowd()
+    act(() => root.render(<Harness />))
+    // Without a pivot, cards stack down from the first.
+    expect(range(0, 5).map(topOf)).toEqual([960, 1068, 1176, 1284, 1392])
+    act(() => select(span(3)))
+    expect(range(0, 5).map(topOf)).toEqual([936, 1044, 1152, 1260, 1368])
+    act(() => select(null))
+    expect(range(0, 5).map(topOf)).toEqual([936, 1044, 1152, 1260, 1368])
+  })
+
+  it('moves to a new selection and is dropped when its discussion disappears', () => {
+    crowd()
+    act(() => root.render(<Harness />))
+    act(() => select(span(3)))
+    act(() => select(span(1)))
+    expect(range(0, 5).map(topOf)).toEqual([952, 1060, 1168, 1276, 1384])
+    act(() => select(null))
+    // A source change that removes the pivot's discussion leaves the cards stacked in order again.
+    act(() => setSource(SOURCE.replace('Paragraph {==w01==}{>>@a: comment 01<<}', 'Paragraph w01')))
+    expect(mounted()).not.toContain(w(1))
+    expect(topOf(w(0))).toBe(960)
+    expect(topOf(w(2))).toBe(1068)
+  })
 })
 
 /** Each move a card started: the card, the transform it starts from, and its animation. */
 let moves: { card: string; from: string; animation: { cancel: () => void; onfinish: null } }[]
-/** Gives the rail a move duration, as the theme does, and records moves through a stubbed `animate`. */
-function enableMotion(duration = '180ms') {
+/**
+ * Gives the rail its move duration and the sections theirs, and records moves through a stubbed
+ * `animate`. Unless `instantSections`, reduced motion is off, so sections ease until their
+ * transition is ended by hand; with it, sections and reveals change at once while cards still move.
+ */
+function enableMotion(duration = '180ms', instantSections = false) {
+  if (!instantSections) vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
   const style = document.createElement('style')
   style.textContent = `.rail { --rail-card-move: ${duration}; --ease-standard: linear; }`
   document.head.append(style)
+  document.documentElement.style.setProperty('--dur-base', duration)
   moves = []
   Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value(this: HTMLElement, keyframes: Keyframe[]) {
     const animation = { cancel: vi.fn(), onfinish: null }
     moves.push({ card: passageOf(this), from: String(keyframes[0]!.transform), animation })
     return animation
   } })
-  return () => { style.remove(); Reflect.deleteProperty(HTMLElement.prototype, 'animate') }
+  return () => {
+    style.remove()
+    document.documentElement.style.removeProperty('--dur-base')
+    Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+  }
+}
+const moved = () => moves.map(({ card, from }) => [card, from])
+/**
+ * One card's easing sections, as layout reports them mid-ease: each moving section's row is
+ * `drawn` tall while its content is `full` tall.
+ */
+let easing: { passage: string; drawn: number; full: number } | null
+function easeSections() {
+  easing = null
+  const still = layout.innerHeight!
+  layout.innerHeight = (element, card) => {
+    if (!easing || passageOf(card) !== easing.passage) return still(element, card)
+    if (element.matches('.collapsible[data-settles-to]')) return easing.drawn
+    if (element.matches('[data-settles-content]')) return easing.full
+    return still(element, card)
+  }
+}
+/** Ends every section's row transition in `card`, as the browser reports it. */
+function endTransitions(card: HTMLElement) {
+  for (const section of card.querySelectorAll('.collapsible')) {
+    const event = new Event('transitionend')
+    Object.defineProperty(event, 'propertyName', { value: 'grid-template-rows' })
+    act(() => { section.dispatchEvent(event) })
+  }
 }
 
-it('plays the moves a selection causes from where each card was drawn, together', () => {
-  const restore = enableMotion()
-  try {
-    act(() => root.render(<Harness />))
-    expect(moves).toEqual([])
-    // Taller than the view, the selected card keeps its top in view and rises; the next card clears it.
-    heights.set(w(1), 1200)
-    act(() => select(span(1)))
-    expect(topOf(w(1))).toBe(108)
-    expect(topOf(w(2))).toBe(1316)
-    expect(moves.map(({ card, from }) => [card, from])).toEqual([[w(1), 'translateY(392px)'], [w(2), 'translateY(-316px)']])
-    // Deselecting interrupts the selected card's move; the next starts from where it is drawn.
-    cardFor(w(1))!.style.transform = 'matrix(1, 0, 0, 1, 0, 30)'
-    const first = moves[0]!.animation
-    act(() => select(null))
-    expect(first.cancel).toHaveBeenCalled()
-    expect(topOf(w(1))).toBe(500)
-    expect(moves.slice(2).map(({ card, from }) => [card, from])).toEqual([[w(1), `translateY(${108 + 30 - 500}px)`],
-      [w(2), `translateY(${1316 - 1708}px)`], [w(3), `translateY(${1500 - 1816}px)`]])
-  } finally { restore() }
-})
+describe('motion', () => {
+  it('plays one move per card a selection pushes, toward a placement by settled heights, and none while it eases', () => {
+    const restore = enableMotion()
+    easeSections()
+    try {
+      act(() => root.render(<Harness />))
+      expect(moves).toEqual([])
+      // The composer opens to 450 px; at the selection it has not grown yet.
+      easing = { passage: w(1), drawn: 0, full: 450 }
+      act(() => select(span(1)))
+      // The selected card keeps its top; the next card clears its settled 550 px at once.
+      expect(topOf(w(1))).toBe(500 - BODY)
+      expect(topOf(w(2))).toBe(460 + 550 + GAP)
+      expect(topOf(w(3))).toBe(1500 - BODY)
+      expect(moved()).toEqual([[w(2), `translateY(${960 - 1018}px)`]])
+      // Frame by frame, the card grows; nothing re-aims.
+      for (const drawn of [150, 300, 450]) {
+        easing = { passage: w(1), drawn, full: 450 }
+        heights.set(w(1), 100 + drawn)
+        resized(cardFor(w(1))!)
+        expect(topOf(w(2))).toBe(1018)
+      }
+      expect(moves).toHaveLength(1)
+      endTransitions(cardFor(w(1))!)
+      easing = null
+      // A change with no selection change, as a reply field growing, moves at once.
+      heights.set(w(1), 600)
+      resized(cardFor(w(1))!)
+      expect(topOf(w(2))).toBe(460 + 600 + GAP)
+      expect(moves).toHaveLength(1)
+    } finally { restore() }
+  })
 
-it('reveals a selected card where it is placed, not where its move still draws it', async () => {
-  const restore = enableMotion()
-  try {
-    act(() => root.render(<Harness />))
-    heights.set(w(5), 600)
-    act(() => select(span(5)))
-    // Centered on its passage at 2,500 px, it starts its move drawn where it was.
-    expect(topOf(w(5))).toBe(2210)
-    expect(moves.find(({ card }) => card === w(5))?.from).toBe('translateY(290px)')
-    cardFor(w(5))!.style.transform = 'matrix(1, 0, 0, 1, 0, 290)'
-    await frames()
-    // The composer's 20 px at its placed top end at the viewport's bottom.
-    expect(scroller().scrollTop).toBe(2210 + 20 - layout.viewport)
-  } finally { restore() }
-})
+  it('leaves the pivot in place on deselection and moves only what its shrinking releases, from where it is drawn', () => {
+    const restore = enableMotion()
+    easeSections()
+    try {
+      act(() => root.render(<Harness />))
+      heights.set(w(1), 600)
+      act(() => select(span(1)))
+      endTransitions(cardFor(w(1))!)
+      expect(topOf(w(2))).toBe(1068)
+      // The next card is still drawn 30 px below its top by its move.
+      cardFor(w(2))!.style.transform = 'matrix(1, 0, 0, 1, 0, 30)'
+      const running = moves.find(({ card }) => card === w(2))!.animation
+      moves = []
+      // The composer closes from 450 px to nothing.
+      easing = { passage: w(1), drawn: 450, full: 450 }
+      act(() => select(null))
+      expect(running.cancel).toHaveBeenCalled()
+      expect(topOf(w(1))).toBe(460)
+      expect(topOf(w(2))).toBe(960)
+      expect(moved()).toEqual([[w(2), `translateY(${1068 + 30 - 960}px)`]])
+    } finally { restore() }
+  })
 
-it('moves cards at once when the size observer, the document, or a mounting card re-places them', async () => {
-  const restore = enableMotion()
-  try {
-    act(() => root.render(<Harness />))
-    heights.set(w(0), 600)
-    resized(cardFor(w(0))!)
-    expect(topOf(w(1))).toBe(608)
-    layout.anchorTop = (anchor) => 600 * marks().indexOf(anchor)
-    documentResized()
-    expect(topOf(w(2))).toBe(1200)
-    await act(() => scrollDocument(scroller(), 10_000))
-    // A far card mounting for its selection has nowhere it was drawn to move from.
-    act(() => select(span(5)))
-    expect(cardFor(w(5))).toBeDefined()
-    expect(moves).toEqual([])
-  } finally { restore() }
-})
+  it('moves a card less than a pixel at once', () => {
+    const restore = enableMotion()
+    easeSections()
+    try {
+      act(() => root.render(<Harness />))
+      easing = { passage: w(1), drawn: 0, full: 392.5 }
+      act(() => select(span(1)))
+      expect(topOf(w(2))).toBe(960.5)
+      expect(moves).toEqual([])
+    } finally { restore() }
+  })
 
-it('moves cards at once under reduced motion and where animations are unavailable', () => {
-  const restoreReduced = enableMotion('0s')
-  try {
-    act(() => root.render(<Harness />))
-    heights.set(w(1), 1200)
-    act(() => select(span(1)))
-    expect(topOf(w(2))).toBe(1316)
-    expect(moves).toEqual([])
-  } finally { restoreReduced() }
-  const restore = enableMotion()
-  Reflect.deleteProperty(HTMLElement.prototype, 'animate')
-  try {
-    act(() => select(null))
-    expect(topOf(w(2))).toBe(1708)
-  } finally { restore() }
+  it('moves cards at once when the size observer, the document, a mounting card, or new cards re-place them', async () => {
+    const restore = enableMotion()
+    try {
+      act(() => root.render(<Harness />))
+      heights.set(w(0), 600)
+      resized(cardFor(w(0))!)
+      expect(topOf(w(1))).toBe(608)
+      layout.anchorTop = (anchor) => 600 * marks().indexOf(anchor)
+      documentResized()
+      expect(topOf(w(2))).toBe(1200 - BODY)
+      act(() => setSource(SOURCE.replace('comment 00<<}', 'comment 00<<}{>>@b: a reply<<}')))
+      act(() => setSource(SOURCE))
+      await act(() => scrollDocument(scroller(), 10_000))
+      // A far card mounting for its selection has nowhere it was drawn to move from.
+      act(() => select(span(30)))
+      expect(cardFor(w(30))).toBeDefined()
+      expect(moves).toEqual([])
+    } finally { restore() }
+  })
+
+  it('moves cards at once under reduced motion and where animations are unavailable', () => {
+    const restoreReduced = enableMotion('0s')
+    easeSections()
+    try {
+      act(() => root.render(<Harness />))
+      heights.set(w(1), 1200)
+      act(() => select(span(1)))
+      expect(topOf(w(2))).toBe(460 + 1200 + GAP)
+      expect(moves).toEqual([])
+    } finally { restoreReduced() }
+    const restore = enableMotion()
+    Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+    try {
+      heights.set(w(1), 100)
+      act(() => select(span(3)))
+      expect(topOf(w(2))).toBe(1000 - BODY)
+    } finally { restore() }
+  })
+
+  it('reveals a selected card where it is placed, not where its move still draws it', async () => {
+    const restore = enableMotion('180ms', true)
+    try {
+      const anchors = [0, 700, 710, 720, 730, 760]
+      layout.anchorTop = (anchor) => anchors[marks().indexOf(anchor)] ?? 5000
+      act(() => root.render(<Harness />))
+      // The sixth card stacks below a crowd; selected, it takes its own alignment and moves up.
+      expect(topOf(w(5))).toBe(1092)
+      act(() => select(span(5)))
+      expect(topOf(w(5))).toBe(760 - BODY)
+      expect(moves.find(({ card }) => card === w(5))?.from).toBe(`translateY(${1092 - 720}px)`)
+      cardFor(w(5))!.style.transform = 'matrix(1, 0, 0, 1, 0, 372)'
+      layout.viewport = 300
+      await frames()
+      // The composer's 20 px at its placed top end at the viewport's bottom.
+      expect(scroller().scrollTop).toBe(720 + 20 - 300)
+    } finally { restore() }
+  })
 })

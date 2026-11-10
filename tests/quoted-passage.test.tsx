@@ -78,6 +78,46 @@ it('collapses when its card is deselected and rechecks overflow when resized', (
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
 })
 
+describe('pressing a live passage', () => {
+  it('expands an overflowing passage in place while expandable, offering no disclosure row', () => {
+    size.scroll = 120; size.client = 30
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable expansion="press" />))
+    expect(toggle()).toBeNull()
+    expect(quote().getAttribute('role')).toBe('button')
+    expect(quote().getAttribute('aria-expanded')).toBe('false')
+    expect(quote().getAttribute('aria-label')).toBe('quoteShowMore: A long passage')
+    act(() => quote().click())
+    expect(quote().classList.contains('expanded')).toBe(true)
+    expect(quote().getAttribute('aria-expanded')).toBe('true')
+    // It keeps focus once expanded, out of the tab order, and pressing it again does not collapse it.
+    expect(quote().tabIndex).toBe(-1)
+    act(() => quote().click())
+    expect(quote().classList.contains('expanded')).toBe(true)
+    expect(toggle()).toBeNull()
+  })
+
+  it('collapses when it stops being expandable and starts collapsed when it is again', () => {
+    size.scroll = 120; size.client = 30
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable expansion="press" />))
+    act(() => quote().click())
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} expansion="press" />))
+    expect(quote().classList.contains('expanded')).toBe(false)
+    expect(quote().getAttribute('role')).toBeNull()
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable expansion="press" />))
+    expect(quote().classList.contains('expanded')).toBe(false)
+  })
+
+  it('is no control when it fits its clamp, and lets clicks reach its card', () => {
+    size.scroll = 30; size.client = 30
+    const clicked = vi.fn()
+    act(() => root.render(<div onClick={clicked}><QuotedPassage text="Short" lines={2} expandable expansion="press" /></div>))
+    expect(quote().getAttribute('role')).toBeNull()
+    expect(quote().hasAttribute('tabindex')).toBe(false)
+    act(() => quote().click())
+    expect(clicked).toHaveBeenCalled()
+  })
+})
+
 it('quotes a resolved passage as a labeled blockquote', () => {
   act(() => root.render(<QuotedPassage as="blockquote" text="Archived" lines={6} expandable aria-label="Quoted passage" />))
   expect(quote().tagName).toBe('BLOCKQUOTE')

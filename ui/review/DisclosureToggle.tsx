@@ -15,8 +15,9 @@ interface Props {
 }
 
 /**
- * The quiet chevron button that discloses part of a discussion card, shared by the reply count and
- * the quoted passage so they cannot drift; its chevron turns while expanded.
+ * The quiet chevron button that discloses part of a discussion card, shared by the reply count, the
+ * earlier-replies row, and a resolved card's quoted passage so they cannot drift; its chevron turns
+ * while expanded.
  */
 export function DisclosureToggle({ expanded, kind = 'reveal', controls, onToggle, children }: Props) {
   return <button type="button" className={`rail-link rail-disclosure${kind === 'expand' ? ' rail-disclosure-expand' : ''}`} aria-expanded={expanded} aria-controls={controls}

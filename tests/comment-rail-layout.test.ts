@@ -1,137 +1,145 @@
-import { expect, it } from 'vitest'
-import { CardHeightEstimator, placeCommentCards, type RailSurface } from '../ui/review/rail-layout'
+import { describe, expect, it } from 'vitest'
+import { CardHeightEstimator, placeCommentCards, type RailMeasurement } from '../ui/review/rail-layout'
 
-/** A document with no end in sight and no scroller, so only passages and order place the selection. */
-const OPEN: RailSurface = { documentBottom: Infinity, view: null }
-/** A card as tall as its passage, which every alignment rule places at the passage's top. */
-const flush = (anchorTop: number, height: number) => ({ anchorTop, anchorHeight: height, height })
+const GAP = 8
+/** A card whose opening message's body starts 60 px below its top, below a quoted passage. */
+const quoted = (anchorTop: number, height: number): RailMeasurement => ({ anchorTop, bodyOffset: 60, height })
+const place = (cards: readonly RailMeasurement[], pivot = -1) => placeCommentCards(cards, pivot, GAP)
 
-it('gives a selected crowded discussion its anchor while retaining readable neighbors', () => {
-  const cards = [300, 340, 380].map((anchorTop) => flush(anchorTop, 100))
-  expect(placeCommentCards(cards, -1, 8, OPEN)).toEqual([300, 408, 516])
-  expect(placeCommentCards(cards, 2, 8, OPEN)).toEqual([164, 272, 380])
-  cards[1] = flush(340, 420)
-  expect(placeCommentCards(cards, 1, 8, OPEN)).toEqual([232, 340, 768])
+describe('alignment', () => {
+  it('puts the opening message\'s body level with the top of its passage', () => {
+    expect(place([quoted(500, 120)])).toEqual([440])
+    expect(place([quoted(500, 120)], 0)).toEqual([440])
+  })
+
+  it('aligns a point comment by its smaller body offset', () => {
+    expect(place([{ anchorTop: 500, bodyOffset: 36, height: 80 }])).toEqual([464])
+    expect(place([{ anchorTop: 500, bodyOffset: 36, height: 80 }], 0)).toEqual([464])
+  })
+
+  it('keeps every card at or below the rail\'s top', () => {
+    expect(place([quoted(20, 100)])).toEqual([0])
+    expect(place([quoted(20, 100), quoted(30, 100), quoted(40, 100)], 2)).toEqual([0, 108, 216])
+    expect(place([], 0)).toEqual([])
+  })
 })
 
-it('keeps cards on the surface when there is insufficient room before the selected anchor', () => {
-  const cards = [0, 0, 20].map((anchorTop) => flush(anchorTop, 100))
-  expect(placeCommentCards(cards, 2, 8, OPEN)).toEqual([0, 108, 216])
-  expect(placeCommentCards([], 0, 8, OPEN)).toEqual([])
-})
+describe('stacking', () => {
+  it('stacks in source order without a pivot, each at its aligned top or a gap below the card before', () => {
+    expect(place([quoted(300, 100), quoted(340, 100), quoted(800, 100)])).toEqual([240, 348, 740])
+  })
 
-it('never overlaps cards or changes source order across crowded and sparse layouts', () => {
-  const heights = [40, 140, 800, 64, 220]
-  const surfaces: RailSurface[] = [OPEN, { documentBottom: 300, view: null }, { documentBottom: 2000, view: { top: 100, bottom: 400 } }]
-  for (const spacing of [0, 12, 80, 800]) {
-    const cards = heights.map((height, i) => ({ height, anchorTop: i * spacing, anchorHeight: 20 }))
-    for (const surface of surfaces) {
-      for (let selected = -1; selected < cards.length; selected++) {
-        const tops = placeCommentCards(cards, selected, 8, surface)
+  it('gives the pivot its alignment in a crowded cluster, earlier cards above and later ones below', () => {
+    const cards = [quoted(300, 100), quoted(340, 100), quoted(380, 100), quoted(420, 100)]
+    expect(place(cards)).toEqual([240, 348, 456, 564])
+    expect(place(cards, 2)).toEqual([104, 212, 320, 428])
+  })
+
+  it('leaves earlier cards that already sit clear of the pivot at their own alignment', () => {
+    expect(place([quoted(100, 100), quoted(600, 100)], 1)).toEqual([40, 540])
+  })
+
+  it('moves the pivot down only as far as earlier cards need to fit below the rail\'s top', () => {
+    expect(place([quoted(0, 100), quoted(10, 100), quoted(130, 100)], 2)).toEqual([0, 108, 216])
+  })
+
+  it('never overlaps cards or changes source order across crowded and sparse layouts', () => {
+    const heights = [40, 140, 800, 64, 220]
+    for (const spacing of [0, 12, 80, 800]) {
+      const cards = heights.map((height, i) => ({ height, anchorTop: i * spacing, bodyOffset: 30 + i * 7 }))
+      for (let pivot = -1; pivot < cards.length; pivot++) {
+        const tops = place(cards, pivot)
         expect(tops[0]).toBeGreaterThanOrEqual(0)
-        for (let i = 1; i < cards.length; i++) {
-          expect(tops[i]).toBeGreaterThanOrEqual(tops[i - 1]! + heights[i - 1]! + 8)
-        }
+        for (let i = 1; i < cards.length; i++) expect(tops[i]).toBeGreaterThanOrEqual(tops[i - 1]! + heights[i - 1]! + GAP)
       }
     }
-  }
+  })
 })
 
-it('never pushes a card up for height it is collapsing, and lets the selection rise as it closes', () => {
-  // The upper card closes from 400 to 100; the lower one is now selected beside its anchor at 300.
-  const frames = [400, 250, 160, 100].map((height) => placeCommentCards([
-    { anchorTop: 100, anchorHeight: 20, height, settledHeight: 100 },
-    flush(300, 60),
-  ], 1, 8, OPEN))
-  expect(frames.map((tops) => tops[0])).toEqual([100, 100, 100, 100])
-  expect(frames.map((tops) => tops[1])).toEqual([508, 358, 300, 300])
-  // Settled, it places exactly as without the collapse.
-  expect(frames.at(-1)).toEqual(placeCommentCards([flush(100, 100), flush(300, 60)], 1, 8, OPEN))
-})
+describe('the pivot', () => {
+  /** A crowded cluster whose third card is selected at 400 px tall, or unselected at 100. */
+  const cluster = (third: number) => [quoted(300, 100), quoted(340, 100), quoted(380, third), quoted(420, 100), quoted(460, 100)]
 
-it('still reclaims the room a collapsing card keeps, at once rather than past it and back', () => {
-  const tops = placeCommentCards([{ anchorTop: 100, anchorHeight: 20, height: 400, settledHeight: 200 }, flush(250, 60)], 1, 8, OPEN)
-  expect(tops).toEqual([42, 450])
-  expect(placeCommentCards([flush(100, 200), flush(250, 60)], 1, 8, OPEN)).toEqual([42, 250])
-})
+  it('stays where it is after deselection; only the cards its shrinking releases move', () => {
+    const selected = place(cluster(400), 2)
+    const deselected = place(cluster(100), 2)
+    expect(selected.slice(0, 3)).toEqual(deselected.slice(0, 3))
+    expect(selected.slice(3)).toEqual([728, 836])
+    expect(deselected.slice(3)).toEqual([428, 536])
+  })
 
-/** Where a lone selected card of `height` sits beside a passage at 500 to 520. */
-const alone = (height: number, surface: RailSurface = OPEN, passage = 20) =>
-  placeCommentCards([{ anchorTop: 500, anchorHeight: passage, height }], 0, 8, surface)[0]
+  it('moves to a newly selected card', () => {
+    expect(place(cluster(100), 2)).toEqual([104, 212, 320, 428, 536])
+    expect(place(cluster(100), 3)).toEqual([36, 144, 252, 360, 468])
+  })
 
-it('centers a selected card on a passage shorter than itself', () => {
-  expect(alone(200)).toBe(410)
-  // Unselected, it starts at its passage's top.
-  expect(placeCommentCards([{ anchorTop: 500, anchorHeight: 20, height: 200 }], -1, 8, OPEN)).toEqual([500])
-})
+  it('grows a selected card downward only: its top, and so its body line, hold while later cards follow', () => {
+    const frames = [100, 180, 260, 400].map((height) => place(cluster(height), 2))
+    expect(frames.map((tops) => tops[2])).toEqual([320, 320, 320, 320])
+    expect(frames.map((tops) => tops[1])).toEqual([212, 212, 212, 212])
+    expect(frames.map((tops) => tops[3])).toEqual([428, 508, 588, 728])
+  })
 
-it('starts a selected card at the top of a passage no shorter than itself', () => {
-  expect(alone(100, OPEN, 400)).toBe(500)
-  expect(alone(100, OPEN, 100)).toBe(500)
-})
+  it('brings later cards back as a selected card shrinks', () => {
+    const grown = place(cluster(400), 2)
+    const shrunk = place(cluster(100), 2)
+    expect(grown[3]).toBe(728)
+    expect(shrunk).toEqual(place(cluster(100), 2))
+    expect(shrunk[3]).toBe(428)
+  })
 
-it('rides a selected card up near the document end, never below its ideal and never off its passage', () => {
-  expect(alone(200, { documentBottom: 560, view: null })).toBe(360)
-  // Its bottom may still pass the end: it stays across its passage's lines.
-  expect(alone(200, { documentBottom: 400, view: null })).toBe(320)
-  // A document ending well below it leaves it centered.
-  expect(alone(200, { documentBottom: 900, view: null })).toBe(410)
-})
-
-it('shifts a selected card into the view its selection was made in, top first', () => {
-  // The view's top edge.
-  expect(placeCommentCards([{ anchorTop: 470, anchorHeight: 20, height: 200 }], 0, 8,
-    { documentBottom: Infinity, view: { top: 450, bottom: 1450 } })).toEqual([458])
-  // The view's bottom edge.
-  expect(alone(200, { documentBottom: Infinity, view: { top: 0, bottom: 600 } })).toBe(392)
-  // Taller than the view, the card keeps its top in view.
-  expect(placeCommentCards([{ anchorTop: 470, anchorHeight: 20, height: 200 }], 0, 8,
-    { documentBottom: Infinity, view: { top: 450, bottom: 600 } })).toEqual([458])
-})
-
-it('ignores the view when the passage was outside it', () => {
-  expect(alone(200, { documentBottom: Infinity, view: { top: 0, bottom: 400 } })).toBe(410)
-  expect(alone(200, { documentBottom: Infinity, view: { top: 520, bottom: 1500 } })).toBe(410)
-})
-
-it('clamps a selected card back onto its passage after the view moves it', () => {
-  // The passage straddles the view's bottom edge; the view would lift the card off it.
-  expect(placeCommentCards([{ anchorTop: 390, anchorHeight: 20, height: 200 }], 0, 8,
-    { documentBottom: Infinity, view: { top: 0, bottom: 400 } })).toEqual([210])
-  // A short card within a tall passage stays inside it.
-  expect(alone(100, { documentBottom: Infinity, view: { top: 0, bottom: 560 } }, 400)).toBe(500)
-})
-
-it('lets order outrank alignment: earlier cards fit above, later ones clear below', () => {
-  const tops = placeCommentCards([flush(0, 100), flush(10, 100), { anchorTop: 20, anchorHeight: 20, height: 200 },
-    flush(30, 50)], 2, 8, OPEN)
-  expect(tops).toEqual([0, 108, 216, 424])
-})
-
-it('keeps a growing selected card centered on its passage, frame by frame', () => {
-  const centers = [40, 90, 150, 200].map((height) => alone(height)! + height / 2)
-  expect(centers).toEqual([510, 510, 510, 510])
+  it('never pushes a card up for height it is collapsing, and keeps the pivot clear of its current bottom', () => {
+    // The upper card closes from 400 to 100; the lower one is the pivot beside its anchor at 360.
+    const frames = [400, 250, 160, 100].map((height) => place([
+      { anchorTop: 160, bodyOffset: 60, height, settledHeight: 100 },
+      quoted(360, 60),
+    ], 1))
+    expect(frames.map((tops) => tops[0])).toEqual([100, 100, 100, 100])
+    expect(frames.map((tops) => tops[1])).toEqual([508, 358, 300, 300])
+    expect(frames.at(-1)).toEqual(place([quoted(160, 100), quoted(360, 60)], 1))
+  })
 })
 
 const discussion = (body: string, replies = 0, anchorText = 'a passage') => ({ key: body, spanIndex: 0, anchorText,
   thread: { comments: [{ author: 'a', body }, ...Array.from({ length: replies }, () => ({ author: 'b', body: 'reply' }))] } })
 
-it('estimates unrendered cards from their content, scaled by how measured cards compared', () => {
-  const estimator = new CardHeightEstimator()
-  const short = discussion('short'), long = discussion('word '.repeat(60)), replied = discussion('short', 2)
-  const paragraphs = discussion('short\n\nshort')
-  expect(estimator.estimate(long)).toBeGreaterThan(estimator.estimate(short))
-  expect(estimator.estimate(replied)).toBeGreaterThan(estimator.estimate(short))
-  expect(estimator.estimate(paragraphs)).toBeGreaterThan(estimator.estimate(short))
-  expect(estimator.estimate(discussion('short', 0, ''))).toBeLessThan(estimator.estimate(short))
-  const raw = estimator.estimate(long)
-  // A card measured at twice its estimate doubles every estimate.
-  estimator.learn(short, 2 * estimator.estimate(short))
-  expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
-  // The ratio follows the running totals, and ignores drift under 2%.
-  const other = discussion('other')
-  estimator.learn(other, 1.005 * estimator.estimate(other))
-  expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
-  estimator.reset()
-  expect(estimator.estimate(long)).toBeCloseTo(raw)
+describe('estimates', () => {
+  it('estimates unrendered cards\' heights from their content, scaled by how measured cards compared', () => {
+    const estimator = new CardHeightEstimator()
+    const short = discussion('short'), long = discussion('word '.repeat(60)), replied = discussion('short', 2)
+    const paragraphs = discussion('short\n\nshort')
+    expect(estimator.estimate(long)).toBeGreaterThan(estimator.estimate(short))
+    expect(estimator.estimate(replied)).toBeGreaterThan(estimator.estimate(short))
+    expect(estimator.estimate(paragraphs)).toBeGreaterThan(estimator.estimate(short))
+    expect(estimator.estimate(discussion('short', 0, ''))).toBeLessThan(estimator.estimate(short))
+    const raw = estimator.estimate(long)
+    // A card measured at twice its estimate doubles every estimate.
+    estimator.learn(short, 2 * estimator.estimate(short))
+    expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+    // The ratio follows the running totals, and ignores drift under 2%.
+    const other = discussion('other')
+    estimator.learn(other, 1.005 * estimator.estimate(other))
+    expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+    estimator.reset()
+    expect(estimator.estimate(long)).toBeCloseTo(raw)
+  })
+
+  it('estimates an unmounted card\'s body offset from the passage above it, calibrated by measured offsets', () => {
+    const estimator = new CardHeightEstimator()
+    const oneLine = discussion('short', 0, 'brief'), twoLines = discussion('short', 0, 'passage '.repeat(20))
+    const point = discussion('short', 0, '')
+    // The body sits below the passage's lines, so a longer passage lowers it until the clamp; the body's own length does not.
+    expect(estimator.bodyOffset(twoLines)).toBeGreaterThan(estimator.bodyOffset(oneLine))
+    expect(estimator.bodyOffset(discussion('short', 0, 'passage '.repeat(80)))).toBe(estimator.bodyOffset(twoLines))
+    expect(estimator.bodyOffset(point)).toBeLessThan(estimator.bodyOffset(oneLine))
+    expect(estimator.bodyOffset(discussion('word '.repeat(60), 3, 'brief'))).toBe(estimator.bodyOffset(oneLine))
+    // An estimate never exceeds the card's estimated height.
+    expect(estimator.bodyOffset(oneLine)).toBeLessThan(estimator.estimate(oneLine))
+    // A measured offset calibrates offsets without touching heights.
+    const height = estimator.estimate(oneLine)
+    const raw = estimator.bodyOffset(twoLines)
+    estimator.learn(oneLine, height, undefined, estimator.bodyOffset(oneLine) / 2)
+    expect(estimator.bodyOffset(twoLines)).toBeCloseTo(raw / 2)
+    expect(estimator.estimate(oneLine)).toBeCloseTo(height)
+  })
 })

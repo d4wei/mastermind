@@ -4,36 +4,45 @@ A card reads author, quoted passage, then the opening comment, followed by a rep
 replies exist; `RepliesDisclosure` draws that count with the chevron toggle it shares with
 resolved discussions, turned while the replies show. A card without replies has no footer and no Reply
 button. Clicking its passage, opening message, or count expands the discussion and focuses the reply
-composer; the expanded count collapses it again and keeps focus. Enter and Space on the passage or
-the card's opening-message button do the same. Repeated activation refocuses an already-open
-composer. A selected card always shows its reply field, so a discussion selected without a reply
-request (by Find revealing a reply, for example) offers it without taking focus. Replies appear
-chronologically beneath the count. Neighboring opening messages remain fully readable. Cards use
+composer; the expanded count collapses it again and keeps focus. Enter and Space on the card's
+opening-message button do the same. Repeated activation refocuses an already-open composer. A
+selected card always shows its reply field, so a discussion selected without a reply request (by
+Find revealing a reply, for example) offers it without taking focus. Replies appear chronologically
+beneath the count: every reply when there are three or fewer; otherwise a row reading how many
+earlier replies there are, drawn with the count's `DisclosureToggle`, then the last two. Activating
+that row shows every reply, moving focus to them, until the card is deselected; Find revealing a
+reply the row hides does the same. Neighboring opening messages remain fully readable. Cards use
 interface typography independently of the reading font preset.
 
-`QuotedPassage` clamps the quoted passage to two lines on an unselected card and six on the
-selected card or a resolved one, ending in an ellipsis. An unselected card only clamps. On a
-selected or resolved card, a passage that overflows its clamp, measured again whenever the card
-resizes and once a clamp change finishes easing, offers Show more, which reveals it whole inside the card and then reads Show less; a new
-clamp starts collapsed. That disclosure and the reply count
-share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
+`QuotedPassage` clamps a live card's quoted passage to two lines whether or not the card is
+selected, and a resolved card's to six, ending in an ellipsis. Overflow is measured again whenever
+the passage resizes and once a clamp change finishes easing. On the selected live card, a passage
+that overflows its clamp is a control (`role="button"`, `aria-expanded`, labeled Show more with the
+passage): clicking it, or Enter or Space, reveals it whole, growing downward, until the card is
+deselected; there is no collapse control and no disclosure row. Any other live passage is no
+control, and a click on it reaches the card. On a resolved card, a passage that overflows offers
+Show more beneath it, which reveals it whole and then reads Show less. That disclosure and the reply
+count share `DisclosureToggle`: the reply count's chevron turns from right to down as replies appear
 below, and the passage's turns from down to up as it grows in place.
 
-`rail-layout.ts` places cards in source order without overlap. An unselected card starts at its
-passage's top, below the card before it. The selected card is centered on a passage shorter than
-itself and starts at the top of one that is not; near the document's end it rides up, never below
-that place, so less of it hangs past the body; and when its passage was in view as the selection
-was made, it moves into that view, keeping its top in view when it is taller than the view. The
-view is read once per selection, so later resizes and scrolling do not move the card into it. Each
-of these yields to the card still spanning its passage's lines, or lying within them, and the card
-is placed by its current height, so one easing open grows from its middle. Order outranks all of
-it: earlier cards make room above the selection and stay within the document surface, and when
-there is not room for every preceding card, the selected card moves down only far enough to retain
-order and separation. When cards run past the document's end, the rail leaves the space the
-document column leaves below the body, read from the rail's bottom padding. Every card is placed,
-whether or not it is mounted: a mounted card by its measured height, including a resized reply
-composer; an unmounted one by the height it was last measured at, or by an estimate if it has never
-rendered. Narrow comment panels use ordinary vertical flow instead of positioned cards.
+`rail-layout.ts` places cards in source order without overlap, around one pivot, so that cards move
+as little as they can. Every card wants its opening message's body level with the top of its
+passage: its aligned top is the passage's top less its body offset, the distance from the card's
+top to that body, never above the rail's top. The pivot is the card most recently selected; it stays
+the pivot after deselection, so it stays where it is, and changes only when another card is
+selected or its discussion leaves the cards. Without a pivot, each card takes its aligned top or
+sits one gap below the card before it, whichever is lower. The pivot takes its aligned top unless
+the cards before it would not fit above it within the rail, and then moves down only as far as they
+need; earlier cards stack upward from it, each as close to its aligned top as order allows, and
+later cards stack downward. Nothing above a card's body line changes height on selection, so a
+selected card keeps its top and grows downward only, later cards move down as it grows and come back
+as it shrinks, and no position is remembered beyond the pivot. A card keeps the body offset its
+clamped passage gives while that passage is expanded or easing back. When cards run past the
+document's end, the rail leaves the space the document column leaves below the body, read from the
+rail's bottom padding. Every card is placed, whether or not it is mounted: a mounted card by its
+measured height and body offset, including a resized reply composer; an unmounted one by those it
+was last measured at, or by estimates if it has never rendered. Narrow comment panels use ordinary
+vertical flow instead of positioned cards.
 
 In the wide rail, only the cards whose placed box meets the viewport, plus one and a half viewports
 above and below, are mounted. The rail also keeps mounted the selected card (which is how a
@@ -48,12 +57,14 @@ A remembered height is dropped when the card's content (its messages, their auth
 its passage) changes, when the card gains or loses the selection, or when the rail's width changes;
 a card that unmounts while a section is still closing is remembered at the height it settles to.
 Font and interface-language changes are not detected, so remembered heights can be stale until the
-card next mounts and is measured. An estimate is computed from content: chrome, the passage at its
-two-line clamp, the opening message's wrapped lines, and the reply count. Its geometry is read once
-from the first rendered single-message card, and it is scaled by the ratio of measured to estimated
-height over the unselected cards measured so far. An estimate that is off moves cards below it once
-the card mounts and is measured, which shows mainly while scrolling up through an unvisited part of
-a crowded rail; the article itself never moves.
+card next mounts and is measured. Estimates are computed from content: the author row, the passage
+at its two-line clamp (or the smaller gap of a card without one), the opening message's wrapped
+lines, and the reply count; the body offset is the same geometry down to the opening message's
+body. Their geometry is read once from the first rendered single-message card with a passage, and
+heights and body offsets are each scaled by the ratio of measured to estimated values over the
+unselected cards measured so far. An estimate that is off moves cards once the card mounts and is
+measured, which shows mainly while scrolling up through an unvisited part of a crowded rail; the
+article itself never moves.
 
 Tab order follows the DOM, so an unmounted card would be skipped. The rail therefore keeps the
 focused card's neighbors in source order mounted as well: when focus reaches the first or last
@@ -85,7 +96,8 @@ place, inert, before the document recenters. Narrow panels use the same fade-in.
 reduced-motion preferences.
 
 Sections that appear inside a card, live or resolved, ease open and closed through `Collapsible`:
-the reply composer and its alert, the replies, and the passage's Show more row. Its grid row moves
+the reply composer and its alert, the replies and the earlier-replies row, and a resolved passage's
+Show more row. Its grid row moves
 between `0fr` and `1fr`, so the card's height follows its content and is never set. Closing content
 keeps its last open render and stays mounted, inert, hidden from assistive technology and refusing
 input, until the row's transition ends or is cancelled; a collapsing composer neither posts nor
@@ -97,25 +109,31 @@ moves. The quoted passage eases between clamps
 by animating `max-height` from the height on screen to the next clamp's measured height, and a
 shrinking clamp stays drawn until then, so the ellipsis appears only at the final height. The rail
 re-places cards synchronously from its size observer, so neighbors follow an easing card in the
-same frame, and a card not yet placed stays unseen rather than at the rail's top. One observer
+same frame unless a selection is easing it (below), and a card not yet placed stays unseen rather
+than at the rail's top. One observer
 watches the document and every mounted card for the rail's lifetime (`RailPlacement` in
 `rail-layout.ts`); an observation re-reads only the cards it reports, and anchor offsets only when
 the document resized, and writes positions to the cards without rendering them. Anchor offsets are
 read for every card, mounted or not. A new selection or set of cards measures every mounted card
-once, and a commit that mounts cards measures those before paint. Shrinking sections
-mark the size they settle to (`settling.ts`), and earlier cards make room for a selection only by
-the heights they keep: a card collapsing above a new selection never rises for height it is losing,
-while the selection starts below its current bottom and rises as it closes.
+once, and a commit that mounts cards measures those before paint. Easing sections mark the size
+they settle to (`settling.ts`): a shrinking one its final height, an opening one its content's full
+height. Earlier cards make room for the pivot only by the heights they keep, so a card collapsing
+above it never rises for height it is losing.
 
-Placement changes that a selection or a new set of cards causes move the mounted cards together, in
-one frame, over the rail's move duration: each card's `top` changes at once, so layout and the
-window stay exact, and a transform plays from where the card was drawn, an interrupted move
-included, back to zero. A card mounting in that commit has nowhere it was drawn and appears in
-place. Re-placements from the size observer, from anchors moving with the document, from cards
-mounting as the window moves, and from an estimate meeting its first measurement move at once:
-they follow motion that is already frame by frame, or correct a card nobody watched settle.
-Revealing a selected card reveals where it is placed, not where its move still draws it. Reduced
-motion sets the move duration to zero.
+A selection change is one motion on one clock. The card it reaches and the card it leaves are
+placed by the heights their sections settle at, from the commit that changes the selection until
+each measures at that height, so placement holds still while they ease and the size observer
+re-aims nothing. Each mounted card whose place changes keeps its new `top` at once, so layout and
+the window stay exact, while a transform plays from where the card was drawn, an interrupted move
+included, back to zero, started in that commit, over `--rail-card-move` and `--ease-standard`. The
+theme sets `--rail-card-move` to `--dur-base`, the sections' own duration, so a card pushed by an
+opening section travels with the edge that pushes it. A move under a pixel happens at once, and a
+card mounting in that commit has nowhere it was drawn and appears in place. Re-placements with no
+selection change (from the size observer, as a reply field grows; from anchors moving with the
+document; from a new set of cards; from cards mounting as the window moves; from an estimate meeting
+its first measurement) move at once: they follow motion that is already frame by frame, or correct
+a card nobody watched settle. Revealing a selected card reveals where it is placed, not where its
+move still draws it. Reduced motion sets the move duration to zero.
 
 The card remains an accessibility group, not a button containing other buttons. Its opening
 message has a native button that opens the discussion and reply composer; Resolve, More, and the

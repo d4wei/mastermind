@@ -9,13 +9,19 @@ export interface DocumentLayout {
   anchorTop: (anchor: HTMLElement) => number
   /** A rail card's border-box height. */
   cardHeight: (card: HTMLElement) => number
+  /** How far below a card's top its message bodies start; 0 when absent. */
+  bodyOffset?: (card: HTMLElement) => number
+  /** The height of an element inside a card, where it differs from the default. */
+  innerHeight?: (element: HTMLElement, card: HTMLElement) => number | undefined
 }
 
 /**
  * Lays out jsdom as a document scroller would, for the rail's placement and window: the scroller
  * sits at the top of the viewport, the rail and article start at the top of its content, a card sits
- * at its written `top` plus any inline `matrix` transform, the scroller's content is as tall as the
- * rail, and `scrollTo` moves the scroller and dispatches its scroll event. Every other element
+ * at its written `top` plus any inline `matrix` transform, a message body inside it at `bodyOffset`
+ * below that, every other element inside it at its top and 20 px tall unless `innerHeight` says
+ * otherwise, the scroller's content is as tall as the rail, and `scrollTo` moves the scroller and
+ * dispatches its scroll event. Every other element
  * measures empty. Returns the restore for `scrollTo`; the other spies end with `vi.restoreAllMocks`.
  */
 export function stubDocumentLayout(layout: DocumentLayout): () => void {
@@ -29,7 +35,9 @@ export function stubDocumentLayout(layout: DocumentLayout): () => void {
       // A move in progress draws the card where its inline transform matrix puts it.
       const drawn = parseFloat(/^matrix\(.*,\s*([^,]+)\)$/.exec(card.style.transform)?.[1] ?? '') || 0
       const top = (parseFloat(card.style.top) || 0) + drawn - scrolled
-      return rect(top, this === card ? layout.cardHeight(card) : Math.min(20, layout.cardHeight(card)))
+      if (this === card) return rect(top, layout.cardHeight(card))
+      const body = this.classList.contains('rail-body') ? layout.bodyOffset?.(card) ?? 0 : 0
+      return rect(top + body, layout.innerHeight?.(this, card) ?? Math.min(20, layout.cardHeight(card)))
     }
     if (this.classList.contains('rail')) return rect(-scrolled, 0)
     if (this.matches('.document-scroll article')) return rect(-scrolled, layout.documentHeight ?? 0)

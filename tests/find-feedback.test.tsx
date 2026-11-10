@@ -159,7 +159,7 @@ it('indexes collapsed comment replies and requests their thread without opening 
   act(() => root.render(<Harness text="Passage" source={source} />))
   key('f', { metaKey: true }); fill('review')
   expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
-  expect(reveal).toHaveBeenCalledWith(0)
+  expect(reveal).toHaveBeenCalledWith(0, 2)
   expect(host.querySelector('textarea')).toBeNull()
 })
 

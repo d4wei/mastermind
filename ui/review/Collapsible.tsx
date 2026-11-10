@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { rootMs } from '../util/css-tokens'
 import { prefersReducedMotion } from '../util/presence'
+import { SETTLES_CONTENT, SETTLES_OPEN, SETTLES_TO } from './settling'
 import './Collapsible.css'
 
 interface Props {
@@ -41,8 +42,9 @@ function refuse(event: SyntheticEvent): void {
  * follows the section. Content mounts when the section opens. Closing content keeps its last open
  * render and stays, inert, hidden from assistive technology and refusing input, until the row's
  * transition ends or is cancelled, marked as settling to nothing (`settling.ts`); reopening it mid-collapse renders
- * the same elements live again. Content opened with the component appears without easing, and
- * reduced motion makes every change immediate.
+ * the same elements live again. An opening section is marked as settling to its content's full
+ * height until its row's transition ends. Content opened with the component appears without easing,
+ * and reduced motion makes every change immediate.
  */
 export function Collapsible({ open, id, className, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
@@ -89,9 +91,12 @@ export function Collapsible({ open, id, className, children }: Props) {
 
   if (!open && !mounted) return null
   const state = shown === 'closed' ? '' : shown === 'opening' ? ' open' : ' open settled'
+  const settles = { [SETTLES_TO]: open ? shown === 'open' ? undefined : SETTLES_OPEN : 0 }
   return <div ref={ref} id={id} className={`collapsible${state}${className ? ` ${className}` : ''}`}
-    inert={!open} aria-hidden={!open || undefined} data-settles-to={open ? undefined : 0}
+    inert={!open} aria-hidden={!open || undefined} {...settles}
     onKeyDownCapture={closing ? refuse : undefined} onClickCapture={closing ? refuse : undefined}>
-    <div className="collapsible-content">{open ? children : lastOpen.current}</div>
+    <div className="collapsible-content">
+      <div className="collapsible-body" {...{ [SETTLES_CONTENT]: '' }}>{open ? children : lastOpen.current}</div>
+    </div>
   </div>
 }

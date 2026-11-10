@@ -29,6 +29,18 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-10 — The wide rail places cards for the least movement, around the last selected card
+
+**Ruled.** Each card's opening message's body aligns with the top of its passage; the card most
+recently selected is the pivot and keeps its place after deselection; nothing above a card's body
+line changes height on selection, so a selected card grows downward only. A selection change places
+cards by the heights its sections settle at and moves them in one motion on the sections' own
+duration and curve, so a pushed card travels with the edge that pushes it.
+
+**Beat:** centering the selected card on its passage, riding it up at the document's end, and
+shifting it into the view, with a six-line clamp and a Show more row on the selected card, which
+moved cards on every selection and deselection and re-aimed them frame by frame during the ease.
+
 ## 2026-11-09 — The network rule protects documents, and resource packs may be fetched
 
 **Ruled.** Documents and review data never leave the machine: no sync, no accounts, no telemetry,

@@ -27,7 +27,8 @@ interface Props {
   mode: 'reading' | 'translated' | 'source'
   docRef: RefObject<HTMLElement | null>
   analysis: Analysis | null
-  onRevealComment: (spanIndex: number) => void
+  /** Selects the discussion at `spanIndex` to reveal its message `message`. */
+  onRevealComment: (spanIndex: number, message: number) => void
   onClose: () => void
 }
 
@@ -254,7 +255,7 @@ export function FindPanel({ sessionId, source, mode, docRef, analysis, onRevealC
     const current = result ? rangeFor(result) : null
     paintMatches(results.map(rangeFor).filter((range): range is Range => !!range), current)
     if (!pendingReveal.current || !result) return
-    if (result.comment !== undefined) onRevealComment(result.anchor!)
+    if (result.comment !== undefined) onRevealComment(result.anchor!, result.comment)
     if (!current) return
     const frame = requestAnimationFrame(() => {
       if (current.startContainer.isConnected) revealMatch(current, panel.current)

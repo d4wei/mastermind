@@ -291,7 +291,8 @@ button:disabled {
 
 
 .rail {
-  /* How long a card takes to move when selection or the set of cards re-places it. */
+  /* How long a card takes to move when a selection re-places it: the duration its sections ease
+     with, so a card pushed by an opening section travels with the edge that pushes it. */
   --rail-card-move: var(--dur-base);
   grid-column: 2;
   position: relative;
@@ -343,7 +344,7 @@ button:disabled {
   border-radius: var(--radius-xs);
   color: var(--color-text-muted);
 }
-/* QuotedPassage sets --quote-lines: two on an unselected card, more on a selected or resolved one. */
+/* QuotedPassage sets --quote-lines: two on a live card, six on a resolved one. */
 .rail-card-anchor {
   --quote-lines: 2;
   display: -webkit-box;
@@ -360,6 +361,11 @@ button:disabled {
   overflow: hidden;
 }
 .rail-card-anchor.expanded { display: block; -webkit-line-clamp: none; line-clamp: none; }
+/* A selected card's truncated passage expands when pressed. */
+.rail-card-anchor[role='button'][aria-expanded='false'] { cursor: pointer; }
+.rail-card-anchor[role='button'][aria-expanded='false']:hover { color: var(--color-text); }
+/* Holds focus after the earlier-replies row closes; it is a reading position, not a control. */
+.rail-earlier-replies:focus { outline: none; }
 /* The passage's disclosure row sits as close to the quote as the reply count sits to the comment.
    The pull-up is the collapsible's own margin, which collapses with the quote's and eases in with
    the row, so the closed row leaves the quote's spacing untouched. */
@@ -402,7 +408,7 @@ button:disabled {
   min-height: calc(var(--space-unit) * 7);
 }
 .rail-footer { justify-content: flex-start; }
-/* DisclosureToggle: the reply count and the quoted passage share it; its chevron turns while expanded. */
+/* DisclosureToggle: the reply count, the earlier-replies row, and a resolved passage share it; its chevron turns while expanded. */
 .rail-disclosure {
   display: inline-flex;
   align-items: center;
