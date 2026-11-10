@@ -11,6 +11,8 @@ import { analyzeMarkdown, type Analysis } from '../../document/markdown/analyze'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { agentLanguage, NO_LANGUAGES, resolveLanguages, scanScripts } from '../../document/markdown/language'
 import { useDocumentLanguageHint } from '../documents/language-hints'
+import { fontPresetById } from '../theme/fontRegistry'
+import { useFontPacks } from '../theme/fontPacks'
 import { MarkdownView } from '../modes/reading/Renderer'
 import { SelectionToolbar } from '../modes/reading/SelectionToolbar'
 import { CommentRail } from '../review/CommentRail'
@@ -211,6 +213,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     ? (translation.artifact ?? translation.available[0])?.sourceLang : undefined)
   const languages = useMemo(() => scripts ? resolveLanguages(scripts, suppliedLanguage) : NO_LANGUAGES,
     [scripts, suppliedLanguage])
+  // Languages whose faces arrive as packs are fetched while this view shows them.
+  const fontStyle = fontPresetById(useConfig((s) => s.config?.fontPreset)).style
+  const shownLanguages = useMemo(() => [languages.document, ...languages.blocks.values(),
+    showTranslated ? translation.targetLang ?? undefined : undefined], [languages, showTranslated, translation.targetLang])
+  useFontPacks(shownLanguages, fontStyle)
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
   const outline = useMemo(
     () => (analysis ? extractOutline(analysis.tree) : plainParse ? extractOutline(plainParse.tree) : []),

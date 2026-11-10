@@ -3,7 +3,7 @@ import type { NativeBridge } from './host'
 declare global {
   interface Window {
     __TAURI__: {
-      core: Pick<NativeBridge, 'invoke'>
+      core: Pick<NativeBridge, 'invoke'> & { convertFileSrc(path: string, protocol?: string): string }
       event: { listen(event: string, handler: (event: { payload: unknown }) => void): Promise<() => void> }
     }
   }
@@ -12,4 +12,5 @@ declare global {
 export const nativeBridge: NativeBridge = {
   invoke: (command, args) => window.__TAURI__.core.invoke(command, args),
   listen: (event, handler) => window.__TAURI__.event.listen(event, (received) => handler(received.payload)),
+  assetUrl: (path) => window.__TAURI__.core.convertFileSrc(path, 'asset'),
 }
