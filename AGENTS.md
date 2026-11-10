@@ -28,8 +28,9 @@
 The tests check these; a change that needs one relaxed is a `DECISIONS.md` ruling first.
 
 - The file on disk is the single source of truth and the only channel: no database, no sync, no
-  accounts, no network beyond localhost. Review feedback round-trips through the file as
-  CriticMarkup.
+  accounts. Documents and review data never leave the machine; the app's one network use is
+  fetching pinned, hash-checked resource packs, such as fonts, by requests that name the pack
+  alone. Review feedback round-trips through the file as CriticMarkup.
 - Opening and saving an unedited file reproduces it byte for byte, line endings included; accepting
   or rejecting a mark is an exact source splice, never a re-render.
 - Nothing reaches disk without the user's acceptance; suggestions render on screen only.

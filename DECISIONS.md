@@ -29,6 +29,20 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-09 — The network rule protects documents, and resource packs may be fetched
+
+**Ruled.** Documents and review data never leave the machine: no sync, no accounts, no telemetry,
+and nothing derived from a file in any request. The app may fetch resource packs it does not
+bundle, such as the fonts of a language outside the interface languages, when each pack is a pinned
+version from a fixed address, checked against a hash committed with the app, and requested by the
+pack's name alone; the native host makes the request and the renderer stays closed to the network.
+Installing from the repository already downloads every bundled resource, so the former "no network
+beyond localhost" guarded the wrong thing: how resources arrive rather than what leaves.
+
+**Beat:** bundling every regional font up front, which grows the clone and the app for languages
+most readers never open; and having only the agent's CLI fetch packs, which leaves documents
+opened from the picker without their faces.
+
 ## 2026-11-08 — Installing from the repository is the distribution
 
 **Ruled.** The README's clone, `npm ci`, and `npm run desktop:build` path is how mastermind is

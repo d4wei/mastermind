@@ -26,22 +26,19 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms
+## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms (updated 2026-11-09)
 
 **Gap.** The bundled CJK faces are Noto Serif SC and Noto Sans SC, and they cover the kanji the
-Japanese interface labels use, so the browser never reaches a Japanese face and characters whose
-regional forms differ (直, 令, 骨 and the like) show their Chinese shapes. The document root's
-`lang` now follows the interface language, which steers screen readers and hyphenation but not
-font choice while the SC face has the glyph; it also says nothing about the document's own
-language, which the app does not detect, so a Chinese document under a Japanese interface is
-announced as Japanese. Bundling Noto JP adds tens of megabytes; a `:lang(ja)` stack that prefers
-system Japanese faces (Hiragino, Yu Gothic, Noto Sans CJK JP) costs nothing but would also restyle
-a Chinese document shown under a Japanese interface unless the stack keys on the document's
-language rather than the interface's.
+Japanese interface labels use, so characters whose regional forms differ (直, 令, 骨 and the like)
+show their Chinese shapes, in the interface and in Japanese documents; Traditional Chinese and
+Korean text falls into the same faces. The document root's `lang` follows the interface language
+and says nothing about a document's own language. The design is settled in
+[CJK glyph forms](docs/cjk-glyph-forms.md): a language per document and per block (frontmatter,
+then the agent's hint, then script detection), Noto faces for every CJK language with the
+interface languages bundled and the rest fetched as packs, under the 2026-11-09 network ruling.
 
-**Exit:** a per-document language (frontmatter, detection, or the prepared translation's code)
-drives both the root `lang` and the CJK stack, or Japanese glyph forms are accepted for the
-interface and recorded as such.
+**Exit:** the design ships, its contract moves beside `ui/theme/fonts.md`, and the design file is
+deleted.
 
 ## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 
