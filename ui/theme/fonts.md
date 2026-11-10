@@ -71,7 +71,9 @@ launch cached is answered at once. Its sheet, generated beside the bundled one a
 `/themes/fonts/packs/`, its bare file names are resolved to the cache through the asset protocol,
 and it is installed as a `<style>` element. The faces keep the package's `unicode-range` slices, so
 the webview reads a slice only when a character needs it, as with the bundled faces. Only the asset
-protocol's origins join `font-src`; the renderer's `connect-src` stays closed to the network.
+protocol's origins join `font-src`; the renderer's `connect-src` stays closed to the network. The
+inserted `<style>` relies on `style-src 'unsafe-inline'`, which holds only while `desktop.html` has
+no inline `<style>`: Tauri gives such a page a style nonce, and a nonce disables `'unsafe-inline'`.
 
 While a pack is absent, the text renders at once in the system faces listed after the Noto face in
 its row. When the pack arrives, the new faces apply to the text already shown, with no reload. When

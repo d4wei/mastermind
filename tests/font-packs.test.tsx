@@ -212,3 +212,26 @@ describe('the desktop host', () => {
     expect(createNativeHost({ invoke: vi.fn(), listen: vi.fn() }, []).fontPack).toBeUndefined()
   })
 })
+
+describe('the renderer content security policy', () => {
+  const conf = JSON.parse(readFileSync(path.resolve('desktop/tauri.conf.json'), 'utf8')) as {
+    app: { security: { csp: string; assetProtocol: { enable: boolean; scope: string[] } } }
+  }
+  const directives = new Map(conf.app.security.csp.split(';').map((directive) => {
+    const [name, ...sources] = directive.trim().split(/\s+/)
+    return [name!, sources]
+  }))
+
+  it('stays closed to the network and admits pack fonts from the asset protocol alone', () => {
+    expect(directives.get('connect-src')).toEqual(["'self'", 'ipc:', 'http://ipc.localhost'])
+    expect(directives.get('font-src')).toEqual(["'self'", 'asset:', 'http://asset.localhost'])
+    expect(conf.app.security.assetProtocol).toEqual({ enable: true, scope: ['$APPCACHE/font-packs/*/*.woff2'] })
+  })
+
+  it('lets the pack loader insert its style elements', () => {
+    // Tauri adds a nonce to style-src when the page has an inline <style>, which would disable
+    // 'unsafe-inline' and block the sheets the loader inserts.
+    expect(directives.get('style-src')).toContain("'unsafe-inline'")
+    expect(readFileSync(path.resolve('ui/desktop.html'), 'utf8')).not.toMatch(/<style/i)
+  })
+})
