@@ -26,6 +26,8 @@ export type CjkStyle = keyof typeof CJK_STACKS
 export type CjkLanguage = keyof typeof CJK_STACKS.serif
 
 export const CJK_LANGUAGES = Object.keys(CJK_STACKS.serif) as CjkLanguage[]
+/** The rows whose leading faces ship in the bundle; the others arrive as resource packs. */
+export const BUNDLED_CJK_LANGUAGES: readonly CjkLanguage[] = ['zh', 'ja']
 /** The stack of `--font-display`, `--font-body`, and `--font-mono`, and of text with no CJK language. */
 export const DEFAULT_CJK_LANGUAGE: CjkLanguage = 'zh'
 

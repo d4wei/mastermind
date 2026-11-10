@@ -6,7 +6,9 @@ results.
 The document store does not interpret native command envelopes or numeric statuses; it reads only
 the failure `kind`. Prepared
 translations pass through the shared TypeScript freshness and source-mapping checks. Theme assets
-are bundled, and preferences use the native application config directory.
+are bundled, and preferences use the native application config directory. Font packs arrive
+through `font_pack` and load through the asset protocol, as the [font contract](../theme/fonts.md)
+says.
 
 The optional host appearance operation connects loaded theme colors to the native background
 surface and light/dark appearance. Its [theme adapter](../theme/appearance.md) owns conversion and

@@ -22,6 +22,7 @@ struct OpenDocument {
     id: String,
     path: String,
     language: Option<String>,
+    document_language: Option<String>,
 }
 
 impl Snapshot {
@@ -34,6 +35,7 @@ impl Snapshot {
                     id: id.to_string(),
                     path: document.path.clone(),
                     language: document.language.clone(),
+                    document_language: document.document_language.clone(),
                 })
                 .collect(),
             activation_revision: docs.activation_revision,
@@ -147,6 +149,7 @@ fn admit_graphical(docs: &mut Documents, paths: Vec<Result<PathBuf, String>>) {
     if !paths.is_empty() {
         let response = docs.admit(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths,
         });
@@ -272,6 +275,25 @@ mod tests {
         assert_eq!(snapshot["active_id"], 0);
         assert_eq!(snapshot["activation_revision"], 1);
         assert!(snapshot["opening_errors"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn inventory_snapshots_carry_each_documents_language_hints() {
+        let dir = crate::test_support::TempDir::new("hint-snapshot");
+        let path = dir.join("plan.md");
+        std::fs::write(&path, b"plan").unwrap();
+        let mut docs = Documents::default();
+        docs.admit(Request {
+            language: Some("en".into()),
+            document_language: Some("ko".into()),
+            version: VERSION,
+            paths: vec![path.to_str().unwrap().into()],
+        });
+        docs.insert("unhinted".into(), None);
+        let snapshot = serde_json::to_value(Snapshot::from_documents(&docs)).unwrap();
+        assert_eq!(snapshot["files"][0]["language"], "en");
+        assert_eq!(snapshot["files"][0]["document_language"], "ko");
+        assert!(snapshot["files"][1]["document_language"].is_null());
     }
 
     #[test]

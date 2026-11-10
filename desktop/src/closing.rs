@@ -421,6 +421,7 @@ mod tests {
             }
             docs.admit(Request {
                 language: None,
+                document_language: None,
                 version: VERSION,
                 paths: names
                     .iter()

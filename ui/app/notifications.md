@@ -39,6 +39,7 @@ and restarts its lifetime, so repeated events never stack copies.
 | Setup could not load, with Retry | `NativeReviewer` | Persistent, dismissible to a recall |
 | Settings could not be saved | `App` | Persistent, dismissible to a recall |
 | Prepared translation stale or unavailable | `SessionView` | Transient |
+| A language's font pack could not arrive, so system faces stand in | `fontPacks.ts` | Transient, one notice id per language |
 | Selection trimmed, or nothing in it can be marked | `SelectionToolbar` | Transient, one notice id |
 | Translated selection spans blocks | `TranslatedSelection` | Transient, the same notice id |
 

@@ -5,7 +5,7 @@ use mastermind_launch_check::protocol::{
 };
 use std::{io, path::PathBuf};
 
-const USAGE: &str = "usage: mastermind-launch-check open [--language CODE] -- FILE... | close -- FILE... | setup --suggest JSON_OBJECT";
+const USAGE: &str = "usage: mastermind-launch-check open [--language CODE] [--document-language CODE] -- FILE... | close -- FILE... | setup --suggest JSON_OBJECT";
 
 /// Set by the repository launcher when it falls back to a debug binary, whose interface comes from
 /// the development server's origin; such a launcher hands files only to a host already running.
@@ -60,25 +60,42 @@ fn request(args: Vec<std::ffi::OsString>) -> io::Result<Operation> {
             close: file_arguments(&args[2..])?,
         }));
     }
-    let (offset, language) = if args.get(1).is_some_and(|arg| arg == "--language") {
-        let language = args
-            .get(2)
-            .and_then(|arg| arg.to_str())
-            .filter(|code| mastermind_launch_check::protocol::language_code(code))
-            .ok_or_else(|| io::Error::other("invalid_language"))?;
-        (4, Some(language.to_owned()))
-    } else {
-        (2, None)
-    };
-    if args.first().is_none_or(|arg| arg != "open")
-        || args.get(offset - 1).is_none_or(|arg| arg != "--")
-    {
+    if args.first().is_none_or(|arg| arg != "open") {
         return Err(io::Error::other(USAGE));
+    }
+    let mut language = None;
+    let mut document_language = None;
+    let mut index = 1;
+    // Options precede `--`, each at most once; everything after it is a path.
+    loop {
+        let option = args.get(index).and_then(|arg| arg.to_str());
+        let (slot, valid, invalid): (_, fn(&str) -> bool, _) = match option {
+            Some("--") => break,
+            Some("--language") if language.is_none() => (
+                &mut language,
+                mastermind_launch_check::protocol::language_code,
+                "invalid_language",
+            ),
+            Some("--document-language") if document_language.is_none() => (
+                &mut document_language,
+                mastermind_launch_check::protocol::language_tag,
+                "invalid_document_language",
+            ),
+            _ => return Err(io::Error::other(USAGE)),
+        };
+        let code = args
+            .get(index + 1)
+            .and_then(|arg| arg.to_str())
+            .filter(|code| valid(code))
+            .ok_or_else(|| io::Error::other(invalid))?;
+        *slot = Some(code.to_owned());
+        index += 2;
     }
     within_frame(Operation::Open(Request {
         language,
+        document_language,
         version: VERSION,
-        paths: file_arguments(&args[offset..])?,
+        paths: file_arguments(&args[index + 1..])?,
     }))
 }
 
@@ -226,6 +243,97 @@ mod tests {
     }
 
     #[test]
+    fn opening_document_language_is_a_well_formed_tag_given_once() {
+        let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
+        let Operation::Open(open) = request(args(&[
+            "open",
+            "--document-language",
+            "zh-Hant-TW",
+            "--language",
+            "en",
+            "--",
+            "one.md",
+        ]))
+        .unwrap() else {
+            panic!("expected open");
+        };
+        assert_eq!(open.document_language.as_deref(), Some("zh-Hant-TW"));
+        assert_eq!(open.language.as_deref(), Some("en"));
+        assert_eq!(open.paths.len(), 1);
+        let Operation::Open(open) = request(args(&["open", "--", "--document-language"])).unwrap()
+        else {
+            panic!("expected open");
+        };
+        assert!(open.document_language.is_none());
+        assert!(open.paths[0].ends_with("--document-language"));
+        for (invalid, error) in [
+            (
+                args(&["open", "--document-language", "zh_TW", "--", "a.md"]),
+                "invalid_document_language",
+            ),
+            (
+                args(&["open", "--document-language", "--", "a.md"]),
+                "invalid_document_language",
+            ),
+            (
+                args(&["open", "--document-language"]),
+                "invalid_document_language",
+            ),
+            (
+                args(&[
+                    "open",
+                    "--document-language",
+                    "ko",
+                    "--document-language",
+                    "ja",
+                    "--",
+                    "a.md",
+                ]),
+                USAGE,
+            ),
+            (
+                args(&["close", "--document-language", "ko", "--", "a.md"]),
+                USAGE,
+            ),
+            (args(&["open", "--document-language", "ko", "a.md"]), USAGE),
+        ] {
+            assert_eq!(request(invalid).err().unwrap().to_string(), error);
+        }
+    }
+
+    #[test]
+    fn the_document_language_hint_reaches_admission() {
+        let dir = crate::test_support::TempDir::new("launcher-hint");
+        let path = dir.join("plan.md");
+        std::fs::write(&path, "計畫\n").unwrap();
+        let operation = request(
+            [
+                "open",
+                "--document-language",
+                "zh-TW",
+                "--",
+                path.to_str().unwrap(),
+            ]
+            .iter()
+            .map(std::ffi::OsString::from)
+            .collect(),
+        )
+        .unwrap();
+        // The request crosses the transport as JSON.
+        let wire = serde_json::to_vec(&operation).unwrap();
+        let Operation::Open(received) = serde_json::from_slice(&wire).unwrap() else {
+            panic!("expected open");
+        };
+        let mut docs = crate::admission::Documents::default();
+        let response = docs.admit(received);
+        assert_eq!(exit_status(&response), 0);
+        assert_eq!(
+            docs.get(0).unwrap().document_language.as_deref(),
+            Some("zh-TW")
+        );
+    }
+
+    #[test]
     fn close_cli_resolves_paths_without_requiring_markdown() {
         let args = |values: &[&str]| values.iter().map(std::ffi::OsString::from).collect();
         let Operation::Close(close) =
@@ -256,6 +364,7 @@ mod tests {
     fn only_a_launcher_allowed_to_start_a_host_spawns_one() {
         let open = Operation::Open(Request {
             language: None,
+            document_language: None,
             version: VERSION,
             paths: vec!["/document.md".into()],
         });

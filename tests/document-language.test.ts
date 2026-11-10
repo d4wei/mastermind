@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { parseMarkdown } from '../document/markdown/processor'
-import { resolveLanguages, scanScripts, wellFormedLanguage } from '../document/markdown/language'
+import { agentLanguage, resolveLanguages, scanScripts, wellFormedLanguage } from '../document/markdown/language'
 
 const parses = vi.hoisted(() => ({ count: 0 }))
 vi.mock('../document/markdown/processor', async (importOriginal) => {
@@ -39,6 +39,17 @@ describe('document language', () => {
     expect(languages('Plain.\n', 'ko').document).toBe('ko')
     expect(languages('かな\n', 'zh_CN').document).toBe('ja')
     expect(languages('かな\n', '').document).toBe('ja')
+  })
+
+  it('lets the open hint speak for the agent before a prepared translation\'s source language', () => {
+    expect(agentLanguage('zh-tw', 'zh-CN')).toBe('zh-TW')
+    expect(agentLanguage(undefined, 'zh-CN')).toBe('zh-CN')
+    expect(agentLanguage(null, undefined)).toBeUndefined()
+    // A malformed hint is no hint.
+    expect(agentLanguage('zh_TW', 'ja')).toBe('ja')
+    // The hint takes the supplied tier: below frontmatter, above detection.
+    expect(languages('かな\n', agentLanguage('ko', 'zh-CN')).document).toBe('ko')
+    expect(languages('---\nlang: fr\n---\n\nかな\n', agentLanguage('ko', undefined)).document).toBe('fr')
   })
 
   it('detects kana, halfwidth katakana, and hangul before Han', () => {

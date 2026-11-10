@@ -31,6 +31,9 @@ export function failureKind(error: unknown): HostFailure {
   return HOST_FAILURES.find((known) => known === kind) ?? 'failure'
 }
 
+/** A font pack request's outcome; `url` turns one of the pack's file names into a loadable URL. */
+export type FontPackReply = { status: 'ready'; url(file: string): string } | { status: 'offline' | 'failed' }
+
 export interface ReviewerHost {
   getSession(id: string): Promise<SessionMeta>
   getFile(id: string): Promise<FileResponse>
@@ -42,6 +45,8 @@ export interface ReviewerHost {
   updateConfig(patch: Partial<Omit<ClientConfig, 'version'>>): Promise<ClientConfig>
   themes(): Promise<ThemeInfo[]>
   setAppearance(color: [number, number, number, number], appearance: ThemeInfo['appearance']): Promise<void>
+  /** Fetches a resource pack by name; only the desktop host has it, so nothing else fetches. */
+  fontPack?(name: string): Promise<FontPackReply>
 }
 
 let installed: ReviewerHost | null = null

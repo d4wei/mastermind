@@ -12,8 +12,12 @@ pub const MAX_REPLY_FRAME: usize = MAX_FILES * MAX_FRAME;
 pub struct Request {
     pub version: u32,
     pub paths: Vec<String>,
+    /// The reading language to select once among prepared translations, as `translations.md` says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<String>,
+    /// The language the documents are written in, for rendering only, as `protocol.md` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub document_language: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -98,6 +102,49 @@ pub fn language_code(code: &str) -> bool {
         && code.len() <= 64
         && bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
         && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
+}
+
+/// Whether `tag` is a well-formed BCP 47 language tag of the form a renderer's
+/// `Intl.getCanonicalLocales` also accepts: a 2–3 or 5–8 letter language, then an optional script,
+/// region, variants, extensions, and private use. Extended language subtags and the grandfathered
+/// irregular tags are refused, since the renderer would ignore them.
+pub fn language_tag(tag: &str) -> bool {
+    if tag.is_empty() || tag.len() > 64 {
+        return false;
+    }
+    let alpha = |s: &str| s.bytes().all(|b| b.is_ascii_alphabetic());
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if tag
+        .split('-')
+        .any(|s| s.is_empty() || s.len() > 8 || !s.bytes().all(|b| b.is_ascii_alphanumeric()))
+    {
+        return false;
+    }
+    let mut rest = tag.split('-').peekable();
+    let language = rest.next().unwrap_or_default();
+    if !(alpha(language) && matches!(language.len(), 2..=3 | 5..=8)) {
+        return false;
+    }
+    rest.next_if(|s| s.len() == 4 && alpha(s));
+    rest.next_if(|s| (s.len() == 2 && alpha(s)) || (s.len() == 3 && digits(s)));
+    while rest
+        .next_if(|s| s.len() >= 5 || (s.len() == 4 && s.as_bytes()[0].is_ascii_digit()))
+        .is_some()
+    {}
+    while rest
+        .next_if(|s| s.len() == 1 && !s.eq_ignore_ascii_case("x"))
+        .is_some()
+    {
+        if rest.next_if(|s| s.len() >= 2).is_none() {
+            return false;
+        }
+        while rest.next_if(|s| s.len() >= 2).is_some() {}
+    }
+    match rest.next() {
+        None => true,
+        Some(x) if x.eq_ignore_ascii_case("x") => rest.next().is_some(),
+        Some(_) => false,
+    }
 }
 
 #[cfg(test)]
@@ -185,6 +232,43 @@ mod tests {
                 .get("reason")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn language_tags_are_well_formed_bcp47() {
+        for tag in [
+            "ja",
+            "zh-TW",
+            "zh-Hant-HK",
+            "ko-KR",
+            "es-419",
+            "de-CH-1996",
+            "sl-rozaj-biske",
+            "en-u-ca-gregory",
+            "en-x-private",
+            "haw",
+        ] {
+            assert!(language_tag(tag), "{tag}");
+        }
+        for tag in [
+            "",
+            "e",
+            "en_US",
+            "zh--TW",
+            "zh-",
+            "-zh",
+            "x-private",
+            "zh-yue",
+            "en-u",
+            "en-x",
+            "en-US-u",
+            "toolongtag",
+            "ja-JP-x-abcdefghi",
+            "../fr",
+            "zh TW",
+        ] {
+            assert!(!language_tag(tag), "{tag}");
+        }
     }
 
     #[test]

@@ -34,6 +34,15 @@ export function wellFormedLanguage(tag: unknown): string | undefined {
   }
 }
 
+/**
+ * What the agent says a document's language is, the resolution's second tier: the
+ * `open --document-language` hint, else a prepared translation's `sourceLang`. Both come from an
+ * agent; the hint names the document's language for this purpose alone, so it wins a disagreement.
+ */
+export function agentLanguage(hint: string | null | undefined, sourceLang: string | undefined): string | undefined {
+  return wellFormedLanguage(hint) ?? wellFormedLanguage(sourceLang)
+}
+
 const FRONTMATTER_LANG = /^lang[ \t]*:[ \t]*(.*)$/m
 
 /** The top-level `lang` key of a YAML frontmatter, read without a YAML parser. */
@@ -133,8 +142,8 @@ function detectedLanguage(profile: ScriptProfile): string | undefined {
 }
 
 /**
- * The document's language is the first of: the frontmatter's `lang`, `supplied` (a language the
- * agent or a prepared translation names; ignored unless well-formed), and the script most of its
+ * The document's language is the first of: the frontmatter's `lang`, `supplied` (what the agent
+ * says, from `agentLanguage`; ignored unless well-formed), and the script most of its
  * CJK blocks are in. A kana block outside a Japanese document is `ja`, and a hangul block without
  * kana outside a Korean one is `ko`; every other block takes the document's language.
  */

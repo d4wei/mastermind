@@ -26,18 +26,19 @@ entry that has already resolved.
 
 * * *
 
-## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms (updated 2026-11-09)
+## 2026-11-08 — Japanese interface text renders in Simplified Chinese glyph forms (updated 2026-11-10)
 
 **Gap.** Characters whose regional forms differ (直, 令, 骨 and the like) take the shape of the
-face that draws them. Phase one of [CJK glyph forms](docs/cjk-glyph-forms.md) shipped: Noto JP is
-bundled beside Noto SC, documents and blocks resolve a language (frontmatter, a prepared
-translation's `sourceLang`, script detection) and carry it as `lang`, and the stacks follow it, so
-Japanese reads in Japanese forms. Still open: the agent's `open --document-language` hint for an
-untranslated document, and the fetched packs for Traditional Chinese, Hong Kong and Korean faces,
-which fall through to system faces meanwhile, under the 2026-11-09 network ruling.
+face that draws them. Both phases of [CJK glyph forms](docs/cjk-glyph-forms.md) shipped: Noto JP
+is bundled beside Noto SC, documents and blocks resolve a language (frontmatter, the agent's
+`open --document-language` hint or a prepared translation's `sourceLang`, script detection) and
+carry it as `lang`, the stacks follow it, and the Traditional Chinese, Hong Kong and Korean faces
+arrive as fetched packs under the 2026-11-09 network ruling. The contract lives beside
+`ui/theme/fonts.md`. What remains is a check in the running app: 直令骨辺 in a Japanese and a
+Chinese document under each interface language, and a Traditional Chinese document before and
+after its pack arrives, online and offline.
 
-**Exit:** the hint and the packs ship, the design's remaining contract moves beside
-`ui/theme/fonts.md`, and the design file is deleted.
+**Exit:** the check passes in the running app and the design file is deleted.
 
 ## 2026-11-07 — Documents above a few megabytes still freeze the window while they parse (updated 2026-11-08)
 

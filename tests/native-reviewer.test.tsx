@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { INVENTORY_POLL_MS, NativeReviewer } from '../ui/desktop/NativeReviewer'
 import { useOverlay } from '../ui/app/overlayStore'
 import { LOADING_DELAY_MS } from '../ui/app/LoadingState'
+import { useDocumentLanguageHints } from '../ui/documents/language-hints'
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
@@ -104,6 +105,17 @@ it('activates only newer requests, including reopening an existing file', async 
   mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot(2, 0) : other(command))
   await poll()
   expect(mocks.navigate).toHaveBeenLastCalledWith('/d/0')
+})
+
+it('passes each document\'s language hint from the inventory to its view', async () => {
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot'
+    ? { ...snapshot(), files: [{ id: '0', path: '/first.md', document_language: 'zh-HK' }, { id: '1', path: '/second.md' }] }
+    : other(command))
+  await mount()
+  expect(useDocumentLanguageHints.getState().hints).toEqual({ '0': 'zh-HK' })
+  mocks.invoke.mockImplementation(async (command: string) => command === 'snapshot' ? snapshot() : other(command))
+  await poll()
+  expect(useDocumentLanguageHints.getState().hints).toEqual({})
 })
 
 it('keeps one snapshot in flight and ignores it after unmount', async () => {

@@ -10,7 +10,12 @@ export interface NativeBridge {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>
   /** `handler` receives the event's payload; events without one deliver null. */
   listen(event: string, handler: (payload?: unknown) => void): Promise<() => void>
+  /** The asset-protocol URL of a local file; the host's asset scope decides which files load. */
+  assetUrl?(path: string): string
 }
+
+/** `font_pack`'s reply; a ready pack's `directory` ends with the platform's separator. */
+type NativeFontPack = { status: 'ready'; directory: string } | { status: 'offline' | 'failed' }
 
 export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): ReviewerHost {
   const invoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
@@ -55,7 +60,13 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
     }
   }
   let preferenceWrite: Promise<unknown> = Promise.resolve()
+  const assetUrl = bridge.assetUrl?.bind(bridge)
+  const fontPack: ReviewerHost['fontPack'] = assetUrl && (async (name) => {
+    const reply = await invoke<NativeFontPack>('font_pack', { name })
+    return reply.status === 'ready' ? { status: 'ready', url: (file) => assetUrl(reply.directory + file) } : reply
+  })
   return {
+    ...(fontPack && { fontPack }),
     setAppearance: (color, appearance) => invoke<void>('set_appearance', { color, appearance }),
     getSession: (id) => invoke('document_meta', { id }),
     getFile,

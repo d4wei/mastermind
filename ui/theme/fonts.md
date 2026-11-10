@@ -34,15 +34,16 @@ Noto face, then system faces for when that face is not bundled or a slice cannot
 | --- | --- | --- | --- |
 | `zh`, the default | any other language, or none | Noto Serif SC, Noto Sans SC | yes |
 | `ja` | `ja` | Noto Serif JP, Noto Sans JP | yes |
-| `zh-TW` | `zh-TW`, `zh-Hant` | Noto Serif TC, Noto Sans TC | no |
-| `zh-HK` | `zh-HK` | Noto Serif HK, Noto Sans HK | no |
-| `ko` | `ko` | Noto Serif KR, Noto Sans KR | no |
+| `zh-TW` | `zh-TW`, `zh-Hant` | Noto Serif TC, Noto Sans TC | pack |
+| `zh-HK` | `zh-HK` | Noto Serif HK, Noto Sans HK | pack |
+| `ko` | `ko` | Noto Serif KR, Noto Sans KR | pack |
 
-Faces not bundled fall through to the system faces after them until resource packs bring them
-([CJK glyph forms](../../docs/cjk-glyph-forms.md)). Code takes system monospace faces after its
-bundled face, so Latin code stays monospace if that face cannot load, then the sans CJK faces of
-its language in every preset. The Noto faces ship as the packages' `unicode-range` slices, so a
-document loads only the slices its characters need; the
+`BUNDLED_CJK_LANGUAGES` names the bundled rows, the interface languages' faces, which the window
+needs before any document opens. The faces of the other rows are resource packs, fetched the first
+time a document needs them, as [resource packs](#resource-packs) describes. Code takes system
+monospace faces after its bundled face, so Latin code stays monospace if that face cannot load,
+then the sans CJK faces of its language in every preset. The Noto faces ship as the packages'
+`unicode-range` slices, so a document loads only the slices its characters need; the
 [bundled fonts](../../themes/fonts/README.md) describe the files and their provenance.
 
 `--font-display`, `--font-body`, and `--font-mono` carry the default language's stacks, and
@@ -52,6 +53,34 @@ reading article, the translated view, the source editor) and on each element ins
 carries `lang`, then to the row its language matches. Components keep referencing the base tokens.
 A root without `lang` matches the interface language it inherits from the document element. The
 [document language](../../document/markdown/language.md) says where a document's `lang` comes from.
+
+## Resource packs
+
+[fontPacks.ts](fontPacks.ts) decides when a pack is needed. A rendered document needs a pack when
+the language of the document, of one of its tagged blocks, or of the translation it shows selects a
+pack row through the `:lang()` rules above (`zh-TW` and `zh-Hant`, `zh-HK`, `ko`; a tag such as
+`zh-Hant-HK` that can select either Traditional row needs both), and the active preset's CJK style
+names that row's leading face. The view asks for the family of the style in use, and for the other
+style's when the preset changes. Code's sans CJK faces are not requested under a serif preset; they
+fall through to the system sans faces.
+
+Each pack is requested once per launch, by name, from the desktop host, which downloads, checks,
+and caches it as the [pack fetcher](../../desktop/src/font_packs.md) describes; a pack an earlier
+launch cached is answered at once. Its sheet, generated beside the bundled one as the
+[bundled fonts](../../themes/fonts/README.md#resource-packs) say, is read from
+`/themes/fonts/packs/`, its bare file names are resolved to the cache through the asset protocol,
+and it is installed as a `<style>` element. The faces keep the package's `unicode-range` slices, so
+the webview reads a slice only when a character needs it, as with the bundled faces. Only the asset
+protocol's origins join `font-src`; the renderer's `connect-src` stays closed to the network. The
+inserted `<style>` relies on `style-src 'unsafe-inline'`, which holds only while `desktop.html` has
+no inline `<style>`: Tauri gives such a page a style nonce, and a nonce disables `'unsafe-inline'`.
+
+While a pack is absent, the text renders at once in the system faces listed after the Noto face in
+its row. When the pack arrives, the new faces apply to the text already shown, with no reload. When
+it cannot arrive, offline or refused, the system faces stand, and one transient notice per language
+says its faces will arrive when the network does. The pack is requested again on the next need
+after the webview reports the network back (`online`), or at the next launch; nothing retries on a
+timer. Only a host with `fontPack`, the desktop host, fetches anything: the tests' hosts have none.
 
 Interface chrome uses `--font-ui`, the system face (`system-ui`), not these stacks; the system picks
 its CJK face from the document element's `lang`, which follows the interface language.
@@ -75,4 +104,5 @@ A saved `fontPreset` that names no current preset reads as the default without r
 The retired `monoFont` key is not read; the native host drops it from the next preference write
 ([setup contract](../../desktop/src/setup.md)).
 
-`tests/fonts-consistency.test.ts` and `tests/fonts-vendored.test.ts` check these rules.
+`tests/fonts-consistency.test.ts`, `tests/fonts-vendored.test.ts`, and `tests/font-packs.test.tsx`
+check these rules.

@@ -1,6 +1,6 @@
 ---
 status: living
-updated: 2026-11-09
+updated: 2026-11-10
 exit: Ship per-language CJK faces, move the contract beside ui/theme/fonts.md, delete this.
 ---
 
@@ -19,9 +19,15 @@ script detection, and the views carry it as `lang`, contract in the
 [document language](../document/markdown/language.md) and the
 [reading presentation](../ui/modes/reading/rendering.md). `CJK_STACKS` is style × language and the
 document stylesheet swaps per-language tokens by `:lang()`, contract in the
-[font presets](../ui/theme/fonts.md). Still to come: the `open --document-language` hint and the
-fetched packs for Traditional Chinese, Hong Kong and Korean faces, which fall through to system
-faces meanwhile.
+[font presets](../ui/theme/fonts.md). The second phase added the rest: `open --document-language`
+reaches the supplied-language tier and wins over a prepared translation's `sourceLang`, contract in
+the [launch protocol](../desktop/src/protocol.md); Noto Serif and Sans TC, HK and KR are packs,
+whose sheets and manifest are generated and committed without their fonts
+([bundled fonts](../themes/fonts/README.md#resource-packs)), fetched by the desktop host from the
+registry tarball and checked against its sha512 ([pack fetcher](../desktop/src/font_packs.md)),
+and loaded through the asset protocol when a document needs them, with system faces and one notice
+meanwhile ([font presets](../ui/theme/fonts.md#resource-packs)). What remains is the manual check
+below in the running app.
 
 ## What is customary
 

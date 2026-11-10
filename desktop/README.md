@@ -45,9 +45,10 @@ requests to the renderer; `document_io.rs` serves admitted document operations a
 discovery](src/translations.md) offers available reading versions; `lifecycle.rs` creates the
 window, keeps its navigation within the app's own origin, and dispatches close requests and
 application events; [`menu.rs`](src/menu.md) builds the localized application menu and routes its
-items. Setup uses preference persistence directly. `appearance.rs` applies the rendered
-theme's background and native light/dark appearance; the [theme adapter](../ui/theme/appearance.md)
-owns its color source and synchronization timing.
+items. [`font_packs.rs`](src/font_packs.md) fetches the pinned, hash-checked font packs of languages
+the app does not bundle, its one network use. Setup uses preference persistence directly.
+`appearance.rs` applies the rendered theme's background and native light/dark appearance; the
+[theme adapter](../ui/theme/appearance.md) owns its color source and synchronization timing.
 
 The [launcher protocol](src/protocol.md) describes file admission and setup suggestions.
 Other native contracts live beside their implementations: [file I/O](src/files.md),
