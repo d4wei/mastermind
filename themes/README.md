@@ -19,7 +19,8 @@ Discovery also defines the files the reviewer serves in development and ships: t
 its TypeScript sources and Markdown docs.
 
 The [font registry](../ui/theme/fontRegistry.ts) owns font presets, each naming display, body,
-code, and CJK faces; [fonts.ts](../ui/theme/fonts.ts) composes their stacks, and
+code, and CJK faces; [fonts.ts](../ui/theme/fonts.ts) names the faces a preset sets, which one rule
+in `ui/app/app.css` composes into the stacks, and
 [fonts/](fonts/README.md) receives the bundled files and their `@font-face` sheet, generated at
 install.
 [Code colors](../ui/theme/codeThemes.ts) are an independent preference. Runtime overrides use the
@@ -73,11 +74,13 @@ document-body text sizes from `--font-size-body` (`--md-font-size-sm` or `em`) s
 setting scales it, while application chrome keeps the fixed `--font-size-sm/xs/micro` rem tokens.
 Interface chrome (controls, menus, panels, inputs, comment cards, and their text) uses
 `--font-ui` independently of reading preferences; only rendered document text and quotations of it
-take the preset faces. `--font-display`, `--font-body`, and `--font-mono` compose the preset's Latin
-faces with `--font-cjk-serif` or `--font-cjk-sans`, the CJK lists of the language in force, which
-default to the `zh` row; `--font-cjk-serif-ja`, `--font-cjk-sans-ja` and the forms for `zh`, `zh-tw`,
-`zh-hk`, and `ko` hold each language's lists, and only the `:lang()` rules for document content
-switch to them, per the [font contract](../ui/theme/fonts.md). The home wordmark uses a
+take the preset faces. `--font-display`, `--font-body`, and `--font-mono` compose the preset's
+faces, `--font-display-face`, `--font-body-face`, and `--font-code-face`, with `--font-cjk-serif` or
+`--font-cjk-sans`, the CJK lists of the language in force, which default to the `zh` row;
+`--font-cjk-serif-ja`, `--font-cjk-sans-ja` and the forms for `zh`, `zh-tw`, `zh-hk`, and `ko` hold
+each language's lists, and only the `:lang()` rules for document content switch to them, per the
+[font contract](../ui/theme/fonts.md). This sheet declares the default preset's faces and every
+list; the stacks themselves are composed in `ui/app/app.css`. The home wordmark uses a
 fixed monospace stack and line height that preserve its horizontal slit.
 
 Controls and panel labels use sentence case. Letter-spaced uppercase is reserved for small section

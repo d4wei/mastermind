@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { syncHostAppearance } from './appearance'
 import { useConfig } from '../app/configStore'
-import { FONT_FACES_HREF, fontPresetById, fontStackRule } from './fonts'
+import { FONT_FACES_HREF, fontFaceTokens, fontPresetById } from './fonts'
 import { prefersReducedMotion } from '../util/presence'
 import { COLOR_TOKS, codeThemeById, codeThemeVars } from './codeThemes'
 
 const TOKENS_LINK_ID = 'theme-tokens'
 const FONTS_LINK_ID = 'theme-fonts'
-const FONT_STACKS_STYLE_ID = 'theme-font-stacks'
 
 /** Applies theme + per-user overrides to the document. Render once in App. */
 export function ThemeEffects() {
@@ -85,18 +84,6 @@ export function ThemeEffects() {
     document.head.appendChild(link)
   }, [])
 
-  // The preset's stacks, as a rule rather than root properties so that each block of another
-  // language composes its own; the default preset applies until preferences load.
-  const fontPreset = config?.fontPreset
-  useEffect(() => {
-    let style = document.getElementById(FONT_STACKS_STYLE_ID) as HTMLStyleElement | null
-    if (!style) {
-      style = document.createElement('style')
-      style.id = FONT_STACKS_STYLE_ID
-      document.head.appendChild(style)
-    }
-    style.textContent = fontStackRule(fontPresetById(fontPreset))
-  }, [fontPreset])
 
   // Personal overrides remain independent of the selected theme.
   useEffect(() => {
@@ -107,6 +94,9 @@ export function ThemeEffects() {
     root.setProperty('--content-max-width', `${config.contentWidth / 16}rem`)
 
     const preset = fontPresetById(config.fontPreset)
+    // The stacks in `ui/app/app.css` compose these faces and follow the style.
+    for (const [name, value] of Object.entries(fontFaceTokens(preset))) root.setProperty(name, value)
+    document.documentElement.dataset.fontStyle = preset.style
     // Light themes keep the base weight from `themes/common.css`.
     if (theme?.appearance === 'dark') root.setProperty('--weight-body', String(preset.darkBodyWeight))
     else root.removeProperty('--weight-body')

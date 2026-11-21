@@ -538,30 +538,44 @@ button:disabled {
 
 /* ---------- markdown elements ---------- */
 
-/* Document content takes the faces of its language: each view root, and each element inside it that
-   names its own language, resets the CJK lists to the default row and then to its `:lang()` row. A
-   root without `lang` matches the interface language it inherits. The stacks that compose these
-   lists are declared on the same elements by the preset's rule (ui/theme/fonts.ts). */
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]) {
-  --font-cjk-serif: var(--font-cjk-serif-zh);
-  --font-cjk-sans: var(--font-cjk-sans-zh);
-}
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ja) {
-  --font-cjk-serif: var(--font-cjk-serif-ja);
-  --font-cjk-sans: var(--font-cjk-sans-ja);
-}
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ko) {
-  --font-cjk-serif: var(--font-cjk-serif-ko);
-  --font-cjk-sans: var(--font-cjk-sans-ko);
-}
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):is(:lang(zh-TW), :lang(zh-Hant)) {
-  --font-cjk-serif: var(--font-cjk-serif-zh-tw);
-  --font-cjk-sans: var(--font-cjk-sans-zh-tw);
-}
-/* After Traditional, so `zh-Hant-HK` takes the Hong Kong row, which Macau shares, where `:lang()` matches it. */
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):is(:lang(zh-HK), :lang(zh-MO)) {
-  --font-cjk-serif: var(--font-cjk-serif-zh-hk);
-  --font-cjk-sans: var(--font-cjk-sans-zh-hk);
+/* The preset's stacks: the faces ThemeProvider sets on the root, then the CJK lists of the language
+   in force, then a generic family. A custom property substitutes its `var()` references where it is
+   declared, so the stacks are declared on the root, which interface text quoting the document reads,
+   and again on each element whose lists switch: each document view root, and each element inside
+   one that names its own language. Those reset the lists to the default row and then to their
+   `:lang()` row; a view root without `lang` matches the interface language it inherits. */
+:is(:root, .md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]) {
+  --font-display: var(--font-display-face), var(--font-cjk-serif), serif;
+  --font-body: var(--font-body-face), var(--font-cjk-serif), serif;
+  /* Code takes the sans lists in every preset; CJK text in code keeps one even stroke. System
+     monospace faces precede them so Latin code stays monospace if the code face cannot load. */
+  --font-mono: var(--font-code-face), ui-monospace, SFMono-Regular, Menlo, Consolas, var(--font-cjk-sans), monospace;
+  &:is([data-font-style='sans'], [data-font-style='sans'] *) {
+    --font-display: var(--font-display-face), var(--font-cjk-sans), sans-serif;
+    --font-body: var(--font-body-face), var(--font-cjk-sans), sans-serif;
+  }
+  &:not(:root) {
+    --font-cjk-serif: var(--font-cjk-serif-zh);
+    --font-cjk-sans: var(--font-cjk-sans-zh);
+    &:lang(ja) {
+      --font-cjk-serif: var(--font-cjk-serif-ja);
+      --font-cjk-sans: var(--font-cjk-sans-ja);
+    }
+    &:lang(ko) {
+      --font-cjk-serif: var(--font-cjk-serif-ko);
+      --font-cjk-sans: var(--font-cjk-sans-ko);
+    }
+    &:is(:lang(zh-TW), :lang(zh-Hant)) {
+      --font-cjk-serif: var(--font-cjk-serif-zh-tw);
+      --font-cjk-sans: var(--font-cjk-sans-zh-tw);
+    }
+    /* After Traditional, so `zh-Hant-HK` takes the Hong Kong row, which Macau shares, where
+       `:lang()` matches it. */
+    &:is(:lang(zh-HK), :lang(zh-MO)) {
+      --font-cjk-serif: var(--font-cjk-serif-zh-hk);
+      --font-cjk-sans: var(--font-cjk-sans-zh-hk);
+    }
+  }
 }
 
 .md-root {
