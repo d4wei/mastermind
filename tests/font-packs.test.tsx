@@ -1,22 +1,19 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { webcrypto } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installHost, type FontPackReply } from '../ui/app/host'
 import { useConfig } from '../ui/app/configStore'
 import { useAnnouncements } from '../ui/app/Notifications'
-import { SessionView } from '../ui/app/SessionView'
 import { createNativeHost } from '../ui/desktop/host'
 import { useDoc } from '../ui/documents/store'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { CJK_STACKS } from '../ui/theme/fontRegistry'
 import { cjkRows, createFontPackLoader, fontPackLoader, neededPacks, PACK_LANGUAGES, packName, resetFontPacks }
   from '../ui/theme/fontPacks'
-import { useTranslation } from '../ui/translate/translationStore'
 import { fakeHost } from './helpers/host'
+import { readingSession } from './helpers/reading-session'
 
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
 
@@ -142,34 +139,21 @@ describe('the pack loader', () => {
 })
 
 describe('packs in the document view', () => {
-  const initial = useDoc.getState()
-  let host: HTMLDivElement
-  let root: Root
   beforeEach(() => {
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-    vi.stubGlobal('crypto', webcrypto)
-    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const name = /packs\/([a-z-]+)\.css$/.exec(url)?.[1]
       return name ? new Response(sheetOf(name)) : new Response('', { status: 404 })
     }))
-    host = document.createElement('div')
-    document.body.append(host)
-    root = createRoot(host)
   })
   afterEach(() => {
-    act(() => root.unmount()); host.remove(); useDoc.setState(initial); useTranslation.getState().release('A')
     useConfig.setState({ config: null })
     useAnnouncements.setState({ items: [] })
     resetFontPacks()
-    vi.unstubAllGlobals(); installHost(null)
   })
+  const session = readingSession()
   async function open(source: string, fontPack?: (name: string) => Promise<FontPackReply>) {
     installHost(fakeHost(fontPack ? { fontPack } : {}))
-    useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', mode: 'reading', source, savedSource: source,
-      load: vi.fn().mockResolvedValue(undefined), meta: null })
-    await act(async () => root.render(<SessionView sessionId="A" />))
+    await session.open(source)
     await settle()
   }
 
@@ -179,7 +163,7 @@ describe('packs in the document view', () => {
     expect(fontPack.mock.calls.map(([name]) => name)).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     expect(installed().sort()).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     // The view re-renders with its text in the arrived faces; an edit asks nothing more.
-    expect(host.querySelector('article.md-root')!.getAttribute('lang')).toBe('zh-TW')
+    expect(session.host.querySelector('article.md-root')!.getAttribute('lang')).toBe('zh-TW')
     await act(async () => useDoc.setState({ source: '---\nlang: zh-TW\n---\n\n繁體中文。\n\n한국어\n' }))
     await settle()
     expect(fontPack).toHaveBeenCalledTimes(2)

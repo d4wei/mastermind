@@ -1,18 +1,16 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { webcrypto } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { resolveLanguages, scanScripts } from '../document/markdown/language'
 import { prepareTranslation, type PreparedTranslation } from '../document/translation'
 import { MarkdownView } from '../ui/modes/reading/Renderer'
 import { installHost } from '../ui/app/host'
-import { SessionView } from '../ui/app/SessionView'
 import { useDoc } from '../ui/documents/store'
 import { useTranslation } from '../ui/translate/translationStore'
 import { fakeHost } from './helpers/host'
+import { readingSession } from './helpers/reading-session'
 import { setDocumentLanguageHints, useDocumentLanguageHints } from '../ui/documents/language-hints'
 
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
@@ -60,35 +58,15 @@ describe('block languages in the reading view', () => {
 })
 
 describe('the document view', () => {
-  const initial = useDoc.getState()
-  let host: HTMLDivElement
-  let root: Root
-  beforeEach(() => {
-    installHost(fakeHost())
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-    vi.stubGlobal('crypto', webcrypto)
-    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
-    host = document.createElement('div')
-    document.body.append(host)
-    root = createRoot(host)
-  })
-  afterEach(() => {
-    act(() => root.unmount()); host.remove(); useDoc.setState(initial); useTranslation.getState().release('A')
-    useDocumentLanguageHints.setState({ hints: {} })
-    vi.unstubAllGlobals(); installHost(null)
-  })
-  async function open(source: string) {
-    useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', mode: 'reading', source, savedSource: source,
-      load: vi.fn().mockResolvedValue(undefined), meta: null })
-    await act(async () => root.render(<SessionView sessionId="A" />))
-  }
+  afterEach(() => { useDocumentLanguageHints.setState({ hints: {} }) })
+  const session = readingSession()
+  const open = session.open
   async function prepare(source: string, sourceLang: string, targetLang: string): Promise<PreparedTranslation> {
     const prepared = await prepareTranslation(source)
     return { version: 1, sourceHash: prepared.sourceHash, sourceLang, targetLang,
       blocks: prepared.blocks.filter((block) => block.translatable).map((block) => ({ id: block.id, text: 'Translated.' })) }
   }
-  const article = () => host.querySelector('article.md-root')!
+  const article = () => session.host.querySelector('article.md-root')!
 
   it.each([
     ['Chinese', '# 标题\n\n中文段落。\n', 'zh-CN'],
@@ -108,8 +86,8 @@ describe('the document view', () => {
   it('carries the document language on the Markdown source editor root', async () => {
     await open('中文段落。\n')
     await act(async () => useDoc.getState().setMode('source'))
-    await vi.waitFor(() => expect(host.querySelector('.source-host')).not.toBeNull())
-    expect(host.querySelector('.source-host')!.getAttribute('lang')).toBe('zh-CN')
+    await vi.waitFor(() => expect(session.host.querySelector('.source-host')).not.toBeNull())
+    expect(session.host.querySelector('.source-host')!.getAttribute('lang')).toBe('zh-CN')
   })
 
   it('takes a prepared translation\'s source language before script detection', async () => {
@@ -136,6 +114,15 @@ describe('the document view', () => {
     expect(article().getAttribute('lang')).toBe('ko')
     // Closing the document drops its hint, and the prepared translation's language speaks again.
     await act(async () => { setDocumentLanguageHints([]); useDoc.setState({ source }) })
+    // The edit to the frontmatter version left no matching translation; the store offers the
+    // prepared one again only once it has revalidated it against the restored source, by a hash
+    // the act scope does not await.
+    await vi.waitFor(() => {
+      const { source: validated, available } = useTranslation.getState()
+      expect(validated).toBe(source)
+      expect(available.map(({ sourceLang }) => sourceLang)).toEqual(['zh-CN'])
+    })
+    await act(async () => {})
     expect(article().getAttribute('lang')).toBe('zh-CN')
   })
 
@@ -147,9 +134,9 @@ describe('the document view', () => {
     await act(async () => useTranslation.getState().select('en'))
     await vi.waitFor(async () => {
       await act(async () => {})
-      expect(host.querySelector('.trans-view .trans-block')).not.toBeNull()
+      expect(session.host.querySelector('.trans-view .trans-block')).not.toBeNull()
     })
-    const view = host.querySelector('.trans-view')!
+    const view = session.host.querySelector('.trans-view')!
     expect(view.getAttribute('lang')).toBe('zh-CN')
     expect([...view.querySelectorAll('.trans-block')].map((block) => [block.getAttribute('lang'), block.textContent]))
       .toEqual([['en', 'Translated.'], ['ja', 'コードのコメント'], [null, '中文代码'], ['en', 'Translated.']])

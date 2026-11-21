@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, it } from 'vitest'
+import { runNode } from './helpers/cli'
 
 let dir: string
 let file: string
@@ -14,22 +14,8 @@ beforeEach(async () => {
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })
 })
-function run(args: string[], input = ''): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', path.resolve('tools/translation/translation-cli.ts'), ...args], {
-      env: { ...process.env, MASTERMIND_CONFIG_DIR: dir }, stdio: ['pipe', 'pipe', 'pipe'] })
-    let stdout = ''; let stderr = ''
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
-    const timer = setTimeout(() => {
-      child.kill()
-      reject(new Error('translation CLI did not exit'))
-    }, 10_000)
-    child.on('error', (error) => { clearTimeout(timer); reject(error) })
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }) })
-    child.stdin.end(input)
-  })
-}
+const run = (args: string[], input = '') => runNode(['--import', 'tsx', path.resolve('tools/translation/translation-cli.ts'),
+  ...args], { env: { ...process.env, MASTERMIND_CONFIG_DIR: dir }, input })
 
 interface Plan {
   sourceHash: string

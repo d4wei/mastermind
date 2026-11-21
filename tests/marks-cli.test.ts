@@ -1,26 +1,15 @@
-import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { formatMark, inventoryMarks } from '../tools/marks/inventory'
+import { runNode } from './helpers/cli'
 
 let dir: string
 beforeEach(async () => { dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mm-marks-')) })
 afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
 
-function run(args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [path.resolve('bin/mastermind.js'), 'marks', ...args],
-      { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })
-    let stdout = ''; let stderr = ''
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
-    const timer = setTimeout(() => { child.kill(); reject(new Error('marks CLI did not exit')) }, 10_000)
-    child.on('error', (error) => { clearTimeout(timer); reject(error) })
-    child.on('close', (code) => { clearTimeout(timer); resolve({ code, stdout, stderr }) })
-  })
-}
+const run = (args: string[]) => runNode([path.resolve('bin/mastermind.js'), 'marks', ...args], { cwd: dir })
 async function write(name: string, source: string) {
   await fs.writeFile(path.join(dir, name), source)
   return name
