@@ -1,14 +1,15 @@
 import type { Root } from 'mdast'
+import { blockUnits } from '../blocks'
 
 /** Which scripts that select a CJK face a run of text holds. */
-export interface Scripts {
+interface Scripts {
   kana: boolean
   hangul: boolean
   han: boolean
 }
 
 /** What one scan of a document found; the [contract](language.md) says how it resolves. */
-export interface ScriptProfile extends Scripts {
+export interface ScriptProfile {
   /** The frontmatter's `lang`, canonicalized, when it is a well-formed language tag. */
   declared?: string
   /** The blocks that hold kana or hangul, by source start offset; only they can be exceptions. */
@@ -54,6 +55,12 @@ function frontmatterLanguage(yaml: string): string | undefined {
   return wellFormedLanguage(quoted ? quoted[2] : value)
 }
 
+/**
+ * Every code unit `scriptOf` can assign a script, as one class; a source with none of them holds no
+ * CJK text, so its blocks need no scan. Non-Unicode mode, so the surrogate range matches code units.
+ */
+const CJK_CODE_UNIT = /[ᄀ-ᇿ぀-ヿ㄰-㆏ㇰ-ㇿ㐀-䶿一-鿿ꥠ-꥿가-퟿\ud840-\ud8bf豈-﫿ｦ-ￜ]/
+
 /** UTF-16 ranges per script; Han beyond the BMP is read from its high surrogate (planes 2 and 3). */
 function scriptOf(code: number): keyof Scripts | null {
   if (code < 0x1100) return null
@@ -97,32 +104,26 @@ function scanRange(source: string, start: number, end: number, into: Scripts): v
 
 /**
  * One linear pass over the source, block by block, using the plain parse the caller already holds:
- * top-level blocks and the items of top-level lists, the units translation segments by.
+ * the units translation segments by (`blockUnits`). A source with no CJK code unit at all is
+ * passed over in one native search instead.
  */
 export function scanScripts(source: string, plain: Root): ScriptProfile {
-  const whole: Scripts = { kana: false, hangul: false, han: false }
-  const block: Scripts = { kana: false, hangul: false, han: false }
+  const yaml = plain.children.find((node) => node.type === 'yaml')
+  const declared = yaml ? frontmatterLanguage(yaml.value) : undefined
   const marked: Array<ScriptProfile['marked'][number]> = []
-  let declared: string | undefined
   let hanOnly = 0
-  const visit = (node: { position?: { start: { offset?: number }; end: { offset?: number } } }) => {
+  if (!CJK_CODE_UNIT.test(source)) return { declared, marked, hanOnly }
+  const block: Scripts = { kana: false, hangul: false, han: false }
+  for (const node of blockUnits(plain)) {
     const start = node.position?.start.offset
     const end = node.position?.end.offset
-    if (start === undefined || end === undefined) return
+    if (start === undefined || end === undefined) continue
     block.kana = block.hangul = block.han = false
     scanRange(source, start, end, block)
-    whole.kana ||= block.kana
-    whole.hangul ||= block.hangul
-    whole.han ||= block.han
     if (block.kana || block.hangul) marked.push({ start, kana: block.kana, hangul: block.hangul })
     else if (block.han) hanOnly++
   }
-  for (const node of plain.children) {
-    if (node.type === 'yaml') declared ??= frontmatterLanguage(node.value)
-    if (node.type === 'list') for (const item of node.children) visit(item)
-    else visit(node)
-  }
-  return { ...whole, declared, marked, hanOnly }
+  return { declared, marked, hanOnly }
 }
 
 /** A tag's primary language subtag, lowercased: `zh` for `zh-Hant-HK`. */
@@ -141,7 +142,7 @@ function detectedLanguage(profile: ScriptProfile): string | undefined {
   for (const block of profile.marked) block.kana ? kana++ : hangul++
   if (kana > 0 && kana >= hangul && kana >= profile.hanOnly) return 'ja'
   if (hangul > 0 && hangul >= profile.hanOnly) return 'ko'
-  return profile.han ? 'zh-CN' : undefined
+  return profile.hanOnly > 0 ? 'zh-CN' : undefined
 }
 
 /**

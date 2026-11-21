@@ -16,7 +16,8 @@ export const CLOSERS: Record<CriticKind, string> = {
   comment: '<<}',
 }
 
-function makeExcludeLookup(exclude: readonly Range[]): (pos: number) => Range | null {
+/** The range of `exclude` that holds `pos`, by binary search; the ranges must not overlap. */
+export function makeExcludeLookup(exclude: readonly Range[]): (pos: number) => Range | null {
   const sorted = [...exclude].sort((a, b) => a.start - b.start)
   return (pos: number) => {
     let lo = 0

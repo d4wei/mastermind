@@ -6,9 +6,10 @@ contradicts it, so the reading view can tag them with `lang` and the font stack 
 the caller already holds and never parses again.
 
 `scanScripts` walks the top-level blocks and the items of top-level lists, the units translation
-segments by, once over their source ranges. It records whether the document holds kana (hiragana,
-katakana, halfwidth katakana), hangul, or Han, which blocks hold kana or hangul, since only those
-can be exceptions, and how many hold Han alone. The katakana middle dot implies nothing, since
+segments by (`blockUnits` in [blocks.ts](../blocks.ts)), once over their source ranges. It records
+which blocks hold kana (hiragana, katakana, halfwidth katakana) or hangul, since only those can be
+exceptions, and how many hold Han alone. A source in which one search finds no code unit of these
+scripts skips the walk. The katakana middle dot implies nothing, since
 Chinese text uses it too. Review comments are skipped: they are in their reviewer's language, and
 translation drops them too. A `{>>` without its `<<}` in the same block ends skipping for that
 block, which keeps the scan linear. The frontmatter's top-level `lang` key is read with a line

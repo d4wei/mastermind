@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { segmentBlocks } from '../document/blocks'
+import { blockUnits, segmentBlocks } from '../document/blocks'
+import { parseMarkdown } from '../document/markdown/processor'
 
 const DOC = [
   '# Title',
@@ -15,6 +16,14 @@ const DOC = [
   '',
   '> a quote',
 ].join('\n')
+
+describe('blockUnits', () => {
+  it('walks the top-level blocks with each top-level list in place of its items, nested lists whole', () => {
+    const units = blockUnits(parseMarkdown('# Title\n\n- one\n  - nested\n- two\n\n1. three\n\nEnd.\n'))
+    expect(units.map((unit) => unit.type)).toEqual(['heading', 'listItem', 'listItem', 'listItem', 'paragraph'])
+    expect(units[1]!.type === 'listItem' && units[1].children.map((child) => child.type)).toEqual(['paragraph', 'list'])
+  })
+})
 
 describe('segmentBlocks', () => {
   it('splits headings, paragraphs, list items, code, quotes', () => {

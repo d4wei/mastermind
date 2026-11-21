@@ -105,6 +105,15 @@ describe('document language', () => {
     expect(exceptions('かな\n\nかな 한국어\n')).toEqual({})
   })
 
+  it('reads the frontmatter of a source with no CJK text, and finds CJK text the source-wide check passes on', () => {
+    const scan = (source: string) => scanScripts(source, parseMarkdown(source))
+    expect(scan('---\nlang: fr\n---\n\nPlain prose.\n')).toEqual({ declared: 'fr', marked: [], hanOnly: 0 })
+    // CJK text only in a review comment reaches the block scan, which skips the comment.
+    expect(scan('---\nlang: fr\n---\n\nPlain {>>@ana: 한국어<<} prose.\n')).toEqual({ declared: 'fr', marked: [], hanOnly: 0 })
+    // Han beyond the Basic Multilingual Plane is found by its high surrogate.
+    expect(languages('\u{20000}\u{2A700}\n').document).toBe('zh-CN')
+  })
+
   it('gives every other block the document language', () => {
     expect(exceptions('かなの文書。\n\n漢字の段落\n\nLatin.\n')).toEqual({})
     expect(exceptions('한국어\n\n漢字\n', 'ko')).toEqual({})

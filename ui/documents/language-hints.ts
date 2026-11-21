@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { shallow } from 'zustand/shallow'
 
 /**
  * The `open --document-language` hint of each open document, by session id, as the native
@@ -10,9 +11,7 @@ export const useDocumentLanguageHints = create<{ hints: Readonly<Record<string, 
 export function setDocumentLanguageHints(files: ReadonlyArray<{ id: string; document_language?: string | null }>): void {
   const hints: Record<string, string> = {}
   for (const file of files) if (file.document_language) hints[file.id] = file.document_language
-  const current = useDocumentLanguageHints.getState().hints
-  const keys = Object.keys(hints)
-  if (keys.length === Object.keys(current).length && keys.every((id) => current[id] === hints[id])) return
+  if (shallow(useDocumentLanguageHints.getState().hints, hints)) return
   useDocumentLanguageHints.setState({ hints })
 }
 
