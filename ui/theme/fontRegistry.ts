@@ -30,6 +30,13 @@ export const CJK_LANGUAGES = Object.keys(CJK_STACKS.serif) as CjkLanguage[]
 export const BUNDLED_CJK_LANGUAGES: readonly CjkLanguage[] = ['zh', 'ja']
 /** The stack of `--font-display`, `--font-body`, and `--font-mono`, and of text with no CJK language. */
 export const DEFAULT_CJK_LANGUAGE: CjkLanguage = 'zh'
+/** The CJK rows whose leading faces arrive as packs rather than in the bundle. */
+export const PACK_LANGUAGES = CJK_LANGUAGES.filter((language) => !BUNDLED_CJK_LANGUAGES.includes(language))
+
+/** A pack is named after its family, as the package that ships it is: `Noto Sans KR` → `noto-sans-kr`. */
+export function packName(family: string): string {
+  return family.toLowerCase().replaceAll(' ', '-')
+}
 
 /** A complete reading choice: every face the document needs. The [contract](fonts.md) explains. */
 export interface FontPreset {

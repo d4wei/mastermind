@@ -35,7 +35,6 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npx --no-install patch-package
-      # The install skipped scripts, so generate the fonts its postinstall would have.
-      - run: npm run fonts:vendor
+      # The install skipped scripts; the test setup generates the fonts its postinstall would have.
       - run: npm run typecheck
       - run: npm test

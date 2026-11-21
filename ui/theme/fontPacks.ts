@@ -5,18 +5,10 @@ import { useConfig } from '../app/configStore'
 import { announce } from '../app/Notifications'
 import { DICTIONARIES } from '../i18n'
 import { languageName } from '../translate/languages'
-import { BUNDLED_CJK_LANGUAGES, CJK_LANGUAGES, CJK_STACKS, type CjkLanguage, type CjkStyle } from './fontRegistry'
+import { CJK_STACKS, PACK_LANGUAGES, packName, type CjkLanguage, type CjkStyle } from './fontRegistry'
 
 /** The pack sheets beside the bundled face sheet; each declares its faces by bare file name. */
 export const FONT_PACKS_HREF = '/themes/fonts/packs/'
-
-/** The CJK rows whose leading faces arrive as packs rather than in the bundle. */
-export const PACK_LANGUAGES = CJK_LANGUAGES.filter((language) => !BUNDLED_CJK_LANGUAGES.includes(language))
-
-/** A pack is named after its family, as the package that ships it is: `Noto Sans KR` → `noto-sans-kr`. */
-export function packName(family: string): string {
-  return family.toLowerCase().replaceAll(' ', '-')
-}
 
 /**
  * The CJK rows of `ui/app/app.css` a language tag can select: `ko`; `zh-TW` for Taiwan or

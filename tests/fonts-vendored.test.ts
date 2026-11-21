@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, utimesSync,
+  writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import postcss from 'postcss'
@@ -34,7 +35,7 @@ let outDir: string
 beforeAll(async () => {
   generated = await vendoredFonts(nodeModules)
   outDir = mkdtempSync(path.join(tmpdir(), 'mm-fonts-'))
-  await writeVendoredFonts(nodeModules, outDir, generated)
+  await writeVendoredFonts(outDir, generated)
 })
 afterAll(() => { rmSync(outDir, { recursive: true, force: true }) })
 
@@ -72,14 +73,32 @@ describe('the font generator', () => {
     const font = [...generated.files.keys()].find((target) => target.endsWith('.woff2'))!
     unlinkSync(path.join(outDir, font))
     expect(await vendoredFontsCurrent(outDir, generated)).toBe(false)
-    await writeVendoredFonts(nodeModules, outDir, generated)
+    await writeVendoredFonts(outDir, generated)
     writeFileSync(path.join(outDir, FACES_SHEET), '/* an older pin */')
     expect(await vendoredFontsCurrent(outDir, generated)).toBe(false)
-    await writeVendoredFonts(nodeModules, outDir, generated)
+    await writeVendoredFonts(outDir, generated)
     writeFileSync(path.join(outDir, 'retired.woff2'), '')
     expect(await vendoredFontsCurrent(outDir, generated)).toBe(false)
-    await writeVendoredFonts(nodeModules, outDir, generated)
+    await writeVendoredFonts(outDir, generated)
     expect(await vendoredFontsCurrent(outDir, generated)).toBe(true)
+  })
+
+  it('rewrites only what differs and removes strays last, leaving matching files untouched', async () => {
+    const manifest = path.join(outDir, PACKS_DIR, PACK_MANIFEST)
+    const [font] = [...generated.files.keys()].filter((target) => target.endsWith('.woff2'))
+    const past = new Date('2020-01-01T00:00:00Z')
+    utimesSync(manifest, past, past)
+    utimesSync(path.join(outDir, font!), past, past)
+    writeFileSync(path.join(outDir, FACES_SHEET), '/* an older pin */')
+    mkdirSync(path.join(outDir, 'retired-family'))
+    writeFileSync(path.join(outDir, 'retired-family/retired.woff2'), '')
+    await writeVendoredFonts(outDir, generated)
+    expect(statSync(manifest).mtimeMs).toBe(past.getTime())
+    expect(statSync(path.join(outDir, font!)).mtimeMs).toBe(past.getTime())
+    expect(readFileSync(path.join(outDir, FACES_SHEET), 'utf8')).toBe(generated.css)
+    expect(existsSync(path.join(outDir, 'retired-family'))).toBe(false)
+    expect(tree(outDir)).toEqual([FACES_SHEET, ...generated.files.keys(), ...generated.packSheets.keys(),
+      `${PACKS_DIR}/${PACK_MANIFEST}`].sort())
   })
 
   it('keeps the working tree current, and git tracks only the hand-written readme', async () => {

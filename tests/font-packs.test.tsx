@@ -9,9 +9,8 @@ import { useAnnouncements } from '../ui/app/Notifications'
 import { createNativeHost } from '../ui/desktop/host'
 import { useDoc } from '../ui/documents/store'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
-import { CJK_STACKS } from '../ui/theme/fontRegistry'
-import { cjkRows, createFontPackLoader, fontPackLoader, neededPacks, PACK_LANGUAGES, packName, resetFontPacks }
-  from '../ui/theme/fontPacks'
+import { CJK_STACKS, PACK_LANGUAGES, packName } from '../ui/theme/fontRegistry'
+import { cjkRows, createFontPackLoader, fontPackLoader, neededPacks, resetFontPacks } from '../ui/theme/fontPacks'
 import { fakeHost } from './helpers/host'
 import { readingSession } from './helpers/reading-session'
 
