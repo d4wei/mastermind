@@ -16,3 +16,8 @@ export function rootMs(name: string, fallback: number): number {
 export function cssPx(style: CSSStyleDeclaration, name: string): number {
   return parseFloat(style.getPropertyValue(name)) || 0
 }
+
+/** A CSS easing token; `ease` when the property is unset. */
+export function cssEasing(style: CSSStyleDeclaration, name = '--ease-standard'): string {
+  return style.getPropertyValue(name).trim() || 'ease'
+}

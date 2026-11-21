@@ -62,17 +62,11 @@ it('reveals an overflowing passage whole through the shared chevron disclosure, 
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
 })
 
-it('collapses when its card is deselected and rechecks overflow when resized', () => {
-  size.scroll = 120; size.client = 30
+it('rechecks overflow when resized', () => {
+  size.scroll = 120; size.client = 120
   act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
-  act(() => toggle()!.click())
-  act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
-  expect(quote().classList.contains('expanded')).toBe(false)
   expect(toggle()).toBeNull()
-  size.client = 120
-  act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
-  expect(quote().classList.contains('expanded')).toBe(false)
-  expect(toggle()).toBeNull()
+  // The card narrows, so the passage now runs past its clamp.
   size.client = 60
   act(() => resize!())
   expect(toggle()!.getAttribute('aria-expanded')).toBe('false')
@@ -154,11 +148,11 @@ describe('easing between clamps', () => {
 
   it('draws a growing clamp at once and eases its height open from the height on screen', () => {
     size.scroll = 120; size.client = 30
-    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
-    act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
-    expect(quote().style.getPropertyValue('--quote-lines')).toBe('6')
+    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable expansion="press" />))
+    act(() => quote().click())
+    expect(quote().classList.contains('expanded')).toBe(true)
     expect(quote().hasAttribute('data-settles-to')).toBe(false)
-    expect(animations.map((animation) => animation.keyframes)).toEqual([[{ maxHeight: '30px' }, { maxHeight: '90px' }]])
+    expect(animations.map((animation) => animation.keyframes)).toEqual([[{ maxHeight: '30px' }, { maxHeight: '120px' }]])
   })
 
   it('keeps a shrinking clamp drawn until its height has eased closed', async () => {
@@ -179,10 +173,11 @@ describe('easing between clamps', () => {
   })
 
   it('measures overflow again once an animation ends, after a resize it went unmeasured through', async () => {
-    size.scroll = 120; size.client = 30
-    act(() => root.render(<QuotedPassage text="A long passage" lines={2} expandable={false} />))
+    size.scroll = 120; size.client = 90
     act(() => root.render(<QuotedPassage text="A long passage" lines={6} expandable />))
     const offered = () => !!host.querySelector('.rail-quote-reveal:not([inert])')
+    act(() => toggle()!.click())
+    act(() => toggle()!.click())
     expect(offered()).toBe(true)
     // The card widens mid-ease, so the passage now fits its clamp.
     size.client = 120

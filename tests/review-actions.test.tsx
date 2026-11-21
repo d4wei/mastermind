@@ -356,6 +356,12 @@ it('shows every reply when Find reveals one the selected card hides', () => {
   expect(shownReplies()).toEqual(['answer 3', 'answer 4'])
   act(() => root.render(<Harness select={card!.spanIndex} reveal={{ message: card!.messages[1]! }} />))
   expect(shownReplies()).toEqual(['answer 1', 'answer 2', 'answer 3', 'answer 4'])
+  // They stay once the request clears, until the card is deselected.
+  act(() => root.render(<Harness select={card!.spanIndex} />))
+  expect(shownReplies()).toEqual(['answer 1', 'answer 2', 'answer 3', 'answer 4'])
+  collapse()
+  openCard()
+  expect(shownReplies()).toEqual(['answer 3', 'answer 4'])
 })
 
 it('posts a reply on Enter, adds a line on Shift+Enter, and leaves Enter to the IME while composing', () => {
@@ -463,6 +469,7 @@ it('keeps hover separate from selection and never changes card positions on hove
 
 it('preserves the expanded thread and reading position after appending a reply', () => {
   const reveal = vi.spyOn(reviewScroll, 'revealElement')
+  const revealRange = vi.spyOn(reviewScroll, 'revealRange')
   render('{==context==}{>>@Alex: question<<}')
   openCard()
   const input = host.querySelector('textarea')!
@@ -473,6 +480,7 @@ it('preserves the expanded thread and reading position after appending a reply',
   const card = host.querySelector('.rail-card')!
   act(() => vi.advanceTimersByTime(40))
   reveal.mockClear()
+  revealRange.mockClear()
   click('Reply')
   expect(host.querySelector('.rail-card')).toBe(card)
   expect(host.querySelectorAll('.rail-body')).toHaveLength(2)
@@ -480,7 +488,9 @@ it('preserves the expanded thread and reading position after appending a reply',
   expect(host.querySelector('.rail-select')!.getAttribute('aria-expanded')).toBe('true')
   act(() => vi.advanceTimersByTime(40))
   expect(reveal).not.toHaveBeenCalled()
+  expect(revealRange).not.toHaveBeenCalled()
   reveal.mockRestore()
+  revealRange.mockRestore()
 })
 
 it('retains the draft but disables mutation if a conflict arrives while replying', () => {

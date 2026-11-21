@@ -10,9 +10,15 @@ const LAYER_SELECTOR = '[data-layer], [data-radix-popper-content-wrapper]'
 /** Pointer travel, in pixels, beyond which a press and release is a drag rather than a click. */
 const DRAG_DISTANCE = 4
 
+/** The close dialogs, as a live collection, so a check reads it without searching the document. */
+let closeDialogs: { document: Document; dialogs: HTMLCollectionOf<Element> } | null = null
+
 /** Whether the close dialog, or the inert root behind it, holds the window. */
 export function modalOpen(): boolean {
-  return !!document.getElementById('root')?.inert || !!document.querySelector('.close-dialog[open]')
+  if (document.getElementById('root')?.inert) return true
+  if (closeDialogs?.document !== document) closeDialogs = { document, dialogs: document.getElementsByClassName('close-dialog') }
+  for (const dialog of closeDialogs.dialogs) if (dialog.hasAttribute('open')) return true
+  return false
 }
 
 export interface Layer {
@@ -30,12 +36,13 @@ export interface Layer {
  */
 export function isOutsidePress(target: EventTarget | null, layer: Layer): boolean {
   // A control the press removed, such as a menu item, was inside what it belonged to.
-  if (!(target instanceof Element) || !target.isConnected || modalOpen()) return false
+  if (!(target instanceof Element) || !target.isConnected) return false
   const { element, inside, host = element } = layer
   if (element?.contains(target)) return false
   if (typeof inside === 'string' ? target.closest(inside) : inside?.(target)) return false
   const owner = target.closest(LAYER_SELECTOR)
-  return !owner || !!host && (owner.contains(host) || host.contains(owner))
+  if (owner && !(host && (owner.contains(host) || host.contains(owner)))) return false
+  return !modalOpen()
 }
 
 export interface OutsidePressOptions {

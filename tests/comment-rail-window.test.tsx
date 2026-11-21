@@ -7,7 +7,7 @@ import { CommentRail } from '../ui/review/CommentRail'
 import { FindPanel } from '../ui/find/FindPanel'
 import { threadRef, type ReplyDraft } from '../ui/review/thread-identity'
 import { useConfig } from '../ui/app/configStore'
-import { createReactHost, removeReactHost, stubHighlights } from './helpers/dom'
+import { createReactHost, endTransition, removeReactHost, stubHighlights } from './helpers/dom'
 import { scrollDocument, stubDocumentLayout, type DocumentLayout } from './helpers/layout'
 
 /** Forty discussions of equal content length, so one measured card calibrates every estimate exactly. */
@@ -16,7 +16,7 @@ const SOURCE = Array.from({ length: 40 }, (_, i) => {
   return `Paragraph {==w${n}==}{>>@a: comment ${n}<<}`
 }).join('\n\n') + '\n'
 const GAP = 8
-/** The rail's space below its last card where no styles apply, as here. */
+/** The rail's bottom padding, which placement leaves below cards that overflow the document. */
 const END_SPACE = 40
 /** How far below a card's top its opening message's body starts. */
 const BODY = 40
@@ -48,7 +48,7 @@ beforeEach(() => {
   heights = new Map()
   railWidth = 300
   // Anchors 500 px apart; a 1,000 px viewport with its margins reaches 2,500 px.
-  layout = { viewport: 1000, documentHeight: 500 * 39 + 20, anchorTop: (anchor) => 500 * marks().indexOf(anchor),
+  layout = { viewport: 1000, documentHeight: 500 * 39 + 20, endSpace: END_SPACE, anchorTop: (anchor) => 500 * marks().indexOf(anchor),
     cardHeight: (card) => heights.get(passageOf(card)) ?? 100, bodyOffset: () => BODY,
     // A card's height stands for its sections' too, so they add nothing to it as they open or close.
     innerHeight: (element) => element.matches('.collapsible, [data-settles-content]') ? 0 : undefined }
@@ -73,7 +73,8 @@ let select: (span: number | null) => void
 let focusDiscussion: (span: number | null) => void
 let setSource: (source: string) => void
 let setDrafts: (drafts: ReplyDraft[]) => void
-function Harness({ initial = SOURCE, find = false }: { initial?: string; find?: boolean }) {
+/** `panel` hosts the rail in the narrow comments panel instead of beside the document. */
+function Harness({ initial = SOURCE, find = false, panel = false }: { initial?: string; find?: boolean; panel?: boolean }) {
   const [source, changeSource] = useState(initial)
   const analysis = useMemo(() => analyzeMarkdown(source), [source])
   const docRef = useRef<HTMLElement>(null)
@@ -85,7 +86,7 @@ function Harness({ initial = SOURCE, find = false }: { initial?: string; find?: 
   setSource = changeSource
   setDrafts = changeDrafts
   return <div className="app-content">
-    <div className="document-scroll">
+    <div className={panel ? 'comments-panel' : 'document-scroll'}>
       <article ref={docRef}>{analysis.threads.map((card) => <p key={card.key}>
         <mark className="critic-anchor" data-span-index={card.spanIndex}>{card.anchorText}</mark>
       </p>)}</article>
@@ -360,11 +361,7 @@ function easeSections() {
 }
 /** Ends every section's row transition in `card`, as the browser reports it. */
 function endTransitions(card: HTMLElement) {
-  for (const section of card.querySelectorAll('.collapsible')) {
-    const event = new Event('transitionend')
-    Object.defineProperty(event, 'propertyName', { value: 'grid-template-rows' })
-    act(() => { section.dispatchEvent(event) })
-  }
+  for (const section of card.querySelectorAll('.collapsible')) endTransition(section)
 }
 
 describe('motion', () => {
@@ -501,6 +498,32 @@ describe('motion', () => {
       act(() => select(span(3)))
       expect(topOf(w(2))).toBe(1000 - BODY)
     } finally { restore() }
+  })
+
+  it('places nothing and starts no move in the narrow comments panel, where cards flow', async () => {
+    const restore = enableMotion()
+    const scrollIntoView = vi.fn()
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      act(() => root.render(<Harness panel />))
+      // Every card mounts, shown though nothing placed it.
+      expect(mounted()).toEqual(range(0, 40))
+      expect(cards().some((card) => card.classList.contains('unplaced'))).toBe(false)
+      act(() => select(span(1)))
+      act(() => select(span(3)))
+      await frames()
+      expect(moves).toEqual([])
+      expect(cards().map((card) => card.style.top).filter(Boolean)).toEqual([])
+      expect(host.querySelector<HTMLElement>('.rail')!.style.height).toBe('')
+      const watched = [host.querySelector('article')!, ...cards()]
+      expect(observers.some(({ observed }) => watched.some((element) => observed.has(element)))).toBe(false)
+      // The panel scrolls the selected card into view itself.
+      expect(scrollIntoView).toHaveBeenCalled()
+    } finally {
+      restore()
+      Element.prototype.scrollIntoView = original
+    }
   })
 
   it('reveals a selected card where it is placed, not where its move still draws it', async () => {

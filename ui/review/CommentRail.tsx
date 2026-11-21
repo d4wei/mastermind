@@ -3,7 +3,7 @@ import { commentBodyFits, replyEdits } from '../modes/reading/marks'
 import { useStandingRefusal } from '../modes/reading/standing-refusal'
 import { useDraftGuard } from './drafts'
 import { flushSync } from 'react-dom'
-import { memo, useCallback, useDeferredValue, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type RefObject,
+import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject,
   type SetStateAction } from 'react'
 import { useT } from '../i18n'
 import { RepliesDisclosure } from './RepliesDisclosure'
@@ -71,8 +71,6 @@ interface CardActions {
   resolve: (card: ThreadCard) => void
   deleteMessage: (card: ThreadCard, messageIndex: number) => void
   setDraft: (card: ThreadCard, text: string) => void
-  /** Shows the selected card's earlier replies until it is deselected. */
-  showAllReplies: (card: ThreadCard) => void
   submit: (card: ThreadCard) => void
   /** Discards the card's draft and collapses it. */
   cancel: (card: ThreadCard) => void
@@ -84,6 +82,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   onFocusSpan, onActivate, onEdit, drafts, onDraftsChange: setDrafts, replyRequest, onReplyHandled, revealRequest, onRevealHandled,
   readOnly = false, leaving = false }: Props) {
   const cards = analysis.threads
+  const cardAt = useMemo(() => new Map(cards.map((card) => [card.spanIndex, card])), [cards])
+  const activeCard = activeSpan === null ? undefined : cardAt.get(activeSpan)
   const { hidden: tableExpanded } = useTableExpansion()
   const t = useT()
   const railRef = useRef<HTMLDivElement | null>(null)
@@ -108,8 +108,6 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   // its composer either way.
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
-  /** The card showing its earlier replies; it counts only while that card stays selected. */
-  const [allRepliesFor, setAllRepliesFor] = useState<string | null>(null)
   const activatedFromCard = useRef<number | null>(null)
   /** A requested composer that could not take focus yet, because it was still collapsing. */
   const pendingFocus = useRef<string | null>(null)
@@ -145,7 +143,8 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     placement.connect()
     return () => placement.disconnect()
   }, [placement])
-  useLayoutEffect(() => placement.update(docRef.current, cards, activeSpan), [placement, docRef, cards, activeSpan])
+  const activeKey = activeCard?.key ?? null
+  useLayoutEffect(() => placement.update(docRef.current, cards, activeKey), [placement, docRef, cards, activeKey])
   useLayoutEffect(() => placement.afterRender())
   useEffect(() => {
     const live = new Set(cards.map((card) => card.key))
@@ -159,7 +158,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       setReplyFor(null)
       return
     }
-    const card = cards.find((item) => item.spanIndex === activeSpan)
+    const card = cardAt.get(activeSpan)
     if (!card || selectedKey.current === card.key) return
     selectedKey.current = card.key
     if (activatedFromCard.current === activeSpan) { activatedFromCard.current = null; return }
@@ -170,23 +169,13 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       // Narrow panels own their scroll surface; wide cards share document scrolling.
       if (element.closest('.comments-panel')) target.scrollIntoView({ block: 'nearest' })
       // Reveal where the card is placed, not where its move still draws it.
-      else revealElement(target, false, placement.drawnOffset(card.key))
+      else placement.reveal(card.key, target)
     })
     return () => cancelAnimationFrame(frame)
-  }, [activeSpan, cards])
+  }, [activeSpan, cardAt])
 
-  // Earlier replies hide again once their card is deselected.
-  useEffect(() => {
-    setAllRepliesFor((key) => key !== null && cards.find((card) => card.key === key)?.spanIndex === activeSpan ? key : null)
-  }, [activeSpan, cards])
-  // Declared after the reset above, so a reveal that selects a card in the same commit outlasts it.
-  useEffect(() => {
-    if (!revealRequest) return
-    const card = cards.find((item) => item.messages.includes(revealRequest.message))
-    const position = card ? card.messages.indexOf(revealRequest.message) : -1
-    if (card && position >= 1 && position <= hiddenReplies(card)) setAllRepliesFor(card.key)
-    onRevealHandled?.()
-  }, [revealRequest, onRevealHandled, cards])
+  // The selected card reads the reveal as it renders, and keeps what it showed once the request clears.
+  useEffect(() => { if (revealRequest) onRevealHandled?.() }, [revealRequest, onRevealHandled])
 
   const focusReply = useCallback((key: string) => {
     if (readOnly) return
@@ -206,22 +195,21 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   })
   useEffect(() => {
     if (!replyRequest) return
-    const card = cards.find((item) => item.spanIndex === replyRequest.spanIndex)
+    const card = cardAt.get(replyRequest.spanIndex)
     if (card) focusReply(card.key)
     onReplyHandled?.()
-  }, [replyRequest, onReplyHandled, cards, focusReply])
+  }, [replyRequest, onReplyHandled, cardAt, focusReply])
 
   const activate = (spanIndex: number) => {
     activatedFromCard.current = spanIndex
     onActivate(spanIndex)
-    const card = cards.find((item) => item.spanIndex === spanIndex)
+    const card = cardAt.get(spanIndex)
     if (card) focusReply(card.key)
     revealElement(docRef.current?.querySelector(`[data-span-index="${spanIndex}"]`) ?? null, true)
   }
   /** Deselects the discussion; `keepFocus` leaves focus on a control that stays rendered. */
   const collapse = (keepFocus = false) => {
-    const card = cards.find((item) => item.spanIndex === activeSpan)
-    const element = card && placement.element(card.key)
+    const element = activeCard && placement.element(activeCard.key)
     if (!keepFocus && element?.contains(document.activeElement)) element.querySelector<HTMLButtonElement>('.rail-select')?.focus({ preventScroll: true })
     setReplyFor(null)
     onActivate(null)
@@ -250,7 +238,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   // kept across renders that change neither. Submission verifies the final text in the whole
   // document; its refusal stands until the text or source changes. Null marks a reply whose insert
   // would not reparse as one comment in place: it stays editable but cannot submit.
-  const composerCard = cards.find(composes)
+  const composerCard = activeCard && composes(activeCard) ? activeCard : undefined
   const composerText = useDeferredValue(composerCard ? draftText(composerCard) : '')
   const composerEnd = composerCard?.thread.end
   const composerVerified = useMemo(() => composerEnd === undefined || readOnly || !composerText.trim() ? null
@@ -274,7 +262,6 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
   }
 
   const latest: CardActions = { activate, collapse, resolve: resolveThread, deleteMessage, setDraft: setDraftText,
-    showAllReplies: (card) => { if (card.spanIndex === activeSpan) setAllRepliesFor(card.key) },
     submit: submitReply, cancel, hover: (spanIndex) => onHover?.(spanIndex),
     focusSpan: (spanIndex) => onFocusSpan?.(spanIndex) }
   const handlers = useRef(latest)
@@ -315,7 +302,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       const composer = card === composerCard
       const selected = activeSpan === card.spanIndex
       return <RailCard key={card.key} card={card} attach={cardRef(card.key)} actions={actions} readOnly={readOnly}
-        selected={selected} allReplies={selected && allRepliesFor === card.key} placed={placed.has(card.key)}
+        selected={selected} reveal={selected ? revealRequest?.message : undefined} placed={placed.has(card.key)}
         paired={hoveredSpan === card.spanIndex || focusedSpan === card.spanIndex}
         composes={composes(card)} requested={replyFor === card.key} draft={draftText(card)}
         canReply={composer && canReply} bodyInvalid={composer && bodyInvalid} />
@@ -339,8 +326,8 @@ interface CardProps {
   actions: CardActions
   readOnly: boolean
   selected: boolean
-  /** The selected card shows the earlier replies it otherwise hides behind a row. */
-  allReplies: boolean
+  /** The message Find is revealing, given to the selected card. */
+  reveal?: number
   /** Hovered or focused: emphasized with its passage, without selecting. */
   paired: boolean
   /** Placement has positioned the card; until then it stays unseen. */
@@ -359,11 +346,20 @@ interface CardProps {
  * One discussion card. It renders only when its own props change, so hover, focus, or a draft on
  * another card leaves it untouched; its labels follow the interface language through `useT`.
  */
-const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selected, allReplies, paired, placed,
+const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selected, reveal, paired, placed,
   composes, requested, draft, canReply, bodyInvalid }: CardProps) {
   const t = useT()
   const ime = useCompositionGuard()
-  const earlierId = useId()
+  const earlier = hiddenReplies(card)
+  const position = reveal === undefined ? -1 : card.messages.indexOf(reveal)
+  const revealing = selected && position >= 1 && position <= earlier
+  // The earlier replies show once their row is activated, or once a reveal names one they hide,
+  // until the card is deselected; React discards the render that resets them.
+  const [earlierShown, setEarlierShown] = useState({ selected, reveal, shown: revealing })
+  if (earlierShown.selected !== selected || earlierShown.reveal !== reveal) {
+    setEarlierShown({ selected, reveal, shown: revealing || (selected === earlierShown.selected && earlierShown.shown) })
+  }
+  const allReplies = earlierShown.shown
   const earlierRef = useRef<HTMLDivElement>(null)
   /** The earlier-replies row was activated; focus moves from the row, which closes, to the replies it reveals. */
   const focusEarlier = useRef(false)
@@ -373,7 +369,6 @@ const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selec
     earlierRef.current?.focus({ preventScroll: true })
   }, [allReplies])
   const replies = card.thread.comments.length - 1
-  const earlier = hiddenReplies(card)
   // A message reads author, then (opening message only) the quoted passage, then the comment, as
   // a resolved discussion does; the reply count follows the opening message.
   const message = (comment: ThreadCard['thread']['comments'][number], messageIndex: number) =>
@@ -412,11 +407,12 @@ const RailCard = memo(function RailCard({ card, attach, actions, readOnly, selec
       {earlier > 0 && <>
         <Collapsible open={!allReplies}><div className="rail-actions rail-footer">
           <DisclosureToggle expanded={false} onToggle={() => {
+            if (!selected) return
             focusEarlier.current = true
-            actions.showAllReplies(card)
+            setEarlierShown((state) => ({ ...state, shown: true }))
           }}>{t('earlierReplies').replace('{count}', String(earlier))}</DisclosureToggle>
         </div></Collapsible>
-        <Collapsible open={allReplies} id={earlierId}>
+        <Collapsible open={allReplies}>
           <div ref={earlierRef} tabIndex={-1} className="rail-earlier-replies">
             {card.thread.comments.slice(1, 1 + earlier).map((comment, reply) => message(comment, reply + 1))}
           </div>

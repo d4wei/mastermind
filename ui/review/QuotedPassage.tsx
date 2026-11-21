@@ -2,6 +2,7 @@ import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type Keyb
   type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { useT } from '../i18n'
+import { cssEasing } from '../util/css-tokens'
 import { prefersReducedMotion } from '../util/presence'
 import { Collapsible, revealMs } from './Collapsible'
 import { DisclosureToggle } from './DisclosureToggle'
@@ -82,7 +83,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
     }
     if (to > from) setDrawn(next)
     else element.setAttribute(SETTLES_TO, String(settledMarginBox(element, to)))
-    const easing = getComputedStyle(document.documentElement).getPropertyValue('--ease-standard').trim() || 'ease'
+    const easing = cssEasing(getComputedStyle(document.documentElement))
     const running = element.animate([{ maxHeight: `${from}px` }, { maxHeight: `${to}px` }], { duration, easing, fill: 'forwards' })
     animation.current = running
     // The final clamp is committed before the held max-height is released, so no frame shows the
@@ -117,7 +118,7 @@ function useClampTransition(ref: RefObject<HTMLElement | null>, text: string, ta
 /**
  * A discussion's quoted passage, clamped to `lines`. An expandable passage that overflows its clamp
  * can be revealed whole inside the card, through the Show more disclosure or by pressing the passage
- * itself; a new clamp or passage, or the passage ceasing to be expandable, starts it clamped again.
+ * itself; a new passage, or the passage ceasing to be expandable, starts it clamped again.
  * Clamp changes ease the passage's height, so an expansion grows downward. The clamp is visual, so
  * assistive technology reads the whole text.
  */
@@ -126,14 +127,12 @@ export function QuotedPassage({ text, lines, expandable, expansion: mode = 'disc
   const t = useT()
   const id = useId()
   const ref = useRef<HTMLElement>(null)
-  // A new clamp or passage starts collapsed, as does one no longer expandable; React discards the render that resets it.
-  const [expansion, setExpansion] = useState({ text, lines, expanded: false })
-  if (expansion.text !== text || expansion.lines !== lines || (!expandable && expansion.expanded)) {
-    setExpansion({ text, lines, expanded: false })
-  }
+  // A new passage starts collapsed, as does one no longer expandable; React discards the render that resets it.
+  const [expansion, setExpansion] = useState({ text, expanded: false })
+  if (expansion.text !== text || (!expandable && expansion.expanded)) setExpansion({ text, expanded: false })
   const expanded = expandable && expansion.expanded
   const { drawn, overflows } = useClampTransition(ref, text, { lines, expanded }, expandable)
-  const setExpanded = (next: boolean) => setExpansion({ text, lines, expanded: next })
+  const setExpanded = (next: boolean) => setExpansion({ text, expanded: next })
   // A pressable passage stays a control once expanded, out of the tab order, so focus stays on it.
   const pressable = mode === 'press' && expandable && (overflows || expanded)
   const press = pressable && !expanded ? {

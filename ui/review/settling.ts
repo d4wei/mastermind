@@ -11,7 +11,7 @@ export const SETTLES_OPEN = 'open'
 export const SETTLES_CONTENT = 'data-settles-content'
 
 /** The sum of `element`'s vertical margins. */
-export function margins(element: HTMLElement): number {
+function margins(element: HTMLElement): number {
   const style = getComputedStyle(element)
   return (parseFloat(style.marginTop) || 0) + (parseFloat(style.marginBottom) || 0)
 }
@@ -21,11 +21,11 @@ export function settledMarginBox(element: HTMLElement, height: number): number {
   return height + margins(element)
 }
 
-/** The margin-box height a marked element settles at. */
-function target(element: HTMLElement, mark: string): number {
+/** The margin-box height a marked element with vertical margins `margin` settles at. */
+function target(element: HTMLElement, mark: string, margin: number): number {
   if (mark !== SETTLES_OPEN) return Number(mark) || 0
   const content = element.querySelector<HTMLElement>(`[${SETTLES_CONTENT}]`)
-  return (content?.getBoundingClientRect().height ?? 0) + margins(element)
+  return (content?.getBoundingClientRect().height ?? 0) + margin
 }
 
 /**
@@ -39,8 +39,9 @@ export function settledHeight(container: HTMLElement, height: number): number {
   for (const element of container.querySelectorAll<HTMLElement>(`[${SETTLES_TO}]`)) {
     if (element.parentElement?.closest(`[${SETTLES_TO}]`)) continue
     const mark = element.getAttribute(SETTLES_TO)!
-    const marginBox = element.getBoundingClientRect().height + margins(element)
-    const settled = target(element, mark)
+    const margin = margins(element)
+    const marginBox = element.getBoundingClientRect().height + margin
+    const settled = target(element, mark, margin)
     change += mark === SETTLES_OPEN ? Math.max(0, settled - marginBox) : -Math.max(0, marginBox - settled)
   }
   return height + change

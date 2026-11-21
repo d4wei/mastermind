@@ -154,20 +154,20 @@ describe('estimates', () => {
     const estimator = new CardHeightEstimator()
     const short = discussion('short'), long = discussion('word '.repeat(60)), replied = discussion('short', 2)
     const paragraphs = discussion('short\n\nshort')
-    expect(estimator.estimate(long)).toBeGreaterThan(estimator.estimate(short))
-    expect(estimator.estimate(replied)).toBeGreaterThan(estimator.estimate(short))
-    expect(estimator.estimate(paragraphs)).toBeGreaterThan(estimator.estimate(short))
-    expect(estimator.estimate(discussion('short', 0, ''))).toBeLessThan(estimator.estimate(short))
-    const raw = estimator.estimate(long)
+    expect(estimator.estimate(long).height).toBeGreaterThan(estimator.estimate(short).height)
+    expect(estimator.estimate(replied).height).toBeGreaterThan(estimator.estimate(short).height)
+    expect(estimator.estimate(paragraphs).height).toBeGreaterThan(estimator.estimate(short).height)
+    expect(estimator.estimate(discussion('short', 0, '')).height).toBeLessThan(estimator.estimate(short).height)
+    const raw = estimator.estimate(long).height
     // A card measured at twice its estimate doubles every estimate.
-    estimator.learn(short, 2 * estimator.estimate(short))
-    expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+    estimator.learn(short, 2 * estimator.estimate(short).height)
+    expect(estimator.estimate(long).height).toBeCloseTo(2 * raw)
     // The ratio follows the running totals, and ignores drift under 2%.
     const other = discussion('other')
-    estimator.learn(other, 1.005 * estimator.estimate(other))
-    expect(estimator.estimate(long)).toBeCloseTo(2 * raw)
+    estimator.learn(other, 1.005 * estimator.estimate(other).height)
+    expect(estimator.estimate(long).height).toBeCloseTo(2 * raw)
     estimator.reset()
-    expect(estimator.estimate(long)).toBeCloseTo(raw)
+    expect(estimator.estimate(long).height).toBeCloseTo(raw)
   })
 
   it('estimates an unmounted card\'s body offset from the passage above it, calibrated by measured offsets', () => {
@@ -175,17 +175,17 @@ describe('estimates', () => {
     const oneLine = discussion('short', 0, 'brief'), twoLines = discussion('short', 0, 'passage '.repeat(20))
     const point = discussion('short', 0, '')
     // The body sits below the passage's lines, so a longer passage lowers it until the clamp; the body's own length does not.
-    expect(estimator.bodyOffset(twoLines)).toBeGreaterThan(estimator.bodyOffset(oneLine))
-    expect(estimator.bodyOffset(discussion('short', 0, 'passage '.repeat(80)))).toBe(estimator.bodyOffset(twoLines))
-    expect(estimator.bodyOffset(point)).toBeLessThan(estimator.bodyOffset(oneLine))
-    expect(estimator.bodyOffset(discussion('word '.repeat(60), 3, 'brief'))).toBe(estimator.bodyOffset(oneLine))
+    expect(estimator.estimate(twoLines).bodyOffset).toBeGreaterThan(estimator.estimate(oneLine).bodyOffset)
+    expect(estimator.estimate(discussion('short', 0, 'passage '.repeat(80))).bodyOffset).toBe(estimator.estimate(twoLines).bodyOffset)
+    expect(estimator.estimate(point).bodyOffset).toBeLessThan(estimator.estimate(oneLine).bodyOffset)
+    expect(estimator.estimate(discussion('word '.repeat(60), 3, 'brief')).bodyOffset).toBe(estimator.estimate(oneLine).bodyOffset)
     // An estimate never exceeds the card's estimated height.
-    expect(estimator.bodyOffset(oneLine)).toBeLessThan(estimator.estimate(oneLine))
+    expect(estimator.estimate(oneLine).bodyOffset).toBeLessThan(estimator.estimate(oneLine).height)
     // A measured offset calibrates offsets without touching heights.
-    const height = estimator.estimate(oneLine)
-    const raw = estimator.bodyOffset(twoLines)
-    estimator.learn(oneLine, height, undefined, estimator.bodyOffset(oneLine) / 2)
-    expect(estimator.bodyOffset(twoLines)).toBeCloseTo(raw / 2)
-    expect(estimator.estimate(oneLine)).toBeCloseTo(height)
+    const height = estimator.estimate(oneLine).height
+    const raw = estimator.estimate(twoLines).bodyOffset
+    estimator.learn(oneLine, height, undefined, estimator.estimate(oneLine).bodyOffset / 2)
+    expect(estimator.estimate(twoLines).bodyOffset).toBeCloseTo(raw / 2)
+    expect(estimator.estimate(oneLine).height).toBeCloseTo(height)
   })
 })

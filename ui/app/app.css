@@ -1607,17 +1607,12 @@ input[type='checkbox'] {
 }
 
 /* A narrow comment panel uses ordinary flow rather than document-aligned offsets. */
-.comments-panel .rail {
-  height: auto !important;
-  padding: 0;
-}
+.comments-panel .rail { padding: 0; }
 .comments-panel .rail-card {
   position: relative;
-  top: auto !important;
   width: 100%;
   margin-bottom: calc(var(--space-unit) * 2);
 }
-.comments-panel .rail-card.unplaced { visibility: visible; }
 
 
 .topbar-language {

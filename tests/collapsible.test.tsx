@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { Collapsible } from '../ui/review/Collapsible'
-import { createReactHost, removeReactHost } from './helpers/dom'
+import { createReactHost, endTransition, removeReactHost } from './helpers/dom'
 import type { Root } from 'react-dom/client'
 
 let host: HTMLDivElement
@@ -27,11 +27,7 @@ const section = () => host.querySelector<HTMLElement>('.collapsible')
 const field = () => host.querySelector('textarea')
 const show = (open: boolean) => act(() => root.render(<Collapsible open={open} id="reply"><textarea /></Collapsible>))
 /** The row's own transition ending or cancelled, as the browser reports it. */
-function endTransition(propertyName = 'grid-template-rows', type = 'transitionend') {
-  const event = new Event(type)
-  Object.defineProperty(event, 'propertyName', { value: propertyName })
-  act(() => section()!.dispatchEvent(event))
-}
+const endRow = (propertyName?: string, type?: string) => endTransition(section()!, propertyName, type)
 /** Lists the row's running transitions, which jsdom cannot. */
 function stubAnimations(running: () => boolean) {
   HTMLElement.prototype.getAnimations = () => running()
@@ -57,16 +53,16 @@ it('opens through its row transition and stops clipping only when that transitio
   show(true)
   expect(section()!.className).toBe('collapsible open')
   expect(field()).not.toBeNull()
-  endTransition('margin-top')
+  endRow('margin-top')
   expect(section()!.className).toBe('collapsible open')
-  endTransition()
+  endRow()
   expect(section()!.className).toBe('collapsible open settled')
 })
 
 it('settles an opening row whose transition is cancelled', () => {
   show(false)
   show(true)
-  endTransition('grid-template-rows', 'transitioncancel')
+  endRow('grid-template-rows', 'transitioncancel')
   expect(section()!.className).toBe('collapsible open settled')
 })
 
@@ -75,10 +71,10 @@ it('keeps clipping through a cancel that reverses the row mid-way', () => {
   stubAnimations(() => moving)
   show(false)
   show(true)
-  endTransition('grid-template-rows', 'transitioncancel')
+  endRow('grid-template-rows', 'transitioncancel')
   expect(section()!.className).toBe('collapsible open')
   moving = false
-  endTransition()
+  endRow()
   expect(section()!.className).toBe('collapsible open settled')
 })
 
@@ -93,16 +89,16 @@ it('keeps closing content mounted, inert and hidden, until the row\'s transition
   expect(section()!.getAttribute('data-settles-to')).toBe('0')
   act(() => vi.advanceTimersByTime(1000))
   expect(field()).toBe(input)
-  endTransition('margin-top')
+  endRow('margin-top')
   expect(field()).toBe(input)
-  endTransition()
+  endRow()
   expect(section()).toBeNull()
 })
 
 it('unmounts closing content whose transition is cancelled', () => {
   show(true)
   show(false)
-  endTransition('grid-template-rows', 'transitioncancel')
+  endRow('grid-template-rows', 'transitioncancel')
   expect(section()).toBeNull()
 })
 
@@ -142,7 +138,7 @@ it('reopens the same content when opened again mid-collapse', () => {
   expect(field()).toBe(input)
   expect(section()!.className).toBe('collapsible open')
   expect(section()!.hasAttribute('inert')).toBe(false)
-  endTransition()
+  endRow()
   expect(field()).toBe(input)
   expect(section()!.className).toBe('collapsible open settled')
 })

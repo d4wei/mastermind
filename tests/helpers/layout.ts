@@ -13,6 +13,8 @@ export interface DocumentLayout {
   bodyOffset?: (card: HTMLElement) => number
   /** The height of an element inside a card, where it differs from the default. */
   innerHeight?: (element: HTMLElement, card: HTMLElement) => number | undefined
+  /** The rail's bottom padding, which placement leaves below cards that overflow the document; 40 by default. */
+  endSpace?: number
 }
 
 /**
@@ -21,8 +23,9 @@ export interface DocumentLayout {
  * at its written `top` plus any inline `matrix` transform, a message body inside it at `bodyOffset`
  * below that, every other element inside it at its top and 20 px tall unless `innerHeight` says
  * otherwise, the scroller's content is as tall as the rail, and `scrollTo` moves the scroller and
- * dispatches its scroll event. Every other element
- * measures empty. Returns the restore for `scrollTo`; the other spies end with `vi.restoreAllMocks`.
+ * dispatches its scroll event. Every other element measures empty, and the rail's bottom padding is
+ * `endSpace`. Returns the restore for `scrollTo` and that padding; the other spies end with
+ * `vi.restoreAllMocks`.
  */
 export function stubDocumentLayout(layout: DocumentLayout): () => void {
   const rect = (top: number, height: number) => ({ top, bottom: top + height, left: 0, right: 0, width: 0, height,
@@ -55,7 +58,13 @@ export function stubDocumentLayout(layout: DocumentLayout): () => void {
     this.scrollTop = typeof x === 'number' ? y ?? 0 : x.top ?? this.scrollTop
     this.dispatchEvent(new Event('scroll'))
   } })
-  return () => { Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo') }
+  const style = document.createElement('style')
+  style.textContent = `.rail { padding-bottom: ${layout.endSpace ?? 40}px; }`
+  document.head.append(style)
+  return () => {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo')
+    style.remove()
+  }
 }
 
 /** Scrolls `scroller` to `top` and lets the rail's frame-throttled window follow. */

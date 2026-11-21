@@ -31,3 +31,10 @@ export function stubHighlights(registry = new Map<string, Set<Range>>()): Map<st
   vi.stubGlobal('Highlight', class extends Set<Range> { constructor(...ranges: Range[]) { super(ranges) } })
   return registry
 }
+
+/** A transition on `element` ending or cancelled, as the browser reports it. */
+export function endTransition(element: Element, propertyName = 'grid-template-rows', type = 'transitionend'): void {
+  const event = new Event(type)
+  Object.defineProperty(event, 'propertyName', { value: propertyName })
+  act(() => { element.dispatchEvent(event) })
+}

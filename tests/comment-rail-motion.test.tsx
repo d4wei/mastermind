@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { analyzeMarkdown } from '../document/markdown/analyze'
 import { CommentRail } from '../ui/review/CommentRail'
 import type { ReplyDraft } from '../ui/review/thread-identity'
-import { createReactHost, inputValue, removeReactHost } from './helpers/dom'
+import { createReactHost, endTransition, inputValue, removeReactHost } from './helpers/dom'
 
 const SOURCE = '{==alpha==}{>>@a: one<<} text {==beta==}{>>@b: two<<}{>>@c: a reply<<}\n'
 
@@ -28,6 +28,10 @@ beforeEach(() => {
     const index = [...document.querySelectorAll('.rail-card')].indexOf(this)
     return { top: 0, bottom: 0, left: 0, right: 0, width: 0, x: 0, y: 0, height: heights[index] ?? 0, toJSON: () => ({}) }
   })
+  // A tall scroller, so the rail's window holds every card.
+  vi.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(function (this: Element) {
+    return this.classList.contains('document-scroll') ? 1000 : 0
+  })
   // jsdom does not implement inert; browsers refuse focus inside it.
   const focus = HTMLElement.prototype.focus
   vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
@@ -48,33 +52,28 @@ const edit = vi.fn(() => true)
 /** Each commit's selected and hovered discussion, as the document lights their passages. */
 let commits: { active: number | null; hovered: number | null; focused: number | null }[]
 
-function Harness({ detached = false }: { detached?: boolean }) {
+function Harness({ detached = false, selected = null }: { detached?: boolean; selected?: number | null }) {
   const analysis = useMemo(() => ANALYSIS, [])
   const docRef = useRef<HTMLElement>(null)
-  const [active, setActive] = useState<number | null>(null)
+  const [active, setActive] = useState<number | null>(selected)
   const [hovered, setHovered] = useState<number | null>(null)
   const [focused, setFocused] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<ReplyDraft[]>([])
   useLayoutEffect(() => { commits.push({ active, hovered, focused }) })
-  return <><article ref={detached ? undefined : docRef} />
+  return <div className="document-scroll"><article ref={detached ? undefined : docRef} />
     <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
       activeSpan={active} onActivate={setActive} hoveredSpan={hovered} focusedSpan={focused} onHover={setHovered} onFocusSpan={setFocused} onEdit={edit}
-      drafts={drafts} onDraftsChange={setDrafts} /></>
+      drafts={drafts} onDraftsChange={setDrafts} /></div>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
 const open = (index: number) => act(() => cards()[index]!.querySelector<HTMLButtonElement>('.rail-select')!.click())
-/** The row's own transition ending, as the browser reports it. */
-function endTransition(section: Element) {
-  const event = new Event('transitionend')
-  Object.defineProperty(event, 'propertyName', { value: 'grid-template-rows' })
-  act(() => section.dispatchEvent(event))
-}
 const escape = () => act(() => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
 
 it('keeps an unplaced card unseen rather than at the top of the rail', () => {
-  act(() => root.render(<Harness detached />))
-  expect(cards().map((card) => card.classList.contains('unplaced'))).toEqual([true, true])
-  expect(cards().map((card) => card.style.top)).toEqual(['', ''])
+  // Without a document to place against, only the selected card mounts.
+  act(() => root.render(<Harness detached selected={ANALYSIS.threads[0]!.spanIndex} />))
+  expect(cards().map((card) => card.classList.contains('unplaced'))).toEqual([true])
+  expect(cards().map((card) => card.style.top)).toEqual([''])
 })
 
 it('moves neighbors within the size observer callback, before the frame paints', () => {

@@ -45,6 +45,10 @@ beforeEach(() => {
     return { top: anchorTops.get(span) ?? 0, bottom: this.tagName === 'ARTICLE' ? 1000 : 0, left: 0, right: 0, width: 0, x: 0, y: 0,
       height: heights[index] ?? 0, toJSON: () => ({}) }
   })
+  // A tall scroller, so the rail's window holds every card.
+  vi.spyOn(Element.prototype, 'clientHeight', 'get').mockImplementation(function (this: Element) {
+    return this.classList.contains('document-scroll') ? 1000 : 0
+  })
   ;({ host, root } = createReactHost())
 })
 afterEach(() => {
@@ -60,11 +64,11 @@ function Harness() {
   const [active, setActive] = useState<number | null>(null)
   const [drafts, setDrafts] = useState<ReplyDraft[]>([])
   select = setActive
-  return <><article ref={docRef}>
+  return <div className="document-scroll"><article ref={docRef}>
     {ANALYSIS.threads.map((card) => <mark key={card.key} data-span-index={card.spanIndex} />)}
   </article>
     <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
-      activeSpan={active} onActivate={setActive} onEdit={() => true} drafts={drafts} onDraftsChange={setDrafts} /></>
+      activeSpan={active} onActivate={setActive} onEdit={() => true} drafts={drafts} onDraftsChange={setDrafts} /></div>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]
 const doc = () => host.querySelector('article')!

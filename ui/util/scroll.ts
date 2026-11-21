@@ -69,7 +69,7 @@ export function scrollToOffset(doc: RefObject<HTMLElement | null>, offset: numbe
 }
 
 /** Reveal only the missing edge; already-visible targets must not move the reading position. */
-function revealRange(top: number, bottom: number): void {
+export function revealRange(top: number, bottom: number): void {
   const viewport = documentViewport()
   const visibleTop = readingLine()
   const visibleBottom = viewport.top + viewport.height
@@ -77,10 +77,8 @@ function revealRange(top: number, bottom: number): void {
   else if (bottom > visibleBottom) smoothScrollTo(viewport.scrollTop + bottom - visibleBottom)
 }
 
-/** `drawnOffset` is how far a running transform draws `element` below where it is laid out. */
-export function revealElement(element: Element | null, headerOnly = false, drawnOffset = 0): void {
+export function revealElement(element: Element | null, headerOnly = false): void {
   if (!element) return
   const rect = element.getBoundingClientRect()
-  const top = rect.top - drawnOffset, bottom = rect.bottom - drawnOffset
-  revealRange(top, headerOnly ? Math.min(bottom, top + 48) : bottom)
+  revealRange(rect.top, headerOnly ? Math.min(rect.bottom, rect.top + 48) : rect.bottom)
 }
