@@ -29,6 +29,16 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-20 — Rail cards stay above the document's end before anything else but order
+
+**Ruled.** When cards would run past the bottom of the body text, the trailing cards shift up
+until the last one ends there. This outranks the pivot's alignment and the 2026-11-10 rule that a
+selected card grows downward only: at the document's end a selected card rises instead of
+lengthening the page. Source order, the gap between cards, and the rail's top still win when the
+cards cannot all fit.
+
+**Beat:** letting the last cards and a growing selection extend the page past its text.
+
 ## 2026-11-10 — The wide rail places cards for the least movement, around the last selected card
 
 **Ruled.** Each card's opening message's body aligns with the top of its passage; the card most

@@ -53,7 +53,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
-  layout = { viewport: 10_000, cardHeight: () => 50, anchorTop: (anchor) => 1000 * Math.max(0, anchors().indexOf(anchor)) }
+  layout = { viewport: 10_000, documentHeight: 2020, cardHeight: () => 50, anchorTop: (anchor) => 1000 * Math.max(0, anchors().indexOf(anchor)) }
   restoreLayout = stubDocumentLayout(layout)
   host = document.createElement('div')
   document.body.append(host)

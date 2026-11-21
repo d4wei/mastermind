@@ -20,35 +20,49 @@ export function alignedTop(card: RailMeasurement): number {
 
 /**
  * Keeps document order without overlap, around `pivot`, the card most recently selected (-1 for
- * none). Without a pivot, each card takes its aligned top or sits one gap below the card before it,
- * whichever is lower. The pivot takes its aligned top unless earlier cards would not fit above it
- * within the rail; earlier cards stack upward from it, each as close to its own aligned top as order
- * allows, and later cards stack downward. Earlier cards make room by their settled heights, so a
- * card collapsing above the pivot is never pushed up by height it is about to lose; current heights
- * then keep every card clear of the one before it.
+ * none), and above `bottom`, the document's bottom, where the cards fit. Without a pivot, each card
+ * takes its aligned top or sits one gap below the card before it, whichever is lower. The pivot
+ * takes its aligned top unless earlier cards would not fit above it within the rail; earlier cards
+ * stack upward from it, each as close to its own aligned top as order allows, and later cards stack
+ * downward. Cards that would then pass `bottom` rise, from the last card backward, just far enough
+ * that the last ends at it, each a gap above the next, until a card already clears the one after it;
+ * this outranks the pivot's alignment. Cards that cannot all fit above `bottom` overflow it.
+ *
+ * Earlier cards make room by their settled heights, so no card is pushed up by height a card above
+ * it is about to lose; current heights then keep every card clear of the one before it.
  */
-export function placeCommentCards(cards: readonly RailMeasurement[], pivot: number, gap: number): number[] {
+export function placeCommentCards(cards: readonly RailMeasurement[], pivot: number, gap: number, bottom: number): number[] {
+  // A growing card reserves only the height it has reached; a collapsing one only what it keeps.
+  const reserved = cards.map((card) => Math.min(card.height, card.settledHeight ?? card.height))
+  // The highest each card may sit: below the cards before it, stacked from the rail's top.
+  const minimumTops: number[] = []
+  let minimum = 0
+  reserved.forEach((height, index) => { minimumTops[index] = minimum; minimum += height + gap })
+
   const tops: number[] = []
   let cursor = 0
   cards.forEach((card, index) => {
     tops[index] = Math.max(alignedTop(card), cursor)
     cursor = tops[index]! + card.height + gap
   })
-  if (pivot < 0 || pivot >= cards.length) return tops
+  if (pivot >= 0 && pivot < cards.length) {
+    tops[pivot] = Math.max(alignedTop(cards[pivot]!), minimumTops[pivot]!)
+    for (let i = pivot - 1; i >= 0; i--) {
+      tops[i] = Math.max(minimumTops[i]!, Math.min(alignedTop(cards[i]!), tops[i + 1]! - reserved[i]! - gap))
+    }
+    for (let i = 1; i < cards.length; i++) {
+      const clear = tops[i - 1]! + cards[i - 1]!.height + gap
+      tops[i] = Math.max(i > pivot ? alignedTop(cards[i]!) : tops[i]!, clear)
+    }
+  }
 
-  // A growing card reserves only the height it has reached; a collapsing one only what it keeps.
-  const reserved = cards.map((card) => Math.min(card.height, card.settledHeight ?? card.height))
-  const minimumTops: number[] = []
-  let minimum = 0
-  reserved.forEach((height, index) => { minimumTops[index] = minimum; minimum += height + gap })
-  tops[pivot] = Math.max(alignedTop(cards[pivot]!), minimumTops[pivot]!)
-  for (let i = pivot - 1; i >= 0; i--) {
-    tops[i] = Math.max(minimumTops[i]!, Math.min(alignedTop(cards[i]!), tops[i + 1]! - reserved[i]! - gap))
+  let limit = bottom
+  for (let i = cards.length - 1; i >= 0 && tops[i]! + cards[i]!.height > limit; i--) {
+    tops[i] = Math.max(minimumTops[i]!, limit - cards[i]!.height)
+    limit = tops[i]! - gap
   }
-  for (let i = 1; i < cards.length; i++) {
-    const clear = tops[i - 1]! + cards[i - 1]!.height + gap
-    tops[i] = Math.max(i > pivot ? alignedTop(cards[i]!) : tops[i]!, clear)
-  }
+  // A card held at its minimum by a collapsing card above may still meet that card's current bottom.
+  for (let i = 1; i < cards.length; i++) tops[i] = Math.max(tops[i]!, tops[i - 1]! + cards[i - 1]!.height + gap)
   return tops
 }
 
@@ -103,6 +117,9 @@ interface Motion {
   duration: number
   easing: string
 }
+
+/** How far, in pixels, the last card may pass the document's end before the rail counts it as overflowing. */
+const SUBPIXEL = 0.5
 
 /** A move shorter than this, in pixels, happens at once. */
 const MIN_MOVE = 1
@@ -319,6 +336,7 @@ export class RailPlacement {
   private passages = new Map<number, number>()
   /** The rail's top within the scroller's content, read with the anchors. */
   private railOffset = 0
+  /** The bottom of the article's body text, in rail coordinates, which placement keeps cards above. */
   private docBottom = 0
   /** Read from the rail's bottom padding, which the document column's bottom padding shares. */
   private endSpace = END_SPACE_FALLBACK
@@ -558,7 +576,7 @@ export class RailPlacement {
       return { anchorTop, bodyOffset, height, settledHeight: size.settledHeight }
     })
     const pivot = this.pivotKey === null ? -1 : this.index.get(this.pivotKey) ?? -1
-    const tops = placeCommentCards(measurements, pivot, this.gap)
+    const tops = placeCommentCards(measurements, pivot, this.gap, this.docBottom)
     this.tops = tops
     this.heights = measurements.map((measurement) => measurement.height)
     this.offsets = measurements.map((measurement) => measurement.bodyOffset)
@@ -569,10 +587,10 @@ export class RailPlacement {
       if (motion && !moving!.has(key)) this.move(element, tops[index]!, motion)
       setPixels(element, 'top', tops[index]!)
     })
-    // Cards past the document's end leave the same space below them as the document column does.
+    // Cards that overflow the document's end leave the same space below them as the document column does.
     let bottom = 0
     tops.forEach((top, i) => { bottom = Math.max(bottom, top + this.heights[i]!) })
-    this.height = Math.max(this.docBottom, bottom + (tops.length ? this.endSpace : 0))
+    this.height = bottom > this.docBottom + SUBPIXEL ? bottom + this.endSpace : this.docBottom
     this.writeHeight()
     if (this.cards === this.placedFor) return
     this.placedFor = this.cards

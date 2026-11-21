@@ -135,8 +135,8 @@ it('mounts only the cards near the viewport and keeps the rail its full height',
   // Cards up to 2,500 px fall within the viewport and its margin; each body meets its passage.
   expect(mounted()).toEqual(range(0, 6))
   expect(cardFor(w(5))!.style.top).toBe(`${2500 - BODY}px`)
-  // The last card passes the document's end, so the rail leaves space below it.
-  expect(railHeight()).toBeCloseTo(500 * 39 - BODY + 100 + END_SPACE)
+  // The last card would pass the document's end, so it rises to end there and the rail keeps the document's height.
+  expect(railHeight()).toBe(500 * 39 + 20)
   await act(() => scrollDocument(scroller(), 10_000))
   // 8,500 to 12,500 px, counting the cards whose box reaches 8,500.
   expect(mounted()).toEqual(range(17, 26))
@@ -268,14 +268,23 @@ it('remembers a card that unmounts mid-collapse at the height it is settling to'
   expect(topOf(w(20))).toBeCloseTo(top(280, 20))
 })
 
-it('keeps the document\'s height while the cards end above it, and leaves space below them once they pass it', () => {
+it('keeps the rail no taller than the document while the cards fit above its end', () => {
   layout.documentHeight = 30_000
   act(() => root.render(<Harness />))
-  const rail = host.querySelector<HTMLElement>('.rail')!
-  expect(rail.style.height).toBe('30000px')
-  layout.documentHeight = 19_590
+  expect(railHeight()).toBe(30_000)
+  // The last card's alignment would end it 40 px past the document; it rises instead.
+  layout.documentHeight = 500 * 39 + 20
   documentResized()
-  expect(railHeight()).toBeCloseTo(500 * 39 - BODY + 100 + END_SPACE)
+  expect(railHeight()).toBe(500 * 39 + 20)
+})
+
+it('leaves space below the cards once they cannot all fit above the document\'s end', () => {
+  layout.documentHeight = 4000
+  act(() => root.render(<Harness />))
+  // Every card stacks down from the rail's top, and the last ends past the document.
+  expect(topOf(w(0))).toBe(0)
+  expect(topOf(w(5))).toBe(5 * (100 + GAP))
+  expect(railHeight()).toBe(39 * (100 + GAP) + 100 + END_SPACE)
 })
 
 describe('the pivot', () => {
@@ -388,6 +397,35 @@ describe('motion', () => {
       resized(cardFor(w(1))!)
       expect(topOf(w(2))).toBe(460 + 600 + GAP)
       expect(moves).toHaveLength(1)
+    } finally { restore() }
+  })
+
+  it('raises a selected last card in one move by its settled height, so it grows upward at the document\'s end', async () => {
+    const restore = enableMotion()
+    easeSections()
+    try {
+      act(() => root.render(<Harness />))
+      await act(() => scrollDocument(scroller(), 18_500))
+      const end = 500 * 39 + 20
+      expect(topOf(w(39))).toBe(end - 100)
+      expect(topOf(w(38))).toBe(19_000 - BODY)
+      // The composer opens to 450 px; at the selection it has not grown yet.
+      easing = { passage: w(39), drawn: 0, full: 450 }
+      act(() => select(span(39)))
+      // The card rises to end at the document's end by its settled 550 px, and the card before it clears it.
+      expect(topOf(w(39))).toBe(end - 550)
+      expect(topOf(w(38))).toBe(end - 550 - GAP - 100)
+      expect(topOf(w(37))).toBe(18_500 - BODY)
+      expect(moved()).toEqual([[w(38), `translateY(${18_960 - 18_862}px)`], [w(39), `translateY(${19_420 - 18_970}px)`]])
+      // Frame by frame, the card grows; nothing re-aims, and the rail stays the document's height.
+      for (const drawn of [150, 300, 450]) {
+        easing = { passage: w(39), drawn, full: 450 }
+        heights.set(w(39), 100 + drawn)
+        resized(cardFor(w(39))!)
+        expect(topOf(w(39))).toBe(end - 550)
+      }
+      expect(moves).toHaveLength(2)
+      expect(railHeight()).toBe(end)
     } finally { restore() }
   })
 

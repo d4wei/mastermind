@@ -45,7 +45,7 @@ it('keeps icon-only hover targets square without inherited text-button padding',
   const controls = [
     ['btn-ghost btn-icon topbar-icon-btn', 30], ['native-open btn-icon', 30],
     ['btn-ghost btn-icon find-nav', 24], ['btn-ghost btn-icon slide-over-close', 28],
-    ['btn-ghost btn-icon notification-dismiss', 24], ['btn-ghost btn-icon recovery-warning', 24],
+    ['btn-ghost btn-icon notification-dismiss', 24], ['btn-ghost btn-icon recovery-warning', 30],
     ['native-file-close btn-icon', 24], ['native-file-attention btn-ghost btn-icon', 24],
     ['btn-ghost btn-icon rail-icon', 24],
   ] as const
@@ -59,6 +59,24 @@ it('keeps icon-only hover targets square without inherited text-button padding',
     expect(style.height.replace(/^calc\((.*)\)$/, '$1'), classes).toBe(`${size}px`)
     for (const edge of ['Top', 'Right', 'Bottom', 'Left'] as const) expect(style[`padding${edge}`], classes).toBe('0px')
     expect(style.flexShrink, classes).toBe('0')
+  }
+})
+
+it('makes the notification recall control its whole visible surface, as the top bar\'s icon buttons are', () => {
+  installStyles()
+  document.body.innerHTML = '<div class="notification-stack"><section class="notification notification-recall">' +
+    '<button class="btn-ghost btn-icon recovery-warning"></button></section></div>' +
+    '<div class="topbar"><button class="btn-ghost btn-icon topbar-icon-btn"></button></div>'
+  // The notice around the control draws no border, fill, or padding, so hover and pressed fills reach its edges.
+  const recall = getComputedStyle(document.querySelector('.notification-recall')!)
+  expect(recall.padding).toBe('0px')
+  expect(recall.borderTopStyle).toBe('none')
+  expect(recall.backgroundColor).toBe('rgba(0, 0, 0, 0)')
+  const button = getComputedStyle(document.querySelector('.recovery-warning')!)
+  const topbar = getComputedStyle(document.querySelector('.topbar-icon-btn')!)
+  expect(recall.borderRadius).toBe(button.borderRadius)
+  for (const property of ['width', 'height', 'borderTopWidth', 'borderTopStyle', 'borderRadius', 'background', 'color'] as const) {
+    expect(button[property], property).toBe(topbar[property])
   }
 })
 

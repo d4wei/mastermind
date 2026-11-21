@@ -164,12 +164,13 @@ body {
 .reader-menu-item > svg { flex: none; color: var(--color-text-muted); }
 .reader-menu-item[data-disabled] { opacity: 0.45; cursor: default; }
 
-.topbar-icon-btn.btn-icon {
+/* The notification recall floats in the bottom corner as the top bar's buttons float in the top one. */
+:is(.topbar-icon-btn, .recovery-warning).btn-icon {
   width: var(--control-size);
   height: var(--control-size);
 }
 /* Equal surfaces and optical bounds keep enclosed icons from outweighing open glyphs. */
-.native-open:not(.native-open-home), .btn-ghost.topbar-icon-btn {
+.native-open:not(.native-open-home), .btn-ghost:is(.topbar-icon-btn, .recovery-warning) {
   padding: 0;
   background: var(--color-bg-elevated);
   border: thin solid var(--color-border);

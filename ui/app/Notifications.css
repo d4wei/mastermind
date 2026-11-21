@@ -86,12 +86,16 @@
   pointer-events: none;
 }
 
-/* A dismissed persistent notice keeps only the control that reopens it. */
+/* A dismissed persistent notice keeps only the control that reopens it; the control is the whole
+   surface, so its hover and pressed fills cover what the reader sees, and the notice keeps only its
+   elevation and entrance. */
 .notification-recall {
   align-self: flex-start;
-  padding: var(--space-unit);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
 }
-.recovery-warning { color: var(--color-text-muted); }
 
 @keyframes mm-notice-in {
   from { opacity: 0; transform: translateY(calc(var(--space-unit) * 2)); }

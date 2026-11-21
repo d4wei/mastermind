@@ -41,7 +41,8 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
     const index = [...document.querySelectorAll('.rail-card')].indexOf(this)
     const span = this.matches('article [data-span-index]') ? Number(this.dataset.spanIndex) : NaN
-    return { top: anchorTops.get(span) ?? 0, bottom: 0, left: 0, right: 0, width: 0, x: 0, y: 0,
+    // The article ends well below every card, so the document's end moves none of them.
+    return { top: anchorTops.get(span) ?? 0, bottom: this.tagName === 'ARTICLE' ? 1000 : 0, left: 0, right: 0, width: 0, x: 0, y: 0,
       height: heights[index] ?? 0, toJSON: () => ({}) }
   })
   ;({ host, root } = createReactHost())

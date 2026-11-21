@@ -37,9 +37,19 @@ need; earlier cards stack upward from it, each as close to its aligned top as or
 later cards stack downward. Nothing above a card's body line changes height on selection, so a
 selected card keeps its top and grows downward only, later cards move down as it grows and come back
 as it shrinks, and no position is remembered beyond the pivot. A card keeps the body offset its
-clamped passage gives while that passage is expanded or easing back. When cards run past the
-document's end, the rail leaves the space the document column leaves below the body, read from the
-rail's bottom padding. Every card is placed, whether or not it is mounted: a mounted card by its
+clamped passage gives while that passage is expanded or easing back.
+
+The document's end bounds the cards: the bottom of the article's body text, in rail coordinates,
+which `placeCommentCards` takes as an explicit input. Cards that the placement above would carry
+past it rise, from the last card backward, just far enough that the last ends at it, each a gap
+above the next, until a card already clears the one after it; cards far from the end do not move.
+The bound outranks the pivot's alignment and the downward growth of a selected card: a selected
+card whose growth would pass the end rises instead, taking earlier cards with it only as far as they
+need. Order and the rail's top outrank the bound: no card rises above where the cards before it,
+stacked from the rail's top by the heights they keep, leave room. While the cards fit, the rail is
+exactly as tall as the document; only when they cannot all fit does the last overflow the end, and
+then the rail leaves the space the document column leaves below the body, read from the rail's
+bottom padding. Every card is placed, whether or not it is mounted: a mounted card by its
 measured height and body offset, including a resized reply composer; an unmounted one by those it
 was last measured at, or by estimates if it has never rendered. Narrow comment panels use ordinary
 vertical flow instead of positioned cards.
@@ -123,7 +133,8 @@ above it never rises for height it is losing.
 A selection change is one motion on one clock. The card it reaches and the card it leaves are
 placed by the heights their sections settle at, from the commit that changes the selection until
 each measures at that height, so placement holds still while they ease and the size observer
-re-aims nothing. Each mounted card whose place changes keeps its new `top` at once, so layout and
+re-aims nothing; a selected card that will rise at the document's end rises by that settled height
+in the same move. Each mounted card whose place changes keeps its new `top` at once, so layout and
 the window stay exact, while a transform plays from where the card was drawn, an interrupted move
 included, back to zero, started in that commit, over `--rail-card-move` and `--ease-standard`. The
 theme sets `--rail-card-move` to `--dur-base`, the sections' own duration, so a card pushed by an

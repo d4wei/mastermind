@@ -4,7 +4,7 @@ import { CardHeightEstimator, placeCommentCards, type RailMeasurement } from '..
 const GAP = 8
 /** A card whose opening message's body starts 60 px below its top, below a quoted passage. */
 const quoted = (anchorTop: number, height: number): RailMeasurement => ({ anchorTop, bodyOffset: 60, height })
-const place = (cards: readonly RailMeasurement[], pivot = -1) => placeCommentCards(cards, pivot, GAP)
+const place = (cards: readonly RailMeasurement[], pivot = -1, bottom = Infinity) => placeCommentCards(cards, pivot, GAP, bottom)
 
 describe('alignment', () => {
   it('puts the opening message\'s body level with the top of its passage', () => {
@@ -48,9 +48,11 @@ describe('stacking', () => {
     for (const spacing of [0, 12, 80, 800]) {
       const cards = heights.map((height, i) => ({ height, anchorTop: i * spacing, bodyOffset: 30 + i * 7 }))
       for (let pivot = -1; pivot < cards.length; pivot++) {
-        const tops = place(cards, pivot)
-        expect(tops[0]).toBeGreaterThanOrEqual(0)
-        for (let i = 1; i < cards.length; i++) expect(tops[i]).toBeGreaterThanOrEqual(tops[i - 1]! + heights[i - 1]! + GAP)
+        for (const bottom of [Infinity, 4000, 1400, 600]) {
+          const tops = place(cards, pivot, bottom)
+          expect(tops[0]).toBeGreaterThanOrEqual(0)
+          for (let i = 1; i < cards.length; i++) expect(tops[i]).toBeGreaterThanOrEqual(tops[i - 1]! + heights[i - 1]! + GAP)
+        }
       }
     }
   })
@@ -97,6 +99,50 @@ describe('the pivot', () => {
     expect(frames.map((tops) => tops[0])).toEqual([100, 100, 100, 100])
     expect(frames.map((tops) => tops[1])).toEqual([508, 358, 300, 300])
     expect(frames.at(-1)).toEqual(place([quoted(160, 100), quoted(360, 60)], 1))
+  })
+})
+
+describe('the document\'s bottom', () => {
+  /** A crowd near a 900 px document's end; unbounded, the cards stack to 956. */
+  const crowd = [quoted(700, 100), quoted(740, 100), quoted(780, 100)]
+
+  it('ends trailing cards at the document\'s bottom instead of passing it', () => {
+    expect(place(crowd)).toEqual([640, 748, 856])
+    expect(place(crowd, -1, 900)).toEqual([584, 692, 800])
+  })
+
+  it('shifts only as many cards as needed, from the last backward', () => {
+    const cards = [quoted(100, 100), quoted(700, 100), quoted(820, 100), quoted(940, 100)]
+    expect(place(cards)).toEqual([40, 640, 760, 880])
+    // The last two cards rise; the card before them already clears them, so nothing earlier moves.
+    expect(place(cards, -1, 960)).toEqual([40, 640, 752, 860])
+  })
+
+  it('grows a selected last card upward at the end, taking earlier cards only as far as needed', () => {
+    const frames = [100, 200, 300, 400].map((height) => place([quoted(300, 100), quoted(500, height)], 1, 700))
+    expect(frames).toEqual([[240, 440], [240, 440], [240, 400], [192, 300]])
+    frames.forEach((tops, i) => expect(tops[1]! + [100, 200, 300, 400][i]!).toBeLessThanOrEqual(700))
+  })
+
+  it('yields the pivot\'s alignment to the bound', () => {
+    const cards = [quoted(300, 100), quoted(600, 100)]
+    expect(place(cards, 1)).toEqual([240, 540])
+    expect(place(cards, 1, 600)).toEqual([240, 500])
+  })
+
+  it('keeps the rail\'s top and order when the cards cannot fit, leaving the overflow at the bottom', () => {
+    expect(place([quoted(200, 100), quoted(220, 100), quoted(240, 100)], -1, 250)).toEqual([0, 108, 216])
+    expect(place([quoted(200, 100), quoted(220, 100), quoted(240, 100)], 2, 250)).toEqual([0, 108, 216])
+    // A card collapsing to 100 px makes room by the height it keeps, and its current height still clears the next.
+    expect(place([{ anchorTop: 100, bodyOffset: 60, height: 300, settledHeight: 100 }, quoted(200, 100)], 1, 150))
+      .toEqual([0, 308])
+  })
+
+  it('leaves cards far from the end unaffected', () => {
+    const cards = [quoted(300, 100), quoted(340, 100), quoted(380, 100), quoted(420, 100), quoted(2000, 100)]
+    for (let pivot = -1; pivot < cards.length; pivot++) expect(place(cards, pivot, 2050)).toEqual(place(cards, pivot))
+    expect(place(cards, -1, 2050)).toEqual([240, 348, 456, 564, 1940])
+    expect(place(cards, -1, 2000)).toEqual([240, 348, 456, 564, 1900])
   })
 })
 
