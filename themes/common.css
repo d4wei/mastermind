@@ -1,23 +1,20 @@
 :where([data-theme]) {
-  --font-display: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-body: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
-  /* The same stacks per CJK language; document content takes them through `:lang()` in ui/app/app.css. */
-  --font-display-zh: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-body-zh: 'Source Serif 4', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
-  --font-mono-zh: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', monospace;
-  --font-display-ja: 'Source Serif 4', 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  --font-body-ja: 'Source Serif 4', 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  --font-mono-ja: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', monospace;
-  --font-display-zh-tw: 'Source Serif 4', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
-  --font-body-zh-tw: 'Source Serif 4', 'Noto Serif TC', 'Songti TC', 'PMingLiU', serif;
-  --font-mono-zh-tw: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', monospace;
-  --font-display-zh-hk: 'Source Serif 4', 'Noto Serif HK', 'Songti TC', 'PMingLiU', serif;
-  --font-body-zh-hk: 'Source Serif 4', 'Noto Serif HK', 'Songti TC', 'PMingLiU', serif;
-  --font-mono-zh-hk: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans HK', 'PingFang HK', 'Microsoft JhengHei', monospace;
-  --font-display-ko: 'Source Serif 4', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
-  --font-body-ko: 'Source Serif 4', 'Noto Serif KR', 'AppleMyungjo', 'Batang', serif;
-  --font-mono-ko: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', monospace;
+  --font-display: 'Source Serif 4', var(--font-cjk-serif), serif;
+  --font-body: 'Source Serif 4', var(--font-cjk-serif), serif;
+  --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, var(--font-cjk-sans), monospace;
+  /* The CJK faces of the default language; document content switches them by `:lang()` in ui/app/app.css. */
+  --font-cjk-serif: var(--font-cjk-serif-zh);
+  --font-cjk-sans: var(--font-cjk-sans-zh);
+  --font-cjk-serif-zh: 'Noto Serif SC', 'Songti SC', 'SimSun';
+  --font-cjk-serif-ja: 'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho';
+  --font-cjk-serif-zh-tw: 'Noto Serif TC', 'Songti TC', 'PMingLiU';
+  --font-cjk-serif-zh-hk: 'Noto Serif HK', 'Songti TC', 'PMingLiU';
+  --font-cjk-serif-ko: 'Noto Serif KR', 'AppleMyungjo', 'Batang';
+  --font-cjk-sans-zh: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei';
+  --font-cjk-sans-ja: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic';
+  --font-cjk-sans-zh-tw: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei';
+  --font-cjk-sans-zh-hk: 'Noto Sans HK', 'PingFang HK', 'Microsoft JhengHei';
+  --font-cjk-sans-ko: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic';
   --font-size-body: 1rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.8125rem;
