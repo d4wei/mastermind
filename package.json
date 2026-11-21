@@ -33,10 +33,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "node tools/desktop/tauri.mjs dev",
+    "dev": "npm run fonts:vendor && node tools/desktop/tauri.mjs dev",
     "desktop:assets": "node --import tsx tools/desktop/build-reviewer.mts",
     "desktop:build": "npm run desktop:assets && node tools/desktop/tauri.mjs build --bundles app -- --locked",
-    "postinstall": "patch-package",
+    "postinstall": "patch-package && npm run fonts:vendor",
     "fonts:vendor": "node --import tsx tools/fonts/vendor-fonts.mts",
     "perf:fixtures": "node tools/perf/fixtures.mjs",
     "perf:document": "node --import tsx tools/perf/document.bench.mts",

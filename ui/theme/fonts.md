@@ -46,13 +46,24 @@ then the sans CJK faces of its language in every preset. The Noto faces ship as 
 `unicode-range` slices, so a document loads only the slices its characters need; the
 [bundled fonts](../../themes/fonts/README.md) describe the files and their provenance.
 
-`--font-display`, `--font-body`, and `--font-mono` carry the default language's stacks, and
-`--font-{display,body,mono}-{zh,ja,zh-tw,zh-hk,ko}` carry each language's. The `:lang()` rules in
-`ui/app/app.css` reset the three base tokens to the default row on each document view root (the
-reading article, the translated view, the source editor) and on each element inside it that
-carries `lang`, then to the row its language matches. Components keep referencing the base tokens.
+The stacks are composed, not listed per language. `themes/common.css` holds each row once, as
+`--font-cjk-serif-{zh,ja,zh-tw,zh-hk,ko}` and `--font-cjk-sans-{…}`, and `--font-cjk-serif` and
+`--font-cjk-sans` name the row in force, the default one at the root. `--font-display`,
+`--font-body`, and `--font-mono` wrap the preset's Latin faces around one of the two: display and
+body take the list of the preset's style, code always the sans list. The `:lang()` rules in
+`ui/app/app.css` switch only the two lists, to the default row on each document view root (the
+reading article, the translated view, the source editor) and on each element inside it that carries
+`lang`, then to the row its language matches. Components keep referencing the three stacks.
 A root without `lang` matches the interface language it inherits from the document element. The
 [document language](../../document/markdown/language.md) says where a document's `lang` comes from.
+
+A custom property substitutes its `var()` references on the element that declares it, and
+descendants inherit the result; a stack declared only on the root would keep the root's lists inside
+a block of another language. `fontStackRule` therefore declares the preset's stacks on the root
+and on every element of `LANGUAGE_SCOPE`, the elements the `:lang()` rules match, and
+[ThemeProvider.tsx](ThemeProvider.tsx) installs it as a `<style>` element. For the same reason an
+element that names its own language declares its `font-family` again: an inherited family is
+computed at the ancestor.
 
 ## Resource packs
 
@@ -95,10 +106,12 @@ bold text, code, and the interface keep their weights.
 ## Defaults and preferences
 
 The first preset is the default, and the base tokens in `themes/common.css` (`--font-display`,
-`--font-body`, `--font-mono` and their per-language forms, `--weight-body`, `--weight-bold`,
-`--ls-heading`, `--weight-code`) match it, so the document renders identically before preferences
-load. [ThemeProvider.tsx](ThemeProvider.tsx) links the bundled `@font-face` sheet once and
-overrides those tokens from the chosen preset; `fontFamilyTokens` lists the family tokens.
+`--font-body`, `--font-mono`, the CJK lists, `--weight-body`, `--weight-bold`, `--ls-heading`,
+`--weight-code`) match it, so interface text that quotes the document renders identically before
+preferences load. [ThemeProvider.tsx](ThemeProvider.tsx) links the bundled `@font-face` sheet once,
+installs the default preset's stack rule at once and the chosen preset's when preferences load, and
+overrides the weight and spacing tokens on the root. The stack rule relies on `style-src
+'unsafe-inline'` as the pack sheets do.
 
 A saved `fontPreset` that names no current preset reads as the default without rewriting the file.
 The retired `monoFont` key is not read; the native host drops it from the next preference write

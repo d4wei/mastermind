@@ -9,10 +9,14 @@ import {
   DEFAULT_FONT_PRESET,
   FONT_FACES_HREF,
   FONT_PRESETS,
+  LANGUAGE_SCOPE,
   bodyStack,
+  cjkListToken,
+  cjkListTokens,
   displayStack,
-  fontFamilyTokens,
   fontPresetById,
+  fontStackRule,
+  fontStackTokens,
   monoStack,
 } from '../ui/theme/fonts'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
@@ -71,30 +75,51 @@ describe('font presets', () => {
     }
   })
 
-  it('emits the default stacks and one set of stacks per language as tokens', () => {
-    const tokens = fontFamilyTokens(fontPresetById('sans'))
-    const preset = fontPresetById('sans')
-    expect(tokens['--font-body']).toBe(bodyStack(preset))
-    expect(tokens['--font-body-ja']).toBe(bodyStack(preset, 'ja'))
-    expect(tokens['--font-display-zh-tw']).toBe(displayStack(preset, 'zh-TW'))
-    expect(tokens['--font-mono-ko']).toBe(monoStack(preset, 'ko'))
-    expect(Object.keys(tokens)).toHaveLength(3 + 3 * CJK_LANGUAGES.length)
-    // Every language token has a `:lang()` rule that swaps it in for document content.
-    const css = readFileSync('ui/app/app.css', 'utf8')
-    for (const name of Object.keys(tokens).filter((token) => /-(zh|ja|zh-tw|zh-hk|ko)$/.test(token))) {
-      const role = name.replace(/-(zh|ja|zh-tw|zh-hk|ko)$/, '')
-      expect(css, name).toContain(`${role}: var(${name});`)
+  it('composes three stacks around the CJK lists of the language in force', () => {
+    const lists = cjkListTokens()
+    expect(Object.keys(lists)).toHaveLength(2 * CJK_LANGUAGES.length)
+    for (const preset of FONT_PRESETS) {
+      const tokens = fontStackTokens(preset)
+      expect(Object.keys(tokens)).toEqual(['--font-display', '--font-body', '--font-mono'])
+      for (const language of CJK_LANGUAGES) {
+        const resolve = (value: string) => value
+          .replace('var(--font-cjk-serif)', lists[cjkListToken('serif', language)]!)
+          .replace('var(--font-cjk-sans)', lists[cjkListToken('sans', language)]!)
+        expect(resolve(tokens['--font-display']!), `${preset.id} ${language}`).toBe(displayStack(preset, language))
+        expect(resolve(tokens['--font-body']!), `${preset.id} ${language}`).toBe(bodyStack(preset, language))
+        expect(resolve(tokens['--font-mono']!), `${preset.id} ${language}`).toBe(monoStack(preset, language))
+      }
     }
   })
 
-  it('matches the base tokens to the default preset, for every language', () => {
+  it('declares the stacks on the elements whose `:lang()` rules switch only the two CJK lists', () => {
+    const scope = `:is(${LANGUAGE_SCOPE.join(', ')})`
+    expect(fontStackRule(DEFAULT_FONT_PRESET).split(' {')[0]).toBe(`:root, ${LANGUAGE_SCOPE.join(', ')}`)
+    const switches = new Map<string, Record<string, string>>()
+    postcss.parse(readFileSync('ui/app/app.css', 'utf8')).walkRules((rule) => {
+      const declared: Record<string, string> = {}
+      rule.walkDecls(/^--font-/, (decl) => { declared[decl.prop] = decl.value })
+      if (Object.keys(declared).length) switches.set(rule.selector, declared)
+    })
+    const rows: Record<string, string> = {
+      '': 'zh', ':lang(ja)': 'ja', ':lang(ko)': 'ko', ':is(:lang(zh-TW), :lang(zh-Hant))': 'zh-TW', ':lang(zh-HK)': 'zh-HK',
+    }
+    expect([...switches.keys()]).toEqual(Object.keys(rows).map((suffix) => `${scope}${suffix}`))
+    for (const [suffix, language] of Object.entries(rows)) {
+      expect(switches.get(`${scope}${suffix}`), language).toEqual({
+        '--font-cjk-serif': `var(${cjkListToken('serif', language as typeof CJK_LANGUAGES[number])})`,
+        '--font-cjk-sans': `var(${cjkListToken('sans', language as typeof CJK_LANGUAGES[number])})`,
+      })
+    }
+  })
+
+  it('matches the base tokens to the default preset, every CJK list included', () => {
     const tokens = declarations(readFileSync('themes/common.css', 'utf8'))
-    for (const [name, value] of Object.entries(fontFamilyTokens(DEFAULT_FONT_PRESET))) {
+    for (const [name, value] of Object.entries({ ...fontStackTokens(DEFAULT_FONT_PRESET), ...cjkListTokens() })) {
       expect(tokens[name], name).toBe(value)
     }
-    expect(tokens['--font-display']).toBe(displayStack(DEFAULT_FONT_PRESET))
-    expect(tokens['--font-body']).toBe(bodyStack(DEFAULT_FONT_PRESET))
-    expect(tokens['--font-mono']).toBe(monoStack(DEFAULT_FONT_PRESET))
+    expect(tokens['--font-cjk-serif']).toBe(`var(${cjkListToken('serif', DEFAULT_CJK_LANGUAGE)})`)
+    expect(tokens['--font-cjk-sans']).toBe(`var(${cjkListToken('sans', DEFAULT_CJK_LANGUAGE)})`)
     expect(tokens['--weight-bold']).toBe(String(DEFAULT_FONT_PRESET.displayWeight))
     expect(tokens['--ls-heading']).toBe(DEFAULT_FONT_PRESET.displayTracking)
     expect(tokens['--weight-code']).toBe(String(DEFAULT_FONT_PRESET.codeWeight))

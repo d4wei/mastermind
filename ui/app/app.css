@@ -539,33 +539,29 @@ button:disabled {
 /* ---------- markdown elements ---------- */
 
 /* Document content takes the faces of its language: each view root, and each element inside it that
-   names its own language, resets the stacks to the default and then to its `:lang()` row. A root
-   without `lang` matches the interface language it inherits. */
+   names its own language, resets the CJK lists to the default row and then to its `:lang()` row. A
+   root without `lang` matches the interface language it inherits. The stacks that compose these
+   lists are declared on the same elements by the preset's rule (ui/theme/fonts.ts). */
 :is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]) {
-  --font-display: var(--font-display-zh);
-  --font-body: var(--font-body-zh);
-  --font-mono: var(--font-mono-zh);
+  --font-cjk-serif: var(--font-cjk-serif-zh);
+  --font-cjk-sans: var(--font-cjk-sans-zh);
 }
 :is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ja) {
-  --font-display: var(--font-display-ja);
-  --font-body: var(--font-body-ja);
-  --font-mono: var(--font-mono-ja);
+  --font-cjk-serif: var(--font-cjk-serif-ja);
+  --font-cjk-sans: var(--font-cjk-sans-ja);
 }
 :is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(ko) {
-  --font-display: var(--font-display-ko);
-  --font-body: var(--font-body-ko);
-  --font-mono: var(--font-mono-ko);
+  --font-cjk-serif: var(--font-cjk-serif-ko);
+  --font-cjk-sans: var(--font-cjk-sans-ko);
 }
 :is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):is(:lang(zh-TW), :lang(zh-Hant)) {
-  --font-display: var(--font-display-zh-tw);
-  --font-body: var(--font-body-zh-tw);
-  --font-mono: var(--font-mono-zh-tw);
+  --font-cjk-serif: var(--font-cjk-serif-zh-tw);
+  --font-cjk-sans: var(--font-cjk-sans-zh-tw);
 }
 /* After Traditional, so `zh-Hant-HK` takes the Hong Kong row where `:lang()` matches it. */
 :is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(zh-HK) {
-  --font-display: var(--font-display-zh-hk);
-  --font-body: var(--font-body-zh-hk);
-  --font-mono: var(--font-mono-zh-hk);
+  --font-cjk-serif: var(--font-cjk-serif-zh-hk);
+  --font-cjk-sans: var(--font-cjk-sans-zh-hk);
 }
 
 .md-root {

@@ -7,8 +7,9 @@ network use. The renderer decides when a pack is needed, as the
 
 ## The request
 
-[`themes/fonts/packs/manifest.json`](../../themes/fonts/README.md#resource-packs) is compiled into
-the binary. Each entry names an exact package version, its fixed address (the npm registry's tarball
+[`themes/fonts/packs/manifest.json`](../../themes/fonts/README.md#resource-packs), which `npm ci`
+generates from the lockfile, is compiled into the binary; `build.rs` stops the build with the
+command to run when it is missing. Each entry names an exact package version, its fixed address (the npm registry's tarball
 for that version, an `https://registry.npmjs.org/` URL), the registry's `sha512` integrity, and the
 woff2 files to keep. The renderer passes a pack name only, and an unknown name is refused; the host
 sends one GET to that entry's address with the HTTP client's default headers. Nothing about a

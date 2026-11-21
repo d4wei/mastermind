@@ -8,7 +8,7 @@ import { useConfig } from '../ui/app/configStore'
 import { installHost } from '../ui/app/host'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { ThemeEffects } from '../ui/theme/ThemeProvider'
-import { FONT_FACES_HREF, fontFamilyTokens, fontPresetById, monoStack } from '../ui/theme/fonts'
+import { DEFAULT_FONT_PRESET, FONT_FACES_HREF, fontPresetById, fontStackRule } from '../ui/theme/fonts'
 import { fakeHost } from './helpers/host'
 import { declarations } from './helpers/themes'
 
@@ -80,19 +80,25 @@ it('loads the bundled faces once and applies the chosen preset, code face includ
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('matchMedia', () => ({ matches: false }))
   installHost(fakeHost())
-  useConfig.setState({ config: { ...DEFAULT_CONFIG, fontPreset: 'hyperlegible' }, themes: [] })
+  useConfig.setState({ config: null, themes: [] })
   const root = createRoot(document.createElement('div'))
   act(() => root.render(<ThemeEffects />))
+  const stacks = () => document.head.querySelectorAll('style#theme-font-stacks')
+  // The default preset's stacks apply before preferences load.
+  expect(stacks()).toHaveLength(1)
+  expect(stacks()[0]!.textContent).toBe(fontStackRule(DEFAULT_FONT_PRESET))
+  act(() => useConfig.setState({ config: { ...DEFAULT_CONFIG, fontPreset: 'hyperlegible' } }))
   act(() => root.render(<ThemeEffects />))
   const style = document.documentElement.style
   const preset = fontPresetById('hyperlegible')
   expect(Array.from(document.head.querySelectorAll('link[rel="stylesheet"]'), (link) => link.getAttribute('href')))
     .toContain(FONT_FACES_HREF)
   expect(document.head.querySelectorAll(`link[href="${FONT_FACES_HREF}"]`)).toHaveLength(1)
-  expect(style.getPropertyValue('--font-body')).toContain("'Atkinson Hyperlegible Next', 'Noto Sans SC'")
-  expect(style.getPropertyValue('--font-mono')).toBe(monoStack(preset))
-  for (const [name, value] of Object.entries(fontFamilyTokens(preset))) expect(style.getPropertyValue(name), name).toBe(value)
-  expect(style.getPropertyValue('--font-body-ja')).toContain("'Atkinson Hyperlegible Next', 'Noto Sans JP'")
+  expect(stacks()).toHaveLength(1)
+  expect(stacks()[0]!.textContent).toBe(fontStackRule(preset))
+  expect(stacks()[0]!.textContent).toContain("--font-body: 'Atkinson Hyperlegible Next', var(--font-cjk-sans), sans-serif;")
+  expect(stacks()[0]!.textContent).toContain("--font-mono: 'Atkinson Hyperlegible Mono', ui-monospace")
+  expect(style.getPropertyValue('--font-body')).toBe('')
   expect(style.getPropertyValue('--weight-code')).toBe(String(preset.codeWeight))
   expect(style.getPropertyValue('--weight-bold')).toBe(String(preset.displayWeight))
   act(() => root.unmount())
