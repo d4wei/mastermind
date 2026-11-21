@@ -28,6 +28,9 @@ if (!chromePath) {
   process.exit(1)
 }
 
+// The page links the generated face sheet, which an install that skipped its scripts lacks.
+execFileSync(process.execPath, ['--import', 'tsx', join(repo, 'tools/fonts/vendor-fonts.mts')], { cwd: repo, stdio: 'inherit' })
+
 await build({
   configFile: false,
   root: here,

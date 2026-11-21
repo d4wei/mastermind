@@ -21,6 +21,10 @@ node_modules/
 /mastermind-demo.md
 /roadmap-demo.md
 
+# Fonts, face sheets and pack manifest generated from the pinned packages (themes/fonts/README.md)
+/themes/fonts/*
+!/themes/fonts/README.md
+
 # Performance fixtures, builds, run state and results (tools/perf/README.md)
 /tools/perf/fixtures/
 /tools/perf/.build/

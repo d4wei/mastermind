@@ -14,6 +14,7 @@ on:
       - 'document/**'
       - 'tools/translation/**'
       - 'themes/**'
+      - 'tools/fonts/**'
       - 'package-lock.json'
 permissions:
   contents: read
@@ -46,6 +47,8 @@ jobs:
           npm ci --ignore-scripts
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npx --no-install patch-package
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node --import tsx tools/fonts/vendor-fonts.mts
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node --import tsx tools/desktop/build-reviewer.mts
           exit $LASTEXITCODE

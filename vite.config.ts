@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { isThemeAsset, resolveThemeAsset, scanThemes } from './themes/discovery'
+import { ensureVendoredFonts } from './tools/fonts/vendor-fonts.mjs'
 
 const root = import.meta.dirname
 const themesDir = path.join(root, 'themes')
@@ -19,6 +20,8 @@ const CONTENT_TYPES: Record<string, string> = {
 function themeAssets(): Plugin {
   return {
     name: 'mastermind-theme-assets',
+    // The fonts under `themes/fonts/` are generated from the pinned packages, not committed.
+    async buildStart() { await ensureVendoredFonts(root) },
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
         const pathname = new URL(request.url ?? '/', 'http://localhost').pathname

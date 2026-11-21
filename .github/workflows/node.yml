@@ -10,6 +10,7 @@ on:
       - 'tests/**'
       - 'themes/**'
       - 'tools/desktop/build-reviewer.mts'
+      - 'tools/fonts/**'
       - 'tools/translation/**'
       - 'ui/**'
       - 'package.json'
@@ -34,5 +35,7 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npx --no-install patch-package
+      # The install skipped scripts, so generate the fonts its postinstall would have.
+      - run: npm run fonts:vendor
       - run: npm run typecheck
       - run: npm test

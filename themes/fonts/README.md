@@ -2,14 +2,20 @@
 
 The faces of the [font presets](../../ui/theme/fontRegistry.ts) ship here, with the CJK faces of the
 interface languages, Simplified Chinese and Japanese; the faces of the other CJK languages arrive as
-resource packs. `npm run fonts:vendor` regenerates this directory, except this file, from the
-exact-pinned `@fontsource-variable/*` devDependencies in [package.json](../../package.json): it
-copies each bundled package's variable woff2 slices and licence, and writes [faces.css](faces.css),
-which stamps each family's package version and keeps the package's `unicode-range` slices, so a
-document loads only the slices its characters need. Do not edit the generated files; change the
-family lists in [vendor-fonts.mts](../../tools/fonts/vendor-fonts.mts) and rerun it.
-`tests/fonts-vendored.test.ts` checks the committed files against the installed packages and the
-lockfile, without the network.
+resource packs. Everything in this directory except this file is generated and git-ignored: the
+exact-pinned `@fontsource-variable/*` devDependencies in [package.json](../../package.json), which
+`npm ci` installs, are the source. [vendor-fonts.mts](../../tools/fonts/vendor-fonts.mts) copies each
+bundled package's variable woff2 slices and its licence as `OFL.txt`, and writes `faces.css`, which
+stamps each family's package version and keeps the package's `unicode-range` slices, so a document
+loads only the slices its characters need. To change what ships, change the family lists in the
+script.
+
+The script runs after `npm ci` as the `postinstall` step, and again, doing nothing when the
+directory is already current for the installed packages, before the tests, the Vite build and dev
+server, `npm run dev`, and the session benchmark; `npm run fonts:vendor` runs it by hand. The desktop
+crate compiles in the pack manifest and stops with an error naming that command when it is missing.
+`tests/fonts-vendored.test.ts` checks the generator's output against the installed packages and
+the lockfile, without the network.
 
 ## Resource packs
 
@@ -17,12 +23,12 @@ Noto Serif and Sans TC, HK, and KR are packs: their font files are never committ
 the desktop host fetches each one the first time a document needs it, as the
 [pack fetcher](../../desktop/src/font_packs.md) describes. The script writes, under `packs/`, one
 sheet per pack, `@font-face` rules with the package's `unicode-range` slices whose URLs are bare
-file names the reviewer resolves to the pack cache, and [manifest.json](packs/manifest.json), one
+file names the reviewer resolves to the pack cache, and `packs/manifest.json`, one
 entry per pack: the family, the package and exact version (the version line the bundled Noto
 families pin), the registry tarball address and the registry's `sha512` integrity, both read from
 `package-lock.json`, the sheet, and the font files to keep from the tarball. The pack packages are
-devDependencies only so that this regeneration and its test run offline; `npm ci` checks the same
-hash on install.
+devDependencies only so that generation and its test run offline; `npm ci` checks the same hash on
+install.
 
 | Directory | Family | Package | Axes, styles |
 | --- | --- | --- | --- |
@@ -36,5 +42,6 @@ hash on install.
 | `noto-serif-jp/` | Noto Serif JP | `@fontsource-variable/noto-serif-jp` | weight; roman |
 | `noto-sans-jp/` | Noto Sans JP | `@fontsource-variable/noto-sans-jp` | weight; roman |
 
-Every family is licensed under the SIL Open Font License 1.1; each directory's `OFL.txt` carries
-the copyright notice and licence text, and ships beside the fonts in the app bundle.
+Every family is licensed under the SIL Open Font License 1.1; each directory's `OFL.txt`, the
+package's `LICENSE`, carries the copyright notice and licence text, and ships beside the fonts in the
+app bundle.

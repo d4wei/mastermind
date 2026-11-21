@@ -29,8 +29,8 @@ export const VENDORED_FAMILIES: VendoredFamily[] = [
 /**
  * The leading faces of the CJK stacks in `ui/theme/fontRegistry.ts` that are not bundled: resource
  * packs the desktop host fetches on first need. Only their sheets and manifest entries are
- * committed; the pinned devDependencies supply the sheets and the lockfile supplies the address
- * and hash, so regenerating needs no network.
+ * generated; the pinned devDependencies supply the sheets and the lockfile supplies the address
+ * and hash, so generating needs no network.
  */
 export const PACK_FAMILIES: VendoredFamily[] = [
   { family: 'Noto Serif TC', pkg: '@fontsource-variable/noto-serif-tc', sheets: ['wght.css'] },
@@ -46,7 +46,7 @@ export const FACES_SHEET = 'faces.css'
 /** The directory of pack sheets and their manifest, relative to the vendored fonts directory. */
 export const PACKS_DIR = 'packs'
 export const PACK_MANIFEST = 'manifest.json'
-/** Vendored files the generator does not own. */
+/** The files of the fonts directory the generator does not own; the rest is git-ignored. */
 const HAND_WRITTEN = new Set(['README.md'])
 
 /**
@@ -153,8 +153,9 @@ export async function vendoredFonts(nodeModules: string,
 }
 
 /** Replaces the generated contents of `fontsDir` with the vendored set and the pack sheets. */
-export async function writeVendoredFonts(nodeModules: string, fontsDir: string): Promise<void> {
-  const { files, css, packSheets, manifest } = await vendoredFonts(nodeModules)
+export async function writeVendoredFonts(nodeModules: string, fontsDir: string,
+  generated?: VendoredFonts): Promise<void> {
+  const { files, css, packSheets, manifest } = generated ?? await vendoredFonts(nodeModules)
   await fs.mkdir(fontsDir, { recursive: true })
   for (const entry of await fs.readdir(fontsDir)) {
     if (!HAND_WRITTEN.has(entry)) await fs.rm(path.join(fontsDir, entry), { recursive: true })
@@ -169,7 +170,56 @@ export async function writeVendoredFonts(nodeModules: string, fontsDir: string):
   await fs.writeFile(path.join(fontsDir, PACKS_DIR, PACK_MANIFEST), manifest)
 }
 
+async function readOrNull(file: string): Promise<string | null> {
+  try { return await fs.readFile(file, 'utf8') } catch { return null }
+}
+
+/**
+ * Whether `fontsDir` holds exactly what `generated` names: the same files, the same text for the
+ * sheets and manifest, and each font file at its package file's size. The sheets stamp every
+ * package version, so a new pin changes their text; sizes stand in for bytes to keep the check fast.
+ */
+export async function vendoredFontsCurrent(fontsDir: string, generated: VendoredFonts): Promise<boolean> {
+  const { files, css, packSheets, manifest } = generated
+  const texts = new Map<string, string>([[FACES_SHEET, css], ...packSheets, [`${PACKS_DIR}/${PACK_MANIFEST}`, manifest]])
+  let present: string[]
+  try {
+    present = (await fs.readdir(fontsDir, { recursive: true, withFileTypes: true }))
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.relative(fontsDir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+      .filter((rel) => !HAND_WRITTEN.has(rel))
+  } catch {
+    return false
+  }
+  if (present.length !== files.size + texts.size || present.some((rel) => !files.has(rel) && !texts.has(rel))) return false
+  for (const [target, text] of texts) if (await readOrNull(path.join(fontsDir, target)) !== text) return false
+  for (const [target, source] of files) {
+    const [copy, original] = await Promise.all([fs.stat(path.join(fontsDir, target)), fs.stat(source)])
+    if (copy.size !== original.size) return false
+  }
+  return true
+}
+
+/**
+ * Generates `themes/fonts/` under `root` unless it is already current for the installed packages,
+ * and reports which. Each entry point that reads the generated files calls it: the install script,
+ * the test setup, the Vite build and dev server, and the session benchmark.
+ */
+export async function ensureVendoredFonts(root: string): Promise<'current' | 'generated'> {
+  const nodeModules = path.join(root, 'node_modules')
+  const fontsDir = path.join(root, 'themes/fonts')
+  let generated: VendoredFonts
+  try {
+    generated = await vendoredFonts(nodeModules, path.join(root, 'package-lock.json'))
+  } catch (error) {
+    throw new Error(`Cannot read the pinned font packages; run \`npm ci\` in ${root}.`, { cause: error })
+  }
+  if (await vendoredFontsCurrent(fontsDir, generated)) return 'current'
+  await writeVendoredFonts(nodeModules, fontsDir, generated)
+  return 'generated'
+}
+
 if (import.meta.filename === process.argv[1]) {
-  const root = path.resolve(import.meta.dirname, '../..')
-  await writeVendoredFonts(path.join(root, 'node_modules'), path.join(root, 'themes/fonts'))
+  const outcome = await ensureVendoredFonts(path.resolve(import.meta.dirname, '../..'))
+  console.log(outcome === 'current' ? 'themes/fonts is current.' : 'Generated themes/fonts from the pinned font packages.')
 }
