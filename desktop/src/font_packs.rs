@@ -6,7 +6,7 @@ use std::{
     io::{self, Read},
     path::{Path, PathBuf},
     sync::{
-        Arc, Condvar, Mutex, OnceLock,
+        Arc, Condvar, Mutex, OnceLock, PoisonError,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
@@ -16,17 +16,17 @@ use std::{
 const MANIFEST: &str = include_str!("../../themes/fonts/packs/manifest.json");
 
 /// The largest tarball the host downloads.
-pub const MAX_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_BYTES: u64 = 32 * 1024 * 1024;
 /// How long one download may take, from connecting to the last byte.
-pub const TIMEOUT: Duration = Duration::from_secs(120);
+const TIMEOUT: Duration = Duration::from_secs(120);
 
 /// One pack as the manifest names it; the manifest's other fields serve the renderer.
 #[derive(serde::Deserialize, Clone, Debug)]
-pub struct Pack {
-    pub version: String,
-    pub url: String,
-    pub integrity: String,
-    pub files: Vec<String>,
+struct Pack {
+    version: String,
+    url: String,
+    integrity: String,
+    files: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -44,7 +44,7 @@ fn plain_file_name(name: &str) -> bool {
 }
 
 /// The packs compiled into this build, by name.
-pub fn manifest() -> &'static BTreeMap<String, Pack> {
+fn manifest() -> &'static BTreeMap<String, Pack> {
     static PACKS: OnceLock<BTreeMap<String, Pack>> = OnceLock::new();
     PACKS.get_or_init(|| {
         let manifest: Manifest = serde_json::from_str(MANIFEST).expect("pack manifest parses");
@@ -60,13 +60,27 @@ pub fn manifest() -> &'static BTreeMap<String, Pack> {
     })
 }
 
-/// What a request for a pack came to. `Offline` means the network did not answer; `Failed` means
-/// it answered with something the host refused.
-#[derive(Clone, Debug, PartialEq)]
+/// What a request for a pack came to, as the renderer receives it. `Offline` means the network
+/// did not answer; `Failed` means it answered with something the host refused. `directory` ends
+/// with the platform's separator, so a file name appended to it is the file's path.
+#[derive(serde::Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "status", rename_all = "snake_case")]
 pub enum Outcome {
-    Ready(PathBuf),
+    Ready { directory: String },
     Offline,
     Failed,
+}
+
+impl Outcome {
+    /// A pack directory whose path is not text cannot be named to the renderer, so it fails.
+    fn ready(directory: &Path) -> Self {
+        match directory.to_str() {
+            Some(path) => Outcome::Ready {
+                directory: format!("{path}{}", std::path::MAIN_SEPARATOR),
+            },
+            None => Outcome::Failed,
+        }
+    }
 }
 
 enum Failure {
@@ -87,12 +101,47 @@ struct Flight {
     done: Condvar,
 }
 
+type Flights = Mutex<HashMap<String, Arc<Flight>>>;
+
+/// Ends a flight however its leader leaves it, by returning or by unwinding: stores the outcome,
+/// `Failed` unless the leader set another, wakes the waiters, and removes the flight so the next
+/// request starts afresh.
+struct Landing<'a> {
+    flights: &'a Flights,
+    name: &'a str,
+    flight: Arc<Flight>,
+    outcome: Outcome,
+}
+
+impl Drop for Landing<'_> {
+    fn drop(&mut self) {
+        let outcome = std::mem::replace(&mut self.outcome, Outcome::Failed);
+        // This runs while unwinding too, where a second panic would abort the host.
+        *self
+            .flight
+            .outcome
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(outcome);
+        self.flight.done.notify_all();
+        self.flights
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(self.name);
+    }
+}
+
+/// A response body and the SHA-512 digest computed while reading it.
+struct Body {
+    bytes: Vec<u8>,
+    digest: Vec<u8>,
+}
+
 /// The pack cache under `root`, and the downloads in progress.
 pub struct Packs {
     root: PathBuf,
     max_bytes: u64,
     timeout: Duration,
-    flights: Mutex<HashMap<String, Arc<Flight>>>,
+    flights: Flights,
 }
 
 impl Packs {
@@ -116,7 +165,7 @@ impl Packs {
 
     /// The pack's directory when it holds every file the pack keeps; entries appear only by a
     /// rename after verification.
-    pub fn cached(&self, name: &str, pack: &Pack) -> Option<PathBuf> {
+    fn cached(&self, name: &str, pack: &Pack) -> Option<PathBuf> {
         let directory = self.directory(name, pack);
         pack.files
             .iter()
@@ -126,10 +175,32 @@ impl Packs {
 
     /// The pack, from the cache or else from one download shared by every concurrent request.
     /// A failed download is not remembered: the next request tries again.
-    pub fn get(&self, name: &str, pack: &Pack) -> Outcome {
+    fn get(&self, name: &str, pack: &Pack) -> Outcome {
         if let Some(directory) = self.cached(name, pack) {
-            return Outcome::Ready(directory);
+            return Outcome::ready(&directory);
         }
+        self.shared(name, || {
+            // A download that finished between the cache check and this one's start left its pack.
+            if let Some(directory) = self.cached(name, pack) {
+                return Outcome::ready(&directory);
+            }
+            match self.download(name, pack) {
+                Ok(directory) => Outcome::ready(&directory),
+                Err(Failure::Offline(reason)) => {
+                    eprintln!("Font pack {name} is unavailable offline: {reason}");
+                    Outcome::Offline
+                }
+                Err(Failure::Failed(reason)) => {
+                    eprintln!("Font pack {name} could not be fetched: {reason}");
+                    Outcome::Failed
+                }
+            }
+        })
+    }
+
+    /// The outcome of `lead`, which only the first of the concurrent requests for `name` runs; the
+    /// others wait for its outcome and share it.
+    fn shared(&self, name: &str, lead: impl FnOnce() -> Outcome) -> Outcome {
         let (flight, leads) = {
             let mut flights = self.flights.lock().unwrap();
             match flights.get(name) {
@@ -148,36 +219,25 @@ impl Packs {
             }
             return outcome.clone().unwrap();
         }
-        // A download that finished between the cache check and this one's start left its pack.
-        let outcome = match self.cached(name, pack) {
-            Some(directory) => Outcome::Ready(directory),
-            None => match self.download(name, pack) {
-                Ok(directory) => Outcome::Ready(directory),
-                Err(Failure::Offline(reason)) => {
-                    eprintln!("Font pack {name} is unavailable offline: {reason}");
-                    Outcome::Offline
-                }
-                Err(Failure::Failed(reason)) => {
-                    eprintln!("Font pack {name} could not be fetched: {reason}");
-                    Outcome::Failed
-                }
-            },
+        let mut landing = Landing {
+            flights: &self.flights,
+            name,
+            flight,
+            outcome: Outcome::Failed,
         };
-        *flight.outcome.lock().unwrap() = Some(outcome.clone());
-        flight.done.notify_all();
-        self.flights.lock().unwrap().remove(name);
-        outcome
+        landing.outcome = lead();
+        landing.outcome.clone()
     }
 
     fn download(&self, name: &str, pack: &Pack) -> Result<PathBuf, Failure> {
-        let bytes = self.fetch(pack)?;
-        verify(&bytes, &pack.integrity)?;
-        self.unpack(name, pack, &bytes)
+        let body = self.fetch(pack)?;
+        verify(&body.digest, &pack.integrity)?;
+        self.unpack(name, pack, &body.bytes)
     }
 
     /// The body of one GET to the pack's address. The request carries no cookies, credentials, or
     /// headers beyond the client's defaults; no redirect is followed.
-    fn fetch(&self, pack: &Pack) -> Result<Vec<u8>, Failure> {
+    fn fetch(&self, pack: &Pack) -> Result<Body, Failure> {
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .max_redirects(0)
             .http_status_as_error(false)
@@ -195,24 +255,33 @@ impl Packs {
         if status != 200 {
             return Err(Failure::Failed(format!("status {status}")));
         }
-        if response
-            .body()
-            .content_length()
-            .is_some_and(|length| length > self.max_bytes)
-        {
+        let declared = response.body().content_length();
+        if declared.is_some_and(|length| length > self.max_bytes) {
             return Err(Failure::Failed("larger than the size cap".into()));
         }
-        let mut bytes = Vec::new();
-        response
-            .into_body()
-            .into_reader()
-            .take(self.max_bytes + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|error| Failure::Offline(error.to_string()))?;
+        // The declared length, already within the cap, only sizes the buffer; the cap holds again
+        // while reading.
+        let mut bytes = Vec::with_capacity(declared.unwrap_or(0) as usize);
+        let mut hasher = Sha512::new();
+        let mut reader = response.into_body().into_reader().take(self.max_bytes + 1);
+        let mut chunk = vec![0; 64 * 1024];
+        loop {
+            let read = match reader.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(read) => read,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(Failure::Offline(error.to_string())),
+            };
+            hasher.update(&chunk[..read]);
+            bytes.extend_from_slice(&chunk[..read]);
+        }
         if bytes.len() as u64 > self.max_bytes {
             return Err(Failure::Failed("larger than the size cap".into()));
         }
-        Ok(bytes)
+        Ok(Body {
+            bytes,
+            digest: hasher.finalize().to_vec(),
+        })
     }
 
     /// Writes the pack's files into a hidden directory beside the cache entry, then renames it into
@@ -247,8 +316,8 @@ impl Packs {
     }
 }
 
-/// Checks `bytes` against a `sha512-` Subresource Integrity string.
-fn verify(bytes: &[u8], integrity: &str) -> Result<(), Failure> {
+/// Checks a body's SHA-512 `digest` against a `sha512-` Subresource Integrity string.
+fn verify(digest: &[u8], integrity: &str) -> Result<(), Failure> {
     let expected = integrity
         .strip_prefix("sha512-")
         .and_then(|digest| {
@@ -257,7 +326,7 @@ fn verify(bytes: &[u8], integrity: &str) -> Result<(), Failure> {
                 .ok()
         })
         .ok_or_else(|| Failure::Failed("the manifest's integrity is not sha512".into()))?;
-    if Sha512::digest(bytes).as_slice() != expected.as_slice() {
+    if digest != expected.as_slice() {
         return Err(Failure::Failed("hash mismatch".into()));
     }
     Ok(())
@@ -297,34 +366,12 @@ fn extract(bytes: &[u8], pack: &Pack, into: &Path) -> Result<(), Failure> {
     Ok(())
 }
 
-/// The renderer's view of an outcome. `directory` ends with the platform's separator, so a file
-/// name appended to it is the file's path.
-#[derive(serde::Serialize, Debug, PartialEq)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum Reply {
-    Ready { directory: String },
-    Offline,
-    Failed,
-}
-
-impl From<Outcome> for Reply {
-    fn from(outcome: Outcome) -> Self {
-        match outcome {
-            Outcome::Ready(directory) => match directory.to_str() {
-                Some(path) => Reply::Ready {
-                    directory: format!("{path}{}", std::path::MAIN_SEPARATOR),
-                },
-                None => Reply::Failed,
-            },
-            Outcome::Offline => Reply::Offline,
-            Outcome::Failed => Reply::Failed,
-        }
-    }
-}
-
 /// The renderer asks for a pack by name; nothing about a document is part of the request.
 #[tauri::command]
-pub async fn font_pack(name: String, packs: tauri::State<'_, Arc<Packs>>) -> Result<Reply, String> {
+pub async fn font_pack(
+    name: String,
+    packs: tauri::State<'_, Arc<Packs>>,
+) -> Result<Outcome, String> {
     let pack = manifest()
         .get(&name)
         .cloned()
@@ -333,7 +380,6 @@ pub async fn font_pack(name: String, packs: tauri::State<'_, Arc<Packs>>) -> Res
     // A download waits on the network, not the filesystem, so it stays off the document lanes.
     tauri::async_runtime::spawn_blocking(move || packs.get(&name, &pack))
         .await
-        .map(Reply::from)
         .map_err(|error| error.to_string())
 }
 
@@ -461,10 +507,9 @@ mod tests {
         pack.url = server.url.clone();
         let cache = TempDir::new("packs-success");
         let packs = Packs::new(cache.join("font-packs"));
-        let Outcome::Ready(directory) = packs.get("demo", &pack) else {
-            panic!("expected the pack");
-        };
-        assert_eq!(directory, cache.join("font-packs/demo-5.3.1"));
+        let directory = cache.join("font-packs/demo-5.3.1");
+        let outcome = packs.get("demo", &pack);
+        assert_eq!(outcome, Outcome::ready(&directory));
         assert_eq!(entries(&cache.join("font-packs")), ["demo-5.3.1"]);
         assert_eq!(entries(&directory), pack.files);
         assert_eq!(
@@ -472,10 +517,10 @@ mod tests {
             b"one"
         );
         // A second request reads the cache.
-        assert_eq!(packs.get("demo", &pack), Outcome::Ready(directory.clone()));
+        assert_eq!(packs.get("demo", &pack), outcome);
         assert_eq!(server.connections.load(Ordering::SeqCst), 1);
         assert_eq!(
-            serde_json::to_value(Reply::from(Outcome::Ready(directory.clone()))).unwrap(),
+            serde_json::to_value(outcome).unwrap(),
             serde_json::json!({
                 "status": "ready",
                 "directory": format!("{}{}", directory.to_str().unwrap(), std::path::MAIN_SEPARATOR)
@@ -495,7 +540,7 @@ mod tests {
         assert_eq!(packs.get("demo", &pack), Outcome::Failed);
         assert!(!cache.join("font-packs").exists());
         assert_eq!(
-            serde_json::to_value(Reply::from(Outcome::Failed)).unwrap()["status"],
+            serde_json::to_value(Outcome::Failed).unwrap()["status"],
             "failed"
         );
     }
@@ -601,13 +646,13 @@ mod tests {
         assert_eq!(packs.get("demo", &pack), Outcome::Offline);
         assert!(!cache.join("font-packs").exists());
         assert_eq!(
-            serde_json::to_value(Reply::from(Outcome::Offline)).unwrap()["status"],
+            serde_json::to_value(Outcome::Offline).unwrap()["status"],
             "offline"
         );
         // The network returns: nothing about the failure was remembered.
         let body = ok(&archive);
         pack.url = serve(move |stream| stream.write_all(&body).unwrap()).url;
-        assert!(matches!(packs.get("demo", &pack), Outcome::Ready(_)));
+        assert!(matches!(packs.get("demo", &pack), Outcome::Ready { .. }));
     }
 
     #[test]
@@ -632,9 +677,53 @@ mod tests {
         assert!(
             outcomes
                 .iter()
-                .all(|outcome| *outcome == Outcome::Ready(cache.join("font-packs/demo-5.3.1")))
+                .all(|outcome| *outcome == Outcome::ready(&cache.join("font-packs/demo-5.3.1")))
         );
         assert_eq!(server.connections.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_panicking_download_releases_the_requests_waiting_on_it() {
+        let cache = TempDir::new("packs-panic");
+        let packs = Arc::new(Packs::new(cache.join("font-packs")));
+        let (started, leading) = mpsc::channel::<()>();
+        let (release, released) = mpsc::channel::<()>();
+        let leader = {
+            let packs = packs.clone();
+            thread::spawn(move || {
+                packs.shared("demo", || {
+                    started.send(()).unwrap();
+                    released.recv().unwrap();
+                    panic!("the download panicked");
+                })
+            })
+        };
+        leading.recv_timeout(Duration::from_secs(5)).unwrap();
+        // Run only by a request that leads a flight of its own.
+        let follower = {
+            let packs = packs.clone();
+            thread::spawn(move || packs.shared("demo", || Outcome::Offline))
+        };
+        // The follower has joined the flight once it holds a reference beside the map's and the
+        // leader's.
+        let joined = std::time::Instant::now();
+        while packs
+            .flights
+            .lock()
+            .unwrap()
+            .get("demo")
+            .map(Arc::strong_count)
+            != Some(3)
+        {
+            assert!(joined.elapsed() < Duration::from_secs(5));
+            thread::sleep(Duration::from_millis(1));
+        }
+        release.send(()).unwrap();
+        assert!(leader.join().is_err());
+        assert_eq!(follower.join().unwrap(), Outcome::Failed);
+        assert!(packs.flights.lock().unwrap().is_empty());
+        // The next request leads a new flight.
+        assert_eq!(packs.shared("demo", || Outcome::Offline), Outcome::Offline);
     }
 
     #[test]
@@ -648,14 +737,14 @@ mod tests {
         }
         pack.url = closed_port();
         let packs = Packs::new(cache.join("font-packs"));
-        assert_eq!(packs.get("demo", &pack), Outcome::Ready(directory.clone()));
+        assert_eq!(packs.get("demo", &pack), Outcome::ready(&directory));
         // An entry missing a file is not a pack; it is fetched again and replaced whole.
         fs::remove_file(directory.join(&pack.files[0])).unwrap();
         assert_eq!(packs.cached("demo", &pack), None);
         let body = ok(&archive);
         let server = serve(move |stream| stream.write_all(&body).unwrap());
         pack.url = server.url;
-        assert_eq!(packs.get("demo", &pack), Outcome::Ready(directory.clone()));
+        assert_eq!(packs.get("demo", &pack), Outcome::ready(&directory));
         assert_eq!(fs::read(directory.join(&pack.files[1])).unwrap(), b"one");
     }
 
@@ -691,7 +780,7 @@ mod tests {
         assert_eq!(packs.cached("demo", &pack), None);
         assert!(!cache.join("font-packs/demo-5.3.1").exists());
         resume.send(()).unwrap();
-        assert!(matches!(downloading.join().unwrap(), Outcome::Ready(_)));
+        assert!(matches!(downloading.join().unwrap(), Outcome::Ready { .. }));
 
         // An archive whose hash matches but lacks a kept file leaves neither the entry nor a
         // partial directory behind, and a crashed run's partial directory is cleared.
