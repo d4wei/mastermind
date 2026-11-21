@@ -17,12 +17,12 @@ document, a path, or the reader is in it, and the address does not vary.
 
 No redirect is followed: a 3xx, like any status but 200, fails the request. The body is capped at
 `MAX_BYTES`, by its declared length and again while reading, and the whole exchange at `TIMEOUT`.
-The body is held in memory and checked against the integrity before anything is written. Only then
-are the kept files copied out of the tarball's `package/files/` into a hidden directory beside the
-cache entry, which is renamed into place once every kept file is present; other archive entries,
-links, and names outside the list are skipped. A partial pack is therefore never at the entry's
-path, and a failure removes the hidden directory. A hidden directory a crashed run left is removed
-at the pack's next download.
+The body is hashed as it is read, held in memory, and checked against the integrity before anything
+is written. Only then are the kept files copied out of the tarball's `package/files/` into a hidden
+directory beside the cache entry, which is renamed into place once every kept file is present; other
+archive entries, links, and names outside the list are skipped. A partial pack is therefore never at
+the entry's path, and a failure removes the hidden directory. A hidden directory a crashed run left
+is removed at the pack's next download.
 
 ## The cache
 
@@ -39,14 +39,14 @@ answered at once, with no request, including one an earlier launch fetched.
 when the network did not answer (no route, refused connection, unresolved host, a timeout, or a
 connection lost mid-body); or `failed` when it answered with something refused (a status other than
 200, a redirect, an oversize body, a hash mismatch, or an archive lacking a kept file). Concurrent
-requests for one pack wait on one download and share its outcome. A failure is not remembered: the
-next request downloads again, and the host never retries on its own. The download runs on a blocking
-thread outside the [document lanes](worker.md), since it waits on the network rather than the
-filesystem.
+requests for one pack wait on one download and share its outcome; a download that panics ends as
+`failed` for each of them. A failure is not remembered: the next request downloads again, and the
+host never retries on its own. The download runs on a blocking thread outside the
+[document lanes](worker.md), since it waits on the network rather than the filesystem.
 
 The renderer reads the files through Tauri's asset protocol, whose scope in `tauri.conf.json` admits
 only `*.woff2` one level inside `$APPCACHE/font-packs/`; the content security policy adds the asset
 protocol's origins to `font-src` alone, and `connect-src` stays closed to the network.
 
 `font_packs.rs` tests each outcome against a local server on `127.0.0.1`, concurrent requests, a
-cached pack found at startup, and that a partial pack is never visible.
+download that panics, a cached pack found at startup, and that a partial pack is never visible.

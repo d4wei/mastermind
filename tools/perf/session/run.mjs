@@ -1,6 +1,7 @@
 // Builds entry.tsx as a production bundle with React's profiling build, loads it with the mid and
 // large fixtures in headless Chrome, and prints the page's results. Run with `npm run perf:session`.
 import { spawn, execFileSync } from 'node:child_process'
+import { tsImport } from 'tsx/esm/api'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -29,7 +30,8 @@ if (!chromePath) {
 }
 
 // The page links the generated face sheet, which an install that skipped its scripts lacks.
-execFileSync(process.execPath, ['--import', 'tsx', join(repo, 'tools/fonts/vendor-fonts.mts')], { cwd: repo, stdio: 'inherit' })
+const { ensureVendoredFonts } = await tsImport('../../fonts/vendor-fonts.mts', import.meta.url)
+await ensureVendoredFonts(repo)
 
 await build({
   configFile: false,

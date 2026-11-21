@@ -7,13 +7,16 @@ exact-pinned `@fontsource-variable/*` devDependencies in [package.json](../../pa
 `npm ci` installs, are the source. [vendor-fonts.mts](../../tools/fonts/vendor-fonts.mts) copies each
 bundled package's variable woff2 slices and its licence as `OFL.txt`, and writes `faces.css`, which
 stamps each family's package version and keeps the package's `unicode-range` slices, so a document
-loads only the slices its characters need. To change what ships, change the family lists in the
-script.
+loads only the slices its characters need. To change what ships, change the family list in the
+script; the packs follow the CJK stacks of the font registry.
 
 The script runs after `npm ci` as the `postinstall` step, and again, doing nothing when the
 directory is already current for the installed packages, before the tests, the Vite build and dev
-server, `npm run dev`, and the session benchmark; `npm run fonts:vendor` runs it by hand. The desktop
-crate compiles in the pack manifest and stops with an error naming that command when it is missing.
+server, and the session benchmark; `npm run dev` starts the dev server before the desktop crate
+builds, and `npm run fonts:vendor` runs the script by hand. A run rewrites only the files that
+differ and removes stale ones last, so a dev server or build reading the directory meanwhile sees
+whole files. The desktop crate compiles in the pack manifest and stops with an error naming that
+command when it is missing.
 `tests/fonts-vendored.test.ts` checks the generator's output against the installed packages and
 the lockfile, without the network.
 

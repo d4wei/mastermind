@@ -1,7 +1,7 @@
 import type { ListItem, Root, RootContent } from 'mdast'
 import { scanMarkdown, scanMarkdownTree } from './markdown/scan'
 import { usableAuthorName } from './author'
-import { segmentBlocks } from './blocks'
+import { blockUnits, segmentBlocks } from './blocks'
 import { applyTextEdits } from './edits'
 import { stringifyEscaped } from './escaped-json'
 import { excludedRanges } from './markdown/exclusions'
@@ -187,13 +187,7 @@ export async function translatedCommentEdit(source: string, request: TranslatedC
 
 /** The top-level block or list item of `tree` that starts at `start`, as `segmentBlocks` divides it. */
 function blockAt(tree: Root, start: number): RootContent | ListItem | undefined {
-  for (const node of tree.children) {
-    if (node.type === 'list') {
-      const item = node.children.find((child) => child.position?.start.offset === start)
-      if (item) return item
-    } else if (node.position?.start.offset === start) return node
-  }
-  return undefined
+  return blockUnits(tree).find((node) => node.position?.start.offset === start)
 }
 
 function blockShape(node: RootContent | ListItem | undefined): string {

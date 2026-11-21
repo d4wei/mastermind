@@ -1,6 +1,7 @@
 import { pickSentinels } from '../../document/critic/mask'
-import { CLOSERS, OPENERS, escapedAt, group, stripLinePrefixes, threadCards } from '../../document/critic/scanner'
-import type { CriticKind, CriticSpan, Range } from '../../document/critic/types'
+import { CLOSERS, OPENERS, escapedAt, group, makeExcludeLookup, stripLinePrefixes, threadCards }
+  from '../../document/critic/scanner'
+import type { CriticKind, CriticSpan } from '../../document/critic/types'
 import { excludedRanges } from '../../document/markdown/exclusions'
 import { parseMarkdown } from '../../document/markdown/processor'
 import { scanMarkdownTree, textBlockRanges } from '../../document/markdown/scan'
@@ -123,19 +124,7 @@ const TOKENS: ReadonlyArray<{ token: string; kind: CriticKind; opener: boolean }
  * escaped opener's literal mark is passed over whole.
  */
 function literalDelimiters(source: string, plain: ReturnType<typeof parseMarkdown>, spans: readonly CriticSpan[]) {
-  const excluded = excludedRanges(plain)
-  const excludedAt = (offset: number): Range | undefined => {
-    let lo = 0
-    let hi = excluded.length - 1
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1
-      const range = excluded[mid]!
-      if (offset < range.start) hi = mid - 1
-      else if (offset >= range.end) lo = mid + 1
-      else return range
-    }
-    return undefined
-  }
+  const excludedAt = makeExcludeLookup(excludedRanges(plain))
   const problems: Array<{ at: number; message: string }> = []
   const tokenAt = (offset: number, limit: number) =>
     TOKENS.find(({ token }) => offset + token.length <= limit && source.startsWith(token, offset))
@@ -203,7 +192,7 @@ function literalDelimiters(source: string, plain: ReturnType<typeof parseMarkdow
 }
 
 /** Collapses a soft-wrapped body onto one line. */
-export function flatten(text: string): string {
+function flatten(text: string): string {
   return text.replace(/[ \t]*\r?\n[ \t]*/g, ' ').trim()
 }
 

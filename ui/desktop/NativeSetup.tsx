@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usableAuthorName } from '../../document/author'
+import { primarySubtag } from '../../document/markdown/language'
 import { useConfig } from '../app/configStore'
 import { UI_LANGUAGE_CODES, UI_LANGUAGES, useT, type UiLang } from '../i18n'
 import { useCompositionGuard } from '../util/composition'
@@ -18,16 +19,15 @@ export interface SetupSnapshot {
   protected: Record<SetupField, boolean>
 }
 
-/** Every Chinese variant reads the bundled Simplified Chinese; other languages match by prefix. */
-const SYSTEM_LANGUAGE_PREFIXES: ReadonlyArray<readonly [RegExp, UiLang]> = [
-  [/^zh(?:-|$)/i, 'zh-CN'], [/^ja(?:-|$)/i, 'ja'], [/^fr(?:-|$)/i, 'fr'], [/^en(?:-|$)/i, 'en'],
-]
-
-/** The first system language the interface speaks, else English. */
+/**
+ * The first system language the interface speaks, by primary subtag, else English. Every Chinese
+ * variant reads the bundled Simplified Chinese.
+ */
 export function systemInterfaceLanguage(languages: readonly string[]): UiLang {
   for (const language of languages) {
-    const match = SYSTEM_LANGUAGE_PREFIXES.find(([prefix]) => prefix.test(language))
-    if (match) return match[1]
+    const primary = primarySubtag(language)
+    const match = UI_LANGUAGE_CODES.find((code) => primarySubtag(code) === primary)
+    if (match) return match
   }
   return 'en'
 }

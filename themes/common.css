@@ -1,7 +1,8 @@
 :where([data-theme]) {
-  --font-display: 'Source Serif 4', var(--font-cjk-serif), serif;
-  --font-body: 'Source Serif 4', var(--font-cjk-serif), serif;
-  --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Consolas, var(--font-cjk-sans), monospace;
+  /* The default preset's faces, which ui/app/app.css composes into the font stacks. */
+  --font-display-face: 'Source Serif 4';
+  --font-body-face: 'Source Serif 4';
+  --font-code-face: 'Source Code Pro';
   /* The CJK faces of the default language; document content switches them by `:lang()` in ui/app/app.css. */
   --font-cjk-serif: var(--font-cjk-serif-zh);
   --font-cjk-sans: var(--font-cjk-sans-zh);

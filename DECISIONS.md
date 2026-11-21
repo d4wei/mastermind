@@ -29,6 +29,15 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-20 — Font stacks are composed in static CSS from faces the preferences set
+
+**Ruled.** Preferences set only `var()`-free faces and `data-font-style` on the root; one rule in
+`ui/app/app.css` composes the stacks there and on every element whose CJK lists switch, stating
+that scope once, so the stacks need no runtime stylesheet and no `style-src 'unsafe-inline'`.
+
+**Beat:** a preset rule composed in TypeScript and injected as a `<style>` over a hand-kept copy of
+the language selector.
+
 ## 2026-11-20 — Rail cards stay above the document's end before anything else but order
 
 **Ruled.** When cards would run past the bottom of the body text, the trailing cards shift up

@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import postcss from 'postcss'
+import { CJK_STACKS, PACK_LANGUAGES, packName } from '../../ui/theme/fontRegistry'
 
 /** One family: the pinned package it comes from and the package sheets naming its faces. */
 interface VendoredFamily {
@@ -27,19 +28,17 @@ export const VENDORED_FAMILIES: VendoredFamily[] = [
 ]
 
 /**
- * The leading faces of the CJK stacks in `ui/theme/fontRegistry.ts` that are not bundled: resource
- * packs the desktop host fetches on first need. Only their sheets and manifest entries are
- * generated; the pinned devDependencies supply the sheets and the lockfile supplies the address
- * and hash, so generating needs no network.
+ * The leading faces of the CJK stacks in `ui/theme/fontRegistry.ts` that are not bundled, serif
+ * then sans for each pack language: resource packs the desktop host fetches on first need. Only
+ * their sheets and manifest entries are generated; the pinned devDependencies, each named after its
+ * pack, supply the sheets and the lockfile supplies the address and hash, so generating needs no
+ * network.
  */
-export const PACK_FAMILIES: VendoredFamily[] = [
-  { family: 'Noto Serif TC', pkg: '@fontsource-variable/noto-serif-tc', sheets: ['wght.css'] },
-  { family: 'Noto Sans TC', pkg: '@fontsource-variable/noto-sans-tc', sheets: ['wght.css'] },
-  { family: 'Noto Serif HK', pkg: '@fontsource-variable/noto-serif-hk', sheets: ['wght.css'] },
-  { family: 'Noto Sans HK', pkg: '@fontsource-variable/noto-sans-hk', sheets: ['wght.css'] },
-  { family: 'Noto Serif KR', pkg: '@fontsource-variable/noto-serif-kr', sheets: ['wght.css'] },
-  { family: 'Noto Sans KR', pkg: '@fontsource-variable/noto-sans-kr', sheets: ['wght.css'] },
-]
+export const PACK_FAMILIES: VendoredFamily[] = PACK_LANGUAGES.flatMap((language) =>
+  (['serif', 'sans'] as const).map((style) => {
+    const family = CJK_STACKS[style][language][0]
+    return { family, pkg: `@fontsource-variable/${packName(family)}`, sheets: ['wght.css'] }
+  }))
 
 /** The stylesheet the reviewer loads, relative to the vendored fonts directory. */
 export const FACES_SHEET = 'faces.css'
@@ -152,26 +151,55 @@ export async function vendoredFonts(nodeModules: string,
     manifest: `${JSON.stringify(manifest, null, 2)}\n` }
 }
 
-/** Replaces the generated contents of `fontsDir` with the vendored set and the pack sheets. */
-export async function writeVendoredFonts(nodeModules: string, fontsDir: string,
-  generated?: VendoredFonts): Promise<void> {
-  const { files, css, packSheets, manifest } = generated ?? await vendoredFonts(nodeModules)
-  await fs.mkdir(fontsDir, { recursive: true })
-  for (const entry of await fs.readdir(fontsDir)) {
-    if (!HAND_WRITTEN.has(entry)) await fs.rm(path.join(fontsDir, entry), { recursive: true })
-  }
-  for (const [target, source] of files) {
-    await fs.mkdir(path.dirname(path.join(fontsDir, target)), { recursive: true })
-    await fs.copyFile(source, path.join(fontsDir, target))
-  }
-  await fs.writeFile(path.join(fontsDir, FACES_SHEET), css)
-  await fs.mkdir(path.join(fontsDir, PACKS_DIR), { recursive: true })
-  for (const [target, text] of packSheets) await fs.writeFile(path.join(fontsDir, target), text)
-  await fs.writeFile(path.join(fontsDir, PACKS_DIR, PACK_MANIFEST), manifest)
+/** The generated text files, by path relative to the fonts directory. */
+function generatedTexts({ css, packSheets, manifest }: VendoredFonts): Map<string, string> {
+  return new Map([[FACES_SHEET, css], ...packSheets, [`${PACKS_DIR}/${PACK_MANIFEST}`, manifest]])
 }
 
-async function readOrNull(file: string): Promise<string | null> {
-  try { return await fs.readFile(file, 'utf8') } catch { return null }
+/** Every file under `fontsDir` the generator owns, relative and with forward slashes. */
+async function generatedFiles(fontsDir: string): Promise<string[]> {
+  return (await fs.readdir(fontsDir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.relative(fontsDir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
+    .filter((rel) => !HAND_WRITTEN.has(rel))
+}
+
+async function readOrNull(file: string): Promise<Buffer | null> {
+  try { return await fs.readFile(file) } catch { return null }
+}
+
+/** Puts `content` at `file` by a rename, so a concurrent reader sees the old file or the new one. */
+async function replaceFile(file: string, content: Buffer | string): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  const partial = `${file}.${process.pid}.partial`
+  await fs.writeFile(partial, content)
+  await fs.rename(partial, file)
+}
+
+/**
+ * Brings `fontsDir` to the vendored set and the pack sheets while a dev server or build may be
+ * reading it: each file that differs is replaced whole, a file whose content already matches is
+ * left untouched with its modification time, and files the set no longer names are removed last.
+ */
+export async function writeVendoredFonts(fontsDir: string, generated: VendoredFonts): Promise<void> {
+  const texts = generatedTexts(generated)
+  for (const [target, source] of generated.files) {
+    const file = path.join(fontsDir, target)
+    const content = await fs.readFile(source)
+    if (!(await readOrNull(file))?.equals(content)) await replaceFile(file, content)
+  }
+  for (const [target, text] of texts) {
+    const file = path.join(fontsDir, target)
+    if ((await readOrNull(file))?.toString('utf8') !== text) await replaceFile(file, text)
+  }
+  for (const rel of await generatedFiles(fontsDir)) {
+    if (!generated.files.has(rel) && !texts.has(rel)) await fs.rm(path.join(fontsDir, rel))
+  }
+  // A retired family leaves its directory empty; deeper directories go first.
+  const directories = (await fs.readdir(fontsDir, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isDirectory()).map((entry) => path.join(entry.parentPath, entry.name))
+    .sort((a, b) => b.length - a.length)
+  for (const directory of directories) if ((await fs.readdir(directory)).length === 0) await fs.rmdir(directory)
 }
 
 /**
@@ -180,30 +208,33 @@ async function readOrNull(file: string): Promise<string | null> {
  * package version, so a new pin changes their text; sizes stand in for bytes to keep the check fast.
  */
 export async function vendoredFontsCurrent(fontsDir: string, generated: VendoredFonts): Promise<boolean> {
-  const { files, css, packSheets, manifest } = generated
-  const texts = new Map<string, string>([[FACES_SHEET, css], ...packSheets, [`${PACKS_DIR}/${PACK_MANIFEST}`, manifest]])
+  const { files } = generated
+  const texts = generatedTexts(generated)
   let present: string[]
   try {
-    present = (await fs.readdir(fontsDir, { recursive: true, withFileTypes: true }))
-      .filter((entry) => entry.isFile())
-      .map((entry) => path.relative(fontsDir, path.join(entry.parentPath, entry.name)).split(path.sep).join('/'))
-      .filter((rel) => !HAND_WRITTEN.has(rel))
+    present = await generatedFiles(fontsDir)
   } catch {
     return false
   }
   if (present.length !== files.size + texts.size || present.some((rel) => !files.has(rel) && !texts.has(rel))) return false
-  for (const [target, text] of texts) if (await readOrNull(path.join(fontsDir, target)) !== text) return false
-  for (const [target, source] of files) {
-    const [copy, original] = await Promise.all([fs.stat(path.join(fontsDir, target)), fs.stat(source)])
-    if (copy.size !== original.size) return false
+  for (const [target, text] of texts) {
+    if ((await readOrNull(path.join(fontsDir, target)))?.toString('utf8') !== text) return false
   }
-  return true
+  let sizes: number[]
+  try {
+    sizes = (await Promise.all([...files].flatMap(([target, source]) =>
+      [fs.stat(path.join(fontsDir, target)), fs.stat(source)]))).map((stats) => stats.size)
+  } catch {
+    return false
+  }
+  return sizes.every((size, index) => index % 2 === 1 || size === sizes[index + 1])
 }
 
 /**
  * Generates `themes/fonts/` under `root` unless it is already current for the installed packages,
  * and reports which. Each entry point that reads the generated files calls it: the install script,
- * the test setup, the Vite build and dev server, and the session benchmark.
+ * the test setup, the Vite build and dev server, which `npm run dev` starts before the desktop
+ * crate builds, and the session benchmark.
  */
 export async function ensureVendoredFonts(root: string): Promise<'current' | 'generated'> {
   const nodeModules = path.join(root, 'node_modules')
@@ -215,7 +246,7 @@ export async function ensureVendoredFonts(root: string): Promise<'current' | 'ge
     throw new Error(`Cannot read the pinned font packages; run \`npm ci\` in ${root}.`, { cause: error })
   }
   if (await vendoredFontsCurrent(fontsDir, generated)) return 'current'
-  await writeVendoredFonts(nodeModules, fontsDir, generated)
+  await writeVendoredFonts(fontsDir, generated)
   return 'generated'
 }
 

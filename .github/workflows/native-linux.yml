@@ -53,7 +53,6 @@ jobs:
         run: |
           npm ci --ignore-scripts
           npx --no-install patch-package
-          node --import tsx tools/fonts/vendor-fonts.mts
           node --import tsx tools/desktop/build-reviewer.mts
       - name: Build the Linux reviewer package
         run: |

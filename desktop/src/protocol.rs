@@ -107,7 +107,8 @@ pub fn language_code(code: &str) -> bool {
 /// Whether `tag` is a well-formed BCP 47 language tag of the form a renderer's
 /// `Intl.getCanonicalLocales` also accepts: a 2–3 or 5–8 letter language, then an optional script,
 /// region, variants, extensions, and private use. Extended language subtags and the grandfathered
-/// irregular tags are refused, since the renderer would ignore them.
+/// irregular tags are refused, since the renderer would ignore them, and so are a repeated variant
+/// and a repeated extension singleton, which the renderer refuses.
 pub fn language_tag(tag: &str) -> bool {
     if tag.is_empty() || tag.len() > 64 {
         return false;
@@ -127,14 +128,25 @@ pub fn language_tag(tag: &str) -> bool {
     }
     rest.next_if(|s| s.len() == 4 && alpha(s));
     rest.next_if(|s| (s.len() == 2 && alpha(s)) || (s.len() == 3 && digits(s)));
-    while rest
-        .next_if(|s| s.len() >= 5 || (s.len() == 4 && s.as_bytes()[0].is_ascii_digit()))
-        .is_some()
-    {}
-    while rest
-        .next_if(|s| s.len() == 1 && !s.eq_ignore_ascii_case("x"))
-        .is_some()
+    let mut variants: Vec<&str> = Vec::new();
+    while let Some(variant) =
+        rest.next_if(|s| s.len() >= 5 || (s.len() == 4 && s.as_bytes()[0].is_ascii_digit()))
     {
+        if variants
+            .iter()
+            .any(|seen| seen.eq_ignore_ascii_case(variant))
+        {
+            return false;
+        }
+        variants.push(variant);
+    }
+    let mut singletons: Vec<u8> = Vec::new();
+    while let Some(singleton) = rest.next_if(|s| s.len() == 1 && !s.eq_ignore_ascii_case("x")) {
+        let singleton = singleton.as_bytes()[0].to_ascii_lowercase();
+        if singletons.contains(&singleton) {
+            return false;
+        }
+        singletons.push(singleton);
         if rest.next_if(|s| s.len() >= 2).is_none() {
             return false;
         }
@@ -236,37 +248,20 @@ mod tests {
 
     #[test]
     fn language_tags_are_well_formed_bcp47() {
-        for tag in [
-            "ja",
-            "zh-TW",
-            "zh-Hant-HK",
-            "ko-KR",
-            "es-419",
-            "de-CH-1996",
-            "sl-rozaj-biske",
-            "en-u-ca-gregory",
-            "en-x-private",
-            "haw",
-        ] {
+        // `tests/document-language.test.ts` checks the renderer against the same tags.
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Tags {
+            accepted: Vec<String>,
+            refused: Vec<String>,
+            refused_by_host_only: Vec<String>,
+        }
+        let tags: Tags =
+            serde_json::from_str(include_str!("../../tests/fixtures/language-tags.json")).unwrap();
+        for tag in &tags.accepted {
             assert!(language_tag(tag), "{tag}");
         }
-        for tag in [
-            "",
-            "e",
-            "en_US",
-            "zh--TW",
-            "zh-",
-            "-zh",
-            "x-private",
-            "zh-yue",
-            "en-u",
-            "en-x",
-            "en-US-u",
-            "toolongtag",
-            "ja-JP-x-abcdefghi",
-            "../fr",
-            "zh TW",
-        ] {
+        for tag in tags.refused.iter().chain(&tags.refused_by_host_only) {
             assert!(!language_tag(tag), "{tag}");
         }
     }

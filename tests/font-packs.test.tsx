@@ -1,22 +1,18 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { webcrypto } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installHost, type FontPackReply } from '../ui/app/host'
 import { useConfig } from '../ui/app/configStore'
 import { useAnnouncements } from '../ui/app/Notifications'
-import { SessionView } from '../ui/app/SessionView'
 import { createNativeHost } from '../ui/desktop/host'
 import { useDoc } from '../ui/documents/store'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
-import { CJK_STACKS } from '../ui/theme/fontRegistry'
-import { cjkRows, createFontPackLoader, neededPacks, PACK_LANGUAGES, packName, resetFontPacks }
-  from '../ui/theme/fontPacks'
-import { useTranslation } from '../ui/translate/translationStore'
+import { CJK_STACKS, PACK_LANGUAGES, packName } from '../ui/theme/fontRegistry'
+import { cjkRows, createFontPackLoader, fontPackLoader, neededPacks, resetFontPacks } from '../ui/theme/fontPacks'
 import { fakeHost } from './helpers/host'
+import { readingSession } from './helpers/reading-session'
 
 vi.mock('../ui/app/ConflictPanel', () => ({ ConflictPanel: () => null }))
 
@@ -35,6 +31,9 @@ describe('which packs rendered text needs', () => {
     expect(cjkRows('zh-Hant')).toEqual(['zh-TW'])
     expect(cjkRows('zh-HK')).toEqual(['zh-HK'])
     expect(cjkRows('zh-Hant-HK')).toEqual(['zh-TW', 'zh-HK'])
+    // Macau writes Traditional characters and shares the Hong Kong row.
+    expect(cjkRows('zh-MO')).toEqual(['zh-HK'])
+    expect(cjkRows('zh-Hant-MO')).toEqual(['zh-TW', 'zh-HK'])
     expect(cjkRows('zh-CN')).toEqual(['zh'])
     expect(cjkRows('ja')).toEqual(['ja'])
     expect(cjkRows('fr')).toEqual([])
@@ -44,6 +43,7 @@ describe('which packs rendered text needs', () => {
   it('names the leading face of the preset style for each pack language, once', () => {
     expect(neededPacks(['zh-TW', 'ko', 'ko', undefined], 'serif')).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     expect(neededPacks(['zh-HK'], 'sans')).toEqual(['noto-sans-hk'])
+    expect(neededPacks(['zh-MO'], 'serif')).toEqual(['noto-serif-hk'])
     // Bundled and non-CJK languages need nothing.
     expect(neededPacks(['zh-CN', 'ja', 'en', undefined], 'sans')).toEqual([])
   })
@@ -93,7 +93,7 @@ describe('the pack loader', () => {
     const release = loader.need(['noto-serif-tc'])
     loader.need(['noto-serif-hk'])()
     await settle()
-    expect(unavailable.mock.calls).toEqual([['noto-serif-tc'], ['noto-serif-hk']])
+    expect(unavailable.mock.calls).toEqual([['noto-serif-tc', 'offline'], ['noto-serif-hk', 'offline']])
     expect(installed()).toEqual([])
     // Still offline: another need asks nothing.
     loader.need(['noto-serif-tc'])()
@@ -110,6 +110,21 @@ describe('the pack loader', () => {
     release()
   })
 
+  it('reports a refused pack, a failed request, and a missing sheet as failed rather than offline', async () => {
+    const request = vi.fn(async (name: string): Promise<FontPackReply> => {
+      if (name === 'noto-sans-kr') throw new Error('unknown_font_pack')
+      return name === 'noto-sans-tc' ? { status: 'failed' } : { status: 'ready', url: (file) => file }
+    })
+    const unavailable = vi.fn()
+    loader = createFontPackLoader({ request: () => request, unavailable,
+      sheet: async (name) => { throw new Error(`pack sheet ${name}: 404`) } })
+    loader.need(['noto-sans-tc', 'noto-sans-kr', 'noto-sans-hk'])
+    await settle()
+    expect(unavailable.mock.calls).toEqual([['noto-sans-tc', 'failed'], ['noto-sans-kr', 'failed'],
+      ['noto-sans-hk', 'failed']])
+    expect(installed()).toEqual([])
+  })
+
   it('fetches nothing where the host cannot fetch packs', async () => {
     const fetch = vi.fn()
     vi.stubGlobal('fetch', fetch)
@@ -123,34 +138,21 @@ describe('the pack loader', () => {
 })
 
 describe('packs in the document view', () => {
-  const initial = useDoc.getState()
-  let host: HTMLDivElement
-  let root: Root
   beforeEach(() => {
-    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-    vi.stubGlobal('crypto', webcrypto)
-    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const name = /packs\/([a-z-]+)\.css$/.exec(url)?.[1]
       return name ? new Response(sheetOf(name)) : new Response('', { status: 404 })
     }))
-    host = document.createElement('div')
-    document.body.append(host)
-    root = createRoot(host)
   })
   afterEach(() => {
-    act(() => root.unmount()); host.remove(); useDoc.setState(initial); useTranslation.getState().release('A')
     useConfig.setState({ config: null })
     useAnnouncements.setState({ items: [] })
     resetFontPacks()
-    vi.unstubAllGlobals(); installHost(null)
   })
+  const session = readingSession()
   async function open(source: string, fontPack?: (name: string) => Promise<FontPackReply>) {
     installHost(fakeHost(fontPack ? { fontPack } : {}))
-    useDoc.setState({ ...initial, sessionId: 'A', status: 'ready', mode: 'reading', source, savedSource: source,
-      load: vi.fn().mockResolvedValue(undefined), meta: null })
-    await act(async () => root.render(<SessionView sessionId="A" />))
+    await session.open(source)
     await settle()
   }
 
@@ -160,7 +162,7 @@ describe('packs in the document view', () => {
     expect(fontPack.mock.calls.map(([name]) => name)).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     expect(installed().sort()).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     // The view re-renders with its text in the arrived faces; an edit asks nothing more.
-    expect(host.querySelector('article.md-root')!.getAttribute('lang')).toBe('zh-TW')
+    expect(session.host.querySelector('article.md-root')!.getAttribute('lang')).toBe('zh-TW')
     await act(async () => useDoc.setState({ source: '---\nlang: zh-TW\n---\n\n繁體中文。\n\n한국어\n' }))
     await settle()
     expect(fontPack).toHaveBeenCalledTimes(2)
@@ -187,11 +189,41 @@ describe('packs in the document view', () => {
     ])
   })
 
+  it.each([
+    ['en', 'Fonts for 繁體中文（香港） could not be loaded. System fonts are in use.'],
+    ['ja', '繁體中文（香港）のフォントを読み込めませんでした。システムフォントで表示しています。'],
+  ] as const)('says in %s that a refused pack\'s faces could not be loaded, not that the network will bring them',
+    async (uiLang, notice) => {
+      useConfig.setState({ config: { ...DEFAULT_CONFIG, uiLang } })
+      const fontPack = vi.fn(async (_name: string): Promise<FontPackReply> => ({ status: 'failed' }))
+      await open('---\nlang: zh-MO\n---\n\n澳門中文。\n', fontPack)
+      expect(fontPack.mock.calls).toEqual([['noto-serif-hk']])
+      expect(useAnnouncements.getState().items.map(({ id, text }) => [id, text])).toEqual([['font-pack:zh-HK', notice]])
+    })
+
   it('fetches nothing outside the desktop host', async () => {
     await open('---\nlang: zh-HK\n---\n\n香港中文。\n')
     expect(fetch).not.toHaveBeenCalled()
     expect(installed()).toEqual([])
     expect(useAnnouncements.getState().items).toEqual([])
+  })
+
+  it('takes a missing host as nothing to fetch, without a rejection', async () => {
+    const rejections: unknown[] = []
+    const rejected = (reason: unknown) => { rejections.push(reason) }
+    process.on('unhandledRejection', rejected)
+    try {
+      installHost(null)
+      const release = fontPackLoader().need(['noto-sans-tc'])
+      await settle()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      release()
+      expect(rejections).toEqual([])
+      expect(fontPackLoader().state('noto-sans-tc')).toBeUndefined()
+      expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', rejected)
+    }
   })
 })
 

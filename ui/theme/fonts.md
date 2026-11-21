@@ -35,7 +35,7 @@ Noto face, then system faces for when that face is not bundled or a slice cannot
 | `zh`, the default | any other language, or none | Noto Serif SC, Noto Sans SC | yes |
 | `ja` | `ja` | Noto Serif JP, Noto Sans JP | yes |
 | `zh-TW` | `zh-TW`, `zh-Hant` | Noto Serif TC, Noto Sans TC | pack |
-| `zh-HK` | `zh-HK` | Noto Serif HK, Noto Sans HK | pack |
+| `zh-HK` | `zh-HK`, `zh-MO` | Noto Serif HK, Noto Sans HK | pack |
 | `ko` | `ko` | Noto Serif KR, Noto Sans KR | pack |
 
 `BUNDLED_CJK_LANGUAGES` names the bundled rows, the interface languages' faces, which the window
@@ -46,32 +46,35 @@ then the sans CJK faces of its language in every preset. The Noto faces ship as 
 `unicode-range` slices, so a document loads only the slices its characters need; the
 [bundled fonts](../../themes/fonts/README.md) describe the files and their provenance.
 
-The stacks are composed, not listed per language. `themes/common.css` holds each row once, as
-`--font-cjk-serif-{zh,ja,zh-tw,zh-hk,ko}` and `--font-cjk-sans-{…}`, and `--font-cjk-serif` and
-`--font-cjk-sans` name the row in force, the default one at the root. `--font-display`,
-`--font-body`, and `--font-mono` wrap the preset's Latin faces around one of the two: display and
-body take the list of the preset's style, code always the sans list. The `:lang()` rules in
-`ui/app/app.css` switch only the two lists, to the default row on each document view root (the
-reading article, the translated view, the source editor) and on each element inside it that carries
-`lang`, then to the row its language matches. Components keep referencing the three stacks.
-A root without `lang` matches the interface language it inherits from the document element. The
-[document language](../../document/markdown/language.md) says where a document's `lang` comes from.
+The stacks are composed in one static rule, not listed per language or per preset.
+`themes/common.css` holds each row once, as `--font-cjk-serif-{zh,ja,zh-tw,zh-hk,ko}` and
+`--font-cjk-sans-{…}`, and `--font-cjk-serif` and `--font-cjk-sans` name the row in force, the
+default one at the root. [ThemeProvider.tsx](ThemeProvider.tsx) sets only the preset's faces on the
+root, `--font-display-face`, `--font-body-face`, and `--font-code-face` (`fontFaceTokens`), and its
+style as `data-font-style`. The rule in `ui/app/app.css` declares `--font-display`, `--font-body`,
+and `--font-mono` from those faces and the two lists: display and body take the serif list and
+generic family, or the sans ones under `data-font-style="sans"`; code always takes the sans list.
+Nested in the same rule, the `:lang()` rules switch only the two lists, to the default row on each
+document view root (the reading article, the translated view, the source editor) and on each element
+inside it that carries `lang`, then to the row its language matches. Components keep referencing the
+three stacks. A root without `lang` matches the interface language it inherits from the document
+element. The [document language](../../document/markdown/language.md) says where a document's
+`lang` comes from.
 
 A custom property substitutes its `var()` references on the element that declares it, and
 descendants inherit the result; a stack declared only on the root would keep the root's lists inside
-a block of another language. `fontStackRule` therefore declares the preset's stacks on the root
-and on every element of `LANGUAGE_SCOPE`, the elements the `:lang()` rules match, and
-[ThemeProvider.tsx](ThemeProvider.tsx) installs it as a `<style>` element. For the same reason an
-element that names its own language declares its `font-family` again: an inherited family is
-computed at the ancestor.
+a block of another language. The rule therefore matches the root, which interface text quoting the
+document reads, and every element whose lists switch, and states that scope once. For the same
+reason an element that names its own language declares its `font-family` again: an inherited family
+is computed at the ancestor.
 
 ## Resource packs
 
 [fontPacks.ts](fontPacks.ts) decides when a pack is needed. A rendered document needs a pack when
 the language of the document, of one of its tagged blocks, or of the translation it shows selects a
-pack row through the `:lang()` rules above (`zh-TW` and `zh-Hant`, `zh-HK`, `ko`; a tag such as
-`zh-Hant-HK` that can select either Traditional row needs both), and the active preset's CJK style
-names that row's leading face. The view asks for the family of the style in use, and for the other
+pack row through the `:lang()` rules above (`zh-TW` and `zh-Hant`, `zh-HK` and `zh-MO`, `ko`; a
+tag such as `zh-Hant-HK` that can select either Traditional row needs both), and the active preset's
+CJK style names that row's leading face. The view asks for the family of the style in use, and for the other
 style's when the preset changes. Code's sans CJK faces are not requested under a serif preset; they
 fall through to the system sans faces.
 
@@ -88,10 +91,12 @@ no inline `<style>`: Tauri gives such a page a style nonce, and a nonce disables
 
 While a pack is absent, the text renders at once in the system faces listed after the Noto face in
 its row. When the pack arrives, the new faces apply to the text already shown, with no reload. When
-it cannot arrive, offline or refused, the system faces stand, and one transient notice per language
-says its faces will arrive when the network does. The pack is requested again on the next need
-after the webview reports the network back (`online`), or at the next launch; nothing retries on a
-timer. Only a host with `fontPack`, the desktop host, fetches anything: the tests' hosts have none.
+it cannot arrive, the system faces stand, and one transient notice per language says why: offline,
+that its faces will arrive when the network does; refused (`failed`: a bad status, a hash mismatch,
+a missing file or sheet), that they could not be loaded and system faces are in use. The pack is
+requested again on the next need after the webview reports the network back (`online`), or at the
+next launch; nothing retries on a timer. Only a host with `fontPack`, the desktop host, fetches
+anything: the tests' hosts have none, and with no host installed there is nothing to fetch.
 
 Interface chrome uses `--font-ui`, the system face (`system-ui`), not these stacks; the system picks
 its CJK face from the document element's `lang`, which follows the interface language.
@@ -105,13 +110,14 @@ bold text, code, and the interface keep their weights.
 
 ## Defaults and preferences
 
-The first preset is the default, and the base tokens in `themes/common.css` (`--font-display`,
-`--font-body`, `--font-mono`, the CJK lists, `--weight-body`, `--weight-bold`, `--ls-heading`,
-`--weight-code`) match it, so interface text that quotes the document renders identically before
-preferences load. [ThemeProvider.tsx](ThemeProvider.tsx) links the bundled `@font-face` sheet once,
-installs the default preset's stack rule at once and the chosen preset's when preferences load, and
-overrides the weight and spacing tokens on the root. The stack rule relies on `style-src
-'unsafe-inline'` as the pack sheets do.
+The first preset is the default, and the base tokens in `themes/common.css` (the three faces, the
+CJK lists, `--weight-body`, `--weight-bold`, `--ls-heading`, `--weight-code`) match it, and the
+stack rule takes the serif lists while the root has no `data-font-style`, so the document and
+interface text that quotes it render identically before preferences load.
+[ThemeProvider.tsx](ThemeProvider.tsx) links the bundled `@font-face` sheet once and, when
+preferences load, overrides the faces, the style, and the weight and spacing tokens on the root.
+The Settings preview of each preset composes its heading stack the same way, from the root's lists
+(`displayStack`).
 
 A saved `fontPreset` that names no current preset reads as the default without rewriting the file.
 The retired `monoFont` key is not read; the native host drops it from the next preference write

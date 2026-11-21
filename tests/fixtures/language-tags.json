@@ -1,0 +1,42 @@
+{
+  "accepted": [
+    "ja",
+    "zh-TW",
+    "zh-Hant-HK",
+    "zh-MO",
+    "ko-KR",
+    "es-419",
+    "de-CH-1996",
+    "de-CH-1901-1996",
+    "sl-rozaj-biske",
+    "en-u-ca-gregory",
+    "en-a-foo-b-bar",
+    "en-u-ca-gregory-x-u-foo",
+    "en-x-private",
+    "haw"
+  ],
+  "refused": [
+    "",
+    "e",
+    "en_US",
+    "zh--TW",
+    "zh-",
+    "-zh",
+    "x-private",
+    "en-u",
+    "en-x",
+    "en-US-u",
+    "toolongtag",
+    "ja-JP-x-abcdefghi",
+    "../fr",
+    "zh TW",
+    "de-1996-1996",
+    "sl-rozaj-ROZAJ",
+    "en-u-ca-gregory-u-nu-latn",
+    "en-a-foo-A-bar"
+  ],
+  "refusedByHostOnly": [
+    "zh-yue",
+    "zh-cmn-Hans-CN"
+  ]
+}
