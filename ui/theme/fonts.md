@@ -35,7 +35,7 @@ Noto face, then system faces for when that face is not bundled or a slice cannot
 | `zh`, the default | any other language, or none | Noto Serif SC, Noto Sans SC | yes |
 | `ja` | `ja` | Noto Serif JP, Noto Sans JP | yes |
 | `zh-TW` | `zh-TW`, `zh-Hant` | Noto Serif TC, Noto Sans TC | pack |
-| `zh-HK` | `zh-HK` | Noto Serif HK, Noto Sans HK | pack |
+| `zh-HK` | `zh-HK`, `zh-MO` | Noto Serif HK, Noto Sans HK | pack |
 | `ko` | `ko` | Noto Serif KR, Noto Sans KR | pack |
 
 `BUNDLED_CJK_LANGUAGES` names the bundled rows, the interface languages' faces, which the window
@@ -69,9 +69,9 @@ computed at the ancestor.
 
 [fontPacks.ts](fontPacks.ts) decides when a pack is needed. A rendered document needs a pack when
 the language of the document, of one of its tagged blocks, or of the translation it shows selects a
-pack row through the `:lang()` rules above (`zh-TW` and `zh-Hant`, `zh-HK`, `ko`; a tag such as
-`zh-Hant-HK` that can select either Traditional row needs both), and the active preset's CJK style
-names that row's leading face. The view asks for the family of the style in use, and for the other
+pack row through the `:lang()` rules above (`zh-TW` and `zh-Hant`, `zh-HK` and `zh-MO`, `ko`; a
+tag such as `zh-Hant-HK` that can select either Traditional row needs both), and the active preset's
+CJK style names that row's leading face. The view asks for the family of the style in use, and for the other
 style's when the preset changes. Code's sans CJK faces are not requested under a serif preset; they
 fall through to the system sans faces.
 
@@ -88,10 +88,12 @@ no inline `<style>`: Tauri gives such a page a style nonce, and a nonce disables
 
 While a pack is absent, the text renders at once in the system faces listed after the Noto face in
 its row. When the pack arrives, the new faces apply to the text already shown, with no reload. When
-it cannot arrive, offline or refused, the system faces stand, and one transient notice per language
-says its faces will arrive when the network does. The pack is requested again on the next need
-after the webview reports the network back (`online`), or at the next launch; nothing retries on a
-timer. Only a host with `fontPack`, the desktop host, fetches anything: the tests' hosts have none.
+it cannot arrive, the system faces stand, and one transient notice per language says why: offline,
+that its faces will arrive when the network does; refused (`failed`: a bad status, a hash mismatch,
+a missing file or sheet), that they could not be loaded and system faces are in use. The pack is
+requested again on the next need after the webview reports the network back (`online`), or at the
+next launch; nothing retries on a timer. Only a host with `fontPack`, the desktop host, fetches
+anything: the tests' hosts have none, and with no host installed there is nothing to fetch.
 
 Interface chrome uses `--font-ui`, the system face (`system-ui`), not these stacks; the system picks
 its CJK face from the document element's `lang`, which follows the interface language.

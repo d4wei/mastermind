@@ -217,8 +217,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     [scripts, suppliedLanguage])
   // Languages whose faces arrive as packs are fetched while this view shows them.
   const fontStyle = fontPresetById(useConfig((s) => s.config?.fontPreset)).style
-  const shownLanguages = useMemo(() => [languages.document, ...languages.blocks.values(),
-    showTranslated ? translation.targetLang ?? undefined : undefined], [languages, showTranslated, translation.targetLang])
+  const shownLanguages = useMemo(() => [...new Set([languages.document, ...languages.blocks.values(),
+    showTranslated ? translation.targetLang ?? undefined : undefined])], [languages, showTranslated, translation.targetLang])
   useFontPacks(shownLanguages, fontStyle)
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
   const outline = useMemo(

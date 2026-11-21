@@ -13,7 +13,7 @@ import { createNativeHost } from '../ui/desktop/host'
 import { useDoc } from '../ui/documents/store'
 import { DEFAULT_CONFIG } from '../ui/settings/defaults'
 import { CJK_STACKS } from '../ui/theme/fontRegistry'
-import { cjkRows, createFontPackLoader, neededPacks, PACK_LANGUAGES, packName, resetFontPacks }
+import { cjkRows, createFontPackLoader, fontPackLoader, neededPacks, PACK_LANGUAGES, packName, resetFontPacks }
   from '../ui/theme/fontPacks'
 import { useTranslation } from '../ui/translate/translationStore'
 import { fakeHost } from './helpers/host'
@@ -35,6 +35,9 @@ describe('which packs rendered text needs', () => {
     expect(cjkRows('zh-Hant')).toEqual(['zh-TW'])
     expect(cjkRows('zh-HK')).toEqual(['zh-HK'])
     expect(cjkRows('zh-Hant-HK')).toEqual(['zh-TW', 'zh-HK'])
+    // Macau writes Traditional characters and shares the Hong Kong row.
+    expect(cjkRows('zh-MO')).toEqual(['zh-HK'])
+    expect(cjkRows('zh-Hant-MO')).toEqual(['zh-TW', 'zh-HK'])
     expect(cjkRows('zh-CN')).toEqual(['zh'])
     expect(cjkRows('ja')).toEqual(['ja'])
     expect(cjkRows('fr')).toEqual([])
@@ -44,6 +47,7 @@ describe('which packs rendered text needs', () => {
   it('names the leading face of the preset style for each pack language, once', () => {
     expect(neededPacks(['zh-TW', 'ko', 'ko', undefined], 'serif')).toEqual(['noto-serif-kr', 'noto-serif-tc'])
     expect(neededPacks(['zh-HK'], 'sans')).toEqual(['noto-sans-hk'])
+    expect(neededPacks(['zh-MO'], 'serif')).toEqual(['noto-serif-hk'])
     // Bundled and non-CJK languages need nothing.
     expect(neededPacks(['zh-CN', 'ja', 'en', undefined], 'sans')).toEqual([])
   })
@@ -93,7 +97,7 @@ describe('the pack loader', () => {
     const release = loader.need(['noto-serif-tc'])
     loader.need(['noto-serif-hk'])()
     await settle()
-    expect(unavailable.mock.calls).toEqual([['noto-serif-tc'], ['noto-serif-hk']])
+    expect(unavailable.mock.calls).toEqual([['noto-serif-tc', 'offline'], ['noto-serif-hk', 'offline']])
     expect(installed()).toEqual([])
     // Still offline: another need asks nothing.
     loader.need(['noto-serif-tc'])()
@@ -108,6 +112,21 @@ describe('the pack loader', () => {
     await settle()
     expect(installed()).toEqual(['noto-serif-tc', 'noto-serif-hk'])
     release()
+  })
+
+  it('reports a refused pack, a failed request, and a missing sheet as failed rather than offline', async () => {
+    const request = vi.fn(async (name: string): Promise<FontPackReply> => {
+      if (name === 'noto-sans-kr') throw new Error('unknown_font_pack')
+      return name === 'noto-sans-tc' ? { status: 'failed' } : { status: 'ready', url: (file) => file }
+    })
+    const unavailable = vi.fn()
+    loader = createFontPackLoader({ request: () => request, unavailable,
+      sheet: async (name) => { throw new Error(`pack sheet ${name}: 404`) } })
+    loader.need(['noto-sans-tc', 'noto-sans-kr', 'noto-sans-hk'])
+    await settle()
+    expect(unavailable.mock.calls).toEqual([['noto-sans-tc', 'failed'], ['noto-sans-kr', 'failed'],
+      ['noto-sans-hk', 'failed']])
+    expect(installed()).toEqual([])
   })
 
   it('fetches nothing where the host cannot fetch packs', async () => {
@@ -187,11 +206,41 @@ describe('packs in the document view', () => {
     ])
   })
 
+  it.each([
+    ['en', 'Fonts for 繁體中文（香港） could not be loaded. System fonts are in use.'],
+    ['ja', '繁體中文（香港）のフォントを読み込めませんでした。システムフォントで表示しています。'],
+  ] as const)('says in %s that a refused pack\'s faces could not be loaded, not that the network will bring them',
+    async (uiLang, notice) => {
+      useConfig.setState({ config: { ...DEFAULT_CONFIG, uiLang } })
+      const fontPack = vi.fn(async (_name: string): Promise<FontPackReply> => ({ status: 'failed' }))
+      await open('---\nlang: zh-MO\n---\n\n澳門中文。\n', fontPack)
+      expect(fontPack.mock.calls).toEqual([['noto-serif-hk']])
+      expect(useAnnouncements.getState().items.map(({ id, text }) => [id, text])).toEqual([['font-pack:zh-HK', notice]])
+    })
+
   it('fetches nothing outside the desktop host', async () => {
     await open('---\nlang: zh-HK\n---\n\n香港中文。\n')
     expect(fetch).not.toHaveBeenCalled()
     expect(installed()).toEqual([])
     expect(useAnnouncements.getState().items).toEqual([])
+  })
+
+  it('takes a missing host as nothing to fetch, without a rejection', async () => {
+    const rejections: unknown[] = []
+    const rejected = (reason: unknown) => { rejections.push(reason) }
+    process.on('unhandledRejection', rejected)
+    try {
+      installHost(null)
+      const release = fontPackLoader().need(['noto-sans-tc'])
+      await settle()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      release()
+      expect(rejections).toEqual([])
+      expect(fontPackLoader().state('noto-sans-tc')).toBeUndefined()
+      expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      process.off('unhandledRejection', rejected)
+    }
   })
 })
 

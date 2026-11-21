@@ -102,7 +102,7 @@ describe('font presets', () => {
       if (Object.keys(declared).length) switches.set(rule.selector, declared)
     })
     const rows: Record<string, string> = {
-      '': 'zh', ':lang(ja)': 'ja', ':lang(ko)': 'ko', ':is(:lang(zh-TW), :lang(zh-Hant))': 'zh-TW', ':lang(zh-HK)': 'zh-HK',
+      '': 'zh', ':lang(ja)': 'ja', ':lang(ko)': 'ko', ':is(:lang(zh-TW), :lang(zh-Hant))': 'zh-TW', ':is(:lang(zh-HK), :lang(zh-MO))': 'zh-HK',
     }
     expect([...switches.keys()]).toEqual(Object.keys(rows).map((suffix) => `${scope}${suffix}`))
     for (const [suffix, language] of Object.entries(rows)) {

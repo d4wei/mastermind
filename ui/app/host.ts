@@ -54,6 +54,9 @@ let installed: ReviewerHost | null = null
 // The entry point installs the host before mounting any document or preference store.
 export function installHost(host: ReviewerHost | null): void { installed = host }
 
+/** The installed host, or null before the entry point installs one. */
+export function installedReviewerHost(): ReviewerHost | null { return installed }
+
 export function requireReviewerHost(): ReviewerHost {
   if (!installed) throw new Error('Reviewer host is not installed; install a host before mounting the reviewer')
   return installed

@@ -125,7 +125,10 @@ export function scanScripts(source: string, plain: Root): ScriptProfile {
   return { ...whole, declared, marked, hanOnly }
 }
 
-const primary = (tag: string | undefined) => tag?.split('-')[0]!.toLowerCase()
+/** A tag's primary language subtag, lowercased: `zh` for `zh-Hant-HK`. */
+export function primarySubtag(tag: string): string {
+  return tag.split('-')[0]!.toLowerCase()
+}
 
 /**
  * The script most of a document's CJK blocks are written in. Japanese and Korean prose carries
@@ -149,7 +152,7 @@ function detectedLanguage(profile: ScriptProfile): string | undefined {
  */
 export function resolveLanguages(profile: ScriptProfile, supplied?: string): DocumentLanguages {
   const document = profile.declared ?? wellFormedLanguage(supplied) ?? detectedLanguage(profile)
-  const own = primary(document)
+  const own = document && primarySubtag(document)
   const blocks = new Map<number, string>()
   for (const { start, kana, hangul } of profile.marked) {
     if (kana) { if (own !== 'ja') blocks.set(start, 'ja') }

@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
-import { requireReviewerHost, type FontPackReply } from '../app/host'
+import { useEffect, useMemo } from 'react'
+import { primarySubtag } from '../../document/markdown/language'
+import { installedReviewerHost, type FontPackReply } from '../app/host'
 import { useConfig } from '../app/configStore'
 import { announce } from '../app/Notifications'
 import { DICTIONARIES } from '../i18n'
@@ -19,18 +20,19 @@ export function packName(family: string): string {
 
 /**
  * The CJK rows of `ui/app/app.css` a language tag can select: `ko`; `zh-TW` for Taiwan or
- * Traditional script; `zh-HK` for Hong Kong. A tag such as `zh-Hant-HK` names both Traditional
- * rows, since engines differ on whether `:lang(zh-HK)` matches it.
+ * Traditional script; `zh-HK` for Hong Kong and Macau. A tag such as `zh-Hant-HK` names both
+ * Traditional rows, since engines differ on whether `:lang(zh-HK)` matches it.
  */
 export function cjkRows(tag: string | undefined): CjkLanguage[] {
   if (!tag) return []
-  const [primary, ...rest] = tag.toLowerCase().split('-')
+  const primary = primarySubtag(tag)
   if (primary === 'ko') return ['ko']
   if (primary === 'ja') return ['ja']
   if (primary !== 'zh') return []
+  const rest = tag.toLowerCase().split('-').slice(1)
   const rows: CjkLanguage[] = []
   if (rest.includes('tw') || rest.includes('hant')) rows.push('zh-TW')
-  if (rest.includes('hk')) rows.push('zh-HK')
+  if (rest.includes('hk') || rest.includes('mo')) rows.push('zh-HK')
   return rows.length ? rows : ['zh']
 }
 
@@ -56,6 +58,8 @@ function packLanguage(name: string): CjkLanguage | undefined {
 }
 
 type PackState = 'requested' | 'ready' | 'unavailable'
+/** Why a pack did not arrive: the network did not answer, or something along the way was refused. */
+export type PackFailure = 'offline' | 'failed'
 
 export interface FontPackLoaderOptions {
   /** The host's pack request; absent outside the desktop host, where nothing is fetched. */
@@ -63,7 +67,7 @@ export interface FontPackLoaderOptions {
   /** The pack's sheet text, with bare file names. */
   sheet(name: string): Promise<string>
   /** Called once per request that did not bring the pack; the reviewer's loader raises the notice. */
-  unavailable(name: string): void
+  unavailable(name: string, failure: PackFailure): void
 }
 
 /**
@@ -79,9 +83,13 @@ export function createFontPackLoader(options: FontPackLoaderOptions) {
     const request = options.request()
     if (!request) return
     states.set(name, 'requested')
+    let failure: PackFailure = 'failed'
     try {
       const reply = await request(name)
-      if (reply.status !== 'ready') throw new Error(reply.status)
+      if (reply.status !== 'ready') {
+        failure = reply.status
+        throw new Error(reply.status)
+      }
       const css = (await options.sheet(name)).replace(/url\('([^']+)'\)/g, (_, file: string) => `url('${reply.url(file)}')`)
       if (disposed) return
       const style = document.createElement('style')
@@ -92,7 +100,7 @@ export function createFontPackLoader(options: FontPackLoaderOptions) {
     } catch {
       if (disposed) return
       states.set(name, 'unavailable')
-      options.unavailable(name)
+      options.unavailable(name, failure)
     }
   }
   const online = (): void => {
@@ -128,22 +136,29 @@ export function createFontPackLoader(options: FontPackLoaderOptions) {
   }
 }
 
-/** One notice per language: the system faces stand until the network brings the pack. */
-function announceUnavailable(name: string): void {
+/**
+ * One notice per language: offline, the system faces stand until the network brings the pack;
+ * failed, they stand in place of faces that could not be loaded.
+ */
+function announceUnavailable(name: string, failure: PackFailure): void {
   const language = packLanguage(name)
   if (!language) return
   const dictionary = DICTIONARIES[useConfig.getState().config?.uiLang ?? 'en']
-  announce(`font-pack:${language}`, dictionary.fontPackOffline.replace('{language}', languageName(language)))
+  const message = failure === 'offline' ? dictionary.fontPackOffline : dictionary.fontPackFailed
+  announce(`font-pack:${language}`, message.replace('{language}', languageName(language)))
 }
 
 let loader: ReturnType<typeof createFontPackLoader> | null = null
 
-/** The reviewer's loader, bound to whichever host is installed when a pack is requested. */
+/**
+ * The reviewer's loader, bound to whichever host is installed when a pack is requested; with none
+ * installed there is nothing to fetch.
+ */
 export function fontPackLoader(): ReturnType<typeof createFontPackLoader> {
   loader ??= createFontPackLoader({
     request: () => {
-      const host = requireReviewerHost()
-      return host.fontPack?.bind(host)
+      const host = installedReviewerHost()
+      return host?.fontPack?.bind(host)
     },
     sheet: async (name) => {
       const response = await fetch(`${FONT_PACKS_HREF}${name}.css`)
@@ -167,6 +182,6 @@ export function resetFontPacks(): void {
  * faces are installed, with no reload.
  */
 export function useFontPacks(tags: ReadonlyArray<string | undefined>, style: CjkStyle): void {
-  const names = neededPacks(tags, style).join(' ')
+  const names = useMemo(() => neededPacks(tags, style).join(' '), [tags, style])
   useEffect(() => (names ? fontPackLoader().need(names.split(' ')) : undefined), [names])
 }

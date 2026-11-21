@@ -558,8 +558,8 @@ button:disabled {
   --font-cjk-serif: var(--font-cjk-serif-zh-tw);
   --font-cjk-sans: var(--font-cjk-sans-zh-tw);
 }
-/* After Traditional, so `zh-Hant-HK` takes the Hong Kong row where `:lang()` matches it. */
-:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):lang(zh-HK) {
+/* After Traditional, so `zh-Hant-HK` takes the Hong Kong row, which Macau shares, where `:lang()` matches it. */
+:is(.md-root, .trans-view, .source-host, .md-root [lang], .trans-view [lang]):is(:lang(zh-HK), :lang(zh-MO)) {
   --font-cjk-serif: var(--font-cjk-serif-zh-hk);
   --font-cjk-sans: var(--font-cjk-sans-zh-hk);
 }
