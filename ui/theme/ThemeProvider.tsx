@@ -84,7 +84,6 @@ export function ThemeEffects() {
     document.head.appendChild(link)
   }, [])
 
-
   // Personal overrides remain independent of the selected theme.
   useEffect(() => {
     if (!config) return

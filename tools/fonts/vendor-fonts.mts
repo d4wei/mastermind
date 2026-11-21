@@ -184,11 +184,13 @@ async function replaceFile(file: string, content: Buffer | string): Promise<void
 export async function writeVendoredFonts(fontsDir: string, generated: VendoredFonts): Promise<void> {
   const texts = generatedTexts(generated)
   for (const [target, source] of generated.files) {
+    const file = path.join(fontsDir, target)
     const content = await fs.readFile(source)
-    if (!(await readOrNull(path.join(fontsDir, target)))?.equals(content)) await replaceFile(path.join(fontsDir, target), content)
+    if (!(await readOrNull(file))?.equals(content)) await replaceFile(file, content)
   }
   for (const [target, text] of texts) {
-    if ((await readOrNull(path.join(fontsDir, target)))?.toString('utf8') !== text) await replaceFile(path.join(fontsDir, target), text)
+    const file = path.join(fontsDir, target)
+    if ((await readOrNull(file))?.toString('utf8') !== text) await replaceFile(file, text)
   }
   for (const rel of await generatedFiles(fontsDir)) {
     if (!generated.files.has(rel) && !texts.has(rel)) await fs.rm(path.join(fontsDir, rel))
