@@ -68,7 +68,7 @@ it.each(['en', 'zh-CN', 'ja', 'fr'] as const)('names Save As and keeps Resolve f
     return <>{keys.map((key) => <p key={key}>{t(key)}</p>)}</>
   }
   act(() => root.render(<Copy />))
-  const lines = Array.from(host.querySelectorAll('p'), (line) => line.textContent!)
+  const lines = Array.from(host.querySelectorAll('p'), (line) => line.textContent)
   expect(lines.slice(0, 4).every((line) => line.includes(SAVE_AS[uiLang]))).toBe(true)
   expect(host.textContent).not.toMatch(/save a copy|另存副本|保存副本|resolve|解决/i)
 })

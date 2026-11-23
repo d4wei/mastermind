@@ -77,7 +77,7 @@ describe('the pack loader', () => {
     await act(async () => ready())
     await settle()
     expect(installed()).toEqual(['noto-sans-kr'])
-    const css = document.head.querySelector('style[data-font-pack]')!.textContent!
+    const css = document.head.querySelector('style[data-font-pack]')!.textContent
     const files = manifest.packs['noto-sans-kr']!.files
     expect(css).toContain(`src: url('asset://localhost/cache/noto-sans-kr/${files[0]}') format('woff2')`)
     expect(css.match(/url\('/g)).toHaveLength(files.length)

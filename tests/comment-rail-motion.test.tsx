@@ -61,7 +61,7 @@ function Harness({ detached = false, selected = null }: { detached?: boolean; se
   const [drafts, setDrafts] = useState<ReplyDraft[]>([])
   useLayoutEffect(() => { commits.push({ active, hovered, focused }) })
   return <div className="document-scroll"><article ref={detached ? undefined : docRef} />
-    <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
+    <CommentRail source={SOURCE} analysis={analysis} docRef={docRef} authorTag="reviewer"
       activeSpan={active} onActivate={setActive} hoveredSpan={hovered} focusedSpan={focused} onHover={setHovered} onFocusSpan={setFocused} onEdit={edit}
       drafts={drafts} onDraftsChange={setDrafts} /></div>
 }

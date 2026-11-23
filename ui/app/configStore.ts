@@ -36,7 +36,7 @@ export const useConfig = create<ConfigState>((set, get) => ({
     set({ saveFailed: false })
     const current = get().config
     if (current) {
-      set({ config: { ...current, ...patch } as ClientConfig })
+      set({ config: { ...current, ...patch } })
     }
     try {
       const config = await host.updateConfig(patch)

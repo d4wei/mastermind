@@ -137,11 +137,11 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
       type: 'criticSub',
       data: {
         spanIndex: -1, // patched by caller
-        old: stripLinePrefixes(original.slice(span.oldStart!, span.oldEnd!)),
-        new: stripLinePrefixes(original.slice(span.newStart!, span.newEnd!)),
+        old: stripLinePrefixes(original.slice(span.oldStart, span.oldEnd)),
+        new: stripLinePrefixes(original.slice(span.newStart, span.newEnd)),
       },
       position: synthPosition(span),
-    } as CriticSubNode
+    }
     return node as unknown as PhrasingContent
   }
   const node: CriticCommentNode = {
@@ -151,7 +151,7 @@ function makeAtom(span: CriticSpan, original: string): PhrasingContent {
       content: stripLinePrefixes(original.slice(span.innerStart, span.innerEnd)),
     },
     position: synthPosition(span),
-  } as CriticCommentNode
+  }
   return node as unknown as PhrasingContent
 }
 
@@ -257,7 +257,7 @@ export function criticTransform(
               children: done.acc,
               data: { spanIndex: spanIndexOf.get(done.span)! },
               position: synthPosition(done.span),
-            } as CriticWrapNode
+            }
             emit(wrapper as unknown as PhrasingContent)
             break
           }
@@ -275,7 +275,7 @@ export function criticTransform(
     }
     // unclosed opener (closer at a different depth) → literal
     restoreFrame()
-    parent.children = out as Parent['children']
+    parent.children = out
   }
 
   processParent(tree)

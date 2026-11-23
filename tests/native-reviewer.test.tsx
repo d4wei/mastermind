@@ -10,7 +10,7 @@ import { useDocumentLanguageHints } from '../ui/documents/language-hints'
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(), navigate: vi.fn(), load: vi.fn(), chinese: false,
   listen: vi.fn(), closeDocument: vi.fn(), prepareToClose: vi.fn(), id: null as string | null,
-  status: 'ready' as 'loading' | 'ready' | 'error', appRenders: 0, routeReads: 0,
+  status: 'ready', appRenders: 0, routeReads: 0,
   storeListeners: new Set<() => void>(),
 }))
 vi.mock('../ui/desktop/bridge', () => ({ nativeBridge: {

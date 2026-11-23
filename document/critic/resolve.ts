@@ -14,7 +14,7 @@ export function acceptEdit(text: string, span: CriticSpan): TextEdit {
     case 'del':
       return { from: span.start, to: span.end, insert: '' }
     case 'sub':
-      return { from: span.start, to: span.end, insert: text.slice(span.newStart!, span.newEnd!) }
+      return { from: span.start, to: span.end, insert: text.slice(span.newStart, span.newEnd) }
     case 'highlight':
       return { from: span.start, to: span.end, insert: text.slice(span.innerStart, span.innerEnd) }
     case 'comment':
@@ -33,7 +33,7 @@ export function rejectEdit(text: string, span: CriticSpan): TextEdit {
     case 'del':
       return { from: span.start, to: span.end, insert: text.slice(span.innerStart, span.innerEnd) }
     case 'sub':
-      return { from: span.start, to: span.end, insert: text.slice(span.oldStart!, span.oldEnd!) }
+      return { from: span.start, to: span.end, insert: text.slice(span.oldStart, span.oldEnd) }
     case 'highlight':
       return { from: span.start, to: span.end, insert: text.slice(span.innerStart, span.innerEnd) }
     case 'comment':

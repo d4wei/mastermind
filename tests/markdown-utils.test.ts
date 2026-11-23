@@ -76,7 +76,7 @@ describe('task list toggling', () => {
       }
       for (const child of (node.children ?? []) as never[]) walk(child)
     }
-    walk(tree as never)
+    walk(tree)
     return starts.sort((a, b) => a - b)
   }
 

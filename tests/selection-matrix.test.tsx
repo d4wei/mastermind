@@ -357,12 +357,12 @@ describe('the selection toolbar', () => {
     await act(async () => vi.advanceTimersByTimeAsync(120))
   }
 
-  const buttons = (): string[] => Array.from(host.querySelectorAll('.sel-toolbar > button'), (button) => button.textContent!)
+  const buttons = (): string[] => Array.from(host.querySelectorAll('.sel-toolbar > button'), (button) => button.textContent)
   const note = (): string | undefined => host.querySelector('.sel-note')?.textContent ?? undefined
   const press = (label: string): void => act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button'))
     .find((button) => button.textContent === label)!.click())
 
-  const notices = (): string[] => Array.from(host.querySelectorAll('.notification-stack .notification'), (notice) => notice.textContent!)
+  const notices = (): string[] => Array.from(host.querySelectorAll('.notification-stack .notification'), (notice) => notice.textContent)
   /** Counts announcements, including ones that replace a shown notice with the same text. */
   function countAnnouncements(): () => number {
     let count = 0

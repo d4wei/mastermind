@@ -17,7 +17,7 @@ describe('native reviewer boundary', () => {
   it('passes theme background and light/dark mode to the native appearance command', async () => {
     const invoke = vi.fn().mockResolvedValue(undefined)
     const host = createNativeHost({ invoke, listen: vi.fn() }, [])
-    await host.setAppearance!([40, 42, 54, 255], 'dark')
+    await host.setAppearance([40, 42, 54, 255], 'dark')
     expect(invoke).toHaveBeenCalledWith('set_appearance', { color: [40, 42, 54, 255], appearance: 'dark' })
   })
 

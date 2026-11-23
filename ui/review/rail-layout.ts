@@ -402,7 +402,7 @@ export class RailPlacement {
     if (this.scroller) {
       this.observer?.observe(element)
       const index = this.index.get(key)
-      if (index !== undefined && this.tops[index] !== undefined) setPixels(element, 'top', this.tops[index]!)
+      if (index !== undefined && this.tops[index] !== undefined) setPixels(element, 'top', this.tops[index])
       this.unmeasured.add(key)
     }
     return () => {
@@ -617,12 +617,12 @@ export class RailPlacement {
     // Every running move's drawn offset is read before any top is written, so reads and writes do not interleave.
     const drawn = new Map<HTMLElement, number>()
     if (motion) {
-      this.elements.forEach((element, key) => { if (!moving!.has(key) && this.moves.has(element)) drawn.set(element, drawnOffset(element)) })
+      this.elements.forEach((element, key) => { if (!moving.has(key) && this.moves.has(element)) drawn.set(element, drawnOffset(element)) })
     }
     this.elements.forEach((element, key) => {
       const index = this.index.get(key)
       if (index === undefined) return
-      if (motion && !moving!.has(key)) this.move(element, tops[index]!, motion, drawn.get(element) ?? 0)
+      if (motion && !moving.has(key)) this.move(element, tops[index]!, motion, drawn.get(element) ?? 0)
       setPixels(element, 'top', tops[index]!)
     })
     // Cards that overflow the document's end leave the same space below them as the document column does.

@@ -45,7 +45,7 @@ export function parseResolvedThreads(source: string, plain?: PlainParse): { entr
       for (const comment of raw.matchAll(/<!--[\s\S]*?(?:-->|$)/g)) {
         const rawRecord = comment[0]
         if (!rawRecord.startsWith(`<!-- ${MARKER}`)) continue
-        const range = { start: start + comment.index!, end: start + comment.index! + rawRecord.length }
+        const range = { start: start + comment.index, end: start + comment.index + rawRecord.length }
         const header = /^<!-- mastermind:resolved-thread v([^\s]+)\r?\n/.exec(rawRecord)
         let message: string | null = null
         if (!header || !rawRecord.endsWith('-->')) message = 'Malformed resolved-thread archive'

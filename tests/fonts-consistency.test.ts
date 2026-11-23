@@ -57,7 +57,7 @@ function stackRule(): postcss.Rule {
   const declaring = new Set<postcss.Rule>()
   appSheet.walkDecls(/^--font-(display|body|mono)$/, (decl) => {
     let rule = decl.parent as postcss.Rule
-    while (rule.parent?.type === 'rule') rule = rule.parent as postcss.Rule
+    while (rule.parent?.type === 'rule') rule = rule.parent
     declaring.add(rule)
   })
   expect(declaring.size).toBe(1)
@@ -143,7 +143,7 @@ describe('font presets', () => {
     const elsewhere: string[] = []
     appSheet.walkDecls(/^--font-(display|body|mono|cjk)/, (decl) => {
       let node: postcss.Node | undefined = decl
-      while (node && node !== rule) node = node.parent as postcss.Node | undefined
+      while (node && node !== rule) node = node.parent
       if (!node) elsewhere.push(decl.prop)
     })
     expect(elsewhere).toEqual([])

@@ -67,7 +67,7 @@ function Harness() {
   return <div className="document-scroll"><article ref={docRef}>
     {ANALYSIS.threads.map((card) => <mark key={card.key} data-span-index={card.spanIndex} />)}
   </article>
-    <CommentRail source={SOURCE} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
+    <CommentRail source={SOURCE} analysis={analysis} docRef={docRef} authorTag="reviewer"
       activeSpan={active} onActivate={setActive} onEdit={() => true} drafts={drafts} onDraftsChange={setDrafts} /></div>
 }
 const cards = () => [...host.querySelectorAll<HTMLElement>('.rail-card')]

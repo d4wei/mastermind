@@ -96,7 +96,7 @@ describe('the selected band across inline code', () => {
         width: this.toString().length * 10, height: code ? 13 : 16 }]
     } })
     Object.defineProperty(Element.prototype, 'getClientRects', { configurable: true, value(this: Element) {
-      return this.matches('code') ? [{ top: lineTop - 1, left: at(this, 0) * 10 - 4, width: this.textContent!.length * 10 + 8, height: 19 }] : []
+      return this.matches('code') ? [{ top: lineTop - 1, left: at(this, 0) * 10 - 4, width: this.textContent.length * 10 + 8, height: 19 }] : []
     } })
   }
   function openComment(): void {

@@ -138,7 +138,7 @@ function TransientNotification({ children, onExpire, restart }: Extract<Notifica
     onPointerLeave={() => { clock.current.hovered = false; resume() }}
     onFocus={() => { clock.current.focused = true; pause() }}
     onBlur={(event) => {
-      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+      if (event.currentTarget.contains(event.relatedTarget)) return
       clock.current.focused = false
       resume()
     }}>

@@ -138,7 +138,7 @@ describe('easing between clamps', () => {
       const animation = { keyframes, cancel: vi.fn(), finish, finished }
       animations.push(animation)
       return animation as unknown as Animation
-    }) as unknown as HTMLElement['animate']
+    })
   })
   afterEach(() => {
     document.documentElement.style.removeProperty('--dur-base')

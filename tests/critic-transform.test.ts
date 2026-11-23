@@ -12,7 +12,7 @@ function collect(tree: Node, type: string): Node[] {
   const walk = (n: Node): void => {
     if (n.type === type) out.push(n)
     const children = (n as Parent).children
-    if (children) for (const c of children) walk(c as Node)
+    if (children) for (const c of children) walk(c)
   }
   walk(tree)
   return out
@@ -23,7 +23,7 @@ function textOf(node: Node): string {
   const walk = (n: Node): void => {
     if (n.type === 'text') s += (n as unknown as { value: string }).value
     const children = (n as Parent).children
-    if (children) for (const c of children) walk(c as Node)
+    if (children) for (const c of children) walk(c)
   }
   walk(node)
   return s
@@ -135,7 +135,7 @@ describe('criticTransform via analyzeMarkdown', () => {
     }
     for (const [type, bytes] of Object.entries(expected)) {
       const node = collect(tree, type)[0]!
-      expect(source.slice(node.position!.start.offset!, node.position!.end.offset!)).toBe(bytes)
+      expect(source.slice(node.position!.start.offset, node.position!.end.offset)).toBe(bytes)
     }
     expect(collect(collect(tree, 'criticInsert')[0]!, 'strong')).toHaveLength(1)
     const comment = collect(tree, 'criticComment')[0] as CriticCommentNode

@@ -88,7 +88,7 @@ it('lets a reply post only after the whole-document check, keeping the draft whe
     const docRef = useRef<HTMLElement>(null)
     const [drafts, setDrafts] = useState<ReplyDraft[]>([])
     return <><article ref={docRef}><mark data-span-index={analysis.threads[0]!.spanIndex} /></article>
-      <CommentRail source={source} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="me"
+      <CommentRail source={source} analysis={analysis} docRef={docRef} authorTag="me"
         activeSpan={analysis.threads[0]!.spanIndex} onActivate={() => {}} onEdit={edit} drafts={drafts}
         onDraftsChange={setDrafts} /></>
   }

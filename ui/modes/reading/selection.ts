@@ -272,7 +272,7 @@ function readItems(range: Range, index: SelectableIndex, spans: readonly CriticS
     }
     else exclude(selected, (element as HTMLElement).dataset.atom === 'label' ? 'generated-text' : 'partial-code')
   }
-  const walker = root.ownerDocument!.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT)
   for (let node: Node | null = root; node; node = walker.nextNode()) {
     if (!range.intersectsNode(node)) continue
     if (node.nodeType === Node.ELEMENT_NODE) {

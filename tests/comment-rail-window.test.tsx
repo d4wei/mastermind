@@ -90,9 +90,9 @@ function Harness({ initial = SOURCE, find = false, panel = false }: { initial?: 
       <article ref={docRef}>{analysis.threads.map((card) => <p key={card.key}>
         <mark className="critic-anchor" data-span-index={card.spanIndex}>{card.anchorText}</mark>
       </p>)}</article>
-      <CommentRail source={source} analysis={analysis} docRef={docRef as RefObject<HTMLElement | null>} authorTag="reviewer"
+      <CommentRail source={source} analysis={analysis} docRef={docRef} authorTag="reviewer"
         activeSpan={active} focusedSpan={focused} onFocusSpan={setFocused} onActivate={setActive} onEdit={() => true}
-        drafts={drafts} onDraftsChange={changeDrafts as never} />
+        drafts={drafts} onDraftsChange={changeDrafts} />
     </div>
     {find && <FindPanel sessionId="window" source={source} mode="reading" docRef={docRef} analysis={analysis}
       onRevealComment={setActive} onClose={() => {}} />}

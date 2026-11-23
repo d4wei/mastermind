@@ -28,7 +28,7 @@ function fontSizes(print = false): Array<{ selectors: string[]; value: string }>
   const found: Array<{ selectors: string[]; value: string }> = []
   for (const sheet of sheets) sheet.walkDecls('font-size', (decl) => {
     const rule = decl.parent
-    if (rule?.type === 'rule' && (print || !inPrint(decl))) found.push({ selectors: (rule as postcss.Rule).selectors, value: decl.value })
+    if (rule?.type === 'rule' && (print || !inPrint(decl))) found.push({ selectors: (rule).selectors, value: decl.value })
   })
   return found
 }

@@ -286,7 +286,7 @@ export function createDocStore() {
       if (next.sessionId !== undefined) activeId = next.sessionId
       if (!activeId || !documents.has(activeId)) { publish(next); return }
       updateDocument(activeId, Object.fromEntries(documentKeys.filter((key) => key in next)
-        .map((key) => [key, next[key]])) as Partial<DocumentState>, next)
+        .map((key) => [key, next[key]])), next)
     }
     return ({
       ...releasedDocument,

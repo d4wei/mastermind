@@ -29,8 +29,8 @@ describe('scanner: the five marks', () => {
   it('extracts substitution arms', () => {
     const text = 'x {~~the old text~>the new text~~} y'
     const [sub] = scan(text)
-    expect(text.slice(sub!.oldStart!, sub!.oldEnd!)).toBe('the old text')
-    expect(text.slice(sub!.newStart!, sub!.newEnd!)).toBe('the new text')
+    expect(text.slice(sub!.oldStart, sub!.oldEnd)).toBe('the old text')
+    expect(text.slice(sub!.newStart, sub!.newEnd)).toBe('the new text')
   })
 
   it('handles empty arms and empty marks', () => {

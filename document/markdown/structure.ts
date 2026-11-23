@@ -39,7 +39,7 @@ export function readingShape(tree: Root, provenance: TextProvenance, omit: Shape
     const end = node.position?.end.offset
     const data = (node as { data?: Record<string, unknown> }).data
     if (CRITIC_TYPES.has(node.type) && omit.spanIndexes?.has(data?.spanIndex as number)) {
-      if (CRITIC_WRAPPERS.has(node.type)) for (const child of (node as Parent).children) walk(child as Nodes)
+      if (CRITIC_WRAPPERS.has(node.type)) for (const child of (node as Parent).children) walk(child)
       return
     }
     if (start !== undefined && end !== undefined && !BLOCKS.has(node.type) && inside(start, end)) return
@@ -64,7 +64,7 @@ export function readingShape(tree: Root, provenance: TextProvenance, omit: Shape
       attributes.data = content
     }
     tokens.push(`<${node.type} ${JSON.stringify(attributes)}>`)
-    for (const child of (node as Partial<Parent>).children ?? []) walk(child as Nodes)
+    for (const child of (node as Partial<Parent>).children ?? []) walk(child)
     flush()
     tokens.push(`</${node.type}>`)
   }
