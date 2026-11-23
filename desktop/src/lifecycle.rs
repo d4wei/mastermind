@@ -99,7 +99,7 @@ pub fn run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
             urls.iter()
                 .map(|url| {
                     url.to_file_path()
-                        .map_err(|_| format!("Not a local file: {url}"))
+                        .map_err(|()| format!("Not a local file: {url}"))
                 })
                 .collect(),
         );

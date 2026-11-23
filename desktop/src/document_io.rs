@@ -72,22 +72,19 @@ fn observe(
     deferred: &mpsc::Sender<PathBuf>,
     event: &notify::Event,
 ) -> bool {
-    match directories.try_lock() {
-        Ok(mut directories) => {
-            let concerns = directories.concerns(event);
-            if event.kind.is_remove() {
-                directories.forget(event.paths.iter().cloned());
-            }
-            concerns
+    if let Ok(mut directories) = directories.try_lock() {
+        let concerns = directories.concerns(event);
+        if event.kind.is_remove() {
+            directories.forget(event.paths.iter().cloned());
         }
-        Err(_) => {
-            if event.kind.is_remove() {
-                for path in &event.paths {
-                    let _ = deferred.send(path.clone());
-                }
+        concerns
+    } else {
+        if event.kind.is_remove() {
+            for path in &event.paths {
+                let _ = deferred.send(path.clone());
             }
-            true
         }
+        true
     }
 }
 
@@ -910,7 +907,9 @@ mod tests {
     fn changed(read: Result<DocumentRead, FileError>) -> Snapshot {
         match read.unwrap() {
             DocumentRead::Changed(snapshot) => snapshot,
-            unchanged => panic!("expected content, got {unchanged:?}"),
+            unchanged @ DocumentRead::Unchanged { .. } => {
+                panic!("expected content, got {unchanged:?}")
+            }
         }
     }
 

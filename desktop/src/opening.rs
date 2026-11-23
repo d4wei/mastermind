@@ -214,7 +214,7 @@ pub async fn dismiss_opening_errors(
         .run(move || docs.lock().unwrap().opening_errors.clear())
         .await
         .map_err(|e| e.to_string())
-        .inspect(|_| inventory_changed(&app))
+        .inspect(|()| inventory_changed(&app))
 }
 
 #[cfg(test)]

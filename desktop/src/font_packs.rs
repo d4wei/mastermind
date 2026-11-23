@@ -203,13 +203,12 @@ impl Packs {
     fn shared(&self, name: &str, lead: impl FnOnce() -> Outcome) -> Outcome {
         let (flight, leads) = {
             let mut flights = self.flights.lock().unwrap();
-            match flights.get(name) {
-                Some(flight) => (flight.clone(), false),
-                None => {
-                    let flight = Arc::new(Flight::default());
-                    flights.insert(name.to_owned(), flight.clone());
-                    (flight, true)
-                }
+            if let Some(flight) = flights.get(name) {
+                (flight.clone(), false)
+            } else {
+                let flight = Arc::new(Flight::default());
+                flights.insert(name.to_owned(), flight.clone());
+                (flight, true)
             }
         };
         if !leads {

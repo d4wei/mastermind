@@ -21,10 +21,10 @@ pub fn set_appearance(
                 unsafe { msg_send![view, respondsToSelector: sel!(setUnderPageBackgroundColor:)] };
             if supported {
                 let color = NSColor::colorWithSRGBRed_green_blue_alpha(
-                    red as f64 / 255.0,
-                    green as f64 / 255.0,
-                    blue as f64 / 255.0,
-                    alpha as f64 / 255.0,
+                    f64::from(red) / 255.0,
+                    f64::from(green) / 255.0,
+                    f64::from(blue) / 255.0,
+                    f64::from(alpha) / 255.0,
                 );
                 let _: () = unsafe { msg_send![view, setUnderPageBackgroundColor: &*color] };
             }

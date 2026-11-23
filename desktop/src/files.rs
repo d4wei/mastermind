@@ -886,7 +886,7 @@ mod tests {
     #[test]
     fn a_file_modified_before_1970_can_be_read_and_saved() {
         let f = Fixture::new();
-        let before_epoch = std::time::UNIX_EPOCH - std::time::Duration::from_secs(86_400);
+        let before_epoch = std::time::UNIX_EPOCH - std::time::Duration::from_hours(24);
         File::options()
             .write(true)
             .open(f.file())
@@ -990,7 +990,7 @@ mod tests {
         assert_eq!(
             handles
                 .into_iter()
-                .map(|h| h.join().unwrap() as usize)
+                .map(|h| usize::from(h.join().unwrap()))
                 .sum::<usize>(),
             1
         );

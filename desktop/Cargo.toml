@@ -45,3 +45,28 @@ objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std
 [target.'cfg(windows)'.dependencies]
 widestring = "=1.2.1"
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"] }
+
+# The lint policy; CI's -D warnings makes every warning fail the build.
+[lints.rust]
+unused_lifetimes = "warn"
+redundant_lifetimes = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Tauri commands receive State, Webview and AppHandle by value.
+needless_pass_by_value = "allow"
+# Platform variants share one signature; a variant that cannot fail still returns its Result.
+unnecessary_wraps = "allow"
+# Win32 calls take and return sizes and codes in fixed-width integers of the other signedness.
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+# Attribute and naming taste, not defects.
+must_use_candidate = "allow"
+struct_excessive_bools = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"
+# Exit codes read clearer as literal 2, 1 and 0 than as a converted bool.
+bool_to_int_with_if = "allow"
+# Suggests the bytecount crate for one test assertion.
+naive_bytecount = "allow"

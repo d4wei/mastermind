@@ -124,13 +124,12 @@ async fn take_slot(
     slots: &Arc<Semaphore>,
     stream: impl AsyncWrite + Unpin,
 ) -> Option<OwnedSemaphorePermit> {
-    match slots.clone().try_acquire_owned() {
-        Ok(permit) => Some(permit),
-        Err(_) => {
-            let busy = Response::error("busy");
-            let _ = tokio::time::timeout(BUSY_REPLY_DEADLINE, write_reply(stream, &busy)).await;
-            None
-        }
+    if let Ok(permit) = slots.clone().try_acquire_owned() {
+        Some(permit)
+    } else {
+        let busy = Response::error("busy");
+        let _ = tokio::time::timeout(BUSY_REPLY_DEADLINE, write_reply(stream, &busy)).await;
+        None
     }
 }
 

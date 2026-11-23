@@ -47,7 +47,7 @@ fn main() {
     let _ = stderr.write_all(&diagnostics);
     let _ = stderr.flush();
     let mut stdout = io::stdout().lock();
-    if let Err(error) = stdout.write_all(&response).and_then(|_| stdout.flush()) {
+    if let Err(error) = stdout.write_all(&response).and_then(|()| stdout.flush()) {
         // A partial frame cannot be repaired by appending a second response.
         let _ = writeln!(stderr, "Outcome unknown: response delivery failed: {error}");
         std::process::exit(3);

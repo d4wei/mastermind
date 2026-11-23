@@ -370,7 +370,7 @@ mod tests {
         });
         let setup = Operation::Setup(SetupRequest {
             version: VERSION,
-            setup: Default::default(),
+            setup: std::collections::BTreeMap::default(),
         });
         let close = Operation::Close(CloseRequest {
             version: VERSION,

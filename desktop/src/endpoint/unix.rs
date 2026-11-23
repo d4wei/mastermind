@@ -35,7 +35,7 @@ fn directory_owner(path: &Path) -> Option<u32> {
     use std::os::unix::fs::MetadataExt;
     fs::symlink_metadata(path)
         .ok()
-        .filter(|meta| meta.is_dir())
+        .filter(std::fs::Metadata::is_dir)
         .map(|meta| meta.uid())
 }
 
@@ -79,20 +79,20 @@ fn user_runtime_root(
     }
     env("TMPDIR")
         .filter(|dir| !dir.is_empty())
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
+        .map_or_else(|| PathBuf::from("/tmp"), PathBuf::from)
 }
 
 pub fn discover() -> io::Result<PathBuf> {
     use std::os::unix::fs::{DirBuilderExt, MetadataExt};
     // This syscall has no arguments or borrowed memory and only reads the effective user identity.
     let uid = unsafe { libc::geteuid() };
-    let path = std::env::var_os("MM_LAUNCH_CHECK_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
+    let path = std::env::var_os("MM_LAUNCH_CHECK_DIR").map_or_else(
+        || {
             user_runtime_root(|name| std::env::var_os(name), uid, directory_owner)
                 .join(format!("mastermind-launch-check-{uid}"))
-        });
+        },
+        PathBuf::from,
+    );
     // A cache root may not exist yet; missing parents are created private to the user.
     match fs::DirBuilder::new()
         .recursive(true)

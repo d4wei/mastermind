@@ -283,7 +283,6 @@ impl Setup {
     }
 
     fn snapshot_locked(
-        &self,
         state: &mut Transient,
         raw: &Map<String, Value>,
         ui_default: Option<&str>,
@@ -331,7 +330,11 @@ impl Setup {
         }
         let mut state = self.transient.lock().unwrap();
         let raw = self.read_raw()?.unwrap_or(json!({}));
-        Ok(self.snapshot_locked(&mut state, raw.as_object().unwrap(), ui_default))
+        Ok(Self::snapshot_locked(
+            &mut state,
+            raw.as_object().unwrap(),
+            ui_default,
+        ))
     }
 
     fn protect(&self, fields: Vec<String>) -> Result<Snapshot, String> {
@@ -347,7 +350,11 @@ impl Setup {
         if changed {
             state.revision += 1;
         }
-        Ok(self.snapshot_locked(&mut state, raw.as_object().unwrap(), None))
+        Ok(Self::snapshot_locked(
+            &mut state,
+            raw.as_object().unwrap(),
+            None,
+        ))
     }
 
     pub fn suggest(&self, request: SetupRequest) -> Response {
@@ -402,7 +409,11 @@ impl Setup {
         write_preferences_file(self.path.clone(), raw.clone())?;
         state.revision += 1;
         state.suggestions.clear();
-        Ok(self.snapshot_locked(&mut state, raw.as_object().unwrap(), None))
+        Ok(Self::snapshot_locked(
+            &mut state,
+            raw.as_object().unwrap(),
+            None,
+        ))
     }
 
     fn patch_preferences(&self, patch: Value) -> Result<(), String> {
@@ -912,6 +923,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn git_runs_on_macos_only_where_it_cannot_open_the_tools_installer() {
+        use std::os::unix::fs::PermissionsExt;
         use std::path::Path;
         let unreachable = || -> bool { panic!("a Git outside /usr/bin needs no check") };
         assert!(git_spawn_allowed(
@@ -930,7 +942,6 @@ mod tests {
         std::fs::write(tools.join("git"), b"").unwrap();
         let search = std::env::join_paths([&empty, &tools]).unwrap();
         assert_eq!(resolve_executable("git", &search), None);
-        use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(tools.join("git"), std::fs::Permissions::from_mode(0o755))
             .unwrap();
         assert_eq!(resolve_executable("git", &search), Some(tools.join("git")));
