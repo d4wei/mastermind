@@ -29,6 +29,17 @@ Use this entry shape:
 
 * * *
 
+## 2026-11-22 — Lint policy lives in the repository, and a rule is dropped only with a reason
+
+**Ruled.** TypeScript and JavaScript are linted by ESLint with the type-aware `typescript-eslint`
+rules and the React hooks rules; Rust by clippy's `pedantic` group through the `[lints]` table in
+`desktop/Cargo.toml`. A rule is turned off or allowed only where its findings here are a deliberate
+pattern, with the reason beside the override, and narrowing or scoping to `tests/` comes first.
+TypeScript has no formatter: its layout stays by hand. Commits that only reformat or apply
+mechanical fixes go in `.git-blame-ignore-revs`.
+
+**Beat:** lint flags kept in CI commands; a formatter that would rewrite the dense hand layout.
+
 ## 2026-11-20 — Font stacks are composed in static CSS from faces the preferences set
 
 **Ruled.** Preferences set only `var()`-free faces and `data-font-style` on the root; one rule in

@@ -17,8 +17,8 @@ static APP: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PENDING: AtomicBool = AtomicBool::new(false);
 static READY: AtomicBool = AtomicBool::new(false);
 
-/// Decides the termination reply `AppKit` awaits. `request_check` asks the subscribed renderer to check its
-/// documents and reports whether a check is now pending.
+/// Decides the termination reply `AppKit` awaits. `request_check` asks the subscribed renderer to
+/// check its documents and reports whether a check is now pending.
 fn termination_reply(
     ready: bool,
     request_check: impl FnOnce() -> bool,

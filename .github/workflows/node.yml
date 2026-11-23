@@ -12,6 +12,8 @@ on:
       - 'themes/**'
       - 'tools/desktop/build-reviewer.mts'
       - 'tools/fonts/**'
+      - 'tools/marks/**'
+      - 'tools/perf/**'
       - 'tools/translation/**'
       - 'ui/**'
       - 'package.json'
