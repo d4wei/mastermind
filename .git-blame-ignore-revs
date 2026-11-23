@@ -1,0 +1,10 @@
+# Formatting and mechanical commits that git blame skips; see the README's Develop section.
+
+# desktop: format the crate with rustfmt
+c8947817d2b1a34a36bd12c53d63d6583d8df423
+# desktop: format admission.rs as rustfmt 1.9 wants
+4d4b62747a8630d092941ab397aaa5e0b8f94010
+# lint: apply eslint autofixes
+3fc452da8d8265a86871bc81e21485bb23860b6d
+# tests: brace synchronous act callbacks
+5d72492f0340db569c39dd9044f64c8b3ec826fb

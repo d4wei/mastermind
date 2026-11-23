@@ -41,7 +41,8 @@ The tests check these; a change that needs one relaxed is a `DECISIONS.md` rulin
 
 ## Working the code
 
-- `npm run typecheck` runs both tsconfigs; both must pass. `npm test` before every commit.
+- `npm run typecheck` runs both tsconfigs; both must pass. Run it, `npm run lint` and `npm test`
+  before every commit, and `npm run lint:native` too when Rust changes.
 - Build with `npm run desktop:build` before opening files through `bin/mastermind.js` from a clone.
 - Touch `document/critic/` only with the `tests/critic-*` suites green; it is the most test-covered
   code.

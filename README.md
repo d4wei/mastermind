@@ -111,8 +111,13 @@ version control.
 npm run dev            # native app with a hot-reloading interface
 npm test               # application and tooling tests
 npm run typecheck      # browser and Node configurations
+npm run lint           # ESLint over the TypeScript and JavaScript
+npm run lint:native    # clippy and rustfmt over the desktop host
 npm run desktop:build  # native macOS app
 ```
+
+[`.git-blame-ignore-revs`](.git-blame-ignore-revs) lists formatting and mechanical commits. GitHub
+skips them in blame; locally, run `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 The [desktop host](desktop/README.md) describes the native build, the development server, and
 platform commands. The [source map](docs/source-map.md) is the implementation guide, and
