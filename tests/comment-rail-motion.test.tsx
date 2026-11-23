@@ -101,7 +101,7 @@ it('keeps a collapsing reply field mounted but inert, and focuses it when reopen
   open(0)
   expect(input.closest('[inert]')).toBeNull()
   expect(document.activeElement).toBe(input)
-  act(() => vi.advanceTimersByTime(500))
+  act(() => { vi.advanceTimersByTime(500) })
   expect(cards()[0]!.querySelector('textarea')).toBe(input)
 })
 
@@ -110,7 +110,7 @@ it('leaves with the collapse when selection moves to another card, drawn as it w
   open(0)
   const input = cards()[0]!.querySelector('textarea')!
   act(() => inputValue(input, 'A reply'))
-  act(() => vi.advanceTimersByTime(0))
+  act(() => { vi.advanceTimersByTime(0) })
   expect(cards()[0]!.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(false)
   open(1)
   const leaving = cards()[0]!.querySelector('.rail-reply')!
@@ -124,7 +124,7 @@ it('leaves with the collapse when selection moves to another card, drawn as it w
     leaving.querySelector<HTMLButtonElement>('.btn-primary')!.click()
   })
   expect(edit).not.toHaveBeenCalled()
-  act(() => vi.advanceTimersByTime(1000))
+  act(() => { vi.advanceTimersByTime(1000) })
   expect(cards()[0]!.querySelector('.rail-reply')).toBe(leaving)
   endTransition(leaving.closest('.collapsible')!)
   expect(cards()[0]!.querySelector('.rail-reply')).toBeNull()

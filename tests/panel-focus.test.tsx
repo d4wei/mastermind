@@ -28,7 +28,7 @@ function render(composer = false) {
   act(() => root.render(<SlideOver title="Comments" onClose={close} returnFocus=".test-trigger">
     {composer ? <textarea autoFocus /> : <p>Discussion</p>}
   </SlideOver>))
-  act(() => vi.advanceTimersByTime(30))
+  act(() => { vi.advanceTimersByTime(30) })
 }
 it('moves focus inside on open and restores the trigger on close', () => {
   render()
@@ -53,9 +53,9 @@ it('does not steal focus back after the user moves to another control', () => {
 })
 it('does not dismiss the panel while Escape belongs to composition', () => {
   render()
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true })))
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true })) })
   expect(close).not.toHaveBeenCalled()
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
   expect(close).toHaveBeenCalledOnce()
 })
 
@@ -92,7 +92,7 @@ it('hands focus from the overflow menu into its panel without restoring the trig
   act(() => root.render(<Harness />))
   openReaderMenu(host)
   act(() => readerMenuItem('Settings').click())
-  act(() => vi.advanceTimersByTime(100))
+  act(() => { vi.advanceTimersByTime(100) })
   expect(document.activeElement).toBe(host.querySelector('.slide-over-close'))
   act(() => host.querySelector<HTMLButtonElement>('.slide-over-close')!.click())
   expect(document.activeElement).toBe(host.querySelector('.topbar-overflow'))

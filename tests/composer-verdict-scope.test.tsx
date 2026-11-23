@@ -65,7 +65,7 @@ it('lets a selection comment submit only after the whole-document check, and sho
   const range = document.createRange()
   range.selectNodeContents(host.querySelector('span')!)
   window.getSelection()!.addRange(range)
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
   await act(async () => vi.advanceTimersByTimeAsync(120))
   act(() => button('Comment').click())
   act(() => inputValue(host.querySelector('textarea')!, 'Looks good'))

@@ -86,7 +86,7 @@ it.each(['<!-- mastermind:resolved-thread v99\nunknown\n-->', '<!-- mastermind:r
 
 function openMenu(index = 0) {
   const trigger = host.querySelectorAll<HTMLButtonElement>('.resolved-card [aria-label="More"]')[index]!
-  act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+  act(() => { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })) })
   return document.querySelector<HTMLElement>('[role="menuitem"]')!
 }
 
@@ -152,9 +152,9 @@ it('closes the card menu on Escape and leaves the panel open', () => {
   const onClose = vi.fn()
   act(() => root.render(<ResolvedThreads source={archive('{>>@Alex: note<<}')} onClose={onClose} onEdit={() => true} />))
   const item = openMenu()
-  act(() => item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(document.querySelector('[role="menuitem"]')).toBeNull()
   expect(onClose).not.toHaveBeenCalled()
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
   expect(onClose).toHaveBeenCalledTimes(1)
 })

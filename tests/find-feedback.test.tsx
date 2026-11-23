@@ -102,12 +102,12 @@ it('closes when the document overflow menu opens in the same region', () => {
 
 it('does not navigate or close while confirming IME composition', () => {
   key('f', { metaKey: true }); fill('Review')
-  act(() => input().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
+  act(() => { input().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })) })
   fill('review')
   key('Enter'); key('Escape')
   expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
   expect(host.querySelector('[role="search"]')).not.toBeNull()
-  act(() => input().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })))
+  act(() => { input().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })) })
   key('Enter', { keyCode: 229 })
   expect(host.querySelector('[role="status"]')?.textContent).toBe('1 of 2')
   key('Enter'); expect(host.querySelector('[role="status"]')?.textContent).toBe('2 of 2')

@@ -46,7 +46,7 @@ async function select(harness = <Harness />) {
   range.selectNodeContents(host.querySelector('span')!)
   window.getSelection()!.removeAllRanges()
   window.getSelection()!.addRange(range)
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
   await act(async () => vi.advanceTimersByTimeAsync(120))
 }
 async function compose(action = 'Comment', harness = <Harness />) {
@@ -69,7 +69,7 @@ it('keeps a selection composer draft while IME Escape cancels marked text', asyn
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')
   expect(edit).not.toHaveBeenCalled()
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(host.querySelector('textarea')).toBeNull()
 })
 
@@ -87,19 +87,19 @@ it('does not submit a selection composer during IME or its final legacy key', as
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')
   expect(edit).not.toHaveBeenCalled()
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenCalledOnce()
 })
 
 it('resets IME state when a selection composer is removed without blur', async () => {
   const textarea = await compose()
-  act(() => textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })))
+  act(() => { textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })) })
   const cancel = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!
   act(() => cancel.click())
   expect(host.querySelector('textarea')).toBeNull()
   act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
   const reopened = host.querySelector('textarea')!
-  act(() => reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { reopened.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(host.querySelector('textarea')).toBeNull()
   expect(edit).not.toHaveBeenCalled()
 })
@@ -110,9 +110,9 @@ it.each(['scroll', 'layout'])('keeps the composer anchored during %s changes', a
   const initialTop = toolbar.style.top
   selectionRect = { top: 300, left: 200, width: 40 } as DOMRect
   if (change === 'layout') window.getSelection()!.removeAllRanges()
-  act(() => change === 'scroll'
+  act(() => { change === 'scroll'
     ? host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll'))
-    : window.dispatchEvent(new Event(READING_LAYOUT_EVENT)))
+    : window.dispatchEvent(new Event(READING_LAYOUT_EVENT)) })
   await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(toolbar.style.top).not.toBe(initialTop)
   expect(host.querySelector('textarea')!.value).toBe('Existing draft')
@@ -124,7 +124,7 @@ it('retains an unsubmitted comment when editing pauses and prevents submit', asy
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')
   expect(textarea.readOnly).toBe(true)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
   expect(textarea.value).toBe('Existing draft')
   act(() => root.render(<Harness />))
@@ -134,11 +134,11 @@ it('retains an unsubmitted comment when editing pauses and prevents submit', asy
 it('keeps the composed comment when its edit is refused', async () => {
   const textarea = await compose()
   edit.mockReturnValueOnce(false)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenCalledTimes(1)
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenCalledTimes(2)
   expect(host.querySelector('textarea')).toBeNull()
 })
@@ -157,7 +157,7 @@ it('refuses a comment that would join the discussion beside the selection', asyn
   const textarea = await compose('Comment', <Harness text="Friday" source="Friday{>>@agent: is Friday firm?<<}" />)
   act(() => inputValue(textarea, 'prefer Monday'))
   expect(host.querySelector('[role="alert"]')!.textContent).toBe('This passage cannot anchor a comment. Select text without review delimiters.')
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
 })
 
@@ -165,7 +165,7 @@ it('prefills a replacement and submits a substitution, or a deletion when cleare
   await compose('Suggest change')
   const textarea = host.querySelector('textarea')!
   act(() => inputValue(textarea, '新段落'))
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenLastCalledWith([{ from: 0, to: 7, insert: '{~~Passage~>新段落~~}' }])
   await compose('Suggest change')
   act(() => inputValue(host.querySelector('textarea')!, ''))
@@ -181,12 +181,12 @@ it('keeps change drafts during IME and blocks unchanged, invalid, or paused subm
   expect(host.querySelector('[role="alert"]')).not.toBeNull()
   expect(host.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
   act(() => inputValue(textarea, '候选'))
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, isComposing: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
   act(() => root.render(<Harness readOnly />))
   expect(textarea.value).toBe('候选')
   expect(textarea.readOnly).toBe(true)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
 })
 
@@ -194,7 +194,7 @@ it('keeps change drafts during IME and blocks unchanged, invalid, or paused subm
 it.each(['Suggest change', 'Comment'])('keeps %s open when an earlier selection check fires after entry', async (action) => {
   await compose()
   act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
   act(() => Array.from(host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')).find((button) => button.textContent === action)!.click())
   const textarea = host.querySelector('textarea')!
   act(() => {
@@ -205,7 +205,7 @@ it.each(['Suggest change', 'Comment'])('keeps %s open when an earlier selection 
   await act(async () => vi.advanceTimersByTimeAsync(300))
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Draft survives pending selection work')
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   await compose(action)
   expect(host.querySelector('textarea')).not.toBeNull()
   expect(edit).not.toHaveBeenCalled()
@@ -273,8 +273,8 @@ it('captures the latest selection when an action beats the selection debounce', 
 it('Escape cancels a pending selection check without reviving the toolbar', async () => {
   await compose()
   act(() => Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Cancel')!.click())
-  act(() => document.dispatchEvent(new Event('selectionchange')))
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
   await act(async () => vi.advanceTimersByTimeAsync(300))
   expect(host.querySelector('.sel-toolbar')).toBeNull()
   await compose()
@@ -289,7 +289,7 @@ it('re-reads a surviving selection when the source changes under a shown toolbar
   const textarea = host.querySelector('textarea')!
   act(() => inputValue(textarea, 'Note'))
   expect(host.querySelector('[role="status"]')).toBeNull()
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenCalledWith([{ from: 0, to: 7, insert: '{==Passage==}{>>@reviewer: Note<<}' }])
 })
 
@@ -297,7 +297,7 @@ it('blocks a comment whose selected text would not reparse as its anchor', async
   const textarea = await compose('Comment', <Harness text="a ==}" />)
   expect(host.querySelector('[role="alert"]')!.textContent).toBe('This passage cannot anchor a comment. Select text without review delimiters.')
   expect(host.querySelector<HTMLButtonElement>('.btn-primary')!.disabled).toBe(true)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
 })
 
@@ -307,11 +307,11 @@ it('leaves Escape to an open settings panel', async () => {
   panel.className = 'slide-over'; panel.setAttribute('role', 'dialog')
   document.body.append(panel)
   try {
-    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
     await act(async () => vi.advanceTimersByTimeAsync(300))
     expect(host.querySelector('.sel-toolbar')).not.toBeNull()
   } finally { panel.remove() }
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
   await act(async () => vi.advanceTimersByTimeAsync(300))
   expect(host.querySelector('.sel-toolbar')).toBeNull()
 })
@@ -320,7 +320,7 @@ it('keeps a composed comment when Escape closes an open menu', async () => {
   const textarea = await compose()
   act(() => root.render(<Harness menu />))
   const item = document.querySelector<HTMLElement>('[role="menuitem"]')!
-  act(() => item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })))
+  act(() => { item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })) })
   expect(document.querySelector('[role="menuitem"]')).toBeNull()
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing draft')

@@ -353,7 +353,7 @@ describe('the selection toolbar', () => {
   async function show(source: string, needle: string, occurrence = 0, rendered = source): Promise<void> {
     act(() => root.render(<Review source={source} rendered={rendered} />))
     selectRendered(host.querySelector('article')!, needle, occurrence)
-    act(() => document.dispatchEvent(new Event('selectionchange')))
+    act(() => { document.dispatchEvent(new Event('selectionchange')) })
     await act(async () => vi.advanceTimersByTimeAsync(120))
   }
 
@@ -372,7 +372,7 @@ describe('the selection toolbar', () => {
   }
   /** Lets jsdom's queued selection events and the toolbar's debounced check run. */
   const settle = async (): Promise<void> => {
-    act(() => document.dispatchEvent(new Event('selectionchange')))
+    act(() => { document.dispatchEvent(new Event('selectionchange')) })
     // jsdom queues its own selection events, each restarting the debounce once more.
     await act(async () => vi.advanceTimersByTimeAsync(250))
   }
@@ -664,7 +664,7 @@ describe('the selection toolbar', () => {
     await show('Alpha bravo charlie.', 'charlie')
     press('Comment')
     expect(painted()).toEqual(['charlie'.length])
-    act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(banded()).toBe(false)
   })
 
@@ -679,7 +679,7 @@ describe('the selection toolbar', () => {
   it('acts on the latest of rapid reselections', async () => {
     await show('One two three.', 'One')
     selectRendered(host.querySelector('article')!, 'three')
-    act(() => document.dispatchEvent(new Event('selectionchange')))
+    act(() => { document.dispatchEvent(new Event('selectionchange')) })
     press('Suggest change')
     expect(host.querySelector('textarea')!.value).toBe('three')
   })

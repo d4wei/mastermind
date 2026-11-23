@@ -143,7 +143,7 @@ it.each(['active', 'native', 'legacy'] as const)('does not confirm on an IME can
     submit()
   })
   expect(mocks.invoke).not.toHaveBeenCalledWith('confirm_setup', expect.anything())
-  act(() => input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })))
+  act(() => { input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })) })
   await act(async () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     submit()

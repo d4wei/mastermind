@@ -70,7 +70,7 @@ function render(source: string) {
 }
 /** Escape on the selected card collapses it; the card has no separate collapse control. */
 function collapse() {
-  act(() => host.querySelector('.rail-card.active .rail-select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { host.querySelector('.rail-card.active .rail-select')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
 }
 /** Opens a discussion through its opening message's button, which also focuses its reply field. */
 function openCard(index = 0) {
@@ -79,7 +79,7 @@ function openCard(index = 0) {
 function click(label: string, index = 0) {
   if (label === 'Delete comment') {
     const trigger = host.querySelectorAll<HTMLButtonElement>('[aria-label="More"]')[index]!
-    act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+    act(() => { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })
     act(() => document.querySelector<HTMLElement>('[role="menuitem"]')!.click())
     return
   }
@@ -209,7 +209,7 @@ it('pairs Cancel and Reply as matching compact buttons and marks Delete comment 
   expect(actions.map((button) => button.textContent)).toEqual(['Cancel', 'Reply'])
   expect(actions.map((button) => button.className)).toEqual(['btn-ghost btn-compact', 'btn-primary btn-compact'])
   const trigger = host.querySelector<HTMLButtonElement>('[aria-label="More"]')!
-  act(() => trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+  act(() => { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })) })
   const item = document.querySelector('[role="menuitem"]')!
   expect(item.textContent).toBe('Delete comment')
   expect(item.firstElementChild?.tagName.toLowerCase()).toBe('svg')
@@ -229,9 +229,9 @@ it('reply textarea focus preserves activation and keyboard submission still edit
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
   })
   expect(textarea.value).toBe('Answer 中文')
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', {
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', {
     key: 'Enter', ctrlKey: true, bubbles: true,
-  })))
+  })) })
   expect(store.getState().source).toBe(source + '{>>@reviewer: Answer 中文<<}')
   expect(edit).toHaveBeenCalledTimes(1)
 })
@@ -402,7 +402,7 @@ it('disables a reply whose backtick would pair with code after the thread or who
     .find((button) => button.textContent === 'Reply')!
   type('use `x')
   expect(submit().disabled).toBe(true)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).not.toHaveBeenCalled()
   expect(host.querySelector('.rail-reply [role="alert"]')).toBeNull()
   type('see:\n- one')
@@ -432,7 +432,7 @@ it('keeps the reply draft and ignores submit while the IME handles keys', () => 
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe('Existing reply')
   expect(edit).not.toHaveBeenCalled()
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(store.getState().source).toContain('{>>@reviewer: Existing reply<<}')
 })
 
@@ -448,7 +448,7 @@ it('retains separate reply drafts when collapsing and switching discussions', ()
   openCard(1)
   expect(host.querySelector('textarea')!.value).toBe('')
   type('Second unfinished reply')
-  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(host.querySelector('textarea')).toBeNull()
   openCard(0)
   expect(host.querySelector('textarea')!.value).toBe('First unfinished reply')
@@ -461,7 +461,7 @@ it('keeps hover separate from selection and never changes card positions on hove
   render('{==first==}{>>@Alex: one<<}{>>@Sam: answer<<}')
   const card = host.querySelector<HTMLElement>('.rail-card')!
   const top = card.style.top
-  act(() => card.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+  act(() => { card.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })) })
   expect(activate).not.toHaveBeenCalled()
   expect(card.style.top).toBe(top)
   expect(card.querySelectorAll('.rail-body')).toHaveLength(1)
@@ -478,7 +478,7 @@ it('preserves the expanded thread and reading position after appending a reply',
     input.dispatchEvent(new Event('input', { bubbles: true }))
   })
   const card = host.querySelector('.rail-card')!
-  act(() => vi.advanceTimersByTime(40))
+  act(() => { vi.advanceTimersByTime(40) })
   reveal.mockClear()
   revealRange.mockClear()
   click('Reply')
@@ -486,7 +486,7 @@ it('preserves the expanded thread and reading position after appending a reply',
   expect(host.querySelectorAll('.rail-body')).toHaveLength(2)
   expect(host.querySelector('textarea')!.value).toBe('')
   expect(host.querySelector('.rail-select')!.getAttribute('aria-expanded')).toBe('true')
-  act(() => vi.advanceTimersByTime(40))
+  act(() => { vi.advanceTimersByTime(40) })
   expect(reveal).not.toHaveBeenCalled()
   expect(revealRange).not.toHaveBeenCalled()
   reveal.mockRestore()
@@ -506,7 +506,7 @@ it('retains the draft but disables mutation if a conflict arrives while replying
   expect(textarea.value).toBe('Keep this draft')
   click('Reply')
   click('Resolve')
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   click('Delete comment')
   expect(edit).not.toHaveBeenCalled()
   expect(store.getState().source).toBe('{>>@Alex: question<<}')
@@ -563,7 +563,7 @@ it('opens a reply for each passage request, including after cancelling the same 
 it('returns keyboard focus to the card when Escape closes the composer', () => {
   render('{>>@Alex: question<<}')
   openCard()
-  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(document.activeElement).toBe(host.querySelector('.rail-select'))
 })
 
@@ -657,7 +657,7 @@ it('keeps a sent reply draft when its edit does not apply', () => {
   openCard()
   typeReply('not lost')
   edit.mockImplementationOnce(() => false)
-  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })))
+  act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })) })
   expect(edit).toHaveBeenCalledTimes(1)
   expect(store.getState().source).toBe(source)
   expect(host.querySelector<HTMLTextAreaElement>('.rail-reply textarea')!.value).toBe('not lost')
@@ -674,7 +674,7 @@ it('discards a reply draft on Cancel but keeps it through Escape', () => {
   }
   openCard()
   type('kept')
-  act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   openCard()
   expect(host.querySelector('textarea')!.value).toBe('kept')
   click('Cancel')

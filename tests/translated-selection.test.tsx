@@ -53,7 +53,7 @@ function select(crossBlock = false) {
     crossBlock ? 6 : quote.length)
   range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 40 } as DOMRect)
   const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range)
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
 }
 function compose() {
   select()
@@ -143,7 +143,7 @@ it('preserves the translated-comment draft across IME cancellation without submi
   expect(host.querySelector('textarea')).toBe(textarea)
   expect(textarea.value).toBe(draft)
   expect(useDoc.getState().source).toBe(source)
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(host.querySelector('textarea')).toBeNull()
 })
 

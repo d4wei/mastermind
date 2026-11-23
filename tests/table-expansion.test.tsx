@@ -100,7 +100,7 @@ it('restores horizontal position and only fades edges with hidden content', asyn
   const scroll = host.querySelector<HTMLElement>('.md-table-scroll')!
   const frame = scroll.parentElement!
   expect(frame.dataset.left).toBe('false'); expect(frame.dataset.right).toBe('true')
-  scroll.scrollLeft = 400; act(() => scroll.dispatchEvent(new Event('scroll')))
+  scroll.scrollLeft = 400; act(() => { scroll.dispatchEvent(new Event('scroll')) })
   expect(frame.dataset.left).toBe('true'); expect(frame.dataset.right).toBe('false')
   toggle(); await finish(); expect(scroll.scrollLeft).toBe(0)
   toggle(); await finish(); expect(scroll.scrollLeft).toBe(400)
@@ -137,18 +137,18 @@ it('collapses immediately when a discussion needs the comment rail', async () =>
 it('returns focus on Escape while leaving composer Escape alone', async () => {
   await show(<Harness />); toggle(); await finish()
   const input = document.createElement('textarea'); host.append(input)
-  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  act(() => { input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) }); await finish()
   expect(document.activeElement).toBe(host.querySelector('.md-table-toggle'))
 })
 it('ignores an Escape the input method consumes after composition ends', async () => {
   await show(<Harness />); toggle(); await finish()
   const imeEscape = new KeyboardEvent('keydown', { key: 'Escape' })
   Object.defineProperty(imeEscape, 'keyCode', { value: 229 })
-  act(() => window.dispatchEvent(imeEscape)); await finish()
+  act(() => { window.dispatchEvent(imeEscape) }); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) }); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
 })
 it('uses current geometry when reversed mid-transition and honors reduced motion', async () => {
@@ -164,7 +164,7 @@ it('settles an interrupted expansion at the resized viewport bounds', async () =
   await show(<Harness />); toggle()
   await act(async () => { vi.advanceTimersByTime(80) })
   windowWidth = 900
-  act(() => window.dispatchEvent(new Event('resize')))
+  act(() => { window.dispatchEvent(new Event('resize')) })
   await finish()
   expect(host.querySelector<HTMLElement>('.md-table-viewport')!.style.width).toBe('868px')
   expect(host.querySelector('aside')!.getAttribute('data-hidden')).toBe('true')
@@ -175,17 +175,17 @@ it('leaves Escape to an open settings panel', async () => {
   panel.className = 'slide-over'; panel.setAttribute('role', 'dialog')
   document.body.append(panel)
   try {
-    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+    act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) }); await finish()
     expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('true')
   } finally { panel.remove() }
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))); await finish()
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) }); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
 })
 it('collapses on Escape while the panel it hid stays open', async () => {
   closePanel.mockClear()
   await show(<Harness panel />); toggle(); await finish()
   expect(host.querySelector('aside')!.hasAttribute('inert')).toBe(true)
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))); await finish()
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })) }); await finish()
   expect(host.querySelector('.md-table-toggle')!.getAttribute('aria-expanded')).toBe('false')
   expect(closePanel).not.toHaveBeenCalled()
 })

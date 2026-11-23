@@ -152,7 +152,7 @@ describe('the selected band across inline code', () => {
     await settle()
     expect(band()).toEqual([{ top: 99, left: 40, width: 160, height: 19 }])
     expect(marks()).toEqual([[], []])
-    act(() => host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+    act(() => { host.querySelector('textarea')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(layer()).toBeNull()
   })
 

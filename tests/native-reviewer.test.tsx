@@ -657,7 +657,7 @@ it('disables native Find at home and forwards its menu event when a document is 
   expect(mocks.invoke).toHaveBeenCalledWith(...menuState(true))
   const requests = useOverlay.getState().findRequest
   const listener = mocks.listen.mock.calls.find(([event]) => event === 'find-requested')![1]
-  act(() => listener())
+  act(() => { listener() })
   expect(useOverlay.getState().findRequest).toBe(requests + 1)
 })
 

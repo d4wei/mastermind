@@ -33,7 +33,7 @@ it('opens on keyboard focus and dismisses with Escape without reopening', () => 
   act(() => trigger.focus())
   expect(trigger.getAttribute('aria-expanded')).toBe('true')
   act(() => host.querySelector<HTMLButtonElement>('.nav-outline button')!.focus())
-  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
   expect(document.activeElement).toBe(trigger)
   expect(host.querySelector('.nav-outline')).toBeNull()
 })
@@ -44,7 +44,7 @@ it('navigates on every mouse selection when the trigger retains focus between op
   const nav = host.querySelector('nav')!
   const trigger = host.querySelector<HTMLButtonElement>('.outline-progress')!
   for (let index = 0; index < 4; index++) {
-    act(() => nav.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })))
+    act(() => { nav.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })) })
     const heading = host.querySelectorAll<HTMLButtonElement>('.nav-outline button')[index % 2]!
     act(() => {
       const defaultsAllowed = heading.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
@@ -102,7 +102,7 @@ it('tracks the active heading as the document scrolls', () => {
   act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   scroll = 600
-  act(() => window.dispatchEvent(new Event('scroll')))
+  act(() => { window.dispatchEvent(new Event('scroll')) })
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(host.querySelectorAll('.outline-tick.active')).toHaveLength(1)
 })
@@ -135,11 +135,11 @@ it('tracks Markdown headings from editor geometry without rendered heading eleme
   act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   scroll = 700
-  act(() => window.dispatchEvent(new Event('scroll')))
+  act(() => { window.dispatchEvent(new Event('scroll')) })
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(host.querySelectorAll('.outline-tick.active')).toHaveLength(1)
   act(() => root.render(<Navigator {...props} source={null} />))
-  act(() => window.dispatchEvent(new Event('scroll')))
+  act(() => { window.dispatchEvent(new Event('scroll')) })
 })
 
 it('tracks element scrolling while the window stays stationary', () => {
@@ -158,7 +158,7 @@ it('tracks element scrolling while the window stays stationary', () => {
   act(() => root.render(<Navigator {...props} />))
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('First')
   viewport.scrollTop = 600
-  act(() => viewport.dispatchEvent(new Event('scroll')))
+  act(() => { viewport.dispatchEvent(new Event('scroll')) })
   expect(host.querySelector('.outline-progress')?.getAttribute('aria-label')).toContain('Second')
   expect(window.scrollY).toBe(0)
   viewport.remove()
@@ -237,7 +237,7 @@ function renderTall(count: number, windowPx: number, { startAt = 0, queueFrames 
     activeIndex: () => Array.from(host.querySelectorAll('.outline-tick')).findIndex((tick) => tick.classList.contains('active')),
     scrollTo(index: number) {
       scroll = index * 100
-      act(() => window.dispatchEvent(new Event('scroll')))
+      act(() => { window.dispatchEvent(new Event('scroll')) })
     },
     resize(height: number) {
       view.height = height

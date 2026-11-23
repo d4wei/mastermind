@@ -120,7 +120,7 @@ it('disables review actions and shows the read-only notice for a lossy document'
   range.selectNodeContents(host.querySelector('article p')!.firstChild!)
   window.getSelection()!.removeAllRanges()
   window.getSelection()!.addRange(range)
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
   await act(async () => vi.advanceTimersByTimeAsync(120))
   const actions = [...host.querySelectorAll<HTMLButtonElement>('.sel-toolbar button')]
   expect(actions.map((button) => button.textContent)).toEqual(['Suggest change', 'Comment'])

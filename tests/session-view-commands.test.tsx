@@ -44,7 +44,7 @@ it('toggles the comment rail and publishes its state for the native menu', () =>
   act(() => requestViewCommand('toggle-comments'))
   // The published state turns at once while the rail fades out.
   expect(useCommentRail.getState()).toEqual({ available: true, open: false })
-  act(() => vi.advanceTimersByTime(120))
+  act(() => { vi.advanceTimersByTime(120) })
   expect(host.querySelector('[data-testid="rail"]')).toBeNull()
   act(() => requestViewCommand('toggle-comments'))
   expect(host.querySelector('[data-testid="rail"]')).not.toBeNull()

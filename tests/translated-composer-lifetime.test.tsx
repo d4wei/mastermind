@@ -38,7 +38,7 @@ beforeEach(async () => {
   const range = document.createRange(); range.selectNodeContents(text)
   range.getBoundingClientRect = () => ({ top: 100, left: 100, width: 50 } as DOMRect)
   window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range)
-  act(() => document.dispatchEvent(new Event('selectionchange')))
+  act(() => { document.dispatchEvent(new Event('selectionchange')) })
   act(() => host.querySelector<HTMLButtonElement>('.sel-toolbar button')!.click())
   const textarea = host.querySelector<HTMLTextAreaElement>('.sel-composer textarea')!
   act(() => {

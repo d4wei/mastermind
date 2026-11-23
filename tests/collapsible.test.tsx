@@ -87,7 +87,7 @@ it('keeps closing content mounted, inert and hidden, until the row\'s transition
   expect(section()!.hasAttribute('inert')).toBe(true)
   expect(section()!.getAttribute('aria-hidden')).toBe('true')
   expect(section()!.getAttribute('data-settles-to')).toBe('0')
-  act(() => vi.advanceTimersByTime(1000))
+  act(() => { vi.advanceTimersByTime(1000) })
   expect(field()).toBe(input)
   endRow('margin-top')
   expect(field()).toBe(input)
