@@ -64,7 +64,7 @@ export function MarkGutter({ docRef, marks }: Props) {
       ro.disconnect()
       window.removeEventListener('resize', schedule)
     }
-  }, [measure])
+  }, [docRef, measure])
 
   useEffect(() => {
     const onScroll = (): void => {

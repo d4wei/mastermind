@@ -172,7 +172,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
       else placement.reveal(card.key, target)
     })
     return () => cancelAnimationFrame(frame)
-  }, [activeSpan, cardAt])
+  }, [placement, activeSpan, cardAt])
 
   // The selected card reads the reveal as it renders, and keeps what it showed once the request clears.
   useEffect(() => { if (revealRequest) onRevealHandled?.() }, [revealRequest, onRevealHandled])
@@ -185,7 +185,7 @@ export function CommentRail({ analysis, source, docRef, authorTag, activeSpan, h
     const input = placement.element(key)?.querySelector('textarea')
     input?.focus({ preventScroll: true })
     pendingFocus.current = input && document.activeElement !== input ? key : null
-  }, [readOnly])
+  }, [placement, readOnly])
   useLayoutEffect(() => {
     const key = pendingFocus.current
     if (key === null) return

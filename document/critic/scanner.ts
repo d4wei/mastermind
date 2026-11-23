@@ -142,6 +142,7 @@ export function scan(
   return spans
 }
 
+// eslint-disable-next-line no-control-regex -- an author name excludes the C0 control characters
 const AUTHOR_RE = /^\s*@([^:@{}<>=|\x00-\x1f\u2028\u2029]{1,64}):\s?/
 
 /**

@@ -18,7 +18,6 @@ import { threadRef, locateThread, refreshReplies } from '../../ui/review/thread-
 import { textMatches } from '../../ui/find/matches'
 import { calloutSections, calloutKind } from '../../ui/modes/reading/callouts'
 import { commentSearchText } from '../../ui/review/CommentBody'
-// @ts-expect-error -- plain ESM helper without declarations
 import { ensureFixture } from './fixtures.mjs'
 
 function median(fn: () => unknown, runs: number, warm = 3) {

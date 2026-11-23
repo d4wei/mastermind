@@ -1,4 +1,4 @@
-import type { ComponentType, SVGProps } from 'react'
+import type { SVGProps } from 'react'
 import {
   EnterFullScreenIcon,
   ExitFullScreenIcon,
@@ -22,8 +22,9 @@ import {
 type IconProps = SVGProps<SVGSVGElement>
 
 /** Icons are decorative; their controls supply accessible names and tooltips. */
-function radix(Icon: ComponentType<any>, size: number) {
-  return function RadixGlyph(props: IconProps) {
+function radix(Icon: typeof RGearIcon, size: number) {
+  // A Radix glyph draws its own path and accepts no children.
+  return function RadixGlyph({ children: _, ...props }: IconProps) {
     return <Icon width={size} height={size} aria-hidden focusable={false} {...props} />
   }
 }

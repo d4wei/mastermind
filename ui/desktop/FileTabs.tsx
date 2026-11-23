@@ -71,7 +71,7 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
 
   useLayoutEffect(() => {
     if (closePrompt) { selecting.current = true; setOpen(false) }
-  }, [closePrompt])
+  }, [closePrompt, setOpen])
   useLayoutEffect(() => {
     const pending = pendingFocus.current
     if (!pending || files.some((file) => file.id === pending.id)) return
@@ -85,7 +85,7 @@ export function FileTabs({ files, activeId, language, needsAttention, onSelect, 
     target?.focus()
     target?.scrollIntoView?.({ block: 'nearest' })
     if (!files.length) setOpen(false)
-  }, [files, activeId, open])
+  }, [files, activeId, open, setOpen])
 
   useLayoutEffect(() => {
     if (open || selectedFocus.current !== activeId) return

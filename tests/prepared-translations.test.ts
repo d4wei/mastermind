@@ -62,7 +62,7 @@ it('rejects a source change while saving the translation and leaves the earlier 
   const originalWrite = fs.writeFile.bind(fs)
   vi.spyOn(fs, 'writeFile').mockImplementation(async (...args: Parameters<typeof fs.writeFile>) => {
     await originalWrite(...args)
-    if (String(args[0]).endsWith('.tmp')) await originalWrite(file, 'Changed narrative')
+    if (typeof args[0] === 'string' && args[0].endsWith('.tmp')) await originalWrite(file, 'Changed narrative')
   })
   await expect(savePreparedTranslation(file, source, 'en', 'zh-CN', valid)).rejects.toThrow('source changed')
   expect(JSON.parse(await fs.readFile(translationFile(file, 'zh-CN'), 'utf8'))).toEqual(valid)
@@ -85,7 +85,7 @@ it.each(['write', 'rename'])('preserves the previous artifact and cleans tempora
   if (operation === 'write') {
     const write = fs.writeFile.bind(fs)
     vi.spyOn(fs, 'writeFile').mockImplementation(async (...args: Parameters<typeof fs.writeFile>) => {
-      if (String(args[0]).endsWith('.tmp')) {
+      if (typeof args[0] === 'string' && args[0].endsWith('.tmp')) {
         await write(args[0], 'partial temporary artifact')
         throw new Error('injected artifact write failure')
       }

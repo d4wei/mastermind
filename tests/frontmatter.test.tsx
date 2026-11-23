@@ -116,7 +116,7 @@ describe('YAML frontmatter', () => {
   })
 
   it('preserves metadata as an untranslated source block', async () => {
-    const blocks = await segmentBlocks(metadata + '\n\nBody.')
+    const blocks = segmentBlocks(metadata + '\n\nBody.')
     expect(blocks[0]).toMatchObject({ kind: 'yaml', text: metadata, translatable: false })
     expect(blocks[1]).toMatchObject({ kind: 'paragraph', text: 'Body.', translatable: true })
   })

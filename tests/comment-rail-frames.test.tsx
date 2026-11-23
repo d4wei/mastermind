@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useMemo, useRef, useState, type RefObject } from 'react'
+import { act, useMemo, useRef, useState } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Root } from 'react-dom/client'
 import { analyzeMarkdown } from '../document/markdown/analyze'
@@ -92,7 +92,7 @@ it('places an easing card frame by frame without rendering cards or looking anch
   const lookups = vi.fn()
   for (const target of [Element.prototype, Document.prototype]) {
     for (const method of ['querySelector', 'querySelectorAll'] as const) {
-      const original = target[method] as (selectors: string) => unknown
+      const original: (selectors: string) => unknown = target[method]
       vi.spyOn(target, method).mockImplementation(function (this: ParentNode, selectors: string) {
         if (selectors.includes('data-span-index')) lookups(selectors)
         return original.call(this, selectors)

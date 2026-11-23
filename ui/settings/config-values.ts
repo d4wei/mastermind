@@ -24,7 +24,7 @@ function acceptsConfigValue(key: keyof MastermindConfig, value: unknown): boolea
 export function storedConfig(saved: unknown): MastermindConfig {
   const config: Record<string, unknown> = { ...DEFAULT_CONFIG }
   if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
-    for (const [key, value] of Object.entries(saved)) {
+    for (const [key, value] of Object.entries(saved as Record<string, unknown>)) {
       if (!knownKey(key) || key === 'version') continue
       const accepted = key === 'authorTag' && typeof value === 'string' ? usableAuthorName(value) : value
       if (accepted !== null && acceptsConfigValue(key, accepted)) config[key] = accepted

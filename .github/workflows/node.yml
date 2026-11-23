@@ -7,6 +7,7 @@ on:
       - '.github/workflows/node.yml'
       - 'bin/**'
       - 'document/**'
+      - 'eslint.config.js'
       - 'tests/**'
       - 'themes/**'
       - 'tools/desktop/build-reviewer.mts'
@@ -37,4 +38,5 @@ jobs:
       - run: npx --no-install patch-package
       # The install skipped scripts; the test setup generates the fonts its postinstall would have.
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test

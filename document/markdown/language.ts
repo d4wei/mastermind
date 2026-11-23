@@ -139,7 +139,10 @@ export function primarySubtag(tag: string): string {
  */
 function detectedLanguage(profile: ScriptProfile): string | undefined {
   let kana = 0, hangul = 0
-  for (const block of profile.marked) block.kana ? kana++ : hangul++
+  for (const block of profile.marked) {
+    if (block.kana) kana++
+    else hangul++
+  }
   if (kana > 0 && kana >= hangul && kana >= profile.hanOnly) return 'ja'
   if (hangul > 0 && hangul >= profile.hanOnly) return 'ko'
   return profile.hanOnly > 0 ? 'zh-CN' : undefined

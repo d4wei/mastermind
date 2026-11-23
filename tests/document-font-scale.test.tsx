@@ -43,6 +43,7 @@ function pixels(value: string, tokens: Record<string, string>, parentPx: number)
   expression = expression.replace(/calc/g, '').replace(/(\d*\.?\d+)(rem|em|px)/g, (_, number: string, unit: string) =>
     String(Number(number) * (unit === 'rem' ? ROOT_PX : unit === 'em' ? parentPx : 1)))
   if (!/^[\d.\s+\-*/()]+$/.test(expression)) throw new Error(`cannot evaluate ${value}`)
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- evaluates arithmetic the pattern above admits
   return Number(Function(`return (${expression})`)())
 }
 

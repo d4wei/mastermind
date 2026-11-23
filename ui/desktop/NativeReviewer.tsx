@@ -73,7 +73,7 @@ export function NativeReviewer() {
       .catch((error) => setError(String(error)))
   }, [id])
   const answerCloseRequest = useRef<(request: CloseFilesRequest) => Promise<RequestedCloseResult[]>>(
-    async ({ ids }) => unavailable(ids))
+    ({ ids }) => Promise.resolve(unavailable(ids)))
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const homeMotion = useRef<ReturnType<typeof createHomeMotion> | null>(null)
   const atHome = files.length === 0 && setupRequired === false

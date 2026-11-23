@@ -3,6 +3,7 @@ import { Text } from '@codemirror/state'
 
 export interface Match { from: number; to: number }
 
+// eslint-disable-next-line no-control-regex -- the ASCII range starts at NUL
 const ASCII = /^[\x00-\x7f]*$/
 
 export function isAscii(text: string): boolean {

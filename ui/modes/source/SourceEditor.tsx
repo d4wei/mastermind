@@ -131,6 +131,7 @@ export function SourceEditor({ lang, onOutline }: {
             sourceSearchExtension,
           ],
         })
+    // eslint-disable-next-line prefer-const -- declared before the view whose dispatch reads it, bound once the view exists
     let searchBinding: ReturnType<typeof attachSourceSearch> | undefined
     const view = new EditorView({
       state,

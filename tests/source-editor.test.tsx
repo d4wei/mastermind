@@ -4,7 +4,7 @@ import { EditorView, runScopeHandlers } from '@codemirror/view'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { installHost } from '../ui/app/host'
+import { installHost, type ReviewerHost } from '../ui/app/host'
 import { fakeHost } from './helpers/host'
 import type { SourceOutline } from '../ui/app/Navigator'
 import { useDoc } from '../ui/documents/store'
@@ -16,9 +16,9 @@ vi.mock('../document/markdown/scan', async (importOriginal) => {
   return { ...actual, scanMarkdown: vi.fn(actual.scanMarkdown) }
 })
 
-const getFile = vi.fn()
-const getSession = vi.fn()
-const putFile = vi.fn()
+const getFile = vi.fn<ReviewerHost['getFile']>()
+const getSession = vi.fn<ReviewerHost['getSession']>()
+const putFile = vi.fn<ReviewerHost['putFile']>()
 
 let host: HTMLDivElement
 let root: Root
@@ -51,8 +51,8 @@ beforeEach(async () => {
   disk.set(a, 'alpha')
   disk.set(b, 'beta')
   vi.mocked(getSession).mockReset().mockImplementation(async (id) => ({
-    id, displayName: id, path: id,
-  }) as never)
+    sessionId: id, displayName: id, path: id,
+  }))
   vi.mocked(getFile).mockReset().mockImplementation(async (id) => ({
     content: disk.get(id)!, version: `${id}:${disk.get(id)}`,
   }))

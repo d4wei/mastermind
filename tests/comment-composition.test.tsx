@@ -110,9 +110,10 @@ it.each(['scroll', 'layout'])('keeps the composer anchored during %s changes', a
   const initialTop = toolbar.style.top
   selectionRect = { top: 300, left: 200, width: 40 } as DOMRect
   if (change === 'layout') window.getSelection()!.removeAllRanges()
-  act(() => { change === 'scroll'
-    ? host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll'))
-    : window.dispatchEvent(new Event(READING_LAYOUT_EVENT)) })
+  act(() => {
+    if (change === 'scroll') host.querySelector('.document-scroll')!.dispatchEvent(new Event('scroll'))
+    else window.dispatchEvent(new Event(READING_LAYOUT_EVENT))
+  })
   await act(async () => vi.advanceTimersByTimeAsync(32))
   expect(toolbar.style.top).not.toBe(initialTop)
   expect(host.querySelector('textarea')!.value).toBe('Existing draft')

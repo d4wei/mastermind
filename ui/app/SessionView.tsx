@@ -221,9 +221,11 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     showTranslated ? translation.targetLang ?? undefined : undefined])], [languages, showTranslated, translation.targetLang])
   useFontPacks(shownLanguages, fontStyle)
   // Reuse the critic-aware reading tree; Markdown mode reads a plain parse.
+  const plainTree = plainParse?.tree
+  const plainSource = plainParse?.source
   const outline = useMemo(
-    () => (analysis ? extractOutline(analysis.tree) : plainParse ? extractOutline(plainParse.tree) : []),
-    [analysis, plainParse?.tree],
+    () => (analysis ? extractOutline(analysis.tree) : plainTree ? extractOutline(plainTree) : []),
+    [analysis, plainTree],
   )
   const [sourceOutline, setSourceOutline] = useState<SourceOutline | null>(null)
   const smallWindow = useIsNarrow()
@@ -238,7 +240,8 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   }, [])
   const panel = useOverlay((s) => s.owner === sessionId && (s.open === 'settings' || s.open === 'resolved') ? s.open : null)
   const resolvedCount = useMemo(() => analysis ? countResolvedThreads(source, analysis.plain)
-    : plainParse ? countResolvedThreads(plainParse.source, plainParse.tree) : 0, [analysis, source, plainParse?.tree])
+    : plainTree && plainSource !== undefined ? countResolvedThreads(plainSource, plainTree) : 0,
+  [analysis, source, plainSource, plainTree])
   const togglePanel = useCallback((next: 'settings' | 'resolved') => {
     if (narrow) setRailOpen(false)
     const { open, owner } = useOverlay.getState()
@@ -464,7 +467,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     (e: React.MouseEvent) => {
       // a drag-to-select that ends inside a deletion shouldn't also undo it
       if (window.getSelection()?.isCollapsed === false) return
-      const del = (e.target as HTMLElement).closest('.critic-del') as HTMLElement | null
+      const del = (e.target as HTMLElement).closest<HTMLElement>('.critic-del')
       if (del && undoDeletion(del)) return
       activateThread(e.target)
     },
@@ -482,7 +485,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
   const onArticleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return
-      const del = (e.target as HTMLElement).closest('.critic-del') as HTMLElement | null
+      const del = (e.target as HTMLElement).closest<HTMLElement>('.critic-del')
       if (del) {
         e.preventDefault()
         undoDeletion(del)
@@ -500,7 +503,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     if (activeSpan !== null) {
       doc.querySelector(`.critic[data-span-index="${activeSpan}"]`)?.classList.add('active')
     }
-  }, [activeSpan, analysis])
+  }, [articleRef, activeSpan, analysis])
 
   useEffect(() => {
     const doc = articleRef.current
@@ -509,7 +512,7 @@ function DocumentView({ sessionId }: { sessionId: string }) {
     for (const span of [hoveredSpan, focusedSpan]) {
       if (span !== null) doc.querySelector(`.critic[data-span-index="${span}"]`)?.classList.add('paired')
     }
-  }, [hoveredSpan, focusedSpan, analysis])
+  }, [articleRef, hoveredSpan, focusedSpan, analysis])
 
   const hasThreads = (analysis?.items.some((i) => i.type === 'thread') ?? false) ||
     replyDrafts.some((draft) => !!draft.text.trim())

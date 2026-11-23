@@ -87,7 +87,7 @@ export function createNativeHost(bridge: NativeBridge, themes: ThemeInfo[]): Rev
       preferenceWrite = write
       return write
     },
-    themes: async () => themes,
+    themes: () => Promise.resolve(themes),
     subscribe(id, listener) {
       subscribers.set(id, (subscribers.get(id) ?? 0) + 1)
       let closed = false

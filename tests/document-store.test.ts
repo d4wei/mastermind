@@ -29,8 +29,8 @@ beforeEach(() => {
       return saved
     },
     async getFile(id) {
-      return unwrap<FileResponse>(await (reads.get(id)?.promise ?? disks.get(id)
-        ?? { content: id, version: `${id}-1` }))
+      return unwrap<FileResponse>(await (reads.get(id)?.promise ?? Promise.resolve(disks.get(id)
+        ?? { content: id, version: `${id}-1` })))
     },
     async getSession(id) { return { sessionId: id, displayName: id, path: id } },
   }))

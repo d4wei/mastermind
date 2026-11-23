@@ -1,7 +1,7 @@
 import { READING_LAYOUT_EVENT } from '../../app/reading-space'
 import { escapeOwner } from '../../app/constants'
 import { useDraftGuard, useDraftState } from '../../review/drafts'
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type RefObject } from 'react'
+import { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type RefObject } from 'react'
 import { useOverlay } from '../../app/overlayStore'
 import type { Analysis } from '../../../document/markdown/analyze'
 import type { TextEdit } from '../../../document/types'
@@ -214,11 +214,11 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   /** Set when the source changes under a shown toolbar, so the next check re-reads its selection. */
   const reread = useRef(false)
   const selectionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cancelSelectionCheck = (): void => {
+  const cancelSelectionCheck = useCallback((): void => {
     if (selectionTimer.current !== null) clearTimeout(selectionTimer.current)
     selectionTimer.current = null
-  }
-  const dismiss = (): void => {
+  }, [])
+  const dismiss = useCallback((): void => {
     cancelSelectionCheck()
     composingRef.current = false
     applied.current = null
@@ -226,9 +226,9 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     setComment('')
     setReplacements([])
     setActive(null)
-  }
+  }, [cancelSelectionCheck, setComposing, setComment, setReplacements, setActive])
   /** The current selection's coverage; null when nothing is selected, undefined while its DOM is outdated. */
-  const readSelection = (): Reading | null | undefined => {
+  const readSelection = useCallback((): Reading | null | undefined => {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed || !containerRef.current) return null
     const range = sel.getRangeAt(0)
@@ -238,7 +238,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
     selectedRange.current = range.cloneRange()
     return { excluded: mapped.excluded, parts: mapped.fragments, active: { source: mapped.revision,
       ranges: mapped.segments, fragments: mapped.fragments.map((part) => part.range), rect: rectOf(range) } }
-  }
+  }, [containerRef, source, analysis])
   /** Whether the document selection is still the one this toolbar set. */
   const echoesTrim = (): boolean => {
     const own = applied.current
@@ -331,8 +331,9 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       window.removeEventListener('blur', blur)
       cancelSelectionCheck()
     }
-  }, [containerRef, source, analysis])
+  }, [containerRef, source, analysis, readSelection, setActive, cancelSelectionCheck])
 
+  const shown = !!active
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (ime.isComposing(e) || e.defaultPrevented) return
@@ -355,7 +356,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       })
     }
     const scrollTarget = documentViewport().target
-    if (active) {
+    if (shown) {
       window.addEventListener('keydown', onKey)
       scrollTarget.addEventListener('scroll', onScroll, { passive: true, capture: true })
       window.addEventListener(READING_LAYOUT_EVENT, onScroll)
@@ -368,7 +369,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
       window.removeEventListener(TABLE_LAYOUT_EVENT, onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [!!active])
+  }, [shown, ime, dismiss, setActive])
 
   const meaningful = composing === 'comment' ? !!comment.trim() : composing === 'change' &&
     !!active && replacements.some((text, index) => text !== active.ranges[index]?.text)
@@ -399,7 +400,7 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   // Find opening or closing moves the ceiling below; re-render once its bar is in the DOM.
   const findOpen = useOverlay((s) => s.open === 'find')
   const [, relayout] = useReducer((n: number) => n + 1, 0)
-  useLayoutEffect(relayout, [findOpen])
+  useLayoutEffect(() => relayout(), [findOpen])
   if (active) lastActive.current = active
   const view = active ?? lastActive.current
   // The analysis describes only the current source; an open composer on a stale view analyzes its
@@ -407,21 +408,22 @@ export function SelectionToolbar({ containerRef, source, analysis, authorTag, on
   const viewSource = view?.source
   const viewAnalysis = useMemo(() => !composing || viewSource === undefined ? undefined
     : viewSource === source ? analysis : analyzeMarkdown(viewSource), [composing, viewSource, source, analysis])
-  const verify = (text: string, changes: readonly string[], scope: VerifyScope): MarkVerdict => {
-    if (!view) return { edits: [] }
-    return composing === 'change' ? changeVerdict(view.source, view.ranges, changes, viewAnalysis, scope)
+  const viewRanges = view?.ranges
+  const verify = useCallback((text: string, changes: readonly string[], scope: VerifyScope): MarkVerdict => {
+    if (viewSource === undefined || !viewRanges) return { edits: [] }
+    return composing === 'change' ? changeVerdict(viewSource, viewRanges, changes, viewAnalysis, scope)
       : composing === 'comment' && text.trim()
-        ? commentVerdict(view.source, view.ranges, authorTag, text, viewAnalysis, scope)
+        ? commentVerdict(viewSource, viewRanges, authorTag, text, viewAnalysis, scope)
         : { edits: [] }
-  }
+  }, [composing, viewSource, viewRanges, viewAnalysis, authorTag])
   // The composer's verdict checks only the edited blocks, follows the deferred text, and is kept
   // across renders, such as scroll frames, that change none of its inputs; submission verifies the
   // final text in the whole document, and its refusal stands until the draft or selection changes.
   const deferredComment = useDeferredValue(comment)
   const deferredReplacements = useDeferredValue(replacements)
   const draftVerdict = useMemo(() => verify(deferredComment, deferredReplacements, 'block'),
-    [composing, view?.source, view?.ranges, deferredComment, deferredReplacements, viewAnalysis, authorTag])
-  const submission = useStandingRefusal(draftVerdict, [source, view?.ranges, composing, deferredComment, deferredReplacements])
+    [verify, deferredComment, deferredReplacements])
+  const submission = useStandingRefusal(draftVerdict, [source, viewRanges, composing, deferredComment, deferredReplacements])
   const verdict = submission.value
   if (!present.mounted || !view) return null
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useMemo, useRef, useState, type RefObject } from 'react'
+import { act, useMemo, useRef, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Root } from 'react-dom/client'
 import { analyzeMarkdown } from '../document/markdown/analyze'

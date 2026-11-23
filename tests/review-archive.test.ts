@@ -275,7 +275,7 @@ describe('resolved discussion archive', () => {
     const result = resolve('{==quote==}{>>@A: note<<}')
     expect(scan(result)).toEqual([])
     expect(result.match(tokenPattern)).toBeNull()
-    const blocks = await segmentBlocks(result)
+    const blocks = segmentBlocks(result)
     const archive = blocks.find((block) => block.kind === 'html')
     expect(archive?.translatable).toBe(false)
     expect(blocks.filter((block) => block.translatable).map((block) => block.text)).toEqual(['quote'])

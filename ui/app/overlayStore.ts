@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { create } from 'zustand'
 
 /**
@@ -47,7 +47,9 @@ export function useOverlayOpen(overlay: Overlay, owner: string | null = null): b
 export function useOverlayControl(overlay: Overlay, owner: string | null = null): [boolean, (next: boolean) => void] {
   const open = useOverlayOpen(overlay, owner)
   useEffect(() => () => closeOverlay(overlay), [overlay])
-  return [open, (next) => { if (next) openOverlay(overlay, owner); else closeOverlay(overlay) }]
+  const setOpen = useCallback((next: boolean) => { if (next) openOverlay(overlay, owner); else closeOverlay(overlay) },
+    [overlay, owner])
+  return [open, setOpen]
 }
 
 /** Opens or refocuses Find for the active document. */

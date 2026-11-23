@@ -73,7 +73,7 @@ export function TranslatedSelection({ containerRef, sessionId, artifact, authorT
       document.removeEventListener('selectionchange', change)
       scrollTarget.removeEventListener('scroll', change)
     }
-  }, [containerRef, artifact])
+  }, [containerRef, artifact, setSelection])
   // A retained draft reappears beside its block, or below the reading line when the block is absent.
   useLayoutEffect(() => {
     if (!selection || placement) return
